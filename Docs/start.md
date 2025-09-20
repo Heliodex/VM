@@ -6,7 +6,7 @@ There are many ways to compare the tools used to write software. One of these co
 
 In computer science, these terms are most commonly used to signify how far abstracted away the tool is from the hardware it runs on. High-level tools are characterised by generalisation of problems, automatic handling of underlying system operations, portability, and reliance on low-level tools, whereas low-level tools tend to provide control over specific system details, performance, and specialisation for particular types of system.
 
-This diagram will be used to illustrate the relationship between high-level and low-level tools. Positions on the chart are extremely simplified and arguable, precision could be improved by adding more dimensions or factors such as complexity.
+The following diagram will be used to illustrate the relationship between high-level and low-level tools. Positions on the chart are extremely simplified and arguable, precision could be improved by adding more dimensions or factors such as complexity.
 
 <img src="../Assets/Level1.svg" height="350" alt="Diagram showing high-level at the top and low-level at the bottom" />
 
@@ -22,13 +22,18 @@ Regardless of which end a system builds from, the ability to build on top of exi
 
 Let's take 2 examples of systems for expressing computations: lambda calculus and Turing machines.
 
-The untyped lambda calculus is built only from functions, parameters, and applications. All data must be expressed as parameters or functions, and expressions are evaluated using β-reduction, repeated substitution of parameters for their values.
+The untyped lambda calculus is built only from functions, parameters, and applications. All data must be expressed as parameters or functions, and expressions are evaluated using β-reduction &ndash; repeated substitution of parameters for their values.  
+Each function takes 1 parameter and results in 1 output value, both of which are functions, as functions are the only method of expressing data. Functions can be combined to create multi-parameter functions and multiple outputs, and recursion can be used to express iteration.
 
-The Turing machine is built only from an infinite tape of symbols and a head that can read and toggle symbols on the tape at its location and move left or right. The behaviour of the head is controlled by a machine that changes its state based on its current state and the symbol it reads, and programs are evaluated by letting the state machine run until it halts.
+The Turing machine is built only from a set of infinite tapes of symbols from its alphabet and a head for each tape that can read and change symbols on the tape at its location and move left or right. The behaviour of the heads are controlled by a machine that changes its state based on its current state and the symbol it reads, and programs are evaluated by letting the state machine run until it halts.  
+The simplest Turing machine has 1 tape and 2 symbols in its alphabet. The tape can also be semi-infinite, that is having only 1 end, though a truly infinite tape can be simpler to reason about as the behaviour at the end of the tape doesn't need to be considered.
 
 Lambda calculus is easily representable in standard mathematics, with standard function notation and parameters. A Turing machine is easily representable in machine code, with a section of memory for the tape and a table for defining possible states. As such, the systems can be thought of as high-level and low-level respectively.
 
 <img src="../Assets/Level5.svg" height="350" alt="A diagram showing lambda calculus as high-level and turing machines as low-level" />
+
+These systems, easy to think of as worlds apart, share some remarkable similarities. The Halting problem states that, for any input program or formula, there is no algorithm to determine whether it will complete, resolve to a value, or halt execution, or whether it will run forever without completing. Both lambda calculus and Turing machines are subject to the Halting problem: in lambda calculus, an expression can evaluate to itself or another expression containing itself, and a Turing machine can enter a loop of states that never reaches a halting state.  
+If there exists an algorithm to determine whether an input to any computational system will halt, then the computational system cannot be Turing complete. This does not mean that the system is not useful, and any Turing complete system can be restricted to a non-Turing complete subset of itself. Take, for example, a turing machine that halts after a N state transitions, or a lambda calculus that disallows more than N β-reductions. For a large enough N these systems might be able to calculate every practical computation problem in the universe, though it will always be possible to construct a theoretical problem requiring more than N transitions/reductions to solve.
 
 The Church-Turing thesis shows that these 2 models of computation have equivalent computational power, and that each can simulate the other &ndash; they are equal.
 
@@ -36,9 +41,9 @@ This shows there's nothing inherently preventing software from going in the oppo
 
 <img src="../Assets/Level3.svg" height="350" alt="A similar diagram showing a low-level simulator built on top of a high-level interpreter" />
 
- If accurate enough, the tools used to build the system could then be built on top of the simulator. This could be done any number of times, resulting in an infinite loop of simulators built on top of themselves. This is an extremely powerful concept, though in practice isn't useful if a system isn't built with this in mind, as there will be a loss of efficiency at each level, eventually resulting in a program that is too slow (read: will not complete in the expected lifetime of the universe).
+ If accurate enough, the tools used to build the system could then be built on top of the simulator. This could be done any number of times, resulting in an infinite loop of simulators built on top of themselves. This is an extremely powerful concept, though in practice isn't useful if a system isn't built with this in mind, as there will be a loss of efficiency at each level, eventually resulting in a program that is too slow (will not complete in the expected lifetime of the universe).
 
- Any simulation of a universe which contains a model of the machine used to run it cannot have the simulated machine run as fast as the physical machine, as every simulation has some level of overhead. However, it is possible to get remarkably close, which I will expand on in future.
+ Any simulation of a universe which contains a model of the machine used to run it cannot have the simulated machine run as fast as the physical machine, as every simulation has some level of overhead. However, it is possible to get remarkably close, which will be expanded on in later documents.
 
  ## Virtual machines
 
@@ -48,3 +53,8 @@ This shows there's nothing inherently preventing software from going in the oppo
 
  In some cases, when writing programs targeting a certain VM, the underlying system and its implementation can be ignored entirely. An entire world's worth of software can be built without caring about low-level implementation details &ndash; the floor can be raised and what is 'low-level' can be reconsidered, in a kind of ignorance that provides strength.
 
+The smaller and simpler the design and implementation of a VM is, the more portable it and its suite of software on top of it becomes, and the easier it is to reason about the system as a whole, generally making it easier to write and maintain software for that VM.
+
+<img src="../Assets/Hourglass.svg" height="350" alt="Hourglass diagram, showing the VM implementation built upon a platform layer, hosting the VM and its software ecosystem above it" />
+
+After the design is complete and implementations are widespread, it may also be possible to remove the lower cone from the diagram entirely by providing a direct hardware implementation, a kind of VMPU, if its design is suited well enough for it.
