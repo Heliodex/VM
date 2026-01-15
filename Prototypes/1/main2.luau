@@ -8,31 +8,20 @@ type Var = {
 type Thing = Pt | Var
 type Pt = {
 	read type: "pt",
-	read eval: boolean,
-	read p1: Thing,
-	read p2: Thing,
+	read _1: Thing,
+	read _2: Thing,
 }
 
 local function var(name: string): Var
 	return table.freeze { type = "var", name = name } :: Var
 end
 
-local function pt(eval: boolean, p1: Thing, p2: Thing): Pt
-	return table.freeze { type = "pt", eval = eval, p1 = p1, p2 = p2 } :: Pt
-end
-
-local function app(p1: Thing, p2: Thing): Pt
-	return pt(true, p1, p2)
-end
-
-local function fn(p1: Thing, p2: Thing): Pt
-	return pt(false, p1, p2)
+local function p(a1: Thing, a2: Thing): Pt
+	return table.freeze { type = "pt", _1 = a1, _2 = a2 } :: Pt
 end
 
 local function view(e: Thing): string
-	return if e.type == "var"
-		then e.name
-		else `{if e.eval then "|" else "λ"}{view(e.p1)}{view(e.p2)}`
+	return if e.type == "var" then e.name else `({view(e._1)}{view(e._2)})`
 end
 
 local function equalVar(a: Var, b: Var): boolean
@@ -42,7 +31,7 @@ end
 local equal
 
 local function equalPt(a: Pt, b: Pt): boolean
-	return equal(a.p1, b.p1) and equal(a.p2, b.p2)
+	return equal(a._1, b._1) and equal(a._2, b._2)
 end
 
 function equal(a: Thing, b: Thing): boolean
@@ -52,55 +41,40 @@ function equal(a: Thing, b: Thing): boolean
 		else false
 end
 
-local function subVar(e: Var, from: Thing, to: Thing): Thing
-	return if from.type == "var" and e.name == from.name then to else e
-end
-
-local sub
-
-local function subPt(e: Pt, from: Thing, to: Thing): Thing
+local function sub(e: Thing, from: Thing, to: Thing): Thing
 	return if equal(e, from)
 		then to
-		else pt(e.eval, sub(e.p1, from, to), sub(e.p2, from, to))
-end
-
-function sub(e: Thing, from: Thing, to: Thing): Thing
-	return if e.type == "var" then subVar(e, from, to) else subPt(e, from, to)
+		elseif e.type == "var" then e
+		else p(sub(e._1, from, to), sub(e._2, from, to))
 end
 
 local function beta(e: Pt): Thing
-	return if e.p1.type == "var"
-		then e
-		elseif e.p1.eval then app(beta(e.p1), e.p2)
-		else sub(e.p1.p2, e.p1.p1, e.p2)
+	return if e._1.type == "var" then e else sub(e._1._2, e._1._1, e._2)
 end
 
 local function reduce(e: Thing): Thing
-	print("Reduce", view(e))
-	if e.type ~= "pt" or not e.eval then
+	print("-", view(e))
+	if e.type == "var" then
 		return e
 	end
 	local newe = beta(e)
 	return if equal(newe, e) then e else reduce(newe)
 end
 
-local ltrue = fn(var "a", fn(var "b", var "a"))
-local lfalse = fn(var "a", fn(var "b", var "b"))
+local A, B, C, D, E, F, G =
+	var "A", var "B", var "C", var "D", var "E", var "F", var "G"
 
 local tests = {
-	app(app(ltrue, var "x"), var "y"),
-	app(app(lfalse, var "x"), var "y"),
-	app(app(app(ltrue, var "x"), var "y"), var "z"), -- app of a var to a var
-	app(fn(app(var "x", var "y"), var "z"), app(var "x", var "y")),
-	app(
-		fn(app(var "x", var "y"), app(var "z", app(var "x", var "y"))),
-		var "w"
-	),
-	app(fn(fn(var "x", var "y"), app(var "z", fn(var "x", var "y"))), var "w"),
+	A,
+	p(A, B),
+	p(A, p(B, C)),
+	p(p(B, C), A),
+	p(p(C, p(D, E)), A),
+	p(p(C, p(D, C)), A),
+	p(p(C, p(C, C)), A),
 }
 
 for i, e in tests do
-	print()
 	print(i)
 	reduce(e)
 end
