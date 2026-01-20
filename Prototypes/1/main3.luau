@@ -1,26 +1,76 @@
 --!strict
 
 type Num = {
-	read type: "num",
+	read type: "num", -- @
 	read value: number,
 }
-type Thing = Pt | Num
-type Pt = {
-	read type: "pt",
-	read _1: Thing,
-	read _2: Thing,
+type Thing = Set | Num
+type Set = {
+	read type: "set", -- $
+	read things: { [string]: boolean },
 }
+
+local function serialise(t: Thing): string
+	if t.type == "num" then
+		return tostring(t.value)
+	end
+
+	local elements = {}
+	for key, _ in t.things do
+		table.insert(elements, key)
+	end
+	table.sort(elements)
+	return "{" .. table.concat(elements, " ") .. "}"
+end
 
 local function num(value: number): Num
 	return table.freeze { type = "num", value = value } :: Num
 end
 
-local function p(a1: Thing, a2: Thing): Pt
-	return table.freeze { type = "pt", _1 = a1, _2 = a2 } :: Pt
+local function set(things: { Thing }): Set
+	local thingSet = {}
+	for _, t in things do
+		thingSet[serialise(t)] = true
+	end
+	return table.freeze { type = "set", things = table.freeze(thingSet) } :: Set
 end
 
-local function view(e: Thing): string
-	return if e.type == "num" then tostring(e.value) else `({view(e._1)} {view(e._2)})`
+local function deserialise(s: string): Thing
+	if string.sub(s, 1, 1) ~= "{" then
+		local n = tonumber(s)
+		if n == nil then
+			error(`Invalid number: {s}`)
+		end
+		return num(n)
+	end
+
+	local news = string.sub(s, 2, -2)
+	local elements = {}
+
+	local lastElem: { string } = {}
+	local braceLevel = 0
+	for i = 1, #news do
+		local c = string.sub(news, i, i)
+		if c == " " and braceLevel == 0 then
+			if #lastElem > 0 then
+				table.insert(elements, deserialise(table.concat(lastElem)))
+				lastElem = {}
+			end
+			continue
+		end
+
+		if c == "{" then
+			braceLevel += 1
+		elseif c == "}" then
+			braceLevel -= 1
+		end
+		table.insert(lastElem, c)
+	end
+	if #lastElem > 0 then
+		table.insert(elements, deserialise(table.concat(lastElem)))
+	end
+
+	return set(elements)
 end
 
 local function equalNum(a: Num, b: Num): boolean
@@ -29,33 +79,85 @@ end
 
 local equal
 
-local function equalPt(a: Pt, b: Pt): boolean
-	return equal(a._1, b._1) and equal(a._2, b._2)
+local function equalSet(a: Set, b: Set): boolean
+	for key, _ in a.things do
+		if not b.things[key] then
+			return false
+		end
+	end
+
+	for key, _ in b.things do
+		if not a.things[key] then
+			return false
+		end
+	end
+
+	return true
 end
 
 function equal(a: Thing, b: Thing): boolean
 	return if a.type == "num" and b.type == "num"
 		then equalNum(a, b)
-		elseif a.type == "pt" and b.type == "pt" then equalPt(a, b)
+		elseif a.type == "set" and b.type == "set" then equalSet(a, b)
 		else false
 end
 
-local function reduce(e: Thing): Thing
-	print("-", view(e))
+local function size(s: Set): number
+	local i = 0
+	for _ in s.things do
+		i += 1
+	end
+	return i
+end
+
+local function reduce1(e: Thing, depth: number): Thing?
+	print(string.rep("  ", depth) .. "-", serialise(e))
 	if e.type == "num" then
-		return e
+		return e -- *a:@ -> a
 	end
 
-	return e
+	if size(e) == 0 then
+		return e -- *{} -> a
+	end
+
+	if size(e) == 1 then
+		-- extract the single element
+		local only: string
+		for k, _ in e.things do
+			only = k
+		end
+		return reduce1(deserialise(only), depth + 1) -- *{a} -> *a
+	end
+
+	return nil
+end
+
+local function reduce(e: Thing): Thing?
+	return reduce1(e, 0)
 end
 
 local tests = {
-	p(num(1), num(2)),
-	p(p(num(3), num(4)), num(5)),
-	p(num(6), p(num(7), num(8))),
+	num(0),
+	set {},
+	set { num(1) },
+	set { set {}, set { set {} } },
 }
 
+-- test serialise and deserialise
 for _, test in tests do
-	print("=", view(reduce(test)))
+	local s = serialise(test)
+	local d = deserialise(s)
+	if not equal(test, d) then
+		print(`Serialization round-trip failed for {s}`)
+		return
+	end
 end
 
+for _, test in tests do
+	local rd = reduce(test)
+	if rd == nil then
+		print "No reduction"
+		continue
+	end
+	print("=", serialise(rd))
+end
