@@ -9,10 +9,6 @@ type Set = {
 	read type: "$",
 	read things: { [string]: boolean },
 }
-type Any = {
-	read type: "any",
-}
-local any = table.freeze { type = "any" } :: Any
 
 local NUM: "@" = "@"
 local SET: "$" = "$"
@@ -119,23 +115,8 @@ local function size(s: Set): number
 	return i
 end
 
-local function match(t: Thing, pattern: Thing): boolean
-	if pattern.type == "any" then
-		return true
-	end
-
-	if t.type == NUM and pattern.type == NUM then
-		return t.value == pattern.value
-	end
-
-	if t.type == SET and pattern.type == SET then
-	end
-
-	return false
-end
-
 local function reduce1(e: Thing, depth: number): Thing?
-	print(string.rep("  ", depth) .. "-", serialise(e))
+	print(string.rep(" ", depth) .. "-", serialise(e))
 	if e.type == NUM then
 		return e -- *a:@ -> a
 	end
@@ -153,8 +134,41 @@ local function reduce1(e: Thing, depth: number): Thing?
 		return reduce1(deserialise(only), depth + 1) -- *{a} -> *a
 	end
 
-	if size(e) == 2 then
-		-- now we're talking
+	if size(e) ~= 2 then
+		return nil
+	end
+
+	-- now we're talking
+	-- the set needs to contain a Num and a Set
+
+	local n: Num?, s: Set?
+
+	for k, _ in e.things do
+		local t = deserialise(k)
+		if t.type == NUM then
+			n = t
+		else
+			s = t
+		end
+	end
+
+	if not n then
+		return nil
+	end
+	if not s then
+		return nil
+	end
+
+	-- print("Found num and set:", serialise(n), serialise(s))
+
+	local st = reduce1(s, depth + 1)
+	if not st then
+		return nil
+	end
+
+	-- opcodes
+	if n.value == 1 and st.type == NUM then
+		return num(st.value + 1) -- *{1 a:@} -> a + 1
 	end
 
 	return nil
@@ -171,6 +185,7 @@ local tests = {
 	set { empty, set { empty } },
 	set { empty, set { set { num(1) } } },
 	set { num(1), set { set { num(1) } } },
+	set { num(1), set { num(1) } },
 }
 
 -- test serialise and deserialise
@@ -187,7 +202,9 @@ for _, test in tests do
 	local rd = reduce(test)
 	if rd == nil then
 		print "No reduction"
+		print()
 		continue
 	end
 	print("=", serialise(rd))
+	print()
 end
