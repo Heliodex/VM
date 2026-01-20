@@ -72,6 +72,15 @@ local tests = {
 	p(p(C, p(D, E)), A),
 	p(p(C, p(D, C)), A),
 	p(p(C, p(C, C)), A),
+	p(p(C, p(C, p(B, C))), A),
+	p(p(C, p(C, p(B, C))), p(B, C)),
+	p(p(C, p(D, p(B, C))), p(B, A)),
+	p(p(A, B), p(C, D)),
+	p(p(B, p(B, B)), p(A, B)),
+	p(p(B, p(B, B)), p(p(A, B), p(B, B))),
+	p(p(B, p(B, B)), p(p(A, B), p(A, B))),
+	p(p(B, p(B, B)), p(p(A, B), p(A, B))),
+	p(p(B, p(p(B, B), p(B, B))), p(p(A, B), p(A, B))),
 }
 
 for i, e in tests do
