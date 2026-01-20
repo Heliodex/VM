@@ -1,17 +1,24 @@
 --!strict
 
 type Num = {
-	read type: "num", -- @
+	read type: "@",
 	read value: number,
 }
 type Thing = Set | Num
 type Set = {
-	read type: "set", -- $
+	read type: "$",
 	read things: { [string]: boolean },
 }
+type Any = {
+	read type: "any",
+}
+local any = table.freeze { type = "any" } :: Any
+
+local NUM: "@" = "@"
+local SET: "$" = "$"
 
 local function serialise(t: Thing): string
-	if t.type == "num" then
+	if t.type == NUM then
 		return tostring(t.value)
 	end
 
@@ -24,7 +31,7 @@ local function serialise(t: Thing): string
 end
 
 local function num(value: number): Num
-	return table.freeze { type = "num", value = value } :: Num
+	return table.freeze { type = NUM, value = value } :: Num
 end
 
 local function set(things: { Thing }): Set
@@ -32,8 +39,10 @@ local function set(things: { Thing }): Set
 	for _, t in things do
 		thingSet[serialise(t)] = true
 	end
-	return table.freeze { type = "set", things = table.freeze(thingSet) } :: Set
+	return table.freeze { type = SET, things = table.freeze(thingSet) } :: Set
 end
+
+local empty = set {}
 
 local function deserialise(s: string): Thing
 	if string.sub(s, 1, 1) ~= "{" then
@@ -96,9 +105,9 @@ local function equalSet(a: Set, b: Set): boolean
 end
 
 function equal(a: Thing, b: Thing): boolean
-	return if a.type == "num" and b.type == "num"
+	return if a.type == NUM and b.type == NUM
 		then equalNum(a, b)
-		elseif a.type == "set" and b.type == "set" then equalSet(a, b)
+		elseif a.type == SET and b.type == SET then equalSet(a, b)
 		else false
 end
 
@@ -110,14 +119,29 @@ local function size(s: Set): number
 	return i
 end
 
+local function match(t: Thing, pattern: Thing): boolean
+	if pattern.type == "any" then
+		return true
+	end
+
+	if t.type == NUM and pattern.type == NUM then
+		return t.value == pattern.value
+	end
+
+	if t.type == SET and pattern.type == SET then
+	end
+
+	return false
+end
+
 local function reduce1(e: Thing, depth: number): Thing?
 	print(string.rep("  ", depth) .. "-", serialise(e))
-	if e.type == "num" then
+	if e.type == NUM then
 		return e -- *a:@ -> a
 	end
 
 	if size(e) == 0 then
-		return e -- *{} -> a
+		return e -- *{} -> {}
 	end
 
 	if size(e) == 1 then
@@ -129,6 +153,10 @@ local function reduce1(e: Thing, depth: number): Thing?
 		return reduce1(deserialise(only), depth + 1) -- *{a} -> *a
 	end
 
+	if size(e) == 2 then
+		-- now we're talking
+	end
+
 	return nil
 end
 
@@ -138,9 +166,11 @@ end
 
 local tests = {
 	num(0),
-	set {},
+	empty,
 	set { num(1) },
-	set { set {}, set { set {} } },
+	set { empty, set { empty } },
+	set { empty, set { set { num(1) } } },
+	set { num(1), set { set { num(1) } } },
 }
 
 -- test serialise and deserialise
