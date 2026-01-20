@@ -115,6 +115,45 @@ local function size(s: Set): number
 	return i
 end
 
+local function arraySetTable(arraySet: Set, red: (Set) -> Thing?): { Thing }?
+	local tab = {}
+
+	for part in arraySet.things do
+		local p = deserialise(part)
+		if p.type ~= SET then
+			return nil
+		end
+
+		-- this part must contain a Num and a Set
+		local n2: Num?, s2: Set?
+
+		for k, _ in p.things do
+			local t = deserialise(k)
+			if t.type == NUM then
+				n2 = t
+			else
+				s2 = t
+			end
+		end
+
+		if not n2 then
+			return nil
+		end
+		if not s2 then
+			return nil
+		end
+
+		local st = red(s2)
+		if not st then
+			return nil
+		end
+
+		tab[n2.value] = st
+	end
+
+	return tab
+end
+
 local function reduce1(e: Thing, depth: number): Thing?
 	print(string.rep(" ", depth) .. "-", serialise(e))
 	if e.type == NUM then
@@ -127,6 +166,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 
 	if size(e) == 1 then
 		-- extract the single element
+		-- kind of like a pin<>
 		local only: string
 		for k, _ in e.things do
 			only = k
@@ -161,14 +201,38 @@ local function reduce1(e: Thing, depth: number): Thing?
 
 	-- print("Found num and set:", serialise(n), serialise(s))
 
-	local st = reduce1(s, depth + 1)
-	if not st then
-		return nil
+	-- opcodes
+
+	-- 0: set size
+	-- til the mathematical term for this is cardinality
+	if n.value == 0 then
+		return num(size(s)) -- *{0 a:$} -> size(a)
 	end
 
-	-- opcodes
-	if n.value == 1 and st.type == NUM then
+	-- 1: increment
+	-- I was going to make this add up all the numbers in a set. Tried it, surprise! It's not useful at all because it only works if every number is different.
+	if n.value == 1 then
+		local st = reduce1(s, depth + 1)
+		if not st or st.type ~= NUM then
+			return nil
+		end
 		return num(st.value + 1) -- *{1 a:@} -> a + 1
+	end
+
+	if n.value == 2 then
+		local ast = arraySetTable(s, function(sube: Set): Thing?
+			return reduce1(sube, depth + 1)
+		end)
+		if not ast then
+			return nil
+		end
+
+		print "array set table"
+		for i, v in ast do
+			print(" ", i, serialise(v))
+		end
+
+		return nil
 	end
 
 	return nil
@@ -178,33 +242,67 @@ local function reduce(e: Thing): Thing?
 	return reduce1(e, 0)
 end
 
+-- array: {{1 {a}} {2{b}} {3 {c}}}
+
 local tests = {
-	num(0),
-	empty,
-	set { num(1) },
-	set { empty, set { empty } },
-	set { empty, set { set { num(1) } } },
-	set { num(1), set { set { num(1) } } },
-	set { num(1), set { num(1) } },
+	-- generic
+	{
+		num(0),
+		empty,
+		set { num(1) },
+		set { empty, set { empty } },
+		set { empty, set { set { num(1) } } },
+	},
+
+	-- 0
+	{
+		set { num(0), set {} },
+		set { num(0), set { num(1) } },
+		set { num(0), set { num(1), num(2), num(3) } },
+	},
+
+	-- 1
+	{
+		set { num(1), set { set { num(1) } } },
+		set { num(1), set { num(1) } },
+		set { num(1), set { set { num(1), set { num(40) } } } },
+	},
+
+	-- 2
+	{
+		set {
+			num(2),
+			set {
+				set { num(1), set { num(1) } },
+				set { num(2), set { num(2) } },
+				set { num(3), set { num(3) } },
+			},
+		},
+	},
 }
 
 -- test serialise and deserialise
-for _, test in tests do
-	local s = serialise(test)
-	local d = deserialise(s)
-	if not equal(test, d) then
-		print(`Serialization round-trip failed for {s}`)
-		return
+for i, testgroup in tests do
+	for _, test in testgroup do
+		local s = serialise(test)
+		local d = deserialise(s)
+		if not equal(test, d) then
+			print(`Serialization round-trip failed for {s}`)
+			return
+		end
 	end
 end
 
-for _, test in tests do
-	local rd = reduce(test)
-	if rd == nil then
-		print "No reduction"
+for i, testgroup in tests do
+	print("Tests group", i)
+	for _, test in testgroup do
+		local rd = reduce(test)
+		if rd == nil then
+			print "~~"
+			print()
+			continue
+		end
+		print("=", serialise(rd))
 		print()
-		continue
 	end
-	print("=", serialise(rd))
-	print()
 end
