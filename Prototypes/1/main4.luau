@@ -115,6 +115,8 @@ local function size(s: List): number
 	return #s.things
 end
 
+local SIZE, TAKE, SUM = 1, 2, 3
+
 local function reduce1(e: Thing, depth: number): Thing?
 	print(string.rep(" ", depth) .. "-", serialise(e))
 	if e.type == NUM then
@@ -154,13 +156,13 @@ local function reduce1(e: Thing, depth: number): Thing?
 
 	-- opcodes
 
-	-- 1: list size
-	if n.value == 1 then
-		return num(size(l)) -- *{1 a:$} -> size(a)
+	-- size
+	if n.value == SIZE then
+		return num(size(l)) -- *{SIZE a:$} -> size(a)
 	end
 
-	-- 2: take
-	if n.value == 2 then
+	-- take
+	if n.value == TAKE then
 		if size(l) ~= 2 then
 			return nil
 		end
@@ -181,20 +183,11 @@ local function reduce1(e: Thing, depth: number): Thing?
 		if not v then
 			return nil -- necessary?
 		end
-		return v -- *{2 {a:@ b:$}} -> a[b]
+		return v -- *{TAKE {a:@ b:$}} -> a[b]
 	end
 
-	-- 3: increment
-	if n.value == 3 then
-		local rl = reduce1(l, depth + 1)
-		if not rl or rl.type ~= NUM then
-			return nil
-		end
-		return num(rl.value + 1) -- *{3 a:$} -> *a + 1
-	end
-
-	-- 4: sum
-	if n.value == 4 then
+	-- sum
+	if n.value == SUM then
 		local total = 0
 
 		for _, e in l.things do
@@ -205,7 +198,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 
 			total += re.value
 		end
-		return num(total) -- *{4 {...a:$} -> sum(...*a)}
+		return num(total) -- *{SUM {...a:$} -> sum(...*a)}
 	end
 
 	return nil
@@ -240,84 +233,78 @@ local tests: {
 		eval = list { empty, list { list { num(1) } } },
 	},
 
-	-- 1
+	-- size
 	{
-		eval = list { num(1), num(0) },
+		eval = list { num(SIZE), num(0) },
 	},
 	{
-		eval = list { num(1), list {} },
+		eval = list { num(SIZE), list {} },
 		res = num(0),
 	},
 	{
-		eval = list { num(1), list { num(1) } },
+		eval = list { num(SIZE), list { num(1) } },
 		res = num(1),
 	},
 	{
-		eval = list { num(1), list { list {}, num(1), list {} } },
+		eval = list { num(SIZE), list { list {}, num(1), list {} } },
 		res = num(3),
 	},
 	{
-		eval = list { num(1), list { list {}, list {} } },
+		eval = list { num(SIZE), list { list {}, list {} } },
 		res = num(2),
 	},
 
-	-- 2
+	-- take
+	{
+		eval = list { num(TAKE), num(0) },
+	},
+	{
+		eval = list { num(TAKE), list { num(5) } },
+	},
 	{ -- take 5
-		eval = list { num(2), list { num(0), list { num(5) } } },
+		eval = list { num(TAKE), list { num(0), list { num(5) } } },
 		res = num(5),
 	},
 
-	-- 3
+	-- sum
 	{
-		eval = list { num(3), list { num(2), list { num(0), list { num(5) } } } },
-		res = num(6),
+		eval = list { num(SUM), num(0) },
 	},
 	{
-		eval = list { num(3), list { num(2), list { num(0), list { num(0) } } } },
-		res = num(1),
-	},
-	{
-		eval = list {
-			num(3),
-			list { num(2), list { num(0), list { num(999) } } },
-		},
-		res = num(1000),
-	},
-
-	-- 4
-	{
-		eval = list {
-			num(4),
-			list { num(0), num(0), num(0) },
-		},
+		eval = list { num(SUM), list {} },
 		res = num(0),
 	},
 	{
-		eval = list {
-			num(4),
-			list { num(1), num(2), num(3) },
-		},
+		eval = list { num(SUM), list { num(0) } },
+		res = num(0),
+	},
+	{
+		eval = list { num(SUM), list { num(0), num(0), num(0) } },
+		res = num(0),
+	},
+	{
+		eval = list { num(SUM), list { num(1), num(2), num(3) } },
 		res = num(6),
 	},
 	{
 		eval = list {
-			num(4),
+			num(SUM),
 			list {
 				num(1),
 				num(2),
-				list { num(2), list { num(0), list { num(5) } } },
+				list { num(TAKE), list { num(0), list { num(5) } } },
 			},
 		},
 		res = num(8),
 	},
 	{
 		eval = list {
-			num(4),
+			num(SUM),
 			list {
 				num(1),
 				num(2),
 				list {
-					num(4),
+					num(SUM),
 					list { num(1), num(2), num(3) },
 				},
 			},
