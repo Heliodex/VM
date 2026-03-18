@@ -242,7 +242,7 @@ local function reduce(e: Thing): Thing?
 	return reduce1(e, 0)
 end
 
--- array: {{1 {a}} {2{b}} {3 {c}}}
+-- array: {{1 {a}} {2 {b}} {3 {c}}}
 
 local tests = {
 	-- generic

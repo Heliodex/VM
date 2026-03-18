@@ -45,7 +45,7 @@ This shows there is nothing inherently preventing software from going in the opp
 
  Any simulation of a universe which contains a model of the machine used to run it cannot have the simulated machine run as fast as the physical machine, as every simulation has some level of overhead. However, it is possible to get remarkably close, which will be expanded on later.
 
- ## Virtual machines
+## Virtual machines
 
  A virtual machine is a software representation of a computer system. These can be split into 2 categories: system virtual machines, which accurately simulate a real-world computer system, and process virtual machines, which simulate an abstract environment that doesn't exist in hardware. This series of documents will focus chiefly on process virtual machines, hereinafter referred to as just VMs.
 
