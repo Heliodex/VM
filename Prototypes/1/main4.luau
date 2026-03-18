@@ -204,8 +204,16 @@ local function reduce1(e: Thing, depth: number): Thing?
 	return nil
 end
 
-local function reduce(e: Thing): Thing?
-	return reduce1(e, 0)
+function a_size(a: Thing): Thing
+	return list { num(SIZE), a }
+end
+
+function a_take(a: Thing): Thing
+	return list { num(TAKE), a }
+end
+
+function a_sum(a: Thing): Thing
+	return list { num(SUM), a }
 end
 
 local tests: {
@@ -235,80 +243,71 @@ local tests: {
 
 	-- size
 	{
-		eval = list { num(SIZE), num(0) },
+		eval = a_size(num(0)),
 	},
 	{
-		eval = list { num(SIZE), list {} },
+		eval = a_size(empty),
 		res = num(0),
 	},
 	{
-		eval = list { num(SIZE), list { num(1) } },
+		eval = a_size(list { num(1) }),
 		res = num(1),
 	},
 	{
-		eval = list { num(SIZE), list { list {}, num(1), list {} } },
+		eval = a_size(list { empty, num(1), empty }),
 		res = num(3),
 	},
 	{
-		eval = list { num(SIZE), list { list {}, list {} } },
+		eval = a_size(list { empty, empty }),
 		res = num(2),
 	},
 
 	-- take
 	{
-		eval = list { num(TAKE), num(0) },
+		eval = a_take(num(0)),
 	},
 	{
-		eval = list { num(TAKE), list { num(5) } },
+		eval = a_take(list { num(5) }),
 	},
 	{ -- take 5
-		eval = list { num(TAKE), list { num(0), list { num(5) } } },
+		eval = a_take(list { num(0), list { num(5) } }),
 		res = num(5),
 	},
 
 	-- sum
 	{
-		eval = list { num(SUM), num(0) },
+		eval = a_sum(num(0)),
 	},
 	{
-		eval = list { num(SUM), list {} },
+		eval = a_sum(empty),
 		res = num(0),
 	},
 	{
-		eval = list { num(SUM), list { num(0) } },
+		eval = a_sum(list { num(0) }),
 		res = num(0),
 	},
 	{
-		eval = list { num(SUM), list { num(0), num(0), num(0) } },
+		eval = a_sum(list { num(0), num(0), num(0) }),
 		res = num(0),
 	},
 	{
-		eval = list { num(SUM), list { num(1), num(2), num(3) } },
+		eval = a_sum(list { num(1), num(2), num(3) }),
 		res = num(6),
 	},
 	{
-		eval = list {
-			num(SUM),
-			list {
-				num(1),
-				num(2),
-				list { num(TAKE), list { num(0), list { num(5) } } },
-			},
-		},
+		eval = a_sum(list {
+			num(1),
+			num(2),
+			a_take(list { num(0), list { num(5) } }),
+		}),
 		res = num(8),
 	},
 	{
-		eval = list {
-			num(SUM),
-			list {
-				num(1),
-				num(2),
-				list {
-					num(SUM),
-					list { num(1), num(2), num(3) },
-				},
-			},
-		},
+		eval = a_sum(list {
+			num(1),
+			num(2),
+			a_sum(list { num(1), num(2), num(3) }),
+		}),
 		res = num(9),
 	},
 }
@@ -326,6 +325,10 @@ for _, test in tests do
 			return
 		end
 	end
+end
+
+local function reduce(e: Thing): Thing?
+	return reduce1(e, 0)
 end
 
 for _, test in tests do
