@@ -115,7 +115,7 @@ local function size(s: List): number
 	return #s.things
 end
 
-local SIZE, TAKE, SUM = 1, 2, 3
+local SIZE, TAKE, SUM, CHECK = 1, 2, 3, 4
 
 local function reduce1(e: Thing, depth: number): Thing?
 	print(string.rep(" ", depth) .. "-", serialise(e))
@@ -199,6 +199,11 @@ local function reduce1(e: Thing, depth: number): Thing?
 			total += re.value
 		end
 		return num(total) -- *{SUM {...a:$} -> sum(...*a)}
+	end
+
+	-- check
+	if n.value == CHECK then
+		if 
 	end
 
 	return nil
@@ -309,6 +314,13 @@ local tests: {
 			a_sum(list { num(1), num(2), num(3) }),
 		}),
 		res = num(9),
+	},
+	{
+		eval = a_sum(list {
+			num(1),
+			num(2),
+			a_sum(num(0)),
+		}),
 	},
 }
 
