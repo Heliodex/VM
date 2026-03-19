@@ -117,7 +117,7 @@ end
 
 local TRUE, FALSE = num(0), num(1) -- loobeans
 
-local SIZE, TAKE, SUM, CHECK = 1, 2, 3, 4
+local SIZE, TAKE, SUM, CHECK, TYPE = 1, 2, 3, 4, 5
 
 local function reduce1(e: Thing, depth: number): Thing?
 	print(string.rep(" ", depth) .. "-", serialise(e))
@@ -222,6 +222,18 @@ local function reduce1(e: Thing, depth: number): Thing?
 		return TRUE
 	end
 
+	-- type
+	if n.value == TYPE then
+		local rv = reduce1(l, depth + 1)
+		if not rv then
+			return nil
+		end
+
+		return if rv.type == NUM then TRUE else FALSE
+		-- *{TYPE a:$} -> TRUE where *a:@
+		-- *{TYPE a:$} -> FALSE where *a:$
+	end
+
 	return nil
 end
 
@@ -239,6 +251,10 @@ end
 
 local function a_check(a: Thing): Thing
 	return list { num(CHECK), a }
+end
+
+local function a_type(a: Thing): Thing
+	return list { num(TYPE), a }
 end
 
 local tests: {
@@ -369,30 +385,43 @@ local tests: {
 		res = FALSE,
 	},
 	{
-		eval = a_check(
-			list {
-				a_take(list { num(0), list { empty } }),
-				a_take(list { num(0), list { empty } }),
-				a_take(list { num(0), list { empty } }),
-			}
-		),
+		eval = a_check(list {
+			a_take(list { num(0), list { empty } }),
+			a_take(list { num(0), list { empty } }),
+			a_take(list { num(0), list { empty } }),
+		}),
 		res = TRUE,
 	},
 	{
-		eval = a_check(
-			list { 
-				a_take(list { num(0), list { num(1), num(2) } }),
-				a_take(list { num(0), list { num(1), num(2) } }),
-			 }
-		),
+		eval = a_check(list {
+			a_take(list { num(0), list { num(1), num(2) } }),
+			a_take(list { num(0), list { num(1), num(2) } }),
+		}),
 		res = TRUE,
 	},
 	{
-		eval = a_check(
-			list { 
-				a_take(list { num(0), list { num(2), num(1) } }),
-				a_take(list { num(0), list { num(1), num(2) } }),
-			 }
+		eval = a_check(list {
+			a_take(list { num(0), list { num(2), num(1) } }),
+			a_take(list { num(0), list { num(1), num(2) } }),
+		}),
+		res = FALSE,
+	},
+
+	-- type
+	{
+		eval = a_type(empty),
+	},
+	{
+		eval = a_type(a_take(list { num(0), list { num(0) } })),
+		res = TRUE,
+	},
+	{
+		eval = a_type(a_take(list { num(0), list { empty } })),
+		res = FALSE,
+	},
+	{
+		eval = a_type(
+			a_take(list { num(0), list { list { num(1), num(2) } } })
 		),
 		res = FALSE,
 	},
