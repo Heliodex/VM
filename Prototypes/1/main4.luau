@@ -488,6 +488,55 @@ local tests: {
 		}),
 		res = list { num(1), num(2), num(3) },
 	},
+	{
+		eval = a_split(list {
+			num(SUM),
+			list {
+				list { num(1) },
+				list { num(2), num(3) },
+				list { num(4), num(5), num(6) },
+			},
+		}),
+		res = list { num(1), num(5), num(15) },
+	},
+	{
+		eval = a_split(list {
+			num(CHECK),
+			list {
+				empty,
+				list { num(0) },
+				list { num(0), num(0), num(0) },
+				list { num(0), num(1), num(0) },
+
+				list { num(0), a_take(list { num(0), list { empty } }) },
+				list {
+					a_take(list { num(0), list { empty } }),
+					a_take(list { num(0), list { empty } }),
+					a_take(list { num(0), list { empty } }),
+				},
+				list {
+					a_take(list { num(0), list { num(1), num(2) } }),
+					a_take(list { num(0), list { num(1), num(2) } }),
+				},
+				list {
+					a_take(list { num(0), list { num(2), num(1) } }),
+					a_take(list { num(0), list { num(1), num(2) } }),
+				},
+			},
+		}),
+		res = list { TRUE, TRUE, TRUE, FALSE, FALSE, TRUE, TRUE, FALSE },
+	},
+	{
+		eval = a_split(list {
+			num(CHECK),
+			list {
+				list { a_take(list { num(0), list { empty } }) },
+				list { a_take(list { num(0), list { list { num(0) } } }) },
+			},
+		}),
+		res = list { TRUE, TRUE },
+	},
+	
 }
 
 -- test serialise and deserialise
