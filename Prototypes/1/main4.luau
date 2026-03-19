@@ -89,14 +89,12 @@ end
 local equal
 
 local function equalList(a: List, b: List): boolean
-	for key, _ in a.things do
-		if not b.things[key] then
-			return false
-		end
+	if #a.things ~= #b.things then
+		return false
 	end
 
-	for key, _ in b.things do
-		if not a.things[key] then
+	for i, t in a.things do
+		if not equal(t, b.things[i]) then
 			return false
 		end
 	end
@@ -206,6 +204,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 	-- check
 	if n.value == CHECK then
 		local prev: Thing?
+		-- print "Comparing:"
 
 		for i, e in l.things do
 			local re = reduce1(e, depth + 1)
@@ -213,6 +212,11 @@ local function reduce1(e: Thing, depth: number): Thing?
 				return nil
 			end
 
+			-- print(
+			-- 	if prev then serialise(prev) else "nil",
+			-- 	serialise(re),
+			-- 	if prev then equal(prev, re) else "nil"
+			-- )
 			if prev and not equal(prev, re) then
 				return FALSE
 			end
@@ -430,15 +434,29 @@ local tests: {
 	},
 	{
 		eval = a_check(list {
-			a_take(list { num(0), list { num(1), num(2) } }),
-			a_take(list { num(0), list { num(1), num(2) } }),
+			a_take(list { num(0), list { num(1) } }),
+			a_take(list { num(0), list { num(1) } }),
 		}),
 		res = TRUE,
 	},
 	{
 		eval = a_check(list {
 			a_take(list { num(0), list { num(2), num(1) } }),
-			a_take(list { num(0), list { num(1), num(2) } }),
+			a_take(list { num(0), list { num(2), num(2) } }),
+		}),
+		res = TRUE,
+	},
+	{
+		eval = a_check(list {
+			a_take(list { num(0), list { list { num(2), num(1) } } }),
+			a_take(list { num(0), list { list { num(2), num(1) } } }),
+		}),
+		res = TRUE,
+	},
+	{
+		eval = a_check(list {
+			a_take(list { num(0), list { list { num(2), num(1) } } }),
+			a_take(list { num(0), list { list { num(2), num(2) } } }),
 		}),
 		res = FALSE,
 	},
@@ -460,6 +478,15 @@ local tests: {
 			a_take(list { num(0), list { list { num(1), num(2) } } })
 		),
 		res = FALSE,
+	},
+
+	{
+		eval = a_check(list {
+			a_type(a_take(list { num(0), list { list { num(0) } } })),
+			a_type(a_take(list { num(0), list { list { empty } } })),
+			a_type(a_take(list { num(0), list { list { num(1), num(2) } } })),
+		}),
+		res = TRUE,
 	},
 
 	-- split
@@ -523,6 +550,14 @@ local tests: {
 			list { a_take(list { num(0), list { list { num(0) } } }) },
 		})),
 		res = list { TRUE, TRUE },
+	},
+	{
+		eval = a_split(a_type(list {
+			a_take(list { num(0), list { num(0) } }),
+			a_take(list { num(0), list { empty } }),
+			a_take(list { num(0), list { list { num(1), num(2) } } }),
+		})),
+		res = list { TRUE, FALSE, FALSE },
 	},
 }
 
