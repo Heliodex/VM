@@ -353,6 +353,10 @@ local tests: {
 		eval = a_take(list { num(0), list { num(5) } }),
 		res = num(5),
 	},
+	{
+		eval = a_take(list { num(0), list { list { num(5) } } }),
+		res = list { num(5) },
+	},
 
 	-- sum
 	{
@@ -498,7 +502,7 @@ local tests: {
 	},
 	{
 		eval = a_split(list { num(0), empty }),
-		res = list {},
+		res = empty,
 	},
 	{
 		eval = a_split(a_size(list { empty })),
@@ -511,6 +515,13 @@ local tests: {
 			list { num(4), num(5), num(6) },
 		})),
 		res = list { num(1), num(2), num(3) },
+	},
+	{
+		eval = a_split(a_take(list {
+			list { num(0), list { num(5) } },
+			list { num(0), list { list { num(5) } } },
+		})),
+		res = list { num(5), list { num(5) } },
 	},
 	{
 		eval = a_split(a_sum(list {
@@ -559,6 +570,31 @@ local tests: {
 		})),
 		res = list { TRUE, FALSE, FALSE },
 	},
+
+	-- double split time
+	{
+		eval = a_split(a_split(list { list { num(0), empty } })),
+		res = list {
+			empty,
+		},
+	},
+	{
+		eval = a_split(a_split(list {
+			a_size(list {
+				list { num(1) },
+				list { num(2), num(3) },
+				list { num(4), num(5), num(6) },
+			}),
+			a_take(list {
+				list { num(0), list { list { num(1), num(2) } } },
+				list { num(0), list { empty } },
+			}),
+		})),
+		res = list {
+			list { num(1), num(2), num(3) },
+			list { list { num(1), num(2) }, empty },
+		},
+	},
 }
 
 -- test serialise and deserialise
@@ -595,5 +631,6 @@ for _, test in tests do
 	local expected = test.res and serialise(test.res)
 	if out ~= expected then
 		print(`Test failed: expected {expected}, got {out}`)
+		break
 	end
 end
