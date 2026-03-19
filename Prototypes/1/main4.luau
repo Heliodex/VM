@@ -88,7 +88,7 @@ end
 
 local equal
 
-local function equalSet(a: List, b: List): boolean
+local function equalList(a: List, b: List): boolean
 	for key, _ in a.things do
 		if not b.things[key] then
 			return false
@@ -107,13 +107,15 @@ end
 function equal(a: Thing, b: Thing): boolean
 	return if a.type == NUM and b.type == NUM
 		then equalNum(a, b)
-		elseif a.type == LIST and b.type == LIST then equalSet(a, b)
+		elseif a.type == LIST and b.type == LIST then equalList(a, b)
 		else false
 end
 
 local function size(s: List): number
 	return #s.things
 end
+
+local TRUE, FALSE = num(0), num(1) -- loobeans
 
 local SIZE, TAKE, SUM, CHECK = 1, 2, 3, 4
 
@@ -123,9 +125,9 @@ local function reduce1(e: Thing, depth: number): Thing?
 		return e -- *a:@ -> a
 	end
 
-	if size(e) == 0 then
-		return e -- *{} -> {}
-	end
+	-- if size(e) == 0 then
+	-- 	return e -- *{} -> {}
+	-- end
 
 	-- if size(e) == 1 then
 	-- 	-- extract the single element
@@ -191,7 +193,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 		local total = 0
 
 		for _, e in l.things do
-			local re = reduce1(e, depth + 2)
+			local re = reduce1(e, depth + 1)
 			if not re or re.type ~= NUM then
 				return nil
 			end
@@ -203,22 +205,40 @@ local function reduce1(e: Thing, depth: number): Thing?
 
 	-- check
 	if n.value == CHECK then
-		if 
+		local prev: Thing?
+
+		for i, e in l.things do
+			local re = reduce1(e, depth + 1)
+			if not re then
+				return nil
+			end
+
+			if prev and not equal(prev, re) then
+				return FALSE
+			end
+
+			prev = re
+		end
+		return TRUE
 	end
 
 	return nil
 end
 
-function a_size(a: Thing): Thing
+local function a_size(a: Thing): Thing
 	return list { num(SIZE), a }
 end
 
-function a_take(a: Thing): Thing
+local function a_take(a: Thing): Thing
 	return list { num(TAKE), a }
 end
 
-function a_sum(a: Thing): Thing
+local function a_sum(a: Thing): Thing
 	return list { num(SUM), a }
+end
+
+local function a_check(a: Thing): Thing
+	return list { num(CHECK), a }
 end
 
 local tests: {
@@ -234,7 +254,6 @@ local tests: {
 	},
 	{
 		eval = empty,
-		res = empty,
 	},
 	{
 		eval = list { num(1) },
@@ -321,6 +340,61 @@ local tests: {
 			num(2),
 			a_sum(num(0)),
 		}),
+	},
+
+	-- check
+	{
+		eval = a_check(num(0)),
+	},
+	{
+		eval = a_check(empty),
+		res = TRUE,
+	},
+	{
+		eval = a_check(list { num(0) }),
+		res = TRUE,
+	},
+	{
+		eval = a_check(list { num(0), num(0), num(0) }),
+		res = TRUE,
+	},
+	{
+		eval = a_check(list { num(0), num(1), num(0) }),
+		res = FALSE,
+	},
+	{
+		eval = a_check(
+			list { num(0), a_take(list { num(0), list { empty } }) }
+		),
+		res = FALSE,
+	},
+	{
+		eval = a_check(
+			list {
+				a_take(list { num(0), list { empty } }),
+				a_take(list { num(0), list { empty } }),
+				a_take(list { num(0), list { empty } }),
+			}
+		),
+		res = TRUE,
+	},
+	{
+		eval = a_check(
+			list { 
+				a_take(list { num(0), list { num(1), num(2) } }),
+				a_take(list { num(0), list { num(1), num(2) } }),
+			 }
+		),
+		res = TRUE,
+	},
+	{
+		eval = a_check(
+			list { 
+				a_take(list { num(0), list { num(2), num(1) } }),
+				a_take(list { num(0), list { num(1), num(2) } }),
+			 }
+		),
+		res = FALSE,
 	},
 }
 
