@@ -117,7 +117,7 @@ end
 
 local TRUE, FALSE = num(0), num(1) -- loobeans
 
-local SIZE, TAKE, SUM, CHECK, TYPE = 1, 2, 3, 4, 5
+local SIZE, TAKE, SUM, CHECK, TYPE, SPLIT = 1, 2, 3, 4, 5, 6
 
 local function reduce1(e: Thing, depth: number): Thing?
 	print(string.rep(" ", depth) .. "-", serialise(e))
@@ -141,7 +141,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 	end
 
 	-- now we're talking
-	-- the list needs to be {n:@, l:$}
+	-- the list needs to be {n:@ l:$}
 	local pn, pl = e.things[1], e.things[2]
 
 	if pn.type ~= NUM then
@@ -169,7 +169,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 			return nil
 		end
 
-		-- the list needs to be {tn:@, tl:$}
+		-- the list needs to be {tn:@ tl:$}
 		local ptn, ptl = l.things[1], l.things[2]
 		if ptn.type ~= NUM then
 			return nil
@@ -234,6 +234,11 @@ local function reduce1(e: Thing, depth: number): Thing?
 		-- *{TYPE a:$} -> FALSE where *a:$
 	end
 
+	-- split
+	if n.value == SPLIT then
+		
+	end
+
 	return nil
 end
 
@@ -255,6 +260,10 @@ end
 
 local function a_type(a: Thing): Thing
 	return list { num(TYPE), a }
+end
+
+local function a_split(a: Thing): Thing
+	return list { num(SPLIT), a }
 end
 
 local tests: {
