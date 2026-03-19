@@ -115,7 +115,7 @@ end
 
 local TRUE, FALSE = num(0), num(1) -- loobeans
 
-local SIZE, TAKE, SUM, CHECK, TYPE, SPLIT = 1, 2, 3, 4, 5, 6
+local SIZE, TAKE, SUM, CHECK, TYPE, SPLIT, SPLIT2 = 1, 2, 3, 4, 5, 6, 7
 
 local function reduce1(e: Thing, depth: number): Thing?
 	print(string.rep(" ", depth) .. "-", serialise(e))
@@ -267,7 +267,43 @@ local function reduce1(e: Thing, depth: number): Thing?
 			table.insert(insts, rv)
 		end
 
-		return list(insts) -- *{SPLIT {a:@ b:$}} -> {*{a:@ b[1]} *{a:@ b[2]} ...}}
+		return list(insts) -- *{SPLIT {a:@ b:$}} -> {*{a b[1]} *{a b[2]} ...}}
+	end
+
+	-- split2
+	if n.value == SPLIT2 then
+		if size(l) ~= 2 then
+			return nil
+		end
+
+		-- l needs to be {tn:@ tl:$}
+		local ptn, ptl = l.things[1], l.things[2]
+		if ptn.type ~= NUM then
+			return nil
+		end
+		local tn: Num = ptn
+
+		if ptl.type ~= LIST then
+			return nil
+		end
+		local tl: List = ptl
+
+		if size(tl) ~= 2 then
+			return nil
+		end
+
+		local insts = {}
+
+		for _, e in tl.things do
+			local rv = reduce1(list { tn, e }, depth + 1)
+			if not rv then
+				return nil
+			end
+
+			table.insert(insts, rv)
+		end
+
+		return reduce1(list(insts), depth + 1) -- *{SPLIT2 {a:@ {b c}}} -> *{*{a b} *{a c}}
 	end
 
 	return nil
@@ -295,6 +331,10 @@ end
 
 local function a_split(a: Thing): Thing
 	return list { num(SPLIT), a }
+end
+
+local function a_split2(a: Thing): Thing
+	return list { num(SPLIT2), a }
 end
 
 local tests: {
@@ -594,6 +634,31 @@ local tests: {
 			list { num(1), num(2), num(3) },
 			list { list { num(1), num(2) }, empty },
 		},
+	},
+
+	-- split squared
+	{
+		eval = a_split2(a_take(list {
+			list { num(0), list { num(SUM) } },
+			list { num(0), list { list { num(1), num(2), num(3) } } },
+		})),
+		res = num(6),
+	},
+	{
+		eval = a_split2(a_take(list {
+			list { num(0), list { num(SUM) } },
+			list {
+				num(0),
+				list {
+					list {
+						a_take(list { num(0), list { num(0) } }),
+						a_take(list { num(0), list { num(2) } }),
+						a_take(list { num(0), list { num(4) } }),
+					},
+				},
+			},
+		})),
+		res = num(6),
 	},
 }
 
