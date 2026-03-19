@@ -169,7 +169,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 			return nil
 		end
 
-		-- the list needs to be {tn:@ tl:$}
+		-- l needs to be {tn:@ tl:$}
 		local ptn, ptl = l.things[1], l.things[2]
 		if ptn.type ~= NUM then
 			return nil
@@ -236,7 +236,34 @@ local function reduce1(e: Thing, depth: number): Thing?
 
 	-- split
 	if n.value == SPLIT then
-		
+		if size(l) ~= 2 then
+			return nil
+		end
+
+		-- l needs to be {tn:@ tl:$}
+		local ptn, ptl = l.things[1], l.things[2]
+		if ptn.type ~= NUM then
+			return nil
+		end
+		local tn: Num = ptn
+
+		if ptl.type ~= LIST then
+			return nil
+		end
+		local tl: List = ptl
+
+		local insts = {}
+
+		for _, e in tl.things do
+			local rv = reduce1(list { tn, e }, depth + 1)
+			if not rv then
+				return nil
+			end
+
+			table.insert(insts, rv)
+		end
+
+		return list(insts) -- *{SPLIT {a:@ b:$}} -> {*{a:@ b[1]} *{a:@ b[2]} ...}}
 	end
 
 	return nil
@@ -433,6 +460,33 @@ local tests: {
 			a_take(list { num(0), list { list { num(1), num(2) } } })
 		),
 		res = FALSE,
+	},
+
+	-- split
+	{
+		eval = a_split(num(0)),
+	},
+	{
+		eval = a_split(empty),
+	},
+	{
+		eval = a_split(list { num(0), empty }),
+		res = list {},
+	},
+	{
+		eval = a_split(list { num(SIZE), list { empty } }),
+		res = list { num(0) },
+	},
+	{
+		eval = a_split(list {
+			num(SIZE),
+			list {
+				list { num(1) },
+				list { num(2), num(3) },
+				list { num(4), num(5), num(6) },
+			},
+		}),
+		res = list { num(1), num(2), num(3) },
 	},
 }
 
