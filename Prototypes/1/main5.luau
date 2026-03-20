@@ -115,7 +115,7 @@ end
 
 local TRUE, FALSE = num(0), num(1) -- loobeans
 
-local SIZE, TAKE, SUM, CHECK, TYPE, SPLIT = 1, 2, 3, 4, 5, 6
+local SIZE, PART, SUM, CHECK, TYPE, SPLIT = 1, 2, 3, 4, 5, 6
 
 local function h_size(t: Thing): Num?
 	if t.type ~= LIST then
@@ -124,7 +124,7 @@ local function h_size(t: Thing): Num?
 	return num(len(t))
 end
 
-local function h_take(t: Thing): Thing?
+local function h_part(t: Thing): Thing?
 	if t.type ~= LIST then
 		return nil
 	end
@@ -211,55 +211,55 @@ local function reduce1(e: Thing, depth: number): Thing?
 
 	-- l needs to be {n:@ a}
 	local n, a = l.things[1], l.things[2]
-	if n.type ~= NUM or a2.type ~= LIST then
+	if n.type ~= NUM then
 		return nil
 	end
 
-	-- so the list is {{n:@ a} a2:$}
+	-- so the list is {{n:@ a} a2}
 
 	-- print("Found num and list:", serialise(n), serialise(l))
 
 	-- opcodes
 
-	-- *{{SIZE a} b} -> size(*{a b})
+	-- *{{SIZE a} b} -> size(*{b a})
 	if n.value == SIZE then
-		local rab = reduce1(a, depth + 1)
+		local rab = reduce1(list { a2, a }, depth + 1)
 		if rab == nil then
 			return nil
 		end
 		return h_size(rab)
 	end
 
-	-- *{{TAKE a} b} -> take(*{a b})
-	if n.value == TAKE then
-		local rab = reduce1(a, depth + 1)
+	-- *{{PART a} b} -> part(*{b a})
+	if n.value == PART then
+		local rab = reduce1(list { a2, a }, depth + 1)
 		if rab == nil then
 			return nil
 		end
-		return h_take(rab)
+		return h_part(rab)
 	end
 
-	-- *{{SUM a} b} -> sum(*{a b})
+	-- *{{SUM a} b} -> sum(*{b a})
 	if n.value == SUM then
-		local rab = reduce1(a, depth + 1)
+		local rab = reduce1(list { a2, a }, depth + 1)
 		if rab == nil then
 			return nil
 		end
 		return h_sum(rab)
 	end
 
-	-- *{{CHECK a} b} -> check(*{a b})
+	-- *{{CHECK a} b} -> check(*{b a})
 	if n.value == CHECK then
-		local rab = reduce1(a, depth + 1)
+		local rab = reduce1(list { a2, a }, depth + 1)
 		if rab == nil then
 			return nil
 		end
 		return h_check(rab)
 	end
 
-	-- *{{TYPE a} b} -> type(*{a b})
+	-- *{{TYPE a} b} -> type(*{b a})
 	if n.value == TYPE then
-		local rab = reduce1(a, depth + 1)
+		local rab = reduce1(list { a2, a }, depth + 1)
 		if rab == nil then
 			return nil
 		end
@@ -294,8 +294,8 @@ local function a_size(a: Thing, b: Thing): Thing
 	return list { list { num(SIZE), a }, b }
 end
 
-local function a_take(a: Thing, b: Thing): Thing
-	return list { list { num(TAKE), a }, b }
+local function a_part(a: Thing, b: Thing): Thing
+	return list { list { num(PART), a }, b }
 end
 
 local function a_sum(a: Thing, b: Thing): Thing
@@ -310,7 +310,7 @@ local function a_type(a: Thing, b: Thing): Thing
 	return list { list { num(TYPE), a }, b }
 end
 
-local function a_split2(a: Thing, b: Thing): Thing
+local function a_split(a: Thing, b: Thing): Thing
 	return list { list { num(SPLIT), a }, b }
 end
 
@@ -336,6 +336,29 @@ local tests: {
 	},
 	{
 		eval = list { empty, list { list { num(1) } } },
+	},
+
+	-- size
+	{
+		eval = a_size(num(0), num(0)),
+	},
+	{
+		eval = a_size(empty, num(0)),
+	},
+	{
+		eval = a_size(empty, empty),
+	},
+	{
+		eval = a_size(list { num(0) }, empty),
+	},
+	{
+		eval = a_size(empty, list { num(0) }),
+	},
+	{
+		eval = a_size(empty, list { num(0), num(0) }),
+	},
+	{
+		eval = a_size(empty, list { num(SIZE), num(0) }),
 	},
 }
 
