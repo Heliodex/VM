@@ -115,7 +115,7 @@ end
 
 local TRUE, FALSE = num(0), num(1) -- loobeans
 
-local SIZE, PART, SUM, CHECK, TYPE, SPLIT = 1, 2, 3, 4, 5, 6
+local TAKE, SIZE, PART, SUM, CHECK, TYPE, SPLIT = 0, 1, 2, 3, 4, 5, 6
 
 local function h_size(t: Thing): Num?
 	if t.type ~= LIST then
@@ -221,6 +221,11 @@ local function reduce1(e: Thing, depth: number): Thing?
 
 	-- opcodes
 
+	-- *{{TAKE a} b} -> b
+	if n.value == TAKE then
+		return a2
+	end
+
 	-- *{{SIZE a} b} -> size(*{b a})
 	if n.value == SIZE then
 		local rab = reduce1(list { a2, a }, depth + 1)
@@ -290,6 +295,10 @@ local function reduce1(e: Thing, depth: number): Thing?
 	return nil
 end
 
+local function a_take(a: Thing, b: Thing): Thing
+	return list { list { num(TAKE), a }, b }
+end
+
 local function a_size(a: Thing, b: Thing): Thing
 	return list { list { num(SIZE), a }, b }
 end
@@ -337,28 +346,57 @@ local tests: {
 	{
 		eval = list { empty, list { list { num(1) } } },
 	},
+	{
+		eval = list { list { num(0) }, num(0) },
+	},
+	{
+		eval = list { list { num(0), num(0) } },
+	},
+
+	-- take
+	{
+		eval = a_take(empty, num(0)),
+		res = num(0),
+	},
+	{
+		eval = a_take(num(1), num(0)),
+		res = num(0),
+	},
+	{
+		eval = a_take(num(1), empty),
+		res = empty,
+	},
+	{
+		eval = a_take(num(1), list { num(0) }),
+		res = list { num(0) },
+	},
 
 	-- size
 	{
-		eval = a_size(num(0), num(0)),
+		eval = a_size(empty, list { num(TAKE), num(0) }),
+		res = num(0),
 	},
 	{
-		eval = a_size(empty, num(0)),
+		eval = a_size(list { num(0) }, list { num(TAKE), num(0) }),
+		res = num(1),
 	},
 	{
-		eval = a_size(empty, empty),
+		eval = a_size(
+			list { num(1), num(2), num(3) },
+			list { num(TAKE), num(0) }
+		),
+		res = num(3),
 	},
 	{
-		eval = a_size(list { num(0) }, empty),
+		eval = a_size(
+			list { empty, num(1), empty },
+			list { num(TAKE), num(0) }
+		),
+		res = num(3),
 	},
 	{
-		eval = a_size(empty, list { num(0) }),
-	},
-	{
-		eval = a_size(empty, list { num(0), num(0) }),
-	},
-	{
-		eval = a_size(empty, list { num(SIZE), num(0) }),
+		eval = a_size(list { empty, empty }, list { num(TAKE), num(0) }),
+		res = num(2),
 	},
 }
 
