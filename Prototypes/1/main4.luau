@@ -206,7 +206,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 		local prev: Thing?
 		-- print "Comparing:"
 
-		for i, e in l.things do
+		for _, e in l.things do
 			local re = reduce1(e, depth + 1)
 			if not re then
 				return nil
