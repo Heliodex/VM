@@ -398,6 +398,142 @@ local tests: {
 		eval = a_size(list { empty, empty }, list { num(TAKE), num(0) }),
 		res = num(2),
 	},
+
+	-- part
+	{
+		eval = a_part(list { num(0), empty }, list { num(TAKE), num(0) }),
+	},
+	{
+		eval = a_part(
+			list { num(0), list { num(1) } },
+			list { num(TAKE), num(0) }
+		),
+		res = num(1),
+	},
+	{
+		eval = a_part(
+			list { num(2), list { num(1), num(4), num(9), num(16) } },
+			list { num(TAKE), num(0) }
+		),
+		res = num(9),
+	},
+	{
+		eval = a_part(
+			list { num(1), list { empty, list { num(5) } } },
+			list { num(TAKE), num(0) }
+		),
+		res = list { num(5) },
+	},
+
+	-- sum
+	{
+		eval = a_sum(num(0), list { num(TAKE), num(0) }),
+	},
+	{
+		eval = a_sum(empty, list { num(TAKE), num(0) }),
+		res = num(0),
+	},
+	{
+		eval = a_sum(list { empty }, list { num(TAKE), num(0) }),
+	},
+	{
+		eval = a_sum(list { num(0) }, list { num(TAKE), num(0) }),
+		res = num(0),
+	},
+	{
+		eval = a_sum(
+			list { num(0), num(0), num(0) },
+			list { num(TAKE), num(0) }
+		),
+		res = num(0),
+	},
+	{
+		eval = a_sum(
+			list { num(1), num(2), num(3) },
+			list { num(TAKE), num(0) }
+		),
+		res = num(6),
+	},
+	{
+		eval = a_sum(
+			list { num(1), num(2), empty },
+			list { num(TAKE), num(0) }
+		),
+	},
+
+	-- check
+	{
+		eval = a_check(num(0), list { num(TAKE), num(0) }),
+	},
+	{
+		eval = a_check(empty, list { num(TAKE), num(0) }),
+		res = TRUE,
+	},
+	{
+		eval = a_check(list { num(0) }, list { num(TAKE), num(0) }),
+		res = TRUE,
+	},
+	{
+		eval = a_check(list { num(0), num(0) }, list { num(TAKE), num(0) }),
+		res = TRUE,
+	},
+	{
+		eval = a_check(list { num(0), num(1) }, list { num(TAKE), num(0) }),
+		res = FALSE,
+	},
+	{
+		eval = a_check(
+			list { num(0), num(0), num(0) },
+			list { num(TAKE), num(0) }
+		),
+		res = TRUE,
+	},
+	{
+		eval = a_check(
+			list { num(0), num(1), num(0) },
+			list { num(TAKE), num(0) }
+		),
+		res = FALSE,
+	},
+	{
+		eval = a_check(
+			list { num(0), empty, num(0) },
+			list { num(TAKE), num(0) }
+		),
+		res = FALSE,
+	},
+	{
+		eval = a_check(
+			list { empty, list { empty } },
+			list { num(TAKE), num(0) }
+		),
+		res = FALSE,
+	},
+	{
+		eval = a_check(list { empty, empty }, list { num(TAKE), num(0) }),
+		res = TRUE,
+	},
+	{
+		eval = a_check(
+			list { list { num(0) }, list { num(0) } },
+			list { num(TAKE), num(0) }
+		),
+		res = TRUE,
+	},
+	{
+		eval = a_check(
+			list { list { num(0) }, list { num(0) } },
+			list { num(TAKE), num(0) }
+		),
+		res = TRUE,
+	},
+	{
+		eval = a_check(
+			list { list { num(0) }, list { num(1) } },
+			list { num(TAKE), num(0) }
+		),
+		res = FALSE,
+	},
 }
 
 -- test serialise and deserialise
