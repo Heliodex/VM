@@ -1,6 +1,6 @@
 --!strict
 
--- this prototype because Sets are hard to work with at a low level and lists seem more useful
+-- this prototype sucks, I need to fix PART
 
 type Num = {
 	read type: "@",
@@ -606,6 +606,37 @@ local tests: {
 			}
 		),
 	},
+
+	--[[
+		more like moment of false, I guess
+
+		*{{SPLIT a} {b c}} -> *{*{b a} *{c a}}
+		*{{SPLIT a} {{PART 1} {PART 0}}} -> *{*{{PART 1} a} *{{PART 0} a}}
+		*{{SPLIT {a b}} {{PART 1} {PART 0}}} -> *{*{{PART 1} {a b}} *{{PART 0} {a b}}}
+
+		*{*{{PART 1} {a b}} *{{PART 0} {a b}}}
+			*{{PART 1} {a b}}
+				part(*{{a b} {PART 1}})
+			*{{PART 0} {a b}}
+				part(*{{a b} {PART 0}})
+
+		*{{SPLIT {TAKE 0}} {{PART 1} {PART 0}}} -> *{*{{PART 1} {TAKE 0}} *{{PART 0} {TAKE 0}}}
+
+		*{*{{PART 1} {TAKE 0}} *{{PART 0} {TAKE 0}}}
+			*{{PART 1} {TAKE 0}}
+				part(*{{TAKE 0} {PART 1}})
+				part({PART 1})
+				~~
+			*{{PART 0} {TAKE 0}}
+				part(*{{TAKE 0} {PART 0}})
+				part({PART 0})
+				~~
+
+		THAT'S why the tests weren't working,
+		THAT'S why the {PART _} opcodes get evaluated 2 times,
+		THAT'S why this combinator calculus sucks,
+		and THAT'S why etiher PART or SPLIT needs to be reworked, probably PART. LOOK AT NOCK. WHY DO YOU THINK Nock Zero & One ARE THE ONLY OPCODES WITHOUT A *
+	]]
 }
 
 -- test serialise and deserialise
