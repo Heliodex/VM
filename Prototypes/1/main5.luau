@@ -118,6 +118,7 @@ local TRUE, FALSE = num(0), num(1) -- loobeans
 local TAKE, SIZE, PART, SUM, CHECK, TYPE, SPLIT = 0, 1, 2, 3, 4, 5, 6
 
 local function h_size(t: Thing): Num?
+	print(`size({serialise(t)})`)
 	if t.type ~= LIST then
 		return nil
 	end
@@ -125,6 +126,7 @@ local function h_size(t: Thing): Num?
 end
 
 local function h_part(t: Thing): Thing?
+	print(`part({serialise(t)})`)
 	if t.type ~= LIST then
 		return nil
 	end
@@ -142,6 +144,7 @@ local function h_part(t: Thing): Thing?
 end
 
 local function h_sum(t: Thing): Num?
+	print(`sum({serialise(t)})`)
 	if t.type ~= LIST then
 		return nil
 	end
@@ -160,6 +163,7 @@ local function h_sum(t: Thing): Num?
 end
 
 local function h_check(t: Thing): Num?
+	print(`check({serialise(t)})`)
 	if t.type ~= LIST then
 		return nil
 	end
@@ -177,6 +181,7 @@ local function h_check(t: Thing): Num?
 end
 
 local function h_type(t: Thing): Num?
+	print(`type({serialise(t)})`)
 	return if t.type == NUM then TRUE else FALSE
 end
 
@@ -533,6 +538,73 @@ local tests: {
 			list { num(TAKE), num(0) }
 		),
 		res = FALSE,
+	},
+
+	-- type
+	{
+		eval = a_type(num(0), list { num(TAKE), num(0) }),
+		res = TRUE,
+	},
+	{
+		eval = a_type(num(1), list { num(TAKE), num(0) }),
+		res = TRUE,
+	},
+	{
+		eval = a_type(empty, list { num(TAKE), num(0) }),
+		res = FALSE,
+	},
+	{
+		eval = a_type(list { num(1) }, list { num(TAKE), num(0) }),
+		res = FALSE,
+	},
+
+	-- split
+	-- ok moment of truth
+	{
+		eval = a_split(num(0), num(0)),
+	},
+	{
+		eval = a_split(num(0), num(0)),
+	},
+	{
+		eval = a_split(num(0), list { num(0) }),
+	},
+	{
+		eval = a_split(num(0), list { num(0), num(0), num(0) }),
+	},
+	{
+		eval = a_split(num(0), list { num(TAKE), num(0) }),
+	},
+
+	-- okay this stuff I don't even understand
+	{
+		eval = a_split(
+			list { list { num(TAKE), num(1) }, list { num(TAKE), num(2) } },
+			list {
+				list { num(SPLIT), list { num(TAKE), num(3) } },
+				list { num(SPLIT), list { num(TAKE), num(4) } },
+			}
+		),
+		res = list { num(TAKE), num(4) },
+	},
+	{
+		eval = a_split(
+			list { list { num(TAKE), num(1) }, list { num(TAKE), num(2) } },
+			list {
+				list { num(SPLIT), list { num(TAKE), num(3) } },
+				list { num(TAKE), num(0) },
+			}
+		),
+		res = list { list { num(TAKE), num(1) }, list { num(TAKE), num(2) } },
+	},
+	{
+		eval = a_split(
+			list { list { num(TAKE), num(1) }, list { num(TAKE), num(2) } },
+			list {
+				list { num(PART), num(0) },
+				list { num(PART), num(0) },
+			}
+		),
 	},
 }
 
