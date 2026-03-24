@@ -218,9 +218,9 @@ local function reduce1(e: Thing, depth: number): Thing?
 		return b
 	end
 
-	-- *{a {PART b}} -> part(a, b)
+	-- *{a {PART b}} -> part(b, a)
 	if n.value == PART then
-		return h_part(a, b)
+		return h_part(b, a)
 	end
 
 	-- *{a {SIZE b}} -> size(*{b a})
@@ -361,32 +361,32 @@ local tests: {
 
 	-- part
 	{
-		eval = a_part(num(0), empty),
+		eval = a_part(empty, num(0)),
 	},
 	{
-		eval = a_part(num(0), list { num(1) }),
+		eval = a_part(list { num(1) }, num(0)),
 		res = num(1),
 	},
 	{
-		eval = a_part(num(2), list { num(1), num(4), num(9), num(16) }),
+		eval = a_part(list { num(1), num(4), num(9), num(16) }, num(2)),
 		res = num(9),
 	},
 	{
-		eval = a_part(num(1), list { empty, list { num(5) } }),
+		eval = a_part(list { empty, list { num(5) } }, num(1)),
 		res = list { num(5) },
 	},
 
 	-- the basis of if else, I guess
 	{
-		eval = a_part(TRUE, list { num(1), num(2) }),
+		eval = a_part(list { num(1), num(2) }, TRUE),
 		res = num(1),
 	},
 	{
-		eval = a_part(FALSE, list { num(1), num(2) }),
+		eval = a_part(list { num(1), num(2) }, FALSE),
 		res = num(2),
 	},
 	{
-		eval = a_part(num(2), list { num(1), num(2) }),
+		eval = a_part(list { num(1), num(2) }, num(2)),
 	},
 
 	-- size
@@ -568,13 +568,13 @@ local tests: {
 
 	{
 		eval = a_split(
-			list { list { num(TAKE), num(1) }, num(0) },
+			list { list { num(TAKE), num(2) }, num(0) },
 			list {
 				list { num(PART), num(1) },
 				list { num(PART), num(0) },
 			}
 		),
-		res = num(1),
+		res = num(2),
 	},
 }
 
