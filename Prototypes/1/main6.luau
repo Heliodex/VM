@@ -1,6 +1,6 @@
 --!strict
 
--- this prototype sucks, I need to fix PART
+-- this prototype sucks less, but still hasn't captured the elusive macros
 
 type Num = {
 	read type: "@",
@@ -286,6 +286,18 @@ local function reduce1(e: Thing, depth: number): Thing?
 
 		return reduce1(list { rba, rca }, depth + 1)
 	end
+
+	--[[
+		If we wanted to do a macro like Nock Six, perhaps an if-then-else which we'll call IF
+		*{{IF a} {b c d}} -> part(*{a b}, {*{a c} *{a d}})
+		*{{IF a} {b c d}} -> *{{PART *{a b}} {*{a c} *{a d}}}
+
+		Okay, where from here? Perhaps:
+
+		*{{IF a} {b c d}} -> *{{PART *{a b}} *{{TAKE a} {*{a c} *{a d}}}}
+		
+		Still doesn't really get us anywhere, since {*{a c} *{a d}} (I think) can't be represented with an existing opcode, so this doesn't count as a macro. Again, the same problem as the previous prototype test, where a bad opcode structure caused problems later down the line. Only this time, it's with *all* the opcodes, not just one. Redesign time!
+	]]
 
 	return nil
 end
