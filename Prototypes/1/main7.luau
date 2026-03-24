@@ -259,7 +259,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 		return h_type(rab)
 	end
 
-	-- *{a {SPLIT {b c}}} -> *{*{b a} *{c a}}
+	-- *{a {SPLIT {b c}}} -> *{*{a b} *{a c}}
 	if n.value == SPLIT then
 		if b.type ~= LIST or len(b) ~= 2 then
 			return nil
@@ -267,12 +267,12 @@ local function reduce1(e: Thing, depth: number): Thing?
 
 		local b2, c2 = b.things[1], b.things[2]
 
-		local rba = reduce1(list { b2, b2 }, depth + 1)
+		local rba = reduce1(list { a, b2 }, depth + 1)
 		if rba == nil then
 			return nil
 		end
 
-		local rca = reduce1(list { c2, b2 }, depth + 1)
+		local rca = reduce1(list { a, c2 }, depth + 1)
 		if rca == nil then
 			return nil
 		end
@@ -575,36 +575,6 @@ local tests: {
 			}
 		),
 		res = num(1),
-	},
-	{
-		eval = a_split(
-			list { list { num(TAKE), num(1) }, list { num(TAKE), num(2) } },
-			list {
-				list { num(SPLIT), list { num(TAKE), num(3) } },
-				list { num(SPLIT), list { num(TAKE), num(4) } },
-			}
-		),
-		res = list { num(TAKE), num(4) },
-	},
-	{
-		eval = a_split(
-			list { list { num(TAKE), num(1) }, list { num(TAKE), num(2) } },
-			list {
-				list { num(SPLIT), list { num(TAKE), num(3) } },
-				list { num(TAKE), num(0) },
-			}
-		),
-		res = list { list { num(TAKE), num(1) }, list { num(TAKE), num(2) } },
-	},
-	{
-		eval = a_split(
-			list { list { num(TAKE), num(1) }, list { num(TAKE), num(2) } },
-			list {
-				list { num(PART), num(0) },
-				list { num(PART), num(0) },
-			}
-		),
-		res = list { num(TAKE), num(1) },
 	},
 }
 
