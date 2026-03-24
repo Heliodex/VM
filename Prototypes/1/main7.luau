@@ -195,30 +195,35 @@ local function reduce1(e: Thing, depth: number): Thing?
 	-- 	return reduce1(only, depth + 1) -- *{a} -> *a
 	-- end
 
-	if len(e) ~= 3 then
+	if len(e) ~= 2 then
 		return nil
 	end
 
 	-- now we're talking
-	-- the list needs to be {a n:@ b}
-	local a, n, b = e.things[1], e.things[2], e.things[3]
+	-- the list needs to be {a {n:@ b}}
+	local a, l = e.things[1], e.things[2]
+	if l.type ~= LIST or len(l) ~= 2 then
+		return nil
+	end
+
+	local n, b = l.things[1], l.things[2]
 	if n.type ~= NUM then
 		return nil
 	end
 
 	-- opcodes
 
-	-- *{a TAKE b} -> b
+	-- *{a {TAKE b}} -> b
 	if n.value == TAKE then
 		return b
 	end
 
-	-- *{a PART b} -> part(a, b)
+	-- *{a {PART b}} -> part(a, b)
 	if n.value == PART then
 		return h_part(a, b)
 	end
 
-	-- *{a SIZE b} -> size(*{b a})
+	-- *{a {SIZE b}} -> size(*{b a})
 	if n.value == SIZE then
 		local rab = reduce1(list { b, a }, depth + 1)
 		if rab == nil then
@@ -227,7 +232,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 		return h_size(rab)
 	end
 
-	-- *{a SUM b} -> sum(*{b a})
+	-- *{a {SUM b}} -> sum(*{b a})
 	if n.value == SUM then
 		local rab = reduce1(list { b, a }, depth + 1)
 		if rab == nil then
@@ -236,7 +241,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 		return h_sum(rab)
 	end
 
-	-- *{a CHECK b} -> check(*{b a})
+	-- *{a {CHECK b}} -> check(*{b a})
 	if n.value == CHECK then
 		local rab = reduce1(list { b, a }, depth + 1)
 		if rab == nil then
@@ -245,7 +250,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 		return h_check(rab)
 	end
 
-	-- *{a TYPE b} -> type(*{b a})
+	-- *{a {TYPE b}} -> type(*{b a})
 	if n.value == TYPE then
 		local rab = reduce1(list { b, a }, depth + 1)
 		if rab == nil then
@@ -254,7 +259,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 		return h_type(rab)
 	end
 
-	-- *{a SPLIT {b c}} -> *{*{b a} *{c a}}
+	-- *{a {SPLIT {b c}}} -> *{*{b a} *{c a}}
 	if n.value == SPLIT then
 		if b.type ~= LIST or len(b) ~= 2 then
 			return nil
@@ -279,31 +284,31 @@ local function reduce1(e: Thing, depth: number): Thing?
 end
 
 local function a_take(a: Thing, b: Thing): Thing
-	return list { a, num(TAKE), b }
+	return list { a, list { num(TAKE), b } }
 end
 
 local function a_size(a: Thing, b: Thing): Thing
-	return list { a, num(SIZE), b }
+	return list { a, list { num(SIZE), b } }
 end
 
 local function a_part(a: Thing, b: Thing): Thing
-	return list { a, num(PART), b }
+	return list { a, list { num(PART), b } }
 end
 
 local function a_sum(a: Thing, b: Thing): Thing
-	return list { a, num(SUM), b }
+	return list { a, list { num(SUM), b } }
 end
 
 local function a_check(a: Thing, b: Thing): Thing
-	return list { a, num(CHECK), b }
+	return list { a, list { num(CHECK), b } }
 end
 
 local function a_type(a: Thing, b: Thing): Thing
-	return list { a, num(TYPE), b }
+	return list { a, list { num(TYPE), b } }
 end
 
 local function a_split(a: Thing, b: Thing): Thing
-	return list { a, num(SPLIT), b }
+	return list { a, list { num(SPLIT), b } }
 end
 
 local tests: {
@@ -386,157 +391,157 @@ local tests: {
 
 	-- size
 	{
-		eval = a_size(empty, list { num(TAKE), num(0) }),
+		eval = a_size(list { num(TAKE), empty }, num(1)),
 		res = num(0),
 	},
 	{
-		eval = a_size(list { num(0) }, list { num(TAKE), num(0) }),
+		eval = a_size(list { num(TAKE), list { num(0) } }, num(0)),
 		res = num(1),
 	},
 	{
 		eval = a_size(
-			list { num(1), num(2), num(3) },
-			list { num(TAKE), num(0) }
+			list { num(TAKE), list { num(1), num(2), num(3) } },
+			num(0)
 		),
 		res = num(3),
 	},
 	{
 		eval = a_size(
-			list { empty, num(1), empty },
-			list { num(TAKE), num(0) }
+			list { num(TAKE), list { empty, num(1), empty } },
+			num(0)
 		),
 		res = num(3),
 	},
 	{
-		eval = a_size(list { empty, empty }, list { num(TAKE), num(0) }),
+		eval = a_size(list { num(TAKE), list { empty, empty } }, num(0)),
 		res = num(2),
 	},
 
 	-- sum
 	{
-		eval = a_sum(num(0), list { num(TAKE), num(0) }),
+		eval = a_sum(list { num(TAKE), num(0) }, num(0)),
 	},
 	{
-		eval = a_sum(empty, list { num(TAKE), num(0) }),
+		eval = a_sum(list { num(TAKE), empty }, num(0)),
 		res = num(0),
 	},
 	{
-		eval = a_sum(list { empty }, list { num(TAKE), num(0) }),
+		eval = a_sum(list { num(TAKE), list { empty } }, num(0)),
 	},
 	{
-		eval = a_sum(list { num(0) }, list { num(TAKE), num(0) }),
+		eval = a_sum(list { num(TAKE), list { num(0) } }, num(0)),
 		res = num(0),
 	},
 	{
 		eval = a_sum(
-			list { num(0), num(0), num(0) },
-			list { num(TAKE), num(0) }
+			list { num(TAKE), list { num(0), num(0), num(0) } },
+			num(0)
 		),
 		res = num(0),
 	},
 	{
 		eval = a_sum(
-			list { num(1), num(2), num(3) },
-			list { num(TAKE), num(0) }
+			list { num(TAKE), list { num(1), num(2), num(3) } },
+			num(0)
 		),
 		res = num(6),
 	},
 	{
 		eval = a_sum(
-			list { num(1), num(2), empty },
-			list { num(TAKE), num(0) }
+			list { num(TAKE), list { num(1), num(2), empty } },
+			num(0)
 		),
 	},
 
 	-- check
 	{
-		eval = a_check(num(0), list { num(TAKE), num(0) }),
+		eval = a_check(list { num(TAKE), num(0) }, num(0)),
 	},
 	{
-		eval = a_check(empty, list { num(TAKE), num(0) }),
+		eval = a_check(list { num(TAKE), empty }, num(0)),
 		res = TRUE,
 	},
 	{
-		eval = a_check(list { num(0) }, list { num(TAKE), num(0) }),
+		eval = a_check(list { num(TAKE), list { num(0) } }, num(0)),
 		res = TRUE,
 	},
 	{
-		eval = a_check(list { num(0), num(0) }, list { num(TAKE), num(0) }),
+		eval = a_check(list { num(TAKE), list { num(0), num(0) } }, num(0)),
 		res = TRUE,
 	},
 	{
-		eval = a_check(list { num(0), num(1) }, list { num(TAKE), num(0) }),
+		eval = a_check(list { num(TAKE), list { num(0), num(1) } }, num(0)),
 		res = FALSE,
 	},
 	{
 		eval = a_check(
-			list { num(0), num(0), num(0) },
-			list { num(TAKE), num(0) }
+			list { num(TAKE), list { num(0), num(0), num(0) } },
+			num(0)
 		),
 		res = TRUE,
 	},
 	{
 		eval = a_check(
-			list { num(0), num(1), num(0) },
-			list { num(TAKE), num(0) }
-		),
-		res = FALSE,
-	},
-	{
-		eval = a_check(
-			list { num(0), empty, num(0) },
-			list { num(TAKE), num(0) }
+			list { num(TAKE), list { num(0), num(1), num(0) } },
+			num(0)
 		),
 		res = FALSE,
 	},
 	{
 		eval = a_check(
-			list { empty, list { empty } },
-			list { num(TAKE), num(0) }
+			list { num(TAKE), list { num(0), empty, num(0) } },
+			num(0)
 		),
 		res = FALSE,
 	},
 	{
-		eval = a_check(list { empty, empty }, list { num(TAKE), num(0) }),
+		eval = a_check(
+			list { num(TAKE), list { empty, list { empty } } },
+			num(0)
+		),
+		res = FALSE,
+	},
+	{
+		eval = a_check(list { num(TAKE), list { empty, empty } }, num(0)),
 		res = TRUE,
 	},
 	{
 		eval = a_check(
-			list { list { num(0) }, list { num(0) } },
-			list { num(TAKE), num(0) }
+			list { num(TAKE), list { list { num(0) }, list { num(0) } } },
+			num(0)
 		),
 		res = TRUE,
 	},
 	{
 		eval = a_check(
-			list { list { num(0) }, list { num(0) } },
-			list { num(TAKE), num(0) }
+			list { num(TAKE), list { list { num(0) }, list { num(0) } } },
+			num(0)
 		),
 		res = TRUE,
 	},
 	{
 		eval = a_check(
-			list { list { num(0) }, list { num(1) } },
-			list { num(TAKE), num(0) }
+			list { num(TAKE), list { list { num(0) }, list { num(1) } } },
+			num(0)
 		),
 		res = FALSE,
 	},
 
 	-- type
 	{
-		eval = a_type(num(0), list { num(TAKE), num(0) }),
+		eval = a_type(list { num(TAKE), num(0) }, num(0)),
 		res = TRUE,
 	},
 	{
-		eval = a_type(num(1), list { num(TAKE), num(0) }),
+		eval = a_type(list { num(TAKE), num(1) }, num(0)),
 		res = TRUE,
 	},
 	{
-		eval = a_type(empty, list { num(TAKE), num(0) }),
+		eval = a_type(list { num(TAKE), empty }, num(0)),
 		res = FALSE,
 	},
 	{
-		eval = a_type(list { num(1) }, list { num(TAKE), num(0) }),
+		eval = a_type(list { num(TAKE), list { num(1) } }, num(0)),
 		res = FALSE,
 	},
 
@@ -546,21 +551,24 @@ local tests: {
 		eval = a_split(num(0), num(0)),
 	},
 	{
-		eval = a_split(num(0), num(0)),
+		eval = a_split(num(0), empty),
 	},
 	{
-		eval = a_split(num(0), list { num(0) }),
+		eval = a_split(empty, num(0)),
 	},
 	{
-		eval = a_split(num(0), list { num(0), num(0), num(0) }),
+		eval = a_split(list { num(0) }, num(0)),
 	},
 	{
-		eval = a_split(num(0), list { num(TAKE), num(0) }),
+		eval = a_split(list { num(0), num(0), num(0) }, num(0)),
+	},
+	{
+		eval = a_split(list { num(TAKE), num(0) }, num(0)),
 	},
 
 	{
 		eval = a_split(
-			list { num(1), list { num(TAKE), num(0) } },
+			list { list { num(TAKE), num(1) }, num(0) },
 			list {
 				list { num(PART), num(1) },
 				list { num(PART), num(0) },
