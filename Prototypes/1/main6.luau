@@ -383,6 +383,19 @@ local tests: {
 		res = list { num(5) },
 	},
 
+	-- the basis of if else, I guess
+	{
+		eval = a_part(TRUE, list{ num(1), num(2) }),
+		res = num(1),
+	},
+	{
+		eval = a_part(FALSE, list{ num(1), num(2) }),
+		res = num(2),
+	},
+	{
+		eval = a_part(num(2), list{ num(1), num(2) }),
+	},
+
 	-- size
 	{
 		eval = a_size(empty, list { num(TAKE), num(0) }),
@@ -557,7 +570,16 @@ local tests: {
 		eval = a_split(num(0), list { num(TAKE), num(0) }),
 	},
 
-	-- okay this stuff I don't even understand
+	{
+		eval = a_split(
+			list { num(1), list { num(TAKE), num(0) } },
+			list {
+				list { num(PART), num(1) },
+				list { num(PART), num(0) },
+			}
+		),
+		res = num(1),
+	},
 	{
 		eval = a_split(
 			list { list { num(TAKE), num(1) }, list { num(TAKE), num(2) } },
