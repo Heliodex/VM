@@ -619,13 +619,33 @@ local tests: {
 	]=]
 	{
 		eval = a_split(
-			list { list { num(1) }, list { num(2) } },
+			list { num(1), num(2) },
+			list {
+				list { num(PART), num(1) },
+				list { num(TAKE), list { num(PART), num(0) } },
+			}
+		),
+		res = num(1),
+	},
+	{
+		eval = a_split(
+			list { num(1), num(2) },
+			list {
+				list { num(PART), num(0) },
+				list { num(TAKE), list { num(PART), num(1) } },
+			}
+		),
+		res = num(1),
+	},
+	{
+		eval = a_split(
+			list { num(1), num(2) },
 			list {
 				list { num(PART), num(0) },
 				list { num(TAKE), list { num(PART), num(0) } },
 			}
 		),
-		res = num(1),
+		res = list { num(1), num(2) },
 	},
 	--[=[
 		If *[a b] equals 0 return *[a c]
