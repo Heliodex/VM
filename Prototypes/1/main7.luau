@@ -591,21 +591,26 @@ local tests: {
 		1
 
 		*{a {SPLIT {b c}}} -> *{*{a b} *{a c}}
-		*{a={1 2} {SPLIT {b c}}}
+		*{a={{1} {2}} {SPLIT {b c}}}
 
-		*{*{a={1 2} b} *{a={1 2} c}}
-			*{a={1 2} {PART 1}}
-			*{a={1 2} c}
+		*{*{a={{1} {2}} {PART 0}}} *{a={{1} {2}} {TAKE {PART 0}}}}
+			*{a={{1} {2}} {PART 0}}
+				{1}
+			*{a={{1} {2}} {TAKE {PART 0}}}
+				{PART 0}
+		
+		*{{1} {PART 0}}
+		1
 	]=]
 	{
 		eval = a_split(
-			list { list { num(TAKE), num(2) }, num(0) },
+			list { list { num(1) }, list { num(2) } },
 			list {
-				list { num(PART), num(1) },
 				list { num(PART), num(0) },
+				list { num(TAKE), list { num(PART), num(0) } },
 			}
 		),
-		res = num(2),
+		res = num(1),
 	},
 }
 
