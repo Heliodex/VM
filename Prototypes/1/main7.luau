@@ -612,6 +612,21 @@ local tests: {
 		),
 		res = num(1),
 	},
+	--[=[
+		If *[a b] equals 0 return *[a c]
+		If *[a b] equals 1 return *[a d]
+		Otherwise: crash
+
+		*[a 6 b c d]     *[a *[[c d] 0 *[[2 3] 0 *[a 4 4 b]]]]
+		*[a 6 b c d]     *[a 2 [0 1] 2 [1 c d] [1 0] 2 [1 2 3] [1 0] 4 4 b]
+
+		*[a *[[c d] 0 *[[2 3] 0 *[a 4 4 b]]]]
+			*[[c d] 0 *[[2 3] 0 *[a 4 4 b]]]
+				*[[2 3] 0 *[a 4 4 b]]
+					*[a 4 4 b]
+		
+		{a {SIX {b c d}}} ->
+	]=]
 }
 
 -- test serialise and deserialise
