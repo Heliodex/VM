@@ -111,7 +111,7 @@ local function len(s: List): number
 	return #s.things
 end
 
-local TRUE, FALSE = num(1), num(2) -- imagine loobeans but worse
+local TRUE, FALSE = num(0), num(1) -- imagine loobeans but if they were loobeans
 
 local TAKE, PART, SIZE, SUM, CHECK, TYPE, SPLIT = 0, 1, 2, 3, 4, 5, 6
 
@@ -391,13 +391,16 @@ local tests: {
 		res = list { num(5) },
 	},
 
-	-- the basis of if else, I guess
 	{
 		eval = a_part(list { num(1), num(2) }, TRUE),
-		res = num(1),
+		res = list { num(1), num(2) },
 	},
 	{
 		eval = a_part(list { num(1), num(2) }, FALSE),
+		res = num(1),
+	},
+	{
+		eval = a_part(list { num(1), num(2) }, num(2)),
 		res = num(2),
 	},
 	{
@@ -466,6 +469,26 @@ local tests: {
 			list { num(TAKE), list { num(1), num(2), empty } },
 			num(0)
 		),
+	},
+	{
+		eval = a_sum(
+			list { num(PART), num(0) },
+			list { num(1), num(2), num(3) }
+		),
+		res = num(6),
+	},
+	{
+		eval = a_sum(
+			list {
+				num(SPLIT),
+				list {
+					list { num(PART), num(2) },
+					list { num(PART), num(3) },
+				},
+			},
+			list { num(0), list { num(1), num(2) }, list { num(PART), num(0) } }
+		),
+		res = num(3),
 	},
 
 	-- check
