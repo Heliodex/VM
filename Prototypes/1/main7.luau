@@ -576,6 +576,37 @@ local tests: {
 		),
 		res = num(2),
 	},
+	--[=[
+		*[a [2 [b c]]]          *[*[a b] *[a c]]
+		*[a=[1 2] [2 b=[0 2] c=[1 [0 1]]]
+		*[[1 2] [2 [[0 2] [1 [0 1]]]]
+
+		*[*[[1 2] [0 2]] *[[1 2] [1 [0 1]]]]
+			*[[1 2] [0 2]]
+				1
+			*[[1 2] [1 [0 1]]]
+				[0 1]
+		
+		*[1 [0 1]]
+		1
+
+		*{a {SPLIT {b c}}} -> *{*{a b} *{a c}}
+		*{a={1 2} {SPLIT {b c}}}
+
+		*{*{a={1 2} b} *{a={1 2} c}}
+			*{a={1 2} {PART 1}}
+			*{a={1 2} c}
+	]=]
+	{
+		eval = a_split(
+			list { list { num(TAKE), num(2) }, num(0) },
+			list {
+				list { num(PART), num(1) },
+				list { num(PART), num(0) },
+			}
+		),
+		res = num(2),
+	},
 }
 
 -- test serialise and deserialise
