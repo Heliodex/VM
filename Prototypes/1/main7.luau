@@ -111,7 +111,7 @@ local function len(s: List): number
 	return #s.things
 end
 
-local TRUE, FALSE = num(0), num(1) -- loobeans
+local TRUE, FALSE = num(1), num(2) -- imagine loobeans but worse
 
 local TAKE, PART, SIZE, SUM, CHECK, TYPE, SPLIT = 0, 1, 2, 3, 4, 5, 6
 
@@ -128,11 +128,15 @@ local function h_part(a: Thing, b: Thing): Thing?
 		return nil
 	end
 
+	if a.value == 0 then
+		return b
+	end
+
 	if b.type ~= LIST then
 		return nil
 	end
 
-	return b.things[a.value + 1] -- sorry, luau...
+	return b.things[a.value] -- sorry, luau...
 end
 
 local function h_sum(t: Thing): Num?
@@ -361,18 +365,29 @@ local tests: {
 
 	-- part
 	{
-		eval = a_part(empty, num(0)),
-	},
-	{
-		eval = a_part(list { num(1) }, num(0)),
+		eval = a_part(num(1), num(0)),
 		res = num(1),
 	},
 	{
-		eval = a_part(list { num(1), num(4), num(9), num(16) }, num(2)),
+		eval = a_part(num(1), num(1)),
+	},
+	{
+		eval = a_part(empty, num(0)),
+		res = empty,
+	},
+	{
+		eval = a_part(empty, num(1)),
+	},
+	{
+		eval = a_part(list { num(1) }, num(1)),
+		res = num(1),
+	},
+	{
+		eval = a_part(list { num(1), num(4), num(9), num(16) }, num(3)),
 		res = num(9),
 	},
 	{
-		eval = a_part(list { empty, list { num(5) } }, num(1)),
+		eval = a_part(list { empty, list { num(5) } }, num(2)),
 		res = list { num(5) },
 	},
 
@@ -386,7 +401,7 @@ local tests: {
 		res = num(2),
 	},
 	{
-		eval = a_part(list { num(1), num(2) }, num(2)),
+		eval = a_part(list { num(1), num(2) }, num(3)),
 	},
 
 	-- size
@@ -570,8 +585,8 @@ local tests: {
 		eval = a_split(
 			list { list { num(TAKE), num(2) }, num(0) },
 			list {
+				list { num(PART), num(2) },
 				list { num(PART), num(1) },
-				list { num(PART), num(0) },
 			}
 		),
 		res = num(2),
@@ -625,7 +640,14 @@ local tests: {
 				*[[2 3] 0 *[a 4 4 b]]
 					*[a 4 4 b]
 		
-		{a {SIX {b c d}}} ->
+		{a {IF {b c d}}} -> part(*{a b}, {*{a c} *{a d}})
+		{a {IF {b c d}}} -> *{{*{a c} *{a d}} {PART *{a b}}}
+
+		*[a 2 [0 1] 2 [1 c d] [1 0] 2 [1 2 3] [1 0] 4 4 b]
+		*[a [2 [[0 1] [2 [[1 [c d]] [[1 0] [2 [[1 [2 3]] [[1 0] [4 [4 b]]]]]]]]]]]
+		*[*[a [0 1]] *[a [2 [[1 [c d]] [[1 0] [2 [[1 [2 3]] [[1 0] [4 [4 b]]]]]]]]]]
+			*[a [0 1]]
+			*[a [2 [[1 [c d]] [[1 0] [2 [[1 [2 3]] [[1 0] [4 [4 b]]]]]]]]]
 	]=]
 }
 
