@@ -332,6 +332,43 @@ local function a_split(a: Thing, b: Thing): Thing
 	return list { a, list { num(SPLIT), b } }
 end
 
+local function a_if(a: Thing, b: Thing, c: Thing, d: Thing): Thing
+	return a_split(
+		a,
+		list {
+			list { num(PART), num(0) },
+			list {
+				num(SPLIT),
+				list {
+					list { num(TAKE), list { c, d } },
+					list {
+						list { num(TAKE), num(0) },
+						list {
+							num(SPLIT),
+							list {
+								list { num(TAKE), list { num(1), num(2) } },
+								list {
+									list { num(TAKE), num(PART) },
+									list {
+										num(SUM),
+										list {
+											list {
+												num(TAKE),
+												num(1) --[[X]],
+											},
+											b,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+	)
+end
+
 local tests: {
 	{
 		eval: Thing,
@@ -435,17 +472,11 @@ local tests: {
 
 	-- size
 	{
-		eval = a_size(
-			num(1),
-			list { num(TAKE), empty }
-		),
+		eval = a_size(num(1), list { num(TAKE), empty }),
 		res = num(0),
 	},
 	{
-		eval = a_size(
-			num(0),
-			list { num(TAKE), list { num(0) } }
-		),
+		eval = a_size(num(0), list { num(TAKE), list { num(0) } }),
 		res = num(1),
 	},
 	{
@@ -463,38 +494,23 @@ local tests: {
 		res = num(3),
 	},
 	{
-		eval = a_size(
-			num(0),
-			list { num(TAKE), list { empty, empty } }
-		),
+		eval = a_size(num(0), list { num(TAKE), list { empty, empty } }),
 		res = num(2),
 	},
 
 	-- sum
 	{
-		eval = a_sum(
-			num(0),
-			list { num(TAKE), num(0) }
-		),
+		eval = a_sum(num(0), list { num(TAKE), num(0) }),
 	},
 	{
-		eval = a_sum(
-			num(0),
-			list { num(TAKE), empty }
-		),
+		eval = a_sum(num(0), list { num(TAKE), empty }),
 		res = num(0),
 	},
 	{
-		eval = a_sum(
-			num(0),
-			list { num(TAKE), list { empty } }
-		),
+		eval = a_sum(num(0), list { num(TAKE), list { empty } }),
 	},
 	{
-		eval = a_sum(
-			num(0),
-			list { num(TAKE), list { num(0) } }
-		),
+		eval = a_sum(num(0), list { num(TAKE), list { num(0) } }),
 		res = num(0),
 	},
 	{
@@ -540,37 +556,22 @@ local tests: {
 
 	-- check
 	{
-		eval = a_check(
-			num(0),
-			list { num(TAKE), num(0) }
-		),
+		eval = a_check(num(0), list { num(TAKE), num(0) }),
 	},
 	{
-		eval = a_check(
-			num(0),
-			list { num(TAKE), empty }
-		),
+		eval = a_check(num(0), list { num(TAKE), empty }),
 		res = TRUE,
 	},
 	{
-		eval = a_check(
-			num(0),
-			list { num(TAKE), list { num(0) } }
-		),
+		eval = a_check(num(0), list { num(TAKE), list { num(0) } }),
 		res = TRUE,
 	},
 	{
-		eval = a_check(
-			num(0),
-			list { num(TAKE), list { num(0), num(0) } }
-		),
+		eval = a_check(num(0), list { num(TAKE), list { num(0), num(0) } }),
 		res = TRUE,
 	},
 	{
-		eval = a_check(
-			num(0),
-			list { num(TAKE), list { num(0), num(1) } }
-		),
+		eval = a_check(num(0), list { num(TAKE), list { num(0), num(1) } }),
 		res = FALSE,
 	},
 	{
@@ -602,10 +603,7 @@ local tests: {
 		res = FALSE,
 	},
 	{
-		eval = a_check(
-			num(0),
-			list { num(TAKE), list { empty, empty } }
-		),
+		eval = a_check(num(0), list { num(TAKE), list { empty, empty } }),
 		res = TRUE,
 	},
 	{
@@ -632,31 +630,19 @@ local tests: {
 
 	-- type
 	{
-		eval = a_type(
-			num(0),
-			list { num(TAKE), num(0) }
-		),
+		eval = a_type(num(0), list { num(TAKE), num(0) }),
 		res = TRUE,
 	},
 	{
-		eval = a_type(
-			num(0),
-			list { num(TAKE), num(1) }
-		),
+		eval = a_type(num(0), list { num(TAKE), num(1) }),
 		res = TRUE,
 	},
 	{
-		eval = a_type(
-			num(0),
-			list { num(TAKE), empty }
-		),
+		eval = a_type(num(0), list { num(TAKE), empty }),
 		res = FALSE,
 	},
 	{
-		eval = a_type(
-			num(0),
-			list { num(TAKE), list { num(1) } }
-		),
+		eval = a_type(num(0), list { num(TAKE), list { num(1) } }),
 		res = FALSE,
 	},
 
@@ -857,7 +843,14 @@ local tests: {
 			*{{c d} {0 part({1 2}, sum({X *{a b}}))}}
 			part({c d}, part({1 2}, sum({X *{a b}})))
 		*{a part({c d}, part({1 2}, sum({X *{a b}})))}
+
+		{a {SPLIT {{PART 0} {SPLIT {{TAKE {c d}} {{TAKE 0} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}}}}}
+		a_split(a, {{PART 0} {SPLIT {{TAKE {c d}} {{TAKE 0} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}}})
+		a_split(a, {{PART 0} {SPLIT {{TAKE {c d}} {{TAKE 0} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}}})
 	]=]
+	{
+		eval = a_if(num(100), list { num(TAKE), TRUE }, num(300), num(400)),
+	},
 }
 
 -- test serialise and deserialise
