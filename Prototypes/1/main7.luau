@@ -724,8 +724,8 @@ local tests: {
 					[c d]
 			*[[c d] *[a [[1 0] [2 [[1 [2 3]] [[1 0] [4 [4 b]]]]]]]]
 				*[a [[b=1 c=0] d=[2 [[1 [2 3]] [[1 0] [4 [4 b]]]]]]]
-				[*[a 1 0] *[a [2 [[1 [2 3]] [[1 0] [4 [4 b]]]]]]]
-					*[a 1 0]
+				[*[a [1 0]] *[a [2 [[1 [2 3]] [[1 0] [4 [4 b]]]]]]]
+					*[a [1 0]]
 						0
 				[0 *[a [2 [[1 [2 3]] [[1 0] [4 [4 b]]]]]]]
 					*[a [2 [b=[1 [2 3]] c=[[1 0] [4 [4 b]]]]]]
@@ -751,8 +751,61 @@ local tests: {
 			/[/[++*[a b] [2 3]] [c d]]
 		*[a /[/[++*[a b] [2 3]] [c d]]]
 
-		*{a {IF {b c d}}} -> part(*{a b}+1, {*{a c} *{a d}})
-		*{a {IF {b c d}}} -> part(sum({*{a b} 1}), {*{a c} *{a d}})
+		*{*{a {c d}} {PART *{1 {SUM *{a b}}}}}
+			{PART *{1 {SUM *{a b}}}}
+				*{1 {SUM *{a b}}}
+				sum({*{a b} 1})
+			{PART sum({*{a b} 1})}
+		*{*{a {c d}} {PART sum({*{a b} 1})}}
+			*{a {c d}}
+			{*{a c} *{a d}}
+		*{{*{a c} *{a d}} {PART sum({*{a b} 1})}}
+		part(sum({*{a b} 1}), {*{a c} *{a d}})
+		part(*{a b}+1, {*{a c} *{a d}})
+
+
+		*[a [2 [[PART 0] [2 [[1 [c d]] [[1 0] [2 [[1 [2 3]] [[1 0] [4 [4 b]]]]]]]]]]]
+
+		*[a=a [SPLIT [b=[PART 0] c=[SPLIT [[TAKE [c d]] [[TAKE 0] [SPLIT [[TAKE [2 3]] [[TAKE 0] [4 [4 b]]]]]]]]]]]
+		*[*[a [PART 0]] *[a [2 [[TAKE [c d]] [[TAKE 0] [SPLIT [[TAKE [2 3]] [[TAKE 0] [4 [4 b]]]]]]]]]]
+			*[a [PART 0]]
+				a
+		*[a *[a [SPLIT [[TAKE [c d]] [[TAKE 0] [SPLIT [[TAKE [2 3]] [[TAKE 0] [4 [4 b]]]]]]]]]]
+			*[a [SPLIT [b=[TAKE [c d]] c=[[TAKE 0] [SPLIT [[TAKE [2 3]] [[TAKE 0] [4 [4 b]]]]]]]]]
+			*[*[a [TAKE [c d]]] *[a [[TAKE 0] [SPLIT [[TAKE [2 3]] [[TAKE 0] [4 [4 b]]]]]]]]
+				*[a [TAKE [c d]]]
+					[c d]
+			*[[c d] *[a [[TAKE 0] [SPLIT [[TAKE [2 3]] [[TAKE 0] [4 [4 b]]]]]]]]
+				*[a [[b=TAKE c=0] d=[SPLIT [[TAKE [2 3]] [[TAKE 0] [4 [4 b]]]]]]]
+				[*[a [TAKE 0]] *[a [SPLIT [[TAKE [2 3]] [[TAKE 0] [4 [4 b]]]]]]]
+					*[a [TAKE 0]]
+						0
+				[0 *[a [SPLIT [[TAKE [2 3]] [[TAKE 0] [4 [4 b]]]]]]]
+					*[a [SPLIT [b=[TAKE [2 3]] c=[[TAKE 0] [4 [4 b]]]]]]
+					*[*[a [TAKE [2 3]]] *[a [[TAKE 0] [4 [4 b]]]]]
+						*[a [TAKE [2 3]]]
+							[2 3]
+					*[[2 3] *[a [[TAKE 0] [4 [4 b]]]]]
+						*[a [[b=TAKE c=0] d=[4 [4 b]]]]
+						[*[a TAKE 0] *[a [4 [4 b]]]]
+							*[a TAKE 0]
+								0
+						[0 *[a [4 [4 b]]]]
+							*[a [4 [4 b]]]
+							+*[a [4 b]]
+								*[a 4 b]
+								+*[a b]
+							++*[a b]
+						[0 ++*[a b]]
+
+		*[[[TAKE X] b] [SUM a]]
+		sum(*[a [[TAKE X] b]])
+			*[a [[TAKE X] b]]
+			[*[a [TAKE X]] *[a b]]
+				*[a [TAKE X]]
+					X
+			[X *[a b]]
+		sum([X *[a b]])
 	]=]
 }
 
