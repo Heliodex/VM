@@ -211,6 +211,23 @@ local function reduce1(e: Thing, depth: number): Thing?
 	end
 
 	local n, b = l.things[1], l.things[2]
+	if n.type == LIST and len(n) == 2 then
+		-- autocons
+		local b2, c2 = n.things[1], n.things[2]
+
+		local rabc = reduce1(list { a, list { b2, c2 } }, depth + 1)
+		if rabc == nil then
+			return nil
+		end
+
+		local rad = reduce1(list { a, b }, depth + 1)
+		if rad == nil then
+			return nil
+		end
+
+		return list { rabc, rad } -- *{a {{b c} d}} -> {*{a {b c}} *{a d}} (no *)
+	end
+
 	if n.type ~= NUM then
 		return nil
 	end
@@ -361,6 +378,15 @@ local tests: {
 	{
 		eval = a_take(num(1), list { num(0) }),
 		res = list { num(0) },
+	},
+
+	-- autocons
+	{
+		eval = list {
+			num(0),
+			list { list { num(TAKE), num(1) }, list { num(TAKE), num(2) } },
+		},
+		res = list { num(1), num(2) },
 	},
 
 	-- part
@@ -690,7 +716,43 @@ local tests: {
 		*[a [2 [[0 1] [2 [[1 [c d]] [[1 0] [2 [[1 [2 3]] [[1 0] [4 [4 b]]]]]]]]]]]
 		*[*[a [0 1]] *[a [2 [[1 [c d]] [[1 0] [2 [[1 [2 3]] [[1 0] [4 [4 b]]]]]]]]]]
 			*[a [0 1]]
-			*[a [2 [[1 [c d]] [[1 0] [2 [[1 [2 3]] [[1 0] [4 [4 b]]]]]]]]]
+				a
+		*[a *[a [2 [[1 [c d]] [[1 0] [2 [[1 [2 3]] [[1 0] [4 [4 b]]]]]]]]]]
+			*[a [2 [b=[1 [c d]] c=[[1 0] [2 [[1 [2 3]] [[1 0] [4 [4 b]]]]]]]]]
+			*[*[a [1 [c d]]] *[a [[1 0] [2 [[1 [2 3]] [[1 0] [4 [4 b]]]]]]]]
+				*[a [1 [c d]]]
+					[c d]
+			*[[c d] *[a [[1 0] [2 [[1 [2 3]] [[1 0] [4 [4 b]]]]]]]]
+				*[a [[b=1 c=0] d=[2 [[1 [2 3]] [[1 0] [4 [4 b]]]]]]]
+				[*[a 1 0] *[a [2 [[1 [2 3]] [[1 0] [4 [4 b]]]]]]]
+					*[a 1 0]
+						0
+				[0 *[a [2 [[1 [2 3]] [[1 0] [4 [4 b]]]]]]]
+					*[a [2 [b=[1 [2 3]] c=[[1 0] [4 [4 b]]]]]]
+					*[*[a [1 [2 3]]] *[a [[1 0] [4 [4 b]]]]]
+						*[a [1 [2 3]]]
+							[2 3]
+					*[[2 3] *[a [[1 0] [4 [4 b]]]]]
+						*[a [[b=1 c=0] d=[4 [4 b]]]]
+						[*[a 1 0] *[a [4 [4 b]]]]
+							*[a 1 0]
+								0
+						[0 *[a [4 [4 b]]]]
+							*[a [4 [4 b]]]
+							+*[a [4 b]]
+								*[a 4 b]
+								+*[a b]
+							++*[a b]
+						[0 ++*[a b]]
+					*[[2 3] [0 ++*[a b]]]
+					/[++*[a b] [2 3]]
+				[0 /[++*[a b] [2 3]]]
+			*[[c d] [0 /[++*[a b] [2 3]]]]
+			/[/[++*[a b] [2 3]] [c d]]
+		*[a /[/[++*[a b] [2 3]] [c d]]]
+
+		*{a {IF {b c d}}} -> part(*{a b}+1, {*{a c} *{a d}})
+		*{a {IF {b c d}}} -> part(sum({*{a b} 1}), {*{a c} *{a d}})
 	]=]
 }
 
