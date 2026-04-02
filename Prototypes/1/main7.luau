@@ -124,19 +124,19 @@ local function h_size(t: Thing): Num?
 end
 
 local function h_part(a: Thing, b: Thing): Thing?
-	if a.type ~= NUM then
+	if b.type ~= NUM then
 		return nil
 	end
 
-	if a.value == 0 then
-		return b
+	if b.value == 0 then
+		return a
 	end
 
-	if b.type ~= LIST then
+	if a.type ~= LIST then
 		return nil
 	end
 
-	return b.things[a.value] -- sorry, luau...
+	return a.things[b.value] -- YEAHH!!! WOOOO00T!! THANK YOU LUAU!!!!!!!!
 end
 
 local function h_sum(t: Thing): Num?
@@ -239,9 +239,9 @@ local function reduce1(e: Thing, depth: number): Thing?
 		return b
 	end
 
-	-- *{a {PART b}} -> part(b, a)
+	-- *{a {PART b}} -> part(a, b)
 	if n.value == PART then
-		return h_part(b, a)
+		return h_part(a, b)
 	end
 
 	-- *{a {SIZE b}} -> size(*{a b})
@@ -817,46 +817,46 @@ local tests: {
 
 		*[a [2 [[PART 0] [2 [[1 [c d]] [[1 0] [2 [[1 [2 3]] [[1 0] [4 [4 b]]]]]]]]]]]
 
-		*[a=a [SPLIT [b=[PART 0] c=[SPLIT [[TAKE [c d]] [[TAKE 0] [SPLIT [[TAKE [2 3]] [[TAKE 0] [4 [4 b]]]]]]]]]]]
-		*[*[a [PART 0]] *[a [2 [[TAKE [c d]] [[TAKE 0] [SPLIT [[TAKE [2 3]] [[TAKE 0] [4 [4 b]]]]]]]]]]
-			*[a [PART 0]]
+		*{a=a {SPLIT {b={PART 0} c={SPLIT {{TAKE {c d}} {{TAKE 0} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}}}}}
+		*{*{a {PART 0}} *{a {2 {{TAKE {c d}} {{TAKE 0} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}}}}
+			*{a {PART 0}}
 				a
-		*[a *[a [SPLIT [[TAKE [c d]] [[TAKE 0] [SPLIT [[TAKE [2 3]] [[TAKE 0] [4 [4 b]]]]]]]]]]
-			*[a [SPLIT [b=[TAKE [c d]] c=[[TAKE 0] [SPLIT [[TAKE [2 3]] [[TAKE 0] [4 [4 b]]]]]]]]]
-			*[*[a [TAKE [c d]]] *[a [[TAKE 0] [SPLIT [[TAKE [2 3]] [[TAKE 0] [4 [4 b]]]]]]]]
-				*[a [TAKE [c d]]]
-					[c d]
-			*[[c d] *[a [[TAKE 0] [SPLIT [[TAKE [2 3]] [[TAKE 0] [4 [4 b]]]]]]]]
-				*[a [[b=TAKE c=0] d=[SPLIT [[TAKE [2 3]] [[TAKE 0] [4 [4 b]]]]]]]
-				[*[a [TAKE 0]] *[a [SPLIT [[TAKE [2 3]] [[TAKE 0] [4 [4 b]]]]]]]
-					*[a [TAKE 0]]
+		*{a *{a {SPLIT {{TAKE {c d}} {{TAKE 0} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}}}}
+			*{a {SPLIT {b={TAKE {c d}} c={{TAKE 0} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}}}
+			*{*{a {TAKE {c d}}} *{a {{TAKE 0} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}}
+				*{a {TAKE {c d}}}
+					{c d}
+			*{{c d} *{a {{TAKE 0} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}}
+				*{a {{b=TAKE c=0} d={SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}
+				{*{a {TAKE 0}} *{a {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}
+					*{a {TAKE 0}}
 						0
-				[0 *[a [SPLIT [[TAKE [2 3]] [[TAKE 0] [4 [4 b]]]]]]]
-					*[a [SPLIT [b=[TAKE [2 3]] c=[[TAKE 0] [4 [4 b]]]]]]
-					*[*[a [TAKE [2 3]]] *[a [[TAKE 0] [4 [4 b]]]]]
-						*[a [TAKE [2 3]]]
-							[2 3]
-					*[[2 3] *[a [[TAKE 0] [4 [4 b]]]]]
-						*[a [[b=TAKE c=0] d=[4 [4 b]]]]
-						[*[a TAKE 0] *[a [4 [4 b]]]]
-							*[a TAKE 0]
-								0
-						[0 *[a [4 [4 b]]]]
-							*[a [4 [4 b]]]
-							+*[a [4 b]]
-								*[a 4 b]
-								+*[a b]
-							++*[a b]
-						[0 ++*[a b]]
-
-		*[[[TAKE X] b] [SUM a]]
-		sum(*[a [[TAKE X] b]])
-			*[a [[TAKE X] b]]
-			[*[a [TAKE X]] *[a b]]
-				*[a [TAKE X]]
-					X
-			[X *[a b]]
-		sum([X *[a b]])
+				{0 *{a {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}
+					*{a {SPLIT {b={TAKE {1 2}} c={{TAKE PART} {SUM {{TAKE X} b}}}}}}
+					*{*{a {TAKE {1 2}}} *{a {{TAKE PART} {SUM {{TAKE X} b}}}}}
+						*{a {TAKE {1 2}}}
+							{1 2}
+					*{{1 2} *{a {{TAKE PART} {SUM {{TAKE X} b}}}}}
+						*{a {{b=TAKE c=PART} d={SUM {{TAKE X} b}}}}
+						{*{a TAKE PART} *{a {SUM {{TAKE X} b}}}}
+							*{a TAKE PART}
+								PART
+						{PART *{a {SUM {{TAKE X} b}}}}
+							*{a {SUM {{TAKE X} b}}}
+							sum(*{a {{TAKE X} b}})
+								*{a {{TAKE X} b}}
+								{*{a {TAKE X}} *{a b}}
+									*{a {TAKE X}}
+										X
+								{X *{a b}}
+							sum({X *{a b}})
+						{PART sum({X *{a b}})}
+					*{{1 2} {PART sum({X *{a b}})}}
+					part({1 2}, sum({X *{a b}}))
+				{0 part({1 2}, sum({X *{a b}}))}
+			*{{c d} {0 part({1 2}, sum({X *{a b}}))}}
+			part({c d}, part({1 2}, sum({X *{a b}})))
+		*{a part({c d}, part({1 2}, sum({X *{a b}})))}
 	]=]
 }
 
