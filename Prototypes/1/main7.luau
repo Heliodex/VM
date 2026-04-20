@@ -367,6 +367,34 @@ local function a_if(a: Thing, b: Thing, c: Thing, d: Thing): Thing
 	)
 end
 
+local function a_if2(a: Thing, b: Thing, c: Thing, d: Thing): Thing
+	--[[
+		{a {SPLIT {{PART 0} {SPLIT {{TAKE {c d}} {{TAKE 0} {SUM {{TAKE X} b}}}}}}}}
+		a_split(a, {{PART 0} {SPLIT {{TAKE {c d}} {{TAKE 0} {SUM {{TAKE X} b}}}}}})
+		a_split(a, split({PART 0}, {{TAKE {c d}} {{TAKE 0} {SUM {{TAKE X} b}}}}))
+		a_split(a, split({PART 0}, {{TAKE {c d}} a_sum({TAKE 0}, {{TAKE X} b})}))
+	]]
+	return a_split(
+		a,
+		a_split(
+			list { num(PART), num(0) },
+			list {
+				list { num(TAKE), list { c, d } },
+				a_sum(
+					list { num(TAKE), num(0) },
+					list {
+						list {
+							num(TAKE),
+							num(1) --[[X]],
+						},
+						b,
+					}
+				),
+			}
+		)
+	)
+end
+
 local tests: {
 	{
 		eval: Thing,
@@ -844,6 +872,39 @@ local tests: {
 	]=]
 	{
 		eval = a_if(num(100), list { num(TAKE), TRUE }, num(300), num(400)),
+	},
+	--[=[
+		*{a=a {SPLIT {b={PART 0} c={SPLIT {{TAKE {c d}} {{TAKE 0} {SUM {{TAKE X} b}}}}}}}}
+		*{*{a {PART 0}} *{a {2 {{TAKE {c d}} {{TAKE 0} {SUM {{TAKE X} b}}}}}}}
+			*{a {PART 0}}
+				a
+		*{a *{a {SPLIT {{TAKE {c d}} {{TAKE 0} {SUM {{TAKE X} b}}}}}}}
+			*{a {SPLIT {b={TAKE {c d}} c={{TAKE 0} {SUM {{TAKE X} b}}}}}}
+			*{*{a {TAKE {c d}}} *{a {{TAKE 0} {SUM {{TAKE X} b}}}}}
+				*{a {TAKE {c d}}}
+					{c d}
+			*{{c d} *{a {{TAKE 0} {SUM {{TAKE X} b}}}}}
+				*{a {{b=TAKE c=0} d={SUM {{TAKE X} b}}}}
+				{*{a {TAKE 0}} *{a {SUM {{TAKE X} b}}}}
+					*{a {TAKE 0}}
+						0
+				{0 *{a {SUM {{TAKE X} b}}}}
+					*{a {SUM {{TAKE X} b}}}
+					sum(*{a {{TAKE X} b}})
+						*{a {{TAKE X} b}}
+						{*{a {TAKE X}} *{a b}}
+							*{a {TAKE X}}
+								X
+						{X *{a b}}
+					sum({X *{a b}})
+					sum({X *{a b}})
+				{0 sum({X *{a b}})}
+			*{{c d} {0 sum({X *{a b}})}}
+			part({c d}, sum({X *{a b}}))
+		*{a part({c d}, sum({X *{a b}}))}
+	]=]
+	{
+		eval = a_if2(num(100), list { num(TAKE), TRUE }, num(300), num(400)),
 	},
 }
 
