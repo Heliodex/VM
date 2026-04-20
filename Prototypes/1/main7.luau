@@ -333,39 +333,37 @@ local function a_split(a: Thing, b: Thing): Thing
 end
 
 local function a_if(a: Thing, b: Thing, c: Thing, d: Thing): Thing
+	--[[
+		{a {SPLIT {{PART 0} {SPLIT {{TAKE {c d}} {{TAKE 0} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}}}}}
+		a_split(a, {{PART 0} {SPLIT {{TAKE {c d}} {{TAKE 0} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}}})
+		a_split(a, a_split({PART 0}, {{TAKE {c d}} {{TAKE 0} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}))
+		a_split(a, a_split({PART 0}, {{TAKE {c d}} a_split({TAKE 0}, {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}})}))
+		a_split(a, a_split({PART 0}, {{TAKE {c d}} a_split({TAKE 0}, {{TAKE {1 2}} a_sum({TAKE PART}, {{TAKE X} b})})}))
+	]]
 	return a_split(
 		a,
-		list {
+		a_split(
 			list { num(PART), num(0) },
 			list {
-				num(SPLIT),
-				list {
-					list { num(TAKE), list { c, d } },
+				list { num(TAKE), list { c, d } },
+				a_split(
+					list { num(TAKE), num(0) },
 					list {
-						list { num(TAKE), num(0) },
-						list {
-							num(SPLIT),
+						list { num(TAKE), list { num(1), num(2) } },
+						a_sum(
+							list { num(TAKE), num(PART) },
 							list {
-								list { num(TAKE), list { num(1), num(2) } },
 								list {
-									list { num(TAKE), num(PART) },
-									list {
-										num(SUM),
-										list {
-											list {
-												num(TAKE),
-												num(1) --[[X]],
-											},
-											b,
-										},
-									},
+									num(TAKE),
+									num(1) --[[X]],
 								},
-							},
-						},
-					},
-				},
-			},
-		}
+								b,
+							}
+						),
+					}
+				),
+			}
+		)
 	)
 end
 
@@ -843,10 +841,6 @@ local tests: {
 			*{{c d} {0 part({1 2}, sum({X *{a b}}))}}
 			part({c d}, part({1 2}, sum({X *{a b}})))
 		*{a part({c d}, part({1 2}, sum({X *{a b}})))}
-
-		{a {SPLIT {{PART 0} {SPLIT {{TAKE {c d}} {{TAKE 0} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}}}}}
-		a_split(a, {{PART 0} {SPLIT {{TAKE {c d}} {{TAKE 0} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}}})
-		a_split(a, {{PART 0} {SPLIT {{TAKE {c d}} {{TAKE 0} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}}})
 	]=]
 	{
 		eval = a_if(num(100), list { num(TAKE), TRUE }, num(300), num(400)),
