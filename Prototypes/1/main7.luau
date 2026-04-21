@@ -285,6 +285,10 @@ local function a_ifc(a: Thing, b: Thing, c: Thing, d: Thing): Thing
 	)
 end
 
+local function a_compog(a: Thing, b: Thing, c: Thing): Thing
+	return a_split(a, a_take(b, c))
+end
+
 -- *a
 local function reduce1(e: Thing, depth: number): Thing?
 	local start = string.rep("    ", depth)
@@ -827,6 +831,8 @@ local tests: {
 		),
 		res = list { num(1), num(2) },
 	},
+
+	-- if construction
 	--[=[
 		*{a {SPLIT {{PART 0} {SPLIT {{TAKE {c d}} {{TAKE PART} {SUM {{TAKE 1} {TAKE TRUE}}}}}}}}}
 		*{*{a {PART 0}} *{a {SPLIT {{TAKE {c d}} {{TAKE PART} {SUM {{TAKE 1} {TAKE TRUE}}}}}}}}
@@ -1033,6 +1039,7 @@ local tests: {
 		),
 	},
 
+	-- if
 	{
 		eval = a_if(
 			num(0),
@@ -1058,6 +1065,24 @@ local tests: {
 			list { TAKE, num(30) },
 			list { TAKE, num(40) }
 		),
+	},
+
+	-- comp construction
+	{
+		eval = a_compog(
+			num(3),
+			list { TAKE, num(2) },
+			list { PART, num(0) }
+		),
+		res = num(2),
+	},
+	{
+		eval = a_compog(
+			num(3),
+			list { PART, num(0) },
+			list { PART, num(0) }
+		),
+		res = num(3),
 	},
 }
 
