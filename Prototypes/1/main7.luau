@@ -191,11 +191,11 @@ end
 
 -- *a
 local function reduce1(e: Thing, depth: number): Thing?
-	local start = string.rep("  ", depth)
+	local start = string.rep("    ", depth)
 
 	local function printReturn(a: Thing?)
 		if a then
-			print(string.rep("  ", depth + 1) .. serialise(a, true))
+			print(start .. serialise(a, true))
 		end
 		return a
 	end
@@ -232,10 +232,22 @@ local function reduce1(e: Thing, depth: number): Thing?
 		-- autocons
 		local b2, c2 = n.things[1], n.things[2]
 
+		local sera = serialise(a, true)
+		print(
+			`{start}\{*\{{sera} \{{serialise(b2, true)} {serialise(c2, true)}}} *\{{sera} {serialise(
+				b,
+				true
+			)}}}`
+		)
+
 		local rabc = reduce1(list { a, list { b2, c2 } }, depth + 1)
 		if rabc == nil then
 			return nil
 		end
+
+		print(
+			`{start}\{{serialise(rabc, true)} *\{{sera} {serialise(b, true)}}}`
+		)
 
 		local rad = reduce1(list { a, b }, depth + 1)
 		if rad == nil then
@@ -269,6 +281,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 		if rab == nil then
 			return nil
 		end
+		print(`{start}size({serialise(rab, true)})`)
 		return printReturn(h_size(rab))
 	end
 
@@ -279,6 +292,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 		if rab == nil then
 			return nil
 		end
+		print(`{start}sum({serialise(rab, true)})`)
 		return printReturn(h_sum(rab))
 	end
 
@@ -289,6 +303,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 		if rab == nil then
 			return nil
 		end
+		print(`{start}check({serialise(rab, true)})`)
 		return printReturn(h_check(rab))
 	end
 
@@ -299,6 +314,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 		if rab == nil then
 			return nil
 		end
+		print(`{start}type({serialise(rab, true)})`)
 		return printReturn(h_type(rab))
 	end
 
@@ -318,17 +334,21 @@ local function reduce1(e: Thing, depth: number): Thing?
 			)}}}`
 		)
 
-		local rba = reduce1(list { a, b2 }, depth + 1)
-		if rba == nil then
+		local rab = reduce1(list { a, b2 }, depth + 1)
+		if rab == nil then
 			return nil
 		end
 
-		local rca = reduce1(list { a, c2 }, depth + 1)
-		if rca == nil then
+		print(
+			`{start}*\{{serialise(rab, true)} *\{{sera} {serialise(c2, true)}}}`
+		)
+
+		local rac = reduce1(list { a, c2 }, depth + 1)
+		if rac == nil then
 			return nil
 		end
 
-		return printReturn(reduce1(list { rba, rca }, depth + 1))
+		return printReturn(reduce1(list { rab, rac }, depth + 1))
 	end
 
 	return nil
@@ -377,7 +397,7 @@ local function a_if(a: Thing, b: Thing, c: Thing, d: Thing): Thing
 			list {
 				list { TAKE, list { c, d } },
 				a_split(
-					list { TAKE, num(0) },
+					list { TAKE, PART },
 					list {
 						list { TAKE, list { num(1), num(2) } },
 						a_sum(
@@ -411,7 +431,7 @@ local function a_if2(a: Thing, b: Thing, c: Thing, d: Thing): Thing
 			list {
 				list { TAKE, list { c, d } },
 				a_sum(
-					list { TAKE, num(0) },
+					list { TAKE, PART },
 					list {
 						list {
 							TAKE,
@@ -829,85 +849,106 @@ local tests: {
 
 		*[a [2 [[PART 0] [2 [[1 [c d]] [[1 0] [2 [[1 [2 3]] [[1 0] [4 [4 b]]]]]]]]]]]
 
-		*{a=a {SPLIT {b={PART 0} c={SPLIT {{TAKE {c d}} {{TAKE 0} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}}}}}
-		*{*{a {PART 0}} *{a {2 {{TAKE {c d}} {{TAKE 0} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}}}}
+		*{a {SPLIT {{PART 0} {SPLIT {{TAKE {c d}} {{TAKE PART} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE 1} {TAKE TRUE}}}}}}}}}}}}
+		*{*{a {PART 0}} *{a {SPLIT {{TAKE {c d}} {{TAKE PART} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE 1} {TAKE TRUE}}}}}}}}}}}
 			*{a {PART 0}}
-				a
-		*{a *{a {SPLIT {{TAKE {c d}} {{TAKE 0} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}}}}
-			*{a {SPLIT {b={TAKE {c d}} c={{TAKE 0} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}}}
-			*{*{a {TAKE {c d}}} *{a {{TAKE 0} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}}
+			part(a, 0)
+			a
+		*{a *{a {SPLIT {{TAKE {c d}} {{TAKE PART} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE 1} {TAKE TRUE}}}}}}}}}}}
+			*{a {SPLIT {{TAKE {c d}} {{TAKE PART} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE 1} {TAKE TRUE}}}}}}}}}}
+			*{*{a {TAKE {c d}}} *{a {{TAKE PART} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE 1} {TAKE TRUE}}}}}}}}}
 				*{a {TAKE {c d}}}
-					{c d}
-			*{{c d} *{a {{TAKE 0} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}}
-				*{a {{b=TAKE c=0} d={SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}
-				{*{a {TAKE 0}} *{a {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}
-					*{a {TAKE 0}}
-						0
-				{0 *{a {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}
-					*{a {SPLIT {b={TAKE {1 2}} c={{TAKE PART} {SUM {{TAKE X} b}}}}}}
-					*{*{a {TAKE {1 2}}} *{a {{TAKE PART} {SUM {{TAKE X} b}}}}}
+				{c d}
+			*{{c d} *{a {{TAKE PART} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE 1} {TAKE TRUE}}}}}}}}}
+				*{a {{TAKE PART} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE 1} {TAKE TRUE}}}}}}}} 
+				{*{a {TAKE PART}} *{a {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE 1} {TAKE TRUE}}}}}}}}
+					*{a {TAKE PART}}
+					PART
+				{PART *{a {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE 1} {TAKE TRUE}}}}}}}}        
+					*{a {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE 1} {TAKE TRUE}}}}}}}
+					*{*{a {TAKE {1 2}}} *{a {{TAKE PART} {SUM {{TAKE 1} {TAKE TRUE}}}}}}
 						*{a {TAKE {1 2}}}
-							{1 2}
-					*{{1 2} *{a {{TAKE PART} {SUM {{TAKE X} b}}}}}
-						*{a {{b=TAKE c=PART} d={SUM {{TAKE X} b}}}}
-						{*{a TAKE PART} *{a {SUM {{TAKE X} b}}}}
-							*{a TAKE PART}
-								PART
-						{PART *{a {SUM {{TAKE X} b}}}}
-							*{a {SUM {{TAKE X} b}}}
-							sum(*{a {{TAKE X} b}})
-								*{a {{TAKE X} b}}
-								{*{a {TAKE X}} *{a b}}
-									*{a {TAKE X}}
-										X
-								{X *{a b}}
-							sum({X *{a b}})
-						{PART sum({X *{a b}})}
-					*{{1 2} {PART sum({X *{a b}})}}
-					part({1 2}, sum({X *{a b}}))
-				{0 part({1 2}, sum({X *{a b}}))}
-			*{{c d} {0 part({1 2}, sum({X *{a b}}))}}
-			part({c d}, part({1 2}, sum({X *{a b}})))
-		*{a part({c d}, part({1 2}, sum({X *{a b}})))}
+						{1 2}
+					*{{1 2} *{a {{TAKE PART} {SUM {{TAKE 1} {TAKE TRUE}}}}}}
+						*{a {{TAKE PART} {SUM {{TAKE 1} {TAKE TRUE}}}}}
+						{*{a {TAKE PART}} *{a {SUM {{TAKE 1} {TAKE TRUE}}}}}
+							*{a {TAKE PART}}
+							PART
+						{PART *{a {SUM {{TAKE 1} {TAKE TRUE}}}}}
+							*{a {SUM {{TAKE 1} {TAKE TRUE}}}}
+							sum(*{a, {{TAKE 1} {TAKE TRUE}}})
+								*{a {{TAKE 1} {TAKE TRUE}}}
+								{*{a {TAKE 1}} *{a {TAKE TRUE}}}
+									*{a {TAKE 1}}
+									1
+								{1 *{a {TAKE TRUE}}}
+									*{a {TAKE TRUE}}
+									TRUE
+								{1 TRUE}
+							sum({1 TRUE})
+							1
+						{PART 1}
+						*{{1 2} {PART 1}}
+						part({1 2}, 1)
+						1
+					1
+				{PART 1}
+				*{{c d} {PART 1}}
+				part({c d}, 1)
+				c
+			c
+			*{a c}
 	]=]
 	{
-		eval = a_if(num(100), list { TAKE, TRUE }, num(300), num(400)),
+		eval = a_if(num(100, "a"), list { TAKE, TRUE }, num(300, "c"), num(400, "d")),
 	},
 	--[=[
-		*{a=a {SPLIT {b={PART 0} c={SPLIT {{TAKE {c d}} {{TAKE 0} {SUM {{TAKE X} b}}}}}}}}
-		*{*{a {PART 0}} *{a {2 {{TAKE {c d}} {{TAKE 0} {SUM {{TAKE X} b}}}}}}}
+		*{a {SPLIT {{PART 0} {SPLIT {{TAKE {c d}} {{TAKE PART} {SUM {{TAKE 1} {TAKE TRUE}}}}}}}}}
+		*{*{a {PART 0}} *{a {SPLIT {{TAKE {c d}} {{TAKE PART} {SUM {{TAKE 1} {TAKE TRUE}}}}}}}}
 			*{a {PART 0}}
-				a
-		*{a *{a {SPLIT {{TAKE {c d}} {{TAKE 0} {SUM {{TAKE X} b}}}}}}}
-			*{a {SPLIT {b={TAKE {c d}} c={{TAKE 0} {SUM {{TAKE X} b}}}}}}
-			*{*{a {TAKE {c d}}} *{a {{TAKE 0} {SUM {{TAKE X} b}}}}}
+			part(a, 0)
+			a
+		*{a *{a {SPLIT {{TAKE {c d}} {{TAKE PART} {SUM {{TAKE 1} {TAKE TRUE}}}}}}}}
+			*{a {SPLIT {{TAKE {c d}} {{TAKE PART} {SUM {{TAKE 1} {TAKE TRUE}}}}}}}
+			*{*{a {TAKE {c d}}} *{a {{TAKE PART} {SUM {{TAKE 1} {TAKE TRUE}}}}}}
 				*{a {TAKE {c d}}}
-					{c d}
-			*{{c d} *{a {{TAKE 0} {SUM {{TAKE X} b}}}}}
-				*{a {{b=TAKE c=0} d={SUM {{TAKE X} b}}}}
-				{*{a {TAKE 0}} *{a {SUM {{TAKE X} b}}}}
-					*{a {TAKE 0}}
-						0
-				{0 *{a {SUM {{TAKE X} b}}}}
-					*{a {SUM {{TAKE X} b}}}
-					sum(*{a {{TAKE X} b}})
-						*{a {{TAKE X} b}}
-						{*{a {TAKE X}} *{a b}}
-							*{a {TAKE X}}
-								X
-						{X *{a b}}
-					sum({X *{a b}})
-				{0 sum({X *{a b}})}
-			*{{c d} {0 sum({X *{a b}})}}
-			part({c d}, sum({X *{a b}}))
-		*{a part({c d}, sum({X *{a b}}))}
-
-		{100 {6 {{1 0} {6 {{0 {300 400}} {{0 0} {3 {{0 1} {0 0}}}}}}}}}
-		{100 {SPLIT {{PART 0} {SPLIT {{TAKE {300 400}} {{TAKE 0} {SUM {{TAKE 1} {TAKE 0}}}}}}}}}
+				{c d}
+			*{{c d} *{a {{TAKE PART} {SUM {{TAKE 1} {TAKE TRUE}}}}}}
+				*{a {{TAKE PART} {SUM {{TAKE 1} {TAKE TRUE}}}}}
+				{*{a {TAKE PART}} *{a {SUM {{TAKE 1} {TAKE TRUE}}}}}
+					*{a {TAKE PART}}
+					PART
+				{PART *{a {SUM {{TAKE 1} {TAKE TRUE}}}}}
+					*{a {SUM {{TAKE 1} {TAKE TRUE}}}}
+					sum(*{a, {{TAKE 1} {TAKE TRUE}}})
+						*{a {{TAKE 1} {TAKE TRUE}}}
+						{*{a {TAKE 1}} *{a {TAKE TRUE}}}
+							*{a {TAKE 1}}
+							1
+						{1 *{a {TAKE TRUE}}}
+							*{a {TAKE TRUE}}
+							TRUE
+						{1 TRUE}
+					sum({1 TRUE})
+					1
+				{PART 1}
+				*{{c d} {PART 1}}
+				part({c d}, 1)
+				c
+			c
+			*{a c}
 	]=]
 	{
-		eval = a_if2(num(100), list { TAKE, TRUE }, num(300), num(400)),
+		eval = a_if2(
+			num(100, "a"),
+			list { TAKE, TRUE },
+			num(300, "c"),
+			num(400, "d")
+		),
 	},
+	-- {
+	-- 	eval = a_if2(num(100), list { TAKE, TRUE }, num(300), num(400)),
+	-- },
 }
 
 -- test serialise and deserialise
