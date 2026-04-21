@@ -117,14 +117,15 @@ end
 
 local TRUE, FALSE = num(0, "TRUE"), num(1, "FALSE") -- imagine loobeans but if they were loobeans
 
-local TAKE, PART, SIZE, SUM, CHECK, TYPE, SPLIT =
+local TAKE, PART, SIZE, SUM, CHECK, TYPE, SPLIT, IF =
 	num(0, "TAKE"),
 	num(1, "PART"),
 	num(2, "SIZE"),
 	num(3, "SUM"),
 	num(4, "CHECK"),
 	num(5, "TYPE"),
-	num(6, "SPLIT")
+	num(6, "SPLIT"),
+	num(7, "IF")
 
 local function h_size(t: Thing): Num?
 	print(`size({serialise(t, true)})`)
@@ -187,6 +188,101 @@ end
 
 local function h_type(t: Thing): Num?
 	return if t.type == NUM then TRUE else FALSE
+end
+
+local function a_take(a: Thing, b: Thing): Thing
+	return list { a, list { TAKE, b } }
+end
+
+local function a_size(a: Thing, b: Thing): Thing
+	return list { a, list { SIZE, b } }
+end
+
+local function a_part(a: Thing, b: Thing): Thing
+	return list { a, list { PART, b } }
+end
+
+local function a_sum(a: Thing, b: Thing): Thing
+	return list { a, list { SUM, b } }
+end
+
+local function a_check(a: Thing, b: Thing): Thing
+	return list { a, list { CHECK, b } }
+end
+
+local function a_type(a: Thing, b: Thing): Thing
+	return list { a, list { TYPE, b } }
+end
+
+local function a_split(a: Thing, b: Thing): Thing
+	return list { a, list { SPLIT, b } }
+end
+
+local function a_if(a: Thing, b: Thing, c: Thing, d: Thing): Thing
+	return list { a, list { IF, list { b, c, d } } }
+end
+
+local function a_ifog(a: Thing, b: Thing, c: Thing, d: Thing): Thing
+	--[[
+		{a {SPLIT {{PART 0} {SPLIT {{TAKE {c d}} {{TAKE 0} {SUM {{TAKE X} b}}}}}}}}
+		a_split(a, {{PART 0} {SPLIT {{TAKE {c d}} {{TAKE 0} {SUM {{TAKE X} b}}}}}})
+		a_split(a, a_split({PART 0}, {{TAKE {c d}} {{TAKE 0} {SUM {{TAKE X} b}}}}))
+		a_split(a, a_split({PART 0}, {{TAKE {c d}} a_sum({TAKE 0}, {{TAKE X} b})}))
+	]]
+	return a_split(
+		a,
+		a_split(
+			list { PART, num(0) },
+			list {
+				list { TAKE, list { c, d } },
+				a_sum(
+					list { TAKE, PART },
+					list {
+						list {
+							TAKE,
+							num(1) --[[X]],
+						},
+						b,
+					}
+				),
+			}
+		)
+	)
+end
+
+local function a_ifc(a: Thing, b: Thing, c: Thing, d: Thing): Thing
+	--[[
+		{a {SPLIT {{PART 0} {SPLIT {{TAKE {c d}} {{TAKE 0} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}}}}}
+		a_split(a, {{PART 0} {SPLIT {{TAKE {c d}} {{TAKE 0} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}}})
+		a_split(a, a_split({PART 0}, {{TAKE {c d}} {{TAKE 0} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}))
+		a_split(a, a_split({PART 0}, {{TAKE {c d}} a_split({TAKE 0}, {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}})}))
+		a_split(a, a_split({PART 0}, {{TAKE {c d}} a_split({TAKE 0}, {{TAKE {1 2}} a_sum({TAKE PART}, {{TAKE X} b})})}))
+	]]
+	return a_split(
+		a,
+		a_split(
+			list { PART, num(0) },
+			list {
+				list { TAKE, list { c, d } },
+				a_split(
+					list { TAKE, PART },
+					list {
+						list { TAKE, list { num(1), num(2) } }, -- constraint not really required
+						a_sum(
+							list { TAKE, PART },
+							list {
+								list {
+									TAKE,
+									num(1) --[[X]],
+								},
+								b,
+							}
+						),
+					}
+				),
+			}
+		)
+	)
 end
 
 -- *a
@@ -351,98 +447,50 @@ local function reduce1(e: Thing, depth: number): Thing?
 		return reduce1(list { rab, rac }, depth)
 	end
 
+	-- macro time
+
+	-- *{a {IF {b c d}}} -> *{a {SPLIT {{PART 0} {SPLIT {{TAKE {c d}} {{TAKE PART} {SUM {{TAKE 1} b}}}}}}}}
+	--[[
+		*{a {SPLIT {{PART 0} {SPLIT {{TAKE {c d}} {{TAKE PART} {SUM {{TAKE 1} b}}}}}}}}
+		*{*{a {PART 0}} *{a {SPLIT {{TAKE {c d}} {{TAKE PART} {SUM {{TAKE 1} b}}}}}}}
+		*{a *{a {SPLIT {{TAKE {c d}} {{TAKE PART} {SUM {{TAKE 1} b}}}}}}}
+		*{a *{*{a {TAKE {c d}}} *{a {{TAKE PART} {SUM {{TAKE 1} b}}}}}}
+		*{a *{{c d} *{a {{TAKE PART} {SUM {{TAKE 1} b}}}}}}
+		*{a *{{c d} {*{a {TAKE PART}} *{a {SUM {{TAKE 1} b}}}}}}
+		*{a *{{c d} {PART *{a {SUM {{TAKE 1} b}}}}}}
+		*{a *{{c d} {PART sum(*{a, {{TAKE 1} b}})}}}
+		*{a *{{c d} {PART sum({*{a {TAKE 1}} *{a b}})}}}
+		*{a *{{c d} {PART sum({1 *{a b}})}}}
+		*{a *{part({c d}, sum({1 *{a b}}))}}
+	]]
+	if equal(n, IF) then
+		if b.type ~= LIST or len(b) ~= 3 then
+			return nil
+		end
+
+		-- to put some clarification in this document for once, this opcode does if-then-else. Just like Nock 6, it's written in the first definition as a funky-looking macro just because we can. The ones after that are a "demacrotisation" of that. While useful for VM implementation, the most interesting thing is that they *can* be written in terms of the other opcodes (note the first definition has only 1 eval operator)
+
+		local b2, c2, d2 = b.things[1], b.things[2], b.things[3]
+		-- return printReturn(reduce1(a_ifog(a, b2, c2, d2), depth + 1))
+
+		-- local sera = serialise(a, true)
+
+		local rab = reduce1(list { a, b2 }, depth + 1)
+		if rab == nil then
+			return nil
+		end
+
+		if equal(rab, TRUE) then
+			return printReturn(reduce1(list { a, c2 }, depth + 1))
+		end
+		if equal(rab, FALSE) then
+			return printReturn(reduce1(list { a, d2 }, depth + 1))
+		end
+
+		return nil
+	end
+
 	return nil
-end
-
-local function a_take(a: Thing, b: Thing): Thing
-	return list { a, list { TAKE, b } }
-end
-
-local function a_size(a: Thing, b: Thing): Thing
-	return list { a, list { SIZE, b } }
-end
-
-local function a_part(a: Thing, b: Thing): Thing
-	return list { a, list { PART, b } }
-end
-
-local function a_sum(a: Thing, b: Thing): Thing
-	return list { a, list { SUM, b } }
-end
-
-local function a_check(a: Thing, b: Thing): Thing
-	return list { a, list { CHECK, b } }
-end
-
-local function a_type(a: Thing, b: Thing): Thing
-	return list { a, list { TYPE, b } }
-end
-
-local function a_split(a: Thing, b: Thing): Thing
-	return list { a, list { SPLIT, b } }
-end
-
-local function a_if(a: Thing, b: Thing, c: Thing, d: Thing): Thing
-	--[[
-		{a {SPLIT {{PART 0} {SPLIT {{TAKE {c d}} {{TAKE 0} {SUM {{TAKE X} b}}}}}}}}
-		a_split(a, {{PART 0} {SPLIT {{TAKE {c d}} {{TAKE 0} {SUM {{TAKE X} b}}}}}})
-		a_split(a, a_split({PART 0}, {{TAKE {c d}} {{TAKE 0} {SUM {{TAKE X} b}}}}))
-		a_split(a, a_split({PART 0}, {{TAKE {c d}} a_sum({TAKE 0}, {{TAKE X} b})}))
-	]]
-	return a_split(
-		a,
-		a_split(
-			list { PART, num(0) },
-			list {
-				list { TAKE, list { c, d } },
-				a_sum(
-					list { TAKE, PART },
-					list {
-						list {
-							TAKE,
-							num(1) --[[X]],
-						},
-						b,
-					}
-				),
-			}
-		)
-	)
-end
-
-local function a_ifc(a: Thing, b: Thing, c: Thing, d: Thing): Thing
-	--[[
-		{a {SPLIT {{PART 0} {SPLIT {{TAKE {c d}} {{TAKE 0} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}}}}}
-		a_split(a, {{PART 0} {SPLIT {{TAKE {c d}} {{TAKE 0} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}}})
-		a_split(a, a_split({PART 0}, {{TAKE {c d}} {{TAKE 0} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}))
-		a_split(a, a_split({PART 0}, {{TAKE {c d}} a_split({TAKE 0}, {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}})}))
-		a_split(a, a_split({PART 0}, {{TAKE {c d}} a_split({TAKE 0}, {{TAKE {1 2}} a_sum({TAKE PART}, {{TAKE X} b})})}))
-	]]
-	return a_split(
-		a,
-		a_split(
-			list { PART, num(0) },
-			list {
-				list { TAKE, list { c, d } },
-				a_split(
-					list { TAKE, PART },
-					list {
-						list { TAKE, list { num(1), num(2) } }, -- constraint not really required
-						a_sum(
-							list { TAKE, PART },
-							list {
-								list {
-									TAKE,
-									num(1) --[[X]],
-								},
-								b,
-							}
-						),
-					}
-				),
-			}
-		)
-	)
 end
 
 local tests: {
@@ -815,7 +863,7 @@ local tests: {
 		*{a c}
 	]=]
 	{
-		eval = a_if(
+		eval = a_ifog(
 			num(0),
 			list { TAKE, TRUE },
 			list { TAKE, num(30) },
@@ -824,13 +872,21 @@ local tests: {
 		res = num(30),
 	},
 	{
-		eval = a_if(
+		eval = a_ifog(
 			num(0),
 			list { TAKE, FALSE },
 			list { TAKE, num(30) },
 			list { TAKE, num(40) }
 		),
 		res = num(40),
+	},
+	{
+		eval = a_ifog(
+			num(0),
+			list { TAKE, num(2) },
+			list { TAKE, num(30) },
+			list { TAKE, num(40) }
+		),
 	},
 	--[=[
 		If *[a b] equals 0 return *[a c]
@@ -967,6 +1023,41 @@ local tests: {
 			list { TAKE, num(40) }
 		),
 		res = num(40),
+	},
+	{
+		eval = a_ifc(
+			num(0),
+			list { TAKE, num(2) },
+			list { TAKE, num(30) },
+			list { TAKE, num(40) }
+		),
+	},
+
+	{
+		eval = a_if(
+			num(0),
+			list { TAKE, TRUE },
+			list { TAKE, num(30) },
+			list { TAKE, num(40) }
+		),
+		res = num(30),
+	},
+	{
+		eval = a_if(
+			num(0),
+			list { TAKE, FALSE },
+			list { TAKE, num(30) },
+			list { TAKE, num(40) }
+		),
+		res = num(40),
+	},
+	{
+		eval = a_if(
+			num(0),
+			list { TAKE, num(2) },
+			list { TAKE, num(30) },
+			list { TAKE, num(40) }
+		),
 	},
 }
 
