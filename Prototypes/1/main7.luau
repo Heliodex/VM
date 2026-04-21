@@ -115,7 +115,7 @@ local function len(s: List): number
 	return #s.things
 end
 
-local TRUE, FALSE = num(0), num(1) -- imagine loobeans but if they were loobeans
+local TRUE, FALSE = num(0, "TRUE"), num(1, "FALSE") -- imagine loobeans but if they were loobeans
 
 local TAKE, PART, SIZE, SUM, CHECK, TYPE, SPLIT =
 	num(0, "TAKE"),
@@ -151,7 +151,6 @@ local function h_part(a: Thing, b: Thing): Thing?
 end
 
 local function h_sum(t: Thing): Num?
-	print(`sum({serialise(t, true)})`)
 	if t.type ~= LIST then
 		return nil
 	end
@@ -170,7 +169,6 @@ local function h_sum(t: Thing): Num?
 end
 
 local function h_check(t: Thing): Num?
-	print(`check({serialise(t, true)})`)
 	if t.type ~= LIST then
 		return nil
 	end
@@ -188,15 +186,23 @@ local function h_check(t: Thing): Num?
 end
 
 local function h_type(t: Thing): Num?
-	print(`type({serialise(t, true)})`)
 	return if t.type == NUM then TRUE else FALSE
 end
 
 -- *a
 local function reduce1(e: Thing, depth: number): Thing?
-	print(string.rep(" ", depth) .. "-", serialise(e, true))
+	local start = string.rep("  ", depth)
+
+	local function printReturn(a: Thing?)
+		if a then
+			print(string.rep("  ", depth + 1) .. serialise(a, true))
+		end
+		return a
+	end
+
+	print(`{start}*{serialise(e, true)}`)
 	if e.type == NUM then
-		return e -- *a:@ -> a
+		return printReturn(e) -- *a:@ -> a
 	end
 
 	-- if len(e) == 0 then
@@ -236,7 +242,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 			return nil
 		end
 
-		return list { rabc, rad } -- *{a {{b c} d}} -> {*{a {b c}} *{a d}} (no *)
+		return printReturn(list { rabc, rad }) -- *{a {{b c} d}} -> {*{a {b c}} *{a d}} (no *)
 	end
 
 	if n.type ~= NUM then
@@ -247,48 +253,53 @@ local function reduce1(e: Thing, depth: number): Thing?
 
 	-- *{a {TAKE b}} -> b
 	if equal(n, TAKE) then
-		return b
+		return printReturn(b)
 	end
 
 	-- *{a {PART b}} -> part(a, b)
 	if equal(n, PART) then
-		return h_part(a, b)
+		print(`{start}part({serialise(a, true)}, {serialise(b, true)})`)
+		return printReturn(h_part(a, b))
 	end
 
 	-- *{a {SIZE b}} -> size(*{a b})
 	if equal(n, SIZE) then
+		print(`{start}size(*\{{serialise(a, true)}, {serialise(b, true)}})`)
 		local rab = reduce1(list { a, b }, depth + 1)
 		if rab == nil then
 			return nil
 		end
-		return h_size(rab)
+		return printReturn(h_size(rab))
 	end
 
 	-- *{a {SUM b}} -> sum(*{a b})
 	if equal(n, SUM) then
+		print(`{start}sum(*\{{serialise(a, true)}, {serialise(b, true)}})`)
 		local rab = reduce1(list { a, b }, depth + 1)
 		if rab == nil then
 			return nil
 		end
-		return h_sum(rab)
+		return printReturn(h_sum(rab))
 	end
 
 	-- *{a {CHECK b}} -> check(*{a b})
 	if equal(n, CHECK) then
+		print(`{start}check(*\{{serialise(a, true)}, {serialise(b, true)}})`)
 		local rab = reduce1(list { a, b }, depth + 1)
 		if rab == nil then
 			return nil
 		end
-		return h_check(rab)
+		return printReturn(h_check(rab))
 	end
 
 	-- *{a {TYPE b}} -> type(*{a b})
 	if equal(n, TYPE) then
+		print(`{start}type(*\{{serialise(a, true)}, {serialise(b, true)}})`)
 		local rab = reduce1(list { a, b }, depth + 1)
 		if rab == nil then
 			return nil
 		end
-		return h_type(rab)
+		return printReturn(h_type(rab))
 	end
 
 	-- *{a {SPLIT {b c}}} -> *{*{a b} *{a c}}
@@ -298,6 +309,14 @@ local function reduce1(e: Thing, depth: number): Thing?
 		end
 
 		local b2, c2 = b.things[1], b.things[2]
+
+		local sera = serialise(a, true)
+		print(
+			`{start}*\{*\{{sera} {serialise(b2, true)}} *\{{sera} {serialise(
+				c2,
+				true
+			)}}}`
+		)
 
 		local rba = reduce1(list { a, b2 }, depth + 1)
 		if rba == nil then
@@ -309,7 +328,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 			return nil
 		end
 
-		return reduce1(list { rba, rca }, depth + 1)
+		return printReturn(reduce1(list { rba, rca }, depth + 1))
 	end
 
 	return nil
@@ -884,7 +903,7 @@ local tests: {
 		*{a part({c d}, sum({X *{a b}}))}
 
 		{100 {6 {{1 0} {6 {{0 {300 400}} {{0 0} {3 {{0 1} {0 0}}}}}}}}}
-		{100 {SPLIT {{PART 0} {SPLIT {{TAKE {300 400}} {{TAKE 0} {SUM {{TAKE 1} {TAKE TRUE}}}}}}}}}
+		{100 {SPLIT {{PART 0} {SPLIT {{TAKE {300 400}} {{TAKE 0} {SUM {{TAKE 1} {TAKE 0}}}}}}}}}
 	]=]
 	{
 		eval = a_if2(num(100), list { TAKE, TRUE }, num(300), num(400)),
