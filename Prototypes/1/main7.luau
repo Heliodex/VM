@@ -3,7 +3,7 @@
 type Num = {
 	read type: "@",
 	read value: number,
-	read op: boolean?,
+	read op: string?,
 }
 type Thing = List | Num
 type List = {
@@ -14,31 +14,34 @@ type List = {
 local NUM: "@" = "@"
 local LIST: "$" = "$"
 
-local function serialise(t: Thing): string
+local function serialise(t: Thing, useOps: boolean): string
 	if t.type == NUM then
+		if useOps and t.op then
+			return t.op
+		end
 		return tostring(t.value)
 	end
 
 	local elements: { string } = {}
 	for i, elem in t.things do
-		elements[i] = serialise(elem)
+		elements[i] = serialise(elem, useOps)
 	end
 	-- table.sort(elements)
 	return "{" .. table.concat(elements, " ") .. "}"
 end
 
-local function num(value: number, op: boolean?): Num
+local function num(value: number, op: string?): Num
 	if value < 0 then
 		error "Negative numbers are not supported at the moment"
 	end
 	if value % 1 ~= 0 then
 		error "Non-integer numbers are not supported at the moment"
 	end
-	return table.freeze { type = NUM, value = value, op = op } :: Num
+	return table.freeze { type = NUM, value = value, op = op }
 end
 
 local function list(things: { Thing }): List
-	return table.freeze { type = LIST, things = table.freeze(things) } :: List
+	return table.freeze { type = LIST, things = table.freeze(things) }
 end
 
 local empty = list {}
@@ -114,15 +117,17 @@ end
 
 local TRUE, FALSE = num(0), num(1) -- imagine loobeans but if they were loobeans
 
-local function op(n: number)
-	return num(n, true)
-end
-
 local TAKE, PART, SIZE, SUM, CHECK, TYPE, SPLIT =
-	op(0), op(1), op(2), op(3), op(4), op(5), op(6)
+	num(0, "TAKE"),
+	num(1, "PART"),
+	num(2, "SIZE"),
+	num(3, "SUM"),
+	num(4, "CHECK"),
+	num(5, "TYPE"),
+	num(6, "SPLIT")
 
 local function h_size(t: Thing): Num?
-	print(`size({serialise(t)})`)
+	print(`size({serialise(t, true)})`)
 	if t.type ~= LIST then
 		return nil
 	end
@@ -146,7 +151,7 @@ local function h_part(a: Thing, b: Thing): Thing?
 end
 
 local function h_sum(t: Thing): Num?
-	print(`sum({serialise(t)})`)
+	print(`sum({serialise(t, true)})`)
 	if t.type ~= LIST then
 		return nil
 	end
@@ -165,7 +170,7 @@ local function h_sum(t: Thing): Num?
 end
 
 local function h_check(t: Thing): Num?
-	print(`check({serialise(t)})`)
+	print(`check({serialise(t, true)})`)
 	if t.type ~= LIST then
 		return nil
 	end
@@ -183,13 +188,13 @@ local function h_check(t: Thing): Num?
 end
 
 local function h_type(t: Thing): Num?
-	print(`type({serialise(t)})`)
+	print(`type({serialise(t, true)})`)
 	return if t.type == NUM then TRUE else FALSE
 end
 
 -- *a
 local function reduce1(e: Thing, depth: number): Thing?
-	print(string.rep(" ", depth) .. "-", serialise(e))
+	print(string.rep(" ", depth) .. "-", serialise(e, true))
 	if e.type == NUM then
 		return e -- *a:@ -> a
 	end
@@ -892,7 +897,7 @@ for _, test in tests do
 		if thing == nil then
 			continue
 		end
-		local s = serialise(thing)
+		local s = serialise(thing, false)
 		local d = deserialise(s)
 		if not equal(thing, d) then
 			print(`Serialization round-trip failed for {s}`)
@@ -912,12 +917,12 @@ for _, test in tests do
 		print "~~"
 		print()
 	else
-		out = serialise(rd)
+		out = serialise(rd, true)
 		print("=", out)
 		print()
 	end
 
-	local expected = test.res and serialise(test.res)
+	local expected = test.res and serialise(test.res, true)
 	if out ~= expected then
 		print(`Test failed: expected {expected}, got {out}`)
 		break
