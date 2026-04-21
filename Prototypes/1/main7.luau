@@ -117,7 +117,7 @@ end
 
 local TRUE, FALSE = num(0, "TRUE"), num(1, "FALSE") -- imagine loobeans but if they were loobeans
 
-local TAKE, PART, SIZE, SUM, CHECK, TYPE, SPLIT, IF =
+local TAKE, PART, SIZE, SUM, CHECK, TYPE, SPLIT, IF, COMP =
 	num(0, "TAKE"),
 	num(1, "PART"),
 	num(2, "SIZE"),
@@ -125,7 +125,8 @@ local TAKE, PART, SIZE, SUM, CHECK, TYPE, SPLIT, IF =
 	num(4, "CHECK"),
 	num(5, "TYPE"),
 	num(6, "SPLIT"),
-	num(7, "IF")
+	num(7, "IF"),
+	num(8, "COMP")
 
 local function h_size(t: Thing): Num?
 	print(`size({serialise(t, true)})`)
@@ -286,7 +287,24 @@ local function a_ifc(a: Thing, b: Thing, c: Thing, d: Thing): Thing
 end
 
 local function a_compog(a: Thing, b: Thing, c: Thing): Thing
+	--[=[
+		*[a=a [2 [b=b c=[1 c]]]]
+		*[*[a b] *[a [1 c]]]
+			*[a [1 c]]
+				c
+		*[*[a b] c]
+
+		*{a {SPLIT {b {TAKE c}}}}
+		*{*{a b} *{a {TAKE c}}}
+			*{a {TAKE c}}
+				c
+		*{*{a b} c}
+	]=]
 	return a_split(a, a_take(b, c))
+end
+
+local function a_comp(a: Thing, b: Thing, c: Thing): Thing
+	return list { a, list { COMP, list { b, c } } }
 end
 
 -- *a
@@ -477,8 +495,6 @@ local function reduce1(e: Thing, depth: number): Thing?
 		local b2, c2, d2 = b.things[1], b.things[2], b.things[3]
 		-- return printReturn(reduce1(a_ifog(a, b2, c2, d2), depth + 1))
 
-		-- local sera = serialise(a, true)
-
 		local rab = reduce1(list { a, b2 }, depth + 1)
 		if rab == nil then
 			return nil
@@ -492,6 +508,28 @@ local function reduce1(e: Thing, depth: number): Thing?
 		end
 
 		return nil
+	end
+
+	-- *{a {COMP {b c}}} -> *{a {SPLIT {b {TAKE c}}}}
+	--[[
+		*{a {SPLIT {b {TAKE c}}}}
+		*{*{a b} *{a {TAKE c}}}
+		*{*{a b} c}
+	]]
+	if equal(n, COMP) then
+		if b.type ~= LIST or len(b) ~= 2 then
+			return nil
+		end
+
+		local b2, c2 = b.things[1], b.things[2]
+		-- return printReturn(a_compog(a, b2, c2))
+
+		local rab = reduce1(list { a, b2 }, depth + 1)
+		if rab == nil then
+			return nil
+		end
+
+		return printReturn(reduce1(list { rab, c2 }, depth + 1))
 	end
 
 	return nil
@@ -1069,19 +1107,21 @@ local tests: {
 
 	-- comp construction
 	{
-		eval = a_compog(
-			num(3),
-			list { TAKE, num(2) },
-			list { PART, num(0) }
-		),
+		eval = a_compog(num(3), list { TAKE, num(2) }, list { PART, num(0) }),
 		res = num(2),
 	},
 	{
-		eval = a_compog(
-			num(3),
-			list { PART, num(0) },
-			list { PART, num(0) }
-		),
+		eval = a_compog(num(3), list { PART, num(0) }, list { PART, num(0) }),
+		res = num(3),
+	},
+
+	-- comp
+	{
+		eval = a_comp(num(3), list { TAKE, num(2) }, list { PART, num(0) }),
+		res = num(2),
+	},
+	{
+		eval = a_comp(num(3), list { PART, num(0) }, list { PART, num(0) }),
 		res = num(3),
 	},
 }
