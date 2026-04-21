@@ -902,6 +902,9 @@ local tests: {
 			*{{c d} {0 sum({X *{a b}})}}
 			part({c d}, sum({X *{a b}}))
 		*{a part({c d}, sum({X *{a b}}))}
+
+		{100 {6 {{1 0} {6 {{0 {300 400}} {{0 0} {3 {{0 1} {0 0}}}}}}}}}
+		{100 {SPLIT {{PART 0} {SPLIT {{TAKE {300 400}} {{TAKE 0} {SUM {{TAKE 1} {TAKE TRUE}}}}}}}}}
 	]=]
 	{
 		eval = a_if2(num(100), list { num(TAKE), TRUE }, num(300), num(400)),
