@@ -348,7 +348,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 			return nil
 		end
 
-		return printReturn(reduce1(list { rab, rac }, depth + 1))
+		return reduce1(list { rab, rac }, depth)
 	end
 
 	return nil
@@ -860,11 +860,11 @@ local tests: {
 				*{a {TAKE {c d}}}
 				{c d}
 			*{{c d} *{a {{TAKE PART} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE 1} {TAKE TRUE}}}}}}}}}
-				*{a {{TAKE PART} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE 1} {TAKE TRUE}}}}}}}} 
+				*{a {{TAKE PART} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE 1} {TAKE TRUE}}}}}}}}
 				{*{a {TAKE PART}} *{a {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE 1} {TAKE TRUE}}}}}}}}
 					*{a {TAKE PART}}
 					PART
-				{PART *{a {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE 1} {TAKE TRUE}}}}}}}}        
+				{PART *{a {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE 1} {TAKE TRUE}}}}}}}}
 					*{a {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE 1} {TAKE TRUE}}}}}}}
 					*{*{a {TAKE {1 2}}} *{a {{TAKE PART} {SUM {{TAKE 1} {TAKE TRUE}}}}}}
 						*{a {TAKE {1 2}}}
@@ -888,19 +888,22 @@ local tests: {
 							sum({1 TRUE})
 							1
 						{PART 1}
-						*{{1 2} {PART 1}}
-						part({1 2}, 1)
-						1
+					*{{1 2} {PART 1}}
+					part({1 2}, 1)
 					1
 				{PART 1}
-				*{{c d} {PART 1}}
-				part({c d}, 1)
-				c
+			*{{c d} {PART 1}}
+			part({c d}, 1)
 			c
-			*{a c}
+		*{a c}
 	]=]
 	{
-		eval = a_if(num(100, "a"), list { TAKE, TRUE }, num(300, "c"), num(400, "d")),
+		eval = a_if(
+			num(100, "a"),
+			list { TAKE, TRUE },
+			num(300, "c"),
+			num(400, "d")
+		),
 	},
 	--[=[
 		*{a {SPLIT {{PART 0} {SPLIT {{TAKE {c d}} {{TAKE PART} {SUM {{TAKE 1} {TAKE TRUE}}}}}}}}}
@@ -932,11 +935,10 @@ local tests: {
 					sum({1 TRUE})
 					1
 				{PART 1}
-				*{{c d} {PART 1}}
-				part({c d}, 1)
-				c
+			*{{c d} {PART 1}}
+			part({c d}, 1)
 			c
-			*{a c}
+		*{a c}
 	]=]
 	{
 		eval = a_if2(
