@@ -307,6 +307,25 @@ local function a_comp(a: Thing, b: Thing, c: Thing): Thing
 	return list { a, list { COMP, list { b, c } } }
 end
 
+local function a_extog(a: Thing, b: Thing, c: Thing): Thing
+	return list {
+		a,
+		list {
+			COMP,
+			list {
+				list {
+					list { COMP, list { list { PART, num(0) }, b } },
+					list {
+						PART,
+						num(0),
+					},
+				},
+				c,
+			},
+		},
+	}
+end
+
 -- *a
 local function reduce1(e: Thing, depth: number): Thing?
 	local start = string.rep("    ", depth)
@@ -522,14 +541,14 @@ local function reduce1(e: Thing, depth: number): Thing?
 		end
 
 		local b2, c2 = b.things[1], b.things[2]
-		-- return printReturn(a_compog(a, b2, c2))
+		return printReturn(reduce1(a_compog(a, b2, c2), depth + 1))
 
-		local rab = reduce1(list { a, b2 }, depth + 1)
-		if rab == nil then
-			return nil
-		end
+		-- local rab = reduce1(list { a, b2 }, depth + 1)
+		-- if rab == nil then
+		-- 	return nil
+		-- end
 
-		return printReturn(reduce1(list { rab, c2 }, depth + 1))
+		-- return printReturn(reduce1(list { rab, c2 }, depth + 1))
 	end
 
 	return nil
@@ -1130,17 +1149,47 @@ local tests: {
 		*[a 8 b c]		*[[*[a b] a] c]
 		*[a 8 b c]		*[a 7 [[7 [0 1] b] 0 1] c]
 
+		*[a 7 [[7 [0 1] b] 0 1] c]
+		*[a 2 [[7 [0 1] b] 0 1] [1 c]]
+		*[*[a [[7 [0 1] b] 0 1]] *[a [1 c]]]
+			*[a [[7 [0 1] b] 0 1]]
+			[*[a [7 [0 1] b]] *[a 0 1]]
+				*[a [7 [0 1] b]]
+				*[a 2 [0 1] 1 b]
+				*[*[a [0 1]] *[a [1 b]]]
+					*[a 0 1]
+						a
+				*[a *[a [1 b]]]
+					*[a 1 b]
+						b
+				*[a b]
+			[*[a b] *[a 0 1]]
+				*[a 0 1]
+					a
+			[*[a b] a]
+		*[[*[a b] a] *[a [1 c]]]
+			*[a [1 c]]
+				c
+		*[[*[a b] a] c]
 
-		*{a {EXT {b c}}} -> *{{*{a b} a} c}
-		*{a {{b c} d}} -> {*{a {b c}} *{a d}}
+		okay, checks out, now it's my turn
 
-		{*{a b} a}
-		{*{a b} *{a {PART 0}}}
+		*[a 7 [[7 [0 1] b] 0 1] c]
+			[[7 [0 1] b] 0 1]
 
-		*[a b 0 1].
-
-		*{{*{a b} a} c}
+		*{a {COMP {{COMP {{PART 0} b}} {PART 0} c}}}
 	]=]
+	{
+		eval = a_extog(
+			num(10),
+			list { TAKE, num(20) },
+			list {
+				list { PART, num(1) },
+				list { PART, num(2) },
+			}
+		),
+		res = list { num(20), num(10) },
+	},
 }
 
 -- test serialise and deserialise
