@@ -1124,6 +1124,23 @@ local tests: {
 		eval = a_comp(num(3), list { PART, num(0) }, list { PART, num(0) }),
 		res = num(3),
 	},
+
+	-- ext construction
+	--[=[
+		*[a 8 b c]		*[[*[a b] a] c]
+		*[a 8 b c]		*[a 7 [[7 [0 1] b] 0 1] c]
+
+
+		*{a {EXT {b c}}} -> *{{*{a b} a} c}
+		*{a {{b c} d}} -> {*{a {b c}} *{a d}}
+
+		{*{a b} a}
+		{*{a b} *{a {PART 0}}}
+
+		*[a b 0 1].
+
+		*{{*{a b} a} c}
+	]=]
 }
 
 -- test serialise and deserialise
