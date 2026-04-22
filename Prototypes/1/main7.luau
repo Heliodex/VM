@@ -117,7 +117,7 @@ end
 
 local TRUE, FALSE = num(0, "TRUE"), num(1, "FALSE") -- imagine loobeans but if they were loobeans
 
-local TAKE, PART, SIZE, SUM, CHECK, TYPE, SPLIT, IF, COMP =
+local TAKE, PART, SIZE, SUM, CHECK, TYPE, SPLIT, IF, COMP, EXT =
 	num(0, "TAKE"),
 	num(1, "PART"),
 	num(2, "SIZE"),
@@ -125,8 +125,10 @@ local TAKE, PART, SIZE, SUM, CHECK, TYPE, SPLIT, IF, COMP =
 	num(4, "CHECK"),
 	num(5, "TYPE"),
 	num(6, "SPLIT"),
+	-- macros
 	num(7, "IF"),
-	num(8, "COMP")
+	num(8, "COMP"),
+	num(9, "EXT")
 
 local function h_size(t: Thing): Num?
 	print(`size({serialise(t, true)})`)
@@ -324,6 +326,10 @@ local function a_extog(a: Thing, b: Thing, c: Thing): Thing
 			},
 		},
 	}
+end
+
+local function a_ext(a: Thing, b: Thing, c: Thing): Thing
+	return list { a, list { EXT, list { b, c } } }
 end
 
 -- *a
@@ -541,14 +547,39 @@ local function reduce1(e: Thing, depth: number): Thing?
 		end
 
 		local b2, c2 = b.things[1], b.things[2]
-		return printReturn(reduce1(a_compog(a, b2, c2), depth + 1))
+		-- return printReturn(reduce1(a_compog(a, b2, c2), depth + 1))
 
-		-- local rab = reduce1(list { a, b2 }, depth + 1)
-		-- if rab == nil then
-		-- 	return nil
-		-- end
+		local rab = reduce1(list { a, b2 }, depth + 1)
+		if rab == nil then
+			return nil
+		end
 
-		-- return printReturn(reduce1(list { rab, c2 }, depth + 1))
+		return printReturn(reduce1(list { rab, c2 }, depth + 1))
+	end
+
+	-- *{a {EXT {b c}}} -> *{a {COMP {{{COMP {{PART 0} b}} {PART 0}} c}}}
+	--[[
+		*{a {COMP {{{COMP {{PART 0} b}} {PART 0}} c}}}
+		*{*{a {{COMP {{PART 0} b}} {PART 0}}} c}
+		*{{*{a {COMP {{PART 0} b}}} *{a {PART 0}}} c}
+		*{{*{*{a {PART 0}} b} *{a {PART 0}}} c}
+		*{{*{a b} *{a {PART 0}}} c}
+		*{{*{a b} a} c}
+	]]
+	if equal(n, EXT) then
+		if b.type ~= LIST or len(b) ~= 2 then
+			return nil
+		end
+
+		local b2, c2 = b.things[1], b.things[2]
+		-- return printReturn(reduce1(a_extog(a, b2, c2), depth + 1))
+
+		local rab = reduce1(list { a, b2 }, depth + 1)
+		if rab == nil then
+			return nil
+		end
+
+		return printReturn(reduce1(list { list { rab, a }, c2 }, depth + 1))
 	end
 
 	return nil
@@ -1181,6 +1212,19 @@ local tests: {
 	]=]
 	{
 		eval = a_extog(
+			num(10),
+			list { TAKE, num(20) },
+			list {
+				list { PART, num(1) },
+				list { PART, num(2) },
+			}
+		),
+		res = list { num(20), num(10) },
+	},
+
+	-- ext
+	{
+		eval = a_ext(
 			num(10),
 			list { TAKE, num(20) },
 			list {
