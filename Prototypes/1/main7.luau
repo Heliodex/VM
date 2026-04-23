@@ -117,7 +117,7 @@ end
 
 local TRUE, FALSE = num(0, "TRUE"), num(1, "FALSE") -- imagine loobeans but if they were loobeans
 
-local TAKE, PART, SIZE, SUM, CHECK, TYPE, SPLIT, IF, COMP, EXT =
+local TAKE, PART, SIZE, SUM, CHECK, TYPE, SPLIT, IF, COMP, EXT, CALL =
 	num(0, "TAKE"),
 	num(1, "PART"),
 	num(2, "SIZE"),
@@ -128,7 +128,8 @@ local TAKE, PART, SIZE, SUM, CHECK, TYPE, SPLIT, IF, COMP, EXT =
 	-- macros
 	num(7, "IF"),
 	num(8, "COMP"),
-	num(9, "EXT")
+	num(9, "EXT"),
+	num(10, "CALL")
 
 local function h_size(t: Thing): Num?
 	print(`size({serialise(t, true)})`)
@@ -330,6 +331,23 @@ end
 
 local function a_ext(a: Thing, b: Thing, c: Thing): Thing
 	return list { a, list { EXT, list { b, c } } }
+end
+
+local function a_callog(a: Thing, b: Thing, c: Thing): Thing
+	return list {
+		a,
+		list {
+			COMP,
+			list {
+				c,
+				list { num(2), list { list { PART, num(1) }, list { PART, b } } },
+			},
+		},
+	}
+end
+
+local function a_call(a: Thing, b: Thing, c: Thing): Thing
+	return list { a, list { CALL, list { b, c } } }
 end
 
 -- *a
@@ -1189,18 +1207,21 @@ local tests: {
 				*[a 2 [0 1] 1 b]
 				*[*[a [0 1]] *[a [1 b]]]
 					*[a 0 1]
-						a
+					/[1 a]
+					a
 				*[a *[a [1 b]]]
 					*[a 1 b]
-						b
+					/[1 b]
+					b
 				*[a b]
 			[*[a b] *[a 0 1]]
 				*[a 0 1]
-					a
+				/[1 a]
+				a
 			[*[a b] a]
 		*[[*[a b] a] *[a [1 c]]]
 			*[a [1 c]]
-				c
+			c
 		*[[*[a b] a] c]
 
 		okay, checks out, now it's my turn
@@ -1234,6 +1255,52 @@ local tests: {
 		),
 		res = list { num(20), num(10) },
 	},
+
+	-- call construction
+	--[=[
+		*[a 9 b c]          *[*[a c] 2 [0 1] 0 b]
+
+		*[a 7 c [2 [0 1] 0 b]]
+		*[*[a c] 2 [0 1] [0 b]]
+		*[*[*[a c] [0 1]] *[*[a c] [0 b]]]
+			*[*[a c] [0 1]]
+			/[1 *[a c]]
+			*[a c]
+		*[*[a c] *[*[a c] [0 b]]]
+			*[*[a c] [0 b]]
+			/[b *[a c]]
+		*[*[a c] /[b *[a c]]]
+
+		*[a [7 [c [2 [[0 1] [0 b]]]]]]
+
+		*{a {COMP {c {2 {{PART 1} {PART b}}}}}}
+		*{*{a c} {SPLIT {{PART 1} {PART b}}}}
+		*{*{*{a c} {PART 1}} *{*{a c} {PART b}}}
+			*{*{a c} {PART 1}}
+			part(*{a c}, 1)
+			*{a c}
+		*{*{a c} *{*{a c} {PART b}}}
+			*{*{a c} {PART b}}
+			part(*{a c}, b)
+		*{*{a c} part(*{a c}, b)}
+
+		*[[1 4 1 0] 9 1 [0 3]]
+		*[*[[1 4 1 0] [0 3]] 2 [0 1] [0 1]]
+			*[[1 [4 1 0]] [0 3]]
+			[4 1 0]
+		*[[4 1 0] 2 [0 1] [0 1]]
+		*[*[[4 1 0] [0 1]] *[[4 1 0] [0 1]]]
+			*[[4 1 0] [0 1]]
+			[4 1 0]
+		*[[4 1 0] [4 1 0]]
+		+*[[4 1 0] [1 0]]
+			*[[4 1 0] [1 0]]
+			0
+		+0
+		1
+
+		Oh, hold on a sec... PART is no Nock 0
+	]=]
 }
 
 -- test serialise and deserialise
