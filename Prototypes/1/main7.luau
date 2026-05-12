@@ -1273,11 +1273,11 @@ local tests: {
 
 		*[a [7 [c [2 [[0 1] [0 b]]]]]]
 
-		*{a {COMP {c {2 {{PART 1} {PART b}}}}}}
-		*{*{a c} {SPLIT {{PART 1} {PART b}}}}
-		*{*{*{a c} {PART 1}} *{*{a c} {PART b}}}
-			*{*{a c} {PART 1}}
-			part(*{a c}, 1)
+		*{a {COMP {c {2 {{PART 0} {PART b}}}}}}
+		*{*{a c} {SPLIT {{PART 0} {PART b}}}}
+		*{*{*{a c} {PART 0}} *{*{a c} {PART b}}}
+			*{*{a c} {PART 0}}
+			part(*{a c}, 0)
 			*{a c}
 		*{*{a c} *{*{a c} {PART b}}}
 			*{*{a c} {PART b}}
@@ -1299,7 +1299,35 @@ local tests: {
 		+0
 		1
 
+		*{a {CALL {b c}}}
+		*{a=[1 4 1 0] {CALL {b=1 c=[0 3]}}}
+		*{a {COMP {c {2 {{PART 0} {PART b}}}}}}
+		*{*{*{a c} {PART 0}} *{*{a c} {PART b}}}
+			*{*{[1 4 1 0] [0 3]} {PART 0}}
+			part(*{[1 4 1 0] [0 3]}, 1)
+			*{[1 4 1 0] [0 3]}
+
 		Oh, hold on a sec... PART is no Nock 0
+
+		*{a={1 {4 1 0}} {CALL {b=1 c={PART 2}}}}
+		*{a={1 {4 1 0}} {COMP {c={PART 2}} {2 {{PART 0} {PART b=1}}}}}}
+		*{*{*{a={1 {4 1 0}} c={PART 2}} {PART 0}} *{*{a={1 {4 1 0}} c={PART 2}} {PART b=1}}}
+			*{*{a={1 {4 1 0}} c={PART 2}} {PART 0}}
+			part(*{a={1 {4 1 0}} c={PART 2}}, 0)
+				*{a={1 {4 1 0}} c={PART 2}}
+				part({1 {4 1 0}}, 2)
+				{4 1 0}
+			part({4 1 0}, 0)
+			{4 1 0}
+		*{{4 1 0} *{*{a={1 {4 1 0}} c={PART 2}} {PART b=1}}}
+			*{*{a={1 {4 1 0}} c={PART 2}} {PART b=1}
+			part(*{a={1 {4 1 0}} c={PART 2}}, b=1)
+				*{a={1 {4 1 0}} c={PART 2}}
+				part({1 {4 1 0}}, 2)
+				{4 1 0}
+			part({4 1 0}, b=1)
+			
+		<--- To be continued
 	]=]
 }
 
