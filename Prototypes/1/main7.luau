@@ -600,6 +600,43 @@ local function reduce1(e: Thing, depth: number): Thing?
 		return printReturn(reduce1(list { list { rab, a }, c2 }, depth + 1))
 	end
 
+	-- *{a {CALL {b c}}} -> *{a {COMP {c {2 {{PART 0} {PART b}}}}}}
+	--[[
+		*{a {COMP {c {2 {{PART 0} {PART b}}}}}}
+		*{*{a c} {SPLIT {{PART 0} {PART b}}}}
+		*{*{*{a c} {PART 0}} *{*{a c} {PART b}}}
+			*{*{a c} {PART 0}}
+			part(*{a c}, 0)
+			*{a c}
+		*{*{a c} *{*{a c} {PART b}}}
+			*{*{a c} {PART b}}
+			part(*{a c}, b)
+		*{*{a c} part(*{a c}, b)}
+	]]
+	if equal(n, CALL) then
+		if b.type ~= LIST or len(b) ~= 2 then
+			return nil
+		end
+
+		local b2, c2 = b.things[1], b.things[2]
+		-- return printReturn(reduce1(a_callog(a, b2, c2), depth + 1))
+
+		local rac = reduce1(list { a, c2 }, depth + 1)
+		if rac == nil then
+			return nil
+		end
+
+		local srac = serialise(rac, true)
+		print(`{start}*\{{srac} part(*\{{srac}}, {serialise(b2, true)})}`)
+
+		local p = h_part(rac, b2)
+		if p == nil then
+			return nil
+		end
+
+		return printReturn(reduce1(list { a, p }, depth + 1))
+	end
+
 	return nil
 end
 
@@ -1309,26 +1346,51 @@ local tests: {
 
 		Oh, hold on a sec... PART is no Nock 0
 
-		*{a={1 {4 1 0}} {CALL {b=1 c={PART 2}}}}
-		*{a={1 {4 1 0}} {COMP {c={PART 2}} {2 {{PART 0} {PART b=1}}}}}}
-		*{*{*{a={1 {4 1 0}} c={PART 2}} {PART 0}} *{*{a={1 {4 1 0}} c={PART 2}} {PART b=1}}}
-			*{*{a={1 {4 1 0}} c={PART 2}} {PART 0}}
-			part(*{a={1 {4 1 0}} c={PART 2}}, 0)
-				*{a={1 {4 1 0}} c={PART 2}}
-				part({1 {4 1 0}}, 2)
-				{4 1 0}
-			part({4 1 0}, 0)
-			{4 1 0}
-		*{{4 1 0} *{*{a={1 {4 1 0}} c={PART 2}} {PART b=1}}}
-			*{*{a={1 {4 1 0}} c={PART 2}} {PART b=1}
-			part(*{a={1 {4 1 0}} c={PART 2}}, b=1)
-				*{a={1 {4 1 0}} c={PART 2}}
-				part({1 {4 1 0}}, 2)
-				{4 1 0}
-			part({4 1 0}, b=1)
-			
-		<--- To be continued
+		*{a={1 {SUM {TAKE {1 1}}}} {CALL {b=0 c={PART 2}}}}
+		*{a={1 {SUM {TAKE {1 1}}}} {COMP {c={PART 2}} {2 {{PART 0} {PART b=0}}}}}
+		*{*{*{a={1 {SUM {TAKE {1 1}}}} c={PART 2}} {PART 0}} *{*{a={1 {SUM {TAKE {1 1}}}} c={PART 2}} {PART b=0}}}
+			*{*{a={1 {SUM {TAKE {1 1}}}} c={PART 2}} {PART 0}}
+			part(*{a={1 {SUM {TAKE {1 1}}}} c={PART 2}}, 0)
+				*{a={1 {SUM {TAKE {1 1}}}} c={PART 2}}
+				part({1 {SUM {TAKE {1 1}}}}, 2)
+				{SUM {TAKE {1 1}}}
+			part({SUM {TAKE {1 1}}}, 0)
+			{SUM {TAKE {1 1}}}
+		*{{SUM {TAKE {1 1}}} *{*{a={1 {SUM {TAKE {1 1}}}} c={PART 2}} {PART b=0}}}
+			*{*{a={1 {SUM {TAKE {1 1}}}} c={PART 2}} {PART b=0}}
+				*{a={1 {SUM {TAKE {1 1}}}} c={PART 2}}
+				part({1 {SUM {TAKE {1 1}}}}, 2)
+				{SUM {TAKE {1 1}}}
+			*{{SUM {TAKE {1 1}}} {PART b=0}}
+			part({SUM {TAKE {1 1}}}, b=0)
+			{SUM {TAKE {1 1}}}
+		*{{SUM {TAKE {1 1}}} {SUM {TAKE {1 1}}}}
+		sum(*{{SUM {TAKE {1 1}}} {TAKE {1 1}}})
+			*{{SUM {TAKE {1 1}}} {TAKE {1 1}}}
+			{1 1}
+		sum({1 1})
+		2
+		
+		There we go
 	]=]
+	{
+		eval = a_callog(
+			list { num(1), list { SUM, list { TAKE, list { num(1), num(1) } } } },
+			num(0),
+			list { PART, num(2) }
+		),
+		res = num(2),
+	},
+
+	-- call
+	{
+		eval = a_call(
+			list { num(1), list { SUM, list { TAKE, list { num(1), num(1) } } } },
+			num(0),
+			list { PART, num(2) }
+		),
+		res = num(2),
+	},
 }
 
 -- test serialise and deserialise
