@@ -117,19 +117,20 @@ end
 
 local TRUE, FALSE = num(0, "TRUE"), num(1, "FALSE") -- imagine loobeans but if they were loobeans
 
-local TAKE, PART, SIZE, SUM, CHECK, TYPE, SPLIT, IF, COMP, EXT, CALL =
+local TAKE, PART, SIZE, SUM, CHECK, TYPE, SPLIT, CHANGE, IF, COMP, EXT, CALL =
 	num(0, "TAKE"),
 	num(1, "PART"),
 	num(2, "SIZE"),
 	num(3, "SUM"),
 	num(4, "CHECK"),
 	num(5, "TYPE"),
-	num(6, "SPLIT"),
+	num(6, "CHANGE"),
+	num(7, "SPLIT"),
 	-- macros
-	num(7, "IF"),
-	num(8, "COMP"),
-	num(9, "EXT"),
-	num(10, "CALL")
+	num(8, "IF"),
+	num(9, "COMP"),
+	num(10, "EXT"),
+	num(11, "CALL")
 
 local function h_size(t: Thing): Num?
 	print(`size({serialise(t, true)})`)
@@ -477,6 +478,10 @@ local function reduce1(e: Thing, depth: number): Thing?
 		end
 		print(`{start}type({serialise(rab, true)})`)
 		return printReturn(h_type(rab))
+	end
+
+	-- *{a {CHANGE {b c d}}} -> change(b, *{a c}, *{a d})
+	if equal(n, CHANGE) then
 	end
 
 	-- *{a {SPLIT {b c}}} -> *{*{a b} *{a c}}
