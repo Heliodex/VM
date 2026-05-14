@@ -486,7 +486,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 
 	-- *{a {CHECK b}} -> check(*{a b})
 	if equal(n, CHECK) then
-		print(`{start}check(*\{{serialise(a, true)}, {serialise(b, true)}})`)
+		print(`{start}check(*\{{serialise(a, true)} {serialise(b, true)}})`)
 		local rab = reduce1(list { a, b }, depth + 1)
 		if rab == nil then
 			return nil
@@ -608,10 +608,25 @@ local function reduce1(e: Thing, depth: number): Thing?
 		local b2, c2, d2 = b.things[1], b.things[2], b.things[3]
 		-- return printReturn(reduce1(a_ifog(a, b2, c2, d2), depth + 1))
 
+		local sera = serialise(a, true)
+		print(
+			`{start}*\{{sera} *\{part(\{{serialise(c2, true)} {serialise(
+				d2,
+				true
+			)}}, sum(\{1 *\{{sera} {serialise(b2, true)}}}))}}`
+		)
+
 		local rab = reduce1(list { a, b2 }, depth + 1)
 		if rab == nil then
 			return nil
 		end
+
+		print(
+			`{start}*\{{sera} *\{part(\{{serialise(c2, true)} {serialise(
+				d2,
+				true
+			)}}, sum(\{1 {serialise(rab, true)}}))}}`
+		)
 
 		if equal(rab, TRUE) then
 			return printReturn(reduce1(list { a, c2 }, depth + 1))
@@ -637,10 +652,19 @@ local function reduce1(e: Thing, depth: number): Thing?
 		local b2, c2 = b.things[1], b.things[2]
 		-- return printReturn(reduce1(a_compog(a, b2, c2), depth + 1))
 
+		print(
+			`{start}*\{*\{{serialise(a, true)} {serialise(b2, true)}} {serialise(
+				c2,
+				true
+			)}}`
+		)
+
 		local rab = reduce1(list { a, b2 }, depth + 1)
 		if rab == nil then
 			return nil
 		end
+
+		print(`{start}*\{{serialise(rab, true)} {serialise(c2, true)}}`)
 
 		return printReturn(reduce1(list { rab, c2 }, depth + 1))
 	end
@@ -662,10 +686,22 @@ local function reduce1(e: Thing, depth: number): Thing?
 		local b2, c2 = b.things[1], b.things[2]
 		-- return printReturn(reduce1(a_extog(a, b2, c2), depth + 1))
 
+		local sera = serialise(a, true)
+		print(
+			`{start}*\{\{*\{{sera} {serialise(b2, true)}} {sera}} {serialise(
+				c2,
+				true
+			)}}`
+		)
+
 		local rab = reduce1(list { a, b2 }, depth + 1)
 		if rab == nil then
 			return nil
 		end
+
+		print(
+			`{start}*\{\{{serialise(rab, true)} {sera}} {serialise(c2, true)}}`
+		)
 
 		return printReturn(reduce1(list { list { rab, a }, c2 }, depth + 1))
 	end
@@ -691,13 +727,22 @@ local function reduce1(e: Thing, depth: number): Thing?
 		local b2, c2 = b.things[1], b.things[2]
 		-- return printReturn(reduce1(a_callog(a, b2, c2), depth + 1))
 
+		local sera = serialise(a, true)
+		local serc = serialise(c2, true)
+		print(
+			`{start}*\{*\{{sera} {serc}} part(*\{{sera} {serc}}, {serialise(
+				b2,
+				true
+			)})}`
+		)
+
 		local rac = reduce1(list { a, c2 }, depth + 1)
 		if rac == nil then
 			return nil
 		end
 
-		local srac = serialise(rac, true)
-		print(`{start}*\{{srac} part(*\{{srac}}, {serialise(b2, true)})}`)
+		local serrac = serialise(rac, true)
+		print(`{start}*\{{serrac} part({serrac}, {serialise(b2, true)})}`)
 
 		local p = h_part(rac, b2)
 		if p == nil then
@@ -712,8 +757,8 @@ end
 
 local tests: {
 	{
-		eval: Thing,
-		res: Thing?,
+		read eval: Thing,
+		read res: Thing?,
 	}
 } = {
 	-- generic
