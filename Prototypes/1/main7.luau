@@ -41,7 +41,11 @@ local function num(value: number, op: string?): Num
 end
 
 local function list(things: { Thing }): List
-	return table.freeze { type = LIST, things = table.freeze(things) }
+	return table.freeze {
+		type = LIST,
+		--[[table.freeze(things)]]
+		things = things,
+	}
 end
 
 local empty = list {}
@@ -195,6 +199,24 @@ local function h_type(t: Thing): Num?
 	return if t.type == NUM then TRUE else FALSE
 end
 
+local function h_change(x: Thing, y: Thing, z: Thing): Thing?
+	if x.type ~= NUM then
+		return nil
+	end
+
+	if x.value == 0 then
+		return y
+	end
+
+	if z.type ~= LIST then
+		return nil
+	end
+
+	z.things[x.value] = y
+
+	return z
+end
+
 local function a_take(a: Thing, b: Thing): Thing
 	return list { a, list { TAKE, b } }
 end
@@ -217,6 +239,10 @@ end
 
 local function a_type(a: Thing, b: Thing): Thing
 	return list { a, list { TYPE, b } }
+end
+
+local function a_change(a: Thing, b: Thing, c: Thing, d: Thing): Thing
+	return list { a, list { CHANGE, list { b, c, d } } }
 end
 
 local function a_split(a: Thing, b: Thing): Thing
@@ -482,6 +508,45 @@ local function reduce1(e: Thing, depth: number): Thing?
 
 	-- *{a {CHANGE {b c d}}} -> change(b, *{a c}, *{a d})
 	if equal(n, CHANGE) then
+		if b.type ~= LIST or len(b) ~= 3 then
+			return nil
+		end
+
+		local b2, c2, d2 = b.things[1], b.things[2], b.things[3]
+
+		local sera = serialise(a, true)
+		print(
+			`{start}change({serialise(b2, true)}, *\{{sera} {serialise(c2, true)}}, *\{{sera} {serialise(
+				d2,
+				true
+			)}})`
+		)
+
+		local rac = reduce1(list { a, c2 }, depth + 1)
+		if rac == nil then
+			return nil
+		end
+
+		print(
+			`{start}change({serialise(b2, true)}, {serialise(rac, true)}, *\{{sera} {serialise(
+				d2,
+				true
+			)}})`
+		)
+
+		local rad = reduce1(list { a, d2 }, depth + 1)
+		if rad == nil then
+			return nil
+		end
+
+		print(
+			`{start}change({serialise(b2, true)}, {serialise(rac, true)}, {serialise(
+				rad,
+				true
+			)})`
+		)
+
+		return printReturn(h_change(b2, rac, rad))
 	end
 
 	-- *{a {SPLIT {b c}}} -> *{*{a b} *{a c}}
@@ -892,6 +957,66 @@ local tests: {
 		res = FALSE,
 	},
 
+	-- change
+	--[=[
+		[a=[[42 43] 45 46] [10 [b=2 c=[1 47 48]] d=[0 1]]]
+		#[b=2 *[a=[[42 43] 45 46] c=[1 47 48]] *[a=[[42 43] 45 46] d=[0 1]]]
+			*[a=[[42 43] 45 46] c=[1 47 48]]
+			[47 48]
+		#[b=2 [47 48] *[a=[[42 43] 45 46] d=[0 1]]]
+			 *[a=[[42 43] 45 46] d=[0 1]]
+			 [[42 43] 45 46]
+		#[b=2 [47 48] [[42 43] 45 46]]
+		#[(1 + 1) [47 48] [[42 43] 45 46]]
+		#[1 [[47 48] /[(1 + 1 + 1) [[42 43] 45 46]]] [[42 43] 45 46]]
+			/[(1 + 1 + 1) [[42 43] 45 46]]
+			/[3 /[1 [[42 43] 45 46]]]
+				/[1 [[42 43] 45 46]]
+				[[42 43] 45 46]
+			/[3 [[42 43] 45 46]]
+			[45 46]
+		#[1 [[47 48] 45 46] [[42 43] 45 46]]
+		[[47 48] 45 46]
+
+		{a={{42 43} 45 46} {CHANGE {b=1 c={TAKE {47 48}} d={PART 0}}}}
+		change(b=1, *{a={{42 43} 45 46} c={TAKE {47 48}}}, *{a={{42 43} 45 46} d={PART 0}})
+			*{a={{42 43} 45 46} c={TAKE {47 48}}}
+			{47 48}
+		change(b=1, {47 48}, *{a={{42 43} 45 46} d={PART 0}})
+			*{a={{42 43} 45 46} d={PART 0}}
+			part(a={{42 43} 45 46}, 0)
+			{{42 43} 45 46}
+		change(b=1, {47 48}, {{42 43} 45 46})
+		{{47 48} 45 46}
+	]=]
+	{
+		eval = a_change(
+			list { list { num(42), num(43) }, num(45), num(46) },
+			num(1),
+			list { TAKE, list { num(47), num(48) } },
+			list { PART, num(0) }
+		),
+		res = list{list { num(47), num(48) }, num(45), num(46) },
+	},
+	{
+		eval = a_change(
+			list { list { num(42), num(43) }, num(45), num(46) },
+			num(2),
+			list { TAKE, list { num(47), num(48) } },
+			list { PART, num(0) }
+		),
+		res = list{list { num(42), num(43) }, list { num(47), num(48) }, num(46) },
+	},
+	{
+		eval = a_change(
+			list { list { num(42), num(43) }, num(45), num(46) },
+			num(3),
+			list { TAKE, list { num(47), num(48) } },
+			list { PART, num(0) }
+		),
+		res = list{list { num(42), num(43) }, num(45), list { num(47), num(48) },  },
+	},
+	
 	-- split
 	-- ok moment of truth
 	{
