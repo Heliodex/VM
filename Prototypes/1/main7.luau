@@ -1563,6 +1563,52 @@ local tests: {
 		end)(),
 		res = num(6),
 	},
+	{
+		eval = (function(): Thing
+			local s = num(42)
+			local f = list { list { TAKE, num(0) }, list { PART, num(0) } }
+
+			return list { s, f }
+		end)(),
+		res = list { num(0), num(42) },
+	},
+	--[=[
+		[a %8 b=[%1 0] c=[%8 [%1 l] [%9 2 %0 1]]]
+		*[[*[a b=[%1 0]] a] c=[%8 [%1 l] [%9 2 %0 1]]]
+			*[a b=[%1 0]]
+			0
+		*[a=[0 a] [%8 b=[%1 l] c=[%9 2 %0 1]]]
+		*[[*[a=[0 a] b=[%1 l]] a=[0 a]] c=[%9 2 %0 1]]
+			*[a=[0 a] b=[%1 l]]
+			l
+		*[a=[l [0 a]] [%9 b=2 c=[%0 1]]]
+		*[*[a=[l [0 a]] c=[%0 1]] 2 [0 1] 0 b=2]
+			*[a=[l [0 a]] c=[%0 1]]
+
+		<---- To be continued... (yes roundabout plays)
+	]=]
+	{
+		eval = (function(): Thing
+			local s = num(42, "s")
+
+			-- local bat = num(100, "bat")
+			-- local pay = num(100, "pay")
+
+			-- local l = list {bat, pay}
+			local l = num(100, "l")
+			local g = list {
+				EXT,
+				list {
+					list { TAKE, l },
+					list { CALL, list { num(2), list { PART, num(0) } } },
+				},
+			}
+			local f = list { EXT, list { list { TAKE, num(0) }, g } }
+
+			return list { s, f }
+		end)(),
+		-- res = list { num(0), num(42) },
+	},
 }
 
 -- test serialise and deserialise
