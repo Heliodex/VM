@@ -996,7 +996,7 @@ local tests: {
 			list { TAKE, list { num(47), num(48) } },
 			list { PART, num(0) }
 		),
-		res = list{list { num(47), num(48) }, num(45), num(46) },
+		res = list { list { num(47), num(48) }, num(45), num(46) },
 	},
 	{
 		eval = a_change(
@@ -1005,7 +1005,11 @@ local tests: {
 			list { TAKE, list { num(47), num(48) } },
 			list { PART, num(0) }
 		),
-		res = list{list { num(42), num(43) }, list { num(47), num(48) }, num(46) },
+		res = list {
+			list { num(42), num(43) },
+			list { num(47), num(48) },
+			num(46),
+		},
 	},
 	{
 		eval = a_change(
@@ -1014,9 +1018,13 @@ local tests: {
 			list { TAKE, list { num(47), num(48) } },
 			list { PART, num(0) }
 		),
-		res = list{list { num(42), num(43) }, num(45), list { num(47), num(48) },  },
+		res = list {
+			list { num(42), num(43) },
+			num(45),
+			list { num(47), num(48) },
+		},
 	},
-	
+
 	-- split
 	-- ok moment of truth
 	{
