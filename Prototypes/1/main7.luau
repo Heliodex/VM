@@ -1529,6 +1529,19 @@ local tests: {
 		),
 		res = num(2),
 	},
+
+	-- what's next?
+	{
+		eval = (function(): Thing
+			local start = num(1)
+
+			return list {
+				list { start, num(5) },
+				list { SUM, list { PART, num(0) } },
+			}
+		end)(),
+		res = num(6),
+	},
 }
 
 -- test serialise and deserialise
