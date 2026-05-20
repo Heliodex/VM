@@ -467,7 +467,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 
 	-- *{a {SIZE b}} -> size(*{a b})
 	if equal(n, SIZE) then
-		print(`{start}size(*\{{serialise(a, true)}, {serialise(b, true)}})`)
+		print(`{start}size(*\{{serialise(a, true)} {serialise(b, true)}})`)
 		local rab = reduce1(list { a, b }, depth + 1)
 		if rab == nil then
 			return nil
@@ -478,7 +478,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 
 	-- *{a {SUM b}} -> sum(*{a b})
 	if equal(n, SUM) then
-		print(`{start}sum(*\{{serialise(a, true)}, {serialise(b, true)}})`)
+		print(`{start}sum(*\{{serialise(a, true)} {serialise(b, true)}})`)
 		local rab = reduce1(list { a, b }, depth + 1)
 		if rab == nil then
 			return nil
@@ -500,7 +500,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 
 	-- *{a {TYPE b}} -> type(*{a b})
 	if equal(n, TYPE) then
-		print(`{start}type(*\{{serialise(a, true)}, {serialise(b, true)}})`)
+		print(`{start}type(*\{{serialise(a, true)} {serialise(b, true)}})`)
 		local rab = reduce1(list { a, b }, depth + 1)
 		if rab == nil then
 			return nil
@@ -725,7 +725,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 			return nil
 		end
 
-		return printReturn(reduce1(list { a, p }, depth + 1))
+		return reduce1(list { a, p }, depth)
 	end
 
 	return nil
@@ -1584,23 +1584,50 @@ local tests: {
 		*[a=[l [0 a]] [%9 b=2 c=[%0 1]]]
 		*[*[a=[l [0 a]] c=[%0 1]] 2 [0 1] 0 b=2]
 			*[a=[l [0 a]] c=[%0 1]]
-
-		<---- To be continued... (yes roundabout plays)
+			[l [0 a]]
+		*[a=[l [0 a]] 2 [0 1] [0 b=2]]
+		*[*[[l [0 a]] [0 1]] *[[l [0 a]] [0 b=2]]]
+			*[[l [0 a]] [0 1]]
+			[l [0 a]]
+		*[[l [0 a]] *[[l [0 a]] [0 b=2]]]
+			*[[l [0 a]] [0 b=2]]
+			l
+		*[[l [0 a]] l]
 	]=]
 	{
 		eval = (function(): Thing
 			local s = num(42, "s")
 
-			-- local bat = num(100, "bat")
-			-- local pay = num(100, "pay")
+			local lidx = num(1, "lidx")
+			local bidx = num(2, "bidx")
+			local aidx = num(3, "aidx")
 
-			-- local l = list {bat, pay}
-			local l = num(100, "l")
+			local t = list {
+				CHECK,
+				list { list { PART, aidx }, list { SUM, list { PART, bidx } } },
+			}
+			local y = list { TAKE, bidx }
+
+			-- hell
+			local n = list {
+				CALL,
+				list {
+					lidx,
+					list {
+						list { TAKE, lidx },
+						list { SUM, list { TAKE, bidx } },
+						list { TAKE, aidx },
+					},
+				},
+			}
+
+			local l = list { IF, t, y, n }
+			-- local l = num(42, "l")
 			local g = list {
 				EXT,
 				list {
 					list { TAKE, l },
-					list { CALL, list { num(2), list { PART, num(0) } } },
+					list { CALL, list { num(1), list { PART, num(0) } } },
 				},
 			}
 			local f = list { EXT, list { list { TAKE, num(0) }, g } }
