@@ -137,7 +137,6 @@ local TAKE, PART, SIZE, SUM, CHECK, TYPE, SPLIT, CHANGE, IF, COMP, EXT, CALL =
 	num(11, "CALL")
 
 local function h_size(t: Thing): Num?
-	print(`size({serialise(t, true)})`)
 	if t.type ~= LIST then
 		return nil
 	end
@@ -408,13 +407,20 @@ local function reduce1(e: Thing, depth: number): Thing?
 	-- end
 
 	if len(e) ~= 2 then
+		print(`{start}! Element not length 2`)
 		return nil
 	end
 
 	-- now we're talking
 	-- the list needs to be {a {n:@ b}}
 	local a, l = e.things[1], e.things[2]
-	if l.type ~= LIST or len(l) ~= 2 then
+	if l.type ~= LIST then
+		print(`{start}! 2nd element not list`)
+		return nil
+	end
+
+	if len(l) ~= 2 then
+		print(`{start}! 2nd element not length 2`)
 		return nil
 	end
 
@@ -433,6 +439,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 
 		local rabc = reduce1(list { a, list { b2, c2 } }, depth + 1)
 		if rabc == nil then
+			print(`{start}! autocons: reduce abc failed`)
 			return nil
 		end
 
@@ -442,6 +449,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 
 		local rad = reduce1(list { a, b }, depth + 1)
 		if rad == nil then
+			print(`{start}! autocons: reduce ad failed`)
 			return nil
 		end
 
@@ -470,6 +478,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 		print(`{start}size(*\{{serialise(a, true)} {serialise(b, true)}})`)
 		local rab = reduce1(list { a, b }, depth + 1)
 		if rab == nil then
+			print(`{start}! size: reduce ab failed`)
 			return nil
 		end
 		print(`{start}size({serialise(rab, true)})`)
@@ -481,6 +490,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 		print(`{start}sum(*\{{serialise(a, true)} {serialise(b, true)}})`)
 		local rab = reduce1(list { a, b }, depth + 1)
 		if rab == nil then
+			print(`{start}! sum: reduce ab failed`)
 			return nil
 		end
 		print(`{start}sum({serialise(rab, true)})`)
@@ -492,6 +502,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 		print(`{start}check(*\{{serialise(a, true)} {serialise(b, true)}})`)
 		local rab = reduce1(list { a, b }, depth + 1)
 		if rab == nil then
+			print(`{start}! check: reduce ab failed`)
 			return nil
 		end
 		print(`{start}check({serialise(rab, true)})`)
@@ -503,6 +514,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 		print(`{start}type(*\{{serialise(a, true)} {serialise(b, true)}})`)
 		local rab = reduce1(list { a, b }, depth + 1)
 		if rab == nil then
+			print(`{start}! type: reduce ab failed`)
 			return nil
 		end
 		print(`{start}type({serialise(rab, true)})`)
@@ -511,7 +523,13 @@ local function reduce1(e: Thing, depth: number): Thing?
 
 	-- *{a {CHANGE {b c d}}} -> change(b, *{a c}, *{a d})
 	if equal(n, CHANGE) then
-		if b.type ~= LIST or len(b) ~= 3 then
+		if b.type ~= LIST then
+			print(`{start}! change: 2nd parameter not list`)
+			return nil
+		end
+
+		if len(b) ~= 3 then
+			print(`{start}! change: 2nd parameter not length 3`)
 			return nil
 		end
 
@@ -527,6 +545,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 
 		local rac = reduce1(list { a, c2 }, depth + 1)
 		if rac == nil then
+			print(`{start}! change: reduce ac failed`)
 			return nil
 		end
 
@@ -536,6 +555,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 
 		local rad = reduce1(list { a, d2 }, depth + 1)
 		if rad == nil then
+			print(`{start}! change: reduce ad failed`)
 			return nil
 		end
 
@@ -546,7 +566,13 @@ local function reduce1(e: Thing, depth: number): Thing?
 
 	-- *{a {SPLIT {b c}}} -> *{*{a b} *{a c}}
 	if equal(n, SPLIT) then
-		if b.type ~= LIST or len(b) ~= 2 then
+		if b.type ~= LIST then
+			print(`{start}! split: 2nd parameter not list`)
+			return nil
+		end
+
+		if len(b) ~= 2 then
+			print(`{start}! split: 2nd parameter not length 2`)
 			return nil
 		end
 
@@ -559,6 +585,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 
 		local rab = reduce1(list { a, b2 }, depth + 1)
 		if rab == nil then
+			print(`{start}! split: reduce ab failed`)
 			return nil
 		end
 
@@ -566,6 +593,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 
 		local rac = reduce1(list { a, c2 }, depth + 1)
 		if rac == nil then
+			print(`{start}! split: reduce ac failed`)
 			return nil
 		end
 
@@ -589,7 +617,13 @@ local function reduce1(e: Thing, depth: number): Thing?
 		*{a *{part({c d}, sum({1 *{a b}}))}}
 	]]
 	if equal(n, IF) then
-		if b.type ~= LIST or len(b) ~= 3 then
+		if b.type ~= LIST then
+			print(`{start}! if: 2nd parameter not list`)
+			return nil
+		end
+
+		if len(b) ~= 3 then
+			print(`{start}! if: 2nd parameter not length 3`)
 			return nil
 		end
 
@@ -610,6 +644,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 
 		local rab = reduce1(list { a, b2 }, depth + 1)
 		if rab == nil then
+			print(`{start}! if: reduce ab failed`)
 			return nil
 		end
 
@@ -627,6 +662,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 			return printReturn(reduce1(list { a, d2 }, depth + 1))
 		end
 
+		print(`{start}! if: condition not boolean (got {serialise(rab, true)})`)
 		return nil
 	end
 
@@ -637,7 +673,13 @@ local function reduce1(e: Thing, depth: number): Thing?
 		*{*{a b} c}
 	]]
 	if equal(n, COMP) then
-		if b.type ~= LIST or len(b) ~= 2 then
+		if b.type ~= LIST then
+			print(`{start}! comp: 2nd parameter not list`)
+			return nil
+		end
+
+		if len(b) ~= 2 then
+			print(`{start}! comp: 2nd parameter not length 2`)
 			return nil
 		end
 
@@ -651,6 +693,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 
 		local rab = reduce1(list { a, b2 }, depth + 1)
 		if rab == nil then
+			print(`{start}! comp: reduce ab failed`)
 			return nil
 		end
 
@@ -667,7 +710,13 @@ local function reduce1(e: Thing, depth: number): Thing?
 		*{{*{a b} a} c}
 	]]
 	if equal(n, EXT) then
-		if b.type ~= LIST or len(b) ~= 2 then
+		if b.type ~= LIST then
+			print(`{start}! ext: 2nd parameter not list`)
+			return nil
+		end
+
+		if len(b) ~= 2 then
+			print(`{start}! ext: 2nd parameter not length 2`)
 			return nil
 		end
 
@@ -680,6 +729,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 
 		local rab = reduce1(list { a, b2 }, depth + 1)
 		if rab == nil then
+			print(`{start}! ext: reduce ab failed`)
 			return nil
 		end
 
@@ -700,7 +750,13 @@ local function reduce1(e: Thing, depth: number): Thing?
 		*{*{a c} part(*{a c}, b)}
 	]]
 	if equal(n, CALL) then
-		if b.type ~= LIST or len(b) ~= 2 then
+		if b.type ~= LIST then
+			print(`{start}! call: 2nd parameter not list`)
+			return nil
+		end
+
+		if len(b) ~= 2 then
+			print(`{start}! call: 2nd parameter not length 2`)
 			return nil
 		end
 
@@ -714,6 +770,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 
 		local rac = reduce1(list { a, c2 }, depth + 1)
 		if rac == nil then
+			print(`{start}! call: reduce ac failed`)
 			return nil
 		end
 
@@ -722,12 +779,14 @@ local function reduce1(e: Thing, depth: number): Thing?
 
 		local p = h_part(rac, b2)
 		if p == nil then
+			print(`{start}! call: part failed`)
 			return nil
 		end
 
 		return reduce1(list { a, p }, depth)
 	end
 
+	print(`{start}! no reduction rule matched`)
 	return nil
 end
 
