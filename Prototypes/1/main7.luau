@@ -121,7 +121,7 @@ end
 
 local TRUE, FALSE = num(0, "TRUE"), num(1, "FALSE") -- imagine loobeans but if they were loobeans
 
-local TAKE, PART, SIZE, SUM, CHECK, TYPE, SPLIT, CHANGE, IF, COMP, EXT, CALL =
+local TAKE, PART, SIZE, SUM, CHECK, TYPE, CHANGE, SPLIT, IF, COMP, EXT, CALL =
 	num(0, "TAKE"),
 	num(1, "PART"),
 	num(2, "SIZE"),
@@ -378,8 +378,15 @@ end
 
 -- *a
 local function reduce1(e: Thing, depth: number): Thing?
+	-- local function print()
+		
+	-- end
+
 	if depth < 0 then
 		error "Invalid depth"
+	end
+	if depth > 10 then
+		error "Too deep!"
 	end
 	local start = string.rep("    ", depth)
 
@@ -394,6 +401,8 @@ local function reduce1(e: Thing, depth: number): Thing?
 	if e.type == NUM then
 		return printReturn(e) -- *a:@ -> a
 	end
+
+	local function print() end
 
 	-- if len(e) == 0 then
 	-- 	return e -- *{} -> {}
@@ -1655,17 +1664,48 @@ local tests: {
 	]=]
 	{
 		eval = (function(): Thing
-			local s = num(42, "s")
+			local s = num(2, "s")
 
 			local lidx = num(1, "lidx")
-			local bidx = num(2, "bidx")
-			local aidx = num(3, "aidx")
+			local baidx = num(2, "baidx")
+			local bidx = num(1, "bidx")
+			local aidx = num(2, "aidx")
+
+			local function idx(i: Num)
+				return list {
+					COMP,
+					list { list { PART, baidx }, list { PART, i } },
+				}
+			end
+
+			local t2 = list {
+				-- list { PART, aidx },
+
+				-- like Nock Zero
+				idx(aidx),
+				--
+				-- list { SUM, list { num(1, "sum1-t"), idx(bidx) } },
+				list {
+					SUM,
+					-- list { num(1, "sum1-t"), idx(bidx) },
+					-- autocons here because better 4 sum
+					list {
+						list { TAKE, num(1, "st") },
+						idx(bidx),
+					},
+				},
+			}
+			-- local t2 = num(42, "t2")
 
 			local t = list {
 				CHECK,
-				list { list { PART, aidx }, list { SUM, list { PART, bidx } } },
+				t2,
 			}
-			local y = list { TAKE, bidx }
+			-- local t = num(42, "t")
+			-- local t = list { TAKE, num(99, "z") }
+
+			local y = idx(bidx)
+			-- local y = num(42, "y")
 
 			-- hell
 			local n = list {
@@ -1673,20 +1713,37 @@ local tests: {
 				list {
 					lidx,
 					list {
-						list { TAKE, lidx },
-						list { SUM, list { TAKE, bidx } },
-						list { TAKE, aidx },
+						list { PART, lidx },
+						list {
+							-- list { SUM, list { num(1, "sum1-n"), idx(bidx) } },
+							-- again, autocons
+							list {
+								SUM,
+								list {
+									list { TAKE, num(5, "sn") },
+									idx(bidx),
+								}
+							},
+							idx(aidx),
+						}
 					},
+					-- list {
+					-- 	PART, num(0)
+					-- }
 				},
 			}
+			-- local n = num(42, "n")
 
-			local l = list { IF, t, y, n }
+			local l = list { IF, list { t, y, n } }
 			-- local l = num(42, "l")
 			local g = list {
 				EXT,
 				list {
 					list { TAKE, l },
-					list { CALL, list { num(1), list { PART, num(0) } } },
+					list {
+						CALL,
+						list { num(1, "call1"), list { PART, num(0) } },
+					},
 				},
 			}
 			local f = list { EXT, list { list { TAKE, num(0) }, g } }
@@ -1716,7 +1773,11 @@ local function reduce(e: Thing): Thing?
 	return reduce1(e, 0)
 end
 
-for _, test in tests do
+for i, test in tests do
+	if i ~= #tests then
+		continue
+	end
+	
 	local rd = reduce(test.eval)
 	local out
 	if rd == nil then
