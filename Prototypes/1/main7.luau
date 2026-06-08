@@ -379,7 +379,7 @@ end
 -- *a
 local function reduce1(e: Thing, depth: number): Thing?
 	-- local function print()
-		
+
 	-- end
 
 	if depth < 0 then
@@ -1722,10 +1722,10 @@ local tests: {
 								list {
 									list { TAKE, num(5, "sn") },
 									idx(bidx),
-								}
+								},
 							},
 							idx(aidx),
-						}
+						},
 					},
 					-- list {
 					-- 	PART, num(0)
@@ -1777,7 +1777,7 @@ for i, test in tests do
 	if i ~= #tests then
 		continue
 	end
-	
+
 	local rd = reduce(test.eval)
 	local out
 	if rd == nil then
