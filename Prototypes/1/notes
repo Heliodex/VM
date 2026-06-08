@@ -1,0 +1,711 @@
+:: Pattern: Apply a stored f to d
+*[[f d] 2 [0 3] [0 2]]  :: Apply f at +3 to d at +2
+
+*[a 2 b c]         *[*[a b] *[a c]]
+*[a 2 [0 3] [0 2]]         *[*[a [0 3]] *[a [0 2]]]
+*[[f d] 2 [0 3] [0 2]]         *[*[[f d] [0 3]] *[[f d] [0 2]]]
+
+*[*[[f d] [0 3]] *[[f d] [0 2]]]
+	*[[f d] 0 3]
+		/[3 f d]
+			d
+	*[[f d] 0 2]
+		/[2 f d]
+			f
+*[d f]
+
+*{SPLIT2 {a:@ {b c}}} -> *{*{a b} *{a c}}
+*{SPLIT2 {a:@ {{OP0 3} {OP0 2}}}} -> *{*{a {OP0 3}} *{a {OP0 2}}}
+*{SPLIT2 {{f d} {{OP0 3} {OP0 2}}}} -> *{*{{f d} {OP0 3}} *{{f d} {OP0 2}}}
+
+*{*{{f d} {OP0 3}} *{{f d} {OP0 2}}}
+	*{{f d} {OP0 3}}
+	*{{f d} {OP0 2}}
+
+*{*{TAKE {1 {f d}}} *{TAKE {0 {f d}}}}
+	*{TAKE {1 {f d}}}
+		d
+	*{TAKE {0 {f d}}}
+		f
+
+*{*{TAKE {1 {f d}}} *{TAKE {0 {f d}}}}
+*{*{TAKE {1 a}} *{TAKE {0 a}}}
+*{*{TAKE {b[1] a}} *{TAKE {c[1] a}}}
+*{*{b[0] {b[1] a}} *{c[0] {c[1] a}}}
+
+*{SPLIT2 {a:@ {b c}}} -> *{*{b[0] {b[1] a}} *{c[0] {c[1] a}}}
+
+hmm, not very clean
+
+*{{SPLIT2 a:@} {b c}} -> *{*{{b[0] b[1]} a} *{{c[0] c[1]} a}}
+*{{SPLIT2 a:@} {b c}} -> *{*{b a} *{c a}}
+
+
+NEW PLAN (lel)
+
+*{{TAKE a} b} -> b
+*{{SIZE a} b} -> size(*{b a})
+*{{PART a} b} -> part(*{b a})
+*{{SUM a} b} -> sum(*{b a})
+*{{CHECK a} b} -> check(*{b a})
+*{{TYPE a} b} -> type(*{b a})
+*{{SPLIT a} {b c}} -> *{*{b a} *{c a}}
+
+
+test
+
+*{{CHECK {TAKE 9}} {TYPE {8}}}
+check(*{{TYPE {8}} {TAKE 9}})
+check(*{type(*{{TAKE 9} {8}})})
+check(*{type({8})})
+check(*{FALSE})
+~~
+
+ ok yea i fukt up somewhere
+
+*{{SPLIT a} {b c}} -> *{*{b a} *{c a}}
+ *{{SPLIT a} {{b1 b2} {c1 c2}}} -> *{*{{b1 b2} a} *{{c1 c2} a}}
+ *{{SPLIT a} {{TAKE 0} {c1 c2}}} -> *{*{{TAKE 0} a} *{{c1 c2} a}}
+ *{{SPLIT {TAKE 0}} {{TAKE 0} {c1 c2}}} -> *{*{{TAKE 0} {TAKE 0}} *{{c1 c2} {TAKE 0}}}
+
+ dude I thikn the SPLIT operator is retarded?? like it isn't useful at all
+
+to compare,
+
+*[a 2 b c]         *[*[a b] *[a c]]
+*[a 2 [0 3] [0 2]]         *[*[a [0 3]] *[a [0 2]]]
+*[[f d] 2 [0 3] [0 2]]         *[*[[f d] [0 3]] *[[f d] [0 2]]]
+
+*[*[[f d] [0 3]] *[[f d] [0 2]]]
+	*[[f d] 0 3]
+		/[3 f d]
+			d
+	*[[f d] 0 2]
+		/[2 f d]
+			f
+*[d f]
+
+*{{SPLIT a} {b c}} -> *{*{b a} *{c a}}
+*{{SPLIT a} {{PART 1} {PART 0}}} -> *{*{{PART 1} a} *{{PART 0} a}}
+*{{SPLIT {a b}} {{PART 1} {PART 0}}} -> *{*{{PART 1} {a b}} *{{PART 0} {a b}}}
+
+*{*{{PART 1} {a b}} *{{PART 0} {a b}}}
+	*{{PART 1} {a b}}
+		part(*{{a b} {PART 1}})
+	*{{PART 0} {a b}}
+		part(*{{a b} {PART 0}})
+
+*{{SPLIT {TAKE 0}} {{PART 1} {PART 0}}} -> *{*{{PART 1} {TAKE 0}} *{{PART 0} {TAKE 0}}}
+
+*{*{{PART 1} {TAKE 0}} *{{PART 0} {TAKE 0}}}
+	*{{PART 1} {TAKE 0}}
+		part(*{{TAKE 0} {PART 1}})
+		part({PART 1})
+		~~
+	*{{PART 0} {TAKE 0}}
+		part(*{{TAKE 0} {PART 0}})
+		part({PART 0})
+		~~
+
+THAT'S why the tests weren't working,
+THAT'S why the {PART _} opcodes get evaluated 2 times,
+THAT'S why this combinator calculus sucks,
+and THAT'S why etiher PART or SPLIT needs to be reworked, probably PART. LOOK AT NOCK. WHY DO YOU THINK Nock Zero & One ARE THE ONLY OPCODES WITHOUT A *
+
+
+NEW PLAN 2
+
+*{{TAKE a} b} -> b
+*{{PART a} b} -> part(a, b)
+*{{SIZE a} b} -> size(*{b a})
+*{{SUM a} b} -> sum(*{b a})
+*{{CHECK a} b} -> check(*{b a})
+*{{TYPE a} b} -> type(*{b a})
+*{{SPLIT a} {b c}} -> *{*{b a} *{c a}}
+
+*{{SPLIT a} {b c}} -> *{*{b a} *{c a}}
+*{{SPLIT a} {{PART 1} {PART 0}}} -> *{*{{PART 1} a} *{{PART 0} a}}
+*{{SPLIT {a b}} {{PART 1} {PART 0}}} -> *{*{{PART 1} {a b}} *{{PART 0} {a b}}}
+
+*{*{{PART 1} {a b}} *{{PART 0} {a b}}}
+	*{{PART 1} {a b}}
+		part(1, {a b})
+			b
+	*{{PART 0} {a b}}
+		part(0, {a b})
+			a
+*{b a}
+
+now, let's analyse Nock Six
+
+*[a 6 b c d] -> *[a *[[c d] 0 *[[2 3] 0 *[a 4 4 b]]]]
+*[a [6 [b [c d]]]] -> *[a *[[c d] [0 *[[2 3] [0 *[a [4 [4 b]]]]]]]]
+
+the double increment is only necessary because of the tree structure, since we have just lists this is probably easier for us
+
+*{{IF a} {b c d}} -> part(*{a b}, {*{a c} *{a d}})
+*{{IF a} {b c d}} -> *{{PART *{a b}} {*{a c} *{a d}}}
+*{{IF a} {b c d}} -> *{{PART *{a b}} *{{TAKE a} {*{a c} *{a d}}}}
+
+
+PLAN 3
+
+*{a {TAKE b}} -> b
+*{a {PART b}} -> part(b, a)
+*{a {SIZE b}} -> size(*{b a})
+*{a {SUM b}} -> sum(*{b a})
+*{a {CHECK b}} -> check(*{b a})
+*{a {TYPE b}} -> type(*{b a})
+*{a {SPLIT {b c}}} -> *{*{a b} *{a c}}
+
+*{{TAKE 0} {SUM {}}}
+	sum(*{{} {TAKE 0}})
+		*{{} {TAKE 0}}
+			0
+
+*{a {SPLIT {b c}}} -> *{*{a b} *{a c}}
+*{a {SPLIT {{PART 1} c}}} -> *{*{a {PART 1}} *{a c}}
+*{a {SPLIT {{PART 1} {PART 0}}}} -> *{*{a {PART 1}} *{a {PART 0}}}
+*{{a b} {SPLIT {{PART 1} {PART 0}}}} -> *{*{{a b} {PART 1}} *{{a b} {PART 0}}}
+
+*{*{{a b} {PART 1}} *{{a b} {PART 0}}}
+*{part({a b}, 1) part({a b}, 0)}
+*{b a}
+
+I guess... I guess this is our lifecycle formula:
+
+{SPLIT {{PART 1} {PART 0}}}
+{6 {{1 1} {1 0}}}
+
+...as compared to [2 [0 3] 0 2]. Of course, the opcodes will probably be re-ordered later.
+
+Let's take another look at Nock Six:
+
+*[a 6 b c d] -> *[a *[[c d] 0 *[[2 3] 0 *[a 4 4 b]]]]
+*[a [6 [b [c d]]]] -> *[a *[[c d] [0 *[[2 3] [0 *[a [4 [4 b]]]]]]]]
+
+with a more explicitly macro version (as specified in 5K):
+
+*[a 6 b c d] ->  *[a 2 [0 1] 2 [1 c d] [1 0] 2 [1 2 3] [1 0] 4 4 b]
+*[a 6 b c d] ->  *[a [2 [[0 1] [2 [[1 [c d]] [[1 0] [2 [[1 [2 3]] [[1 0] [4 [4 b]]]]]]]]]]]
+
+	If *[subject b] equals 0, return *[subject c]
+	If *[subject b] equals 1, return *[subject d]
+	Otherwise, crash
+
+that's a helluva lotta brackets
+okay, let's call ours IF again
+
+*{a {IF {b c d}}} -> part(*{a b}, {*{a c} *{a d}})
+*{a {IF {b c d}}} -> *{{*{a c} *{a d}} {PART *{a b}}}
+*{a {IF {b c d}}} -> *{a {SPLIT {?}}}
+
+*[a [b c] d]        [*[a b c] *[a d]]
+
+*[a 0 b]            /[b a]
+*[a 1 b]            b
+*[a 2 b c]         *[*[a b] *[a c]]
+*[a 4 b]            +*[a b]
+
+*[a 2 [0 1] 2 [1 c d] [1 0] 2 [1 2 3] [1 0] 4 4 b]
+*[a [2 [[0 1] [2 [[1 [c d]] [[1 0] [2 [[1 [2 3]] [[1 0] [4 [4 b]]]]]]]]]]]
+*[*[a [0 1]] *[a [2 [[1 [c d]] [[1 0] [2 [[1 [2 3]] [[1 0] [4 [4 b]]]]]]]]]]
+	*[a [0 1]]
+		a
+*[a *[a [2 [[1 [c d]] [[1 0] [2 [[1 [2 3]] [[1 0] [4 [4 b]]]]]]]]]]
+	*[a [2 [b=[1 [c d]] c=[[1 0] [2 [[1 [2 3]] [[1 0] [4 [4 b]]]]]]]]]
+	*[*[a [1 [c d]]] *[a [[1 0] [2 [[1 [2 3]] [[1 0] [4 [4 b]]]]]]]]
+		*[a [1 [c d]]]
+			[c d]
+	*[[c d] *[a [[1 0] [2 [[1 [2 3]] [[1 0] [4 [4 b]]]]]]]]
+		*[a [[b=1 c=0] d=[2 [[1 [2 3]] [[1 0] [4 [4 b]]]]]]]
+		[*[a 1 0] *[a [2 [[1 [2 3]] [[1 0] [4 [4 b]]]]]]]
+			*[a 1 0]
+				0
+		[0 *[a [2 [[1 [2 3]] [[1 0] [4 [4 b]]]]]]]
+			*[a [2 [b=[1 [2 3]] c=[[1 0] [4 [4 b]]]]]]
+			*[*[a [1 [2 3]]] *[a [[1 0] [4 [4 b]]]]]
+				*[a [1 [2 3]]]
+					[2 3]
+			*[[2 3] *[a [[1 0] [4 [4 b]]]]]
+				*[a [[b=1 c=0] d=[4 [4 b]]]]
+				[*[a 1 0] *[a [4 [4 b]]]]
+					*[a 1 0]
+						0
+				[0 *[a [4 [4 b]]]]
+					*[a [4 [4 b]]]
+					+*[a [4 b]]
+						*[a 4 b]
+						+*[a b]
+					++*[a b]
+				[0 ++*[a b]]
+			*[[2 3] [0 ++*[a b]]]
+			/[++*[a b] [2 3]]
+		[0 /[++*[a b] [2 3]]]
+	*[[c d] [0 /[++*[a b] [2 3]]]]
+	/[/[++*[a b] [2 3]] [c d]]
+*[a /[/[++*[a b] [2 3]] [c d]]]
+
+*{a {IF {b c d}}} -> part(*{a b}+1, {*{a c} *{a d}})
+*{a {IF {b c d}}} -> part(sum({*{a b} 1}), {*{a c} *{a d}})
+
+...we need autocons
+
+
+PLAN 4
+
+*{a {{b c} d}} -> {*{a {b c}} *{a d}}
+*{a {TAKE b}} -> b
+*{a {PART b}} -> part(b, a)
+*{a {SIZE b}} -> size(*{b a})
+*{a {SUM b}} -> sum(*{b a})
+*{a {CHECK b}} -> check(*{b a})
+*{a {TYPE b}} -> type(*{b a})
+*{a {SPLIT {b c}}} -> *{*{a b} *{a c}}
+
+
+*[a [2 [[PART 0] [2 [[1 [c d]] [[1 0] [2 [[1 [2 3]] [[1 0] [4 [4 b]]]]]]]]]]]
+
+*{a=a {SPLIT {b={PART 0} c={SPLIT {{TAKE {c d}} {{TAKE 0} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}}}}}
+*{*{a {PART 0}} *{a {2 {{TAKE {c d}} {{TAKE 0} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}}}}
+	*{a {PART 0}}
+		a
+*{a *{a {SPLIT {{TAKE {c d}} {{TAKE 0} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}}}}
+	*{a {SPLIT {b={TAKE {c d}} c={{TAKE 0} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}}}
+	*{*{a {TAKE {c d}}} *{a {{TAKE 0} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}}
+		*{a {TAKE {c d}}}
+			{c d}
+	*{{c d} *{a {{TAKE 0} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}}
+		*{a {{b=TAKE c=0} d={SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}
+		{*{a {TAKE 0}} *{a {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}
+			*{a {TAKE 0}}
+				0
+		{0 *{a {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}
+			*{a {SPLIT {b={TAKE {1 2}} c={{TAKE PART} {SUM {{TAKE X} b}}}}}}
+			*{*{a {TAKE {1 2}}} *{a {{TAKE PART} {SUM {{TAKE X} b}}}}}
+				*{a {TAKE {1 2}}}
+					{1 2}
+			*{{1 2} *{a {{TAKE PART} {SUM {{TAKE X} b}}}}}
+				*{a {{b=TAKE c=PART} d={SUM {{TAKE X} b}}}}
+				{*{a TAKE PART} *{a {SUM {{TAKE X} b}}}}
+					*{a TAKE PART}
+						PART
+				{PART *{a {SUM {{TAKE X} b}}}}
+					*{a {SUM {{TAKE X} b}}}
+					sum(*{a {{TAKE X} b}})
+						*{a {{TAKE X} b}}
+						{*{a {TAKE X}} *{a b}}
+							*{a {TAKE X}}
+								X
+						{X *{a b}}
+					sum({X *{a b}})
+				{PART sum({X *{a b}})}
+			*{{1 2} {PART sum({X *{a b}})}}
+			part({1 2}, sum({X *{a b}}))
+		{0 part({1 2}, sum({X *{a b}}))}
+	*{{c d} {0 part({1 2}, sum({X *{a b}}))}}
+	part({c d}, part({1 2}, sum({X *{a b}})))
+*{a part({c d}, part({1 2}, sum({X *{a b}})))}
+
+{a {SPLIT {{PART 0} {SPLIT {{TAKE {c d}} {{TAKE 0} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}}}}}
+a_split(a, {{PART 0} {SPLIT {{TAKE {c d}} {{TAKE 0} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}}})
+a_split(a, a_split({PART 0}, {{TAKE {c d}} {{TAKE 0} {SPLIT {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}}}}}))
+a_split(a, a_split({PART 0}, {{TAKE {c d}} a_split({TAKE 0}, {{TAKE {1 2}} {{TAKE PART} {SUM {{TAKE X} b}}}})}))
+a_split(a, a_split({PART 0}, {{TAKE {c d}} a_split({TAKE 0}, {{TAKE {1 2}} a_sum({TAKE PART}, {{TAKE X} b})})}))
+
+*{a=a {SPLIT {b={PART 0} c={SPLIT {{TAKE {c d}} {{TAKE 0} {SUM {{TAKE X} b}}}}}}}}
+*{*{a {PART 0}} *{a {2 {{TAKE {c d}} {{TAKE 0} {SUM {{TAKE X} b}}}}}}}
+	*{a {PART 0}}
+		a
+*{a *{a {SPLIT {{TAKE {c d}} {{TAKE 0} {SUM {{TAKE X} b}}}}}}}
+	*{a {SPLIT {b={TAKE {c d}} c={{TAKE 0} {SUM {{TAKE X} b}}}}}}
+	*{*{a {TAKE {c d}}} *{a {{TAKE 0} {SUM {{TAKE X} b}}}}}
+		*{a {TAKE {c d}}}
+			{c d}
+	*{{c d} *{a {{TAKE 0} {SUM {{TAKE X} b}}}}}
+		*{a {{b=TAKE c=0} d={SUM {{TAKE X} b}}}}
+		{*{a {TAKE 0}} *{a {SUM {{TAKE X} b}}}}
+			*{a {TAKE 0}}
+				0
+		{0 *{a {SUM {{TAKE X} b}}}}
+			*{a {SUM {{TAKE X} b}}}
+			sum(*{a {{TAKE X} b}})
+				*{a {{TAKE X} b}}
+				{*{a {TAKE X}} *{a b}}
+					*{a {TAKE X}}
+						X
+				{X *{a b}}
+			sum({X *{a b}})
+		{0 sum({X *{a b}})}
+	*{{c d} {0 sum({X *{a b}})}}
+	part({c d}, sum({X *{a b}}))
+*{a part({c d}, sum({X *{a b}}))}
+
+{a {SPLIT {{PART 0} {SPLIT {{TAKE {c d}} {{TAKE 0} {SUM {{TAKE X} b}}}}}}}}
+a_split(a, {{PART 0} {SPLIT {{TAKE {c d}} {{TAKE 0} {SUM {{TAKE X} b}}}}}})
+a_split(a, split({PART 0}, {{TAKE {c d}} {{TAKE 0} {SUM {{TAKE X} b}}}}))
+a_split(a, split({PART 0}, {{TAKE {c d}} a_sum({TAKE 0}, {{TAKE X} b})}))
+
+
+some issues whatever
+
+*{a {{b c} d}} -> {*{a {b c}} *{a d}}
+
+*{a {TAKE b}} -> b
+*{a {PART b}} -> part(b, a)
+*{a {SIZE b}} -> size(*{b a})
+*{a {SUM b}} -> sum(*{b a})
+*{a {CHECK b}} -> check(*{b a})
+*{a {TYPE b}} -> type(*{b a})
+*{a {SPLIT {b c}}} -> *{*{a b} *{a c}}
+
+*{a {IF {b c d}}} -> *{a {SPLIT {{PART 0} {SPLIT {{TAKE {c d}} {{TAKE PART} {SUM {{TAKE 1} b}}}}}}}}
+
+
+*[a [b c] d]      [*[a b c] *[a d]]
+
+*[a 1 b]          b
+*[a 2 b c]        *[*[a b] *[a c]]
+
+*[a 7 b c]        *[a 2 b 1 c]
+
+*[a=a [2 [b=b c=[1 c]]]]
+*[*[a b] *[a [1 c]]]
+	*[a [1 c]]
+		c
+*[*[a b] c]
+
+
+*{a {SPLIT {b {TAKE c}}}}
+*{*{a b} *{a {TAKE c}}}
+	*{a {TAKE c}}
+		c
+*{*{a b} c}
+
+okay that was piss easy
+
+*{*{a {TAKE b}} {PART 0}}
+
+
+hemi-demi-semifinally
+
+*{a {{b c} d}} -> {*{a {b c}} *{a d}}
+
+*{a {TAKE b}} -> b
+*{a {PART b}} -> part(b, a)
+*{a {SIZE b}} -> size(*{b a})
+*{a {SUM b}} -> sum(*{b a})
+*{a {CHECK b}} -> check(*{b a})
+*{a {TYPE b}} -> type(*{b a})
+*{a {SPLIT {b c}}} -> *{*{a b} *{a c}}
+
+*{a {IF {b c d}}} -> *{a {SPLIT {{PART 0} {SPLIT {{TAKE {c d}} {{TAKE PART} {SUM {{TAKE 1} b}}}}}}}}
+*{a {COMP {b c}}} -> *{a {SPLIT {b {TAKE c}}}}
+
+
+*[a 8 b c]		*[[*[a b] a] c]
+*[a 8 b c]		*[a 7 [[7 [0 1] b] 0 1] c]
+
+*[a 7 [[7 [0 1] b] 0 1] c]
+*[a 2 [[7 [0 1] b] 0 1] [1 c]]
+*[*[a [[7 [0 1] b] 0 1]] *[a [1 c]]]
+	*[a [[7 [0 1] b] 0 1]]
+	[*[a [7 [0 1] b]] *[a 0 1]]
+		*[a [7 [0 1] b]]
+		*[a 2 [0 1] 1 b]
+		*[*[a [0 1]] *[a [1 b]]]
+			*[a 0 1]
+			a
+		*[a *[a [1 b]]]
+			*[a 1 b]
+			b
+		*[a b]
+	[*[a b] *[a 0 1]]
+		*[a 0 1]
+		a
+	[*[a b] a]
+*[[*[a b] a] *[a [1 c]]]
+	*[a [1 c]]
+	c
+*[[*[a b] a] c]
+
+with example:
+
+[a 8 [1 b] [[0 2] [0 3]]]
+*[[*[a [1 b]] a] [[0 2] [0 3]]]
+	*[a [1 b]]
+	b
+*[[b a] [[0 2] [0 3]]]
+[*[[b a] [0 2]] *[[b a] [0 3]]]
+	*[[b a] [0 2]]
+	b	
+[b *[[b a] [0 3]]]
+	*[[b a] [0 3]]
+	a
+[b a]
+
+okay, checks out, now it's my turn
+
+*[a 7 [[7 [0 1] b] 0 1] c]
+	[[7 [0 1] b] 0 1]
+
+*{a {COMP {{{COMP {{PART 0} b}} {PART 0}} c}}}
+
+*{a {EXT {b c}}} -> *{{*{a b} a} c}
+*{a {{b c} d}} -> {*{a {b c}} *{a d}}
+
+{*{a b} a}
+{*{a b} *{a {PART 0}}}
+
+*[a b 0 1]
+
+*{{*{a b} a} c}
+
+uhh, example:
+
+*{a {EXT {{TAKE b} {{PART 1} {PART 2}}}}}
+*{{*{a {TAKE b}} a} {{PART 1} {PART 2}}}
+	*{a {TAKE b}}
+	b
+*{{b a} {{PART 1} {PART 2}}}
+{*{{b a} {PART 1}} *{{b a} {PART 2}}}
+	*{{b a} {PART 1}}
+	b
+{b *{{b a} {PART 2}}}
+	*{{b a} {PART 2}}
+	a
+{b a}
+
+okay final attempt at a decrement
+
+*[s
+	[%8
+	    [%1 0]
+	    [ %8
+	        [ %1
+	            [ %6
+	                [%5 [%0 7] [%4 %0 6]]
+	                [%0 6]
+	                [%9 2 [[%0 2] [%4 %0 6] [%0 7]]]
+	            ]
+	        ]
+	        [%9 2 %0 1]
+	    ]
+	]
+]
+*[
+	[
+		*[s [%1 0]]
+		s
+	]
+    %8
+    [ %1
+        [ %6
+            [%5 [%0 7] [%4 %0 6]]
+            [%0 6]
+            [%9 2 [[%0 2] [%4 %0 6] [%0 7]]]
+        ]
+    ]
+    [%9 2 %0 1]
+]
+	*[s [%1 0]]
+	0
+*[
+	[0 s]
+    %8
+    [ %1
+        [ %6
+            [%5 [%0 7] [%4 %0 6]]
+            [%0 6]
+            [%9 2 [[%0 2] [%4 %0 6] [%0 7]]]
+        ]
+    ]
+    [%9 2 %0 1]
+]
+*[
+	[
+		*[
+			[0 s]
+		    [ %1
+		        [ %6
+		            [%5 [%0 7] [%4 %0 6]]
+		            [%0 6]
+		            [%9 2 [[%0 2] [%4 %0 6] [%0 7]]]
+		        ]
+		    ]
+		]
+		[0 s]
+	]
+	[%9 2 %0 1]
+]
+	*[
+		[0 s]
+	    [ %1
+	        [ %6
+	            [%5 [%0 7] [%4 %0 6]]
+	            [%0 6]
+	            [%9 2 [[%0 2] [%4 %0 6] [%0 7]]]
+	        ]
+	    ]
+	]
+	[ %6
+        [%5 [%0 7] [%4 %0 6]]
+        [%0 6]
+        [%9 2 [[%0 2] [%4 %0 6] [%0 7]]]
+    ]
+*[
+	[
+		[ %6
+	        [%5 [%0 7] [%4 %0 6]]
+	        [%0 6]
+	        [%9 2 [[%0 2] [%4 %0 6] [%0 7]]]
+	    ]
+		[0 s]
+	]
+	%9 2 [%0 1]
+]
+*[
+	*[
+		[
+			[ %6
+				[%5 [%0 7] [%4 %0 6]]
+				[%0 6]
+				[%9 2 [[%0 2] [%4 %0 6] [%0 7]]]
+			]
+			[0 s]
+		]
+		[%0 1]
+	]
+	2
+	[0 1]
+	[0 2]
+]
+	*[
+		[
+			[ %6
+				[%5 [%0 7] [%4 %0 6]]
+				[%0 6]
+				[%9 2 [[%0 2] [%4 %0 6] [%0 7]]]
+			]
+			[0 s]
+		]
+		[%0 1]
+	]
+	[
+		[ %6
+			[%5 [%0 7] [%4 %0 6]]
+			[%0 6]
+			[%9 2 [[%0 2] [%4 %0 6] [%0 7]]]
+		]
+		[0 s]
+	]
+*[
+	[
+		[ %6
+			[%5 [%0 7] [%4 %0 6]]
+			[%0 6]
+			[%9 2 [[%0 2] [%4 %0 6] [%0 7]]]
+		]
+		[0 s]
+	]
+	2
+	[0 1]
+	[0 2]
+]
+*[
+	*[
+		[
+			[ %6
+				[%5 [%0 7] [%4 %0 6]]
+				[%0 6]
+				[%9 2 [[%0 2] [%4 %0 6] [%0 7]]]
+			]
+			[0 s]
+		]
+		[0 1]
+	]
+	*[
+		[
+			[ %6
+				[%5 [%0 7] [%4 %0 6]]
+				[%0 6]
+				[%9 2 [[%0 2] [%4 %0 6] [%0 7]]]
+			]
+			[0 s]
+		]
+		[0 2]
+	]
+]
+	*[
+		[
+			[ %6
+				[%5 [%0 7] [%4 %0 6]]
+				[%0 6]
+				[%9 2 [[%0 2] [%4 %0 6] [%0 7]]]
+			]
+			[0 s]
+		]
+		[0 1]
+	]
+	[
+		[ %6
+			[%5 [%0 7] [%4 %0 6]]
+			[%0 6]
+			[%9 2 [[%0 2] [%4 %0 6] [%0 7]]]
+		]
+		[0 s]
+	]
+*[
+	[
+		[ %6
+			[%5 [%0 7] [%4 %0 6]]
+			[%0 6]
+			[%9 2 [[%0 2] [%4 %0 6] [%0 7]]]
+		]
+		[0 s]
+	]
+	*[
+		[
+			[ %6
+				[%5 [%0 7] [%4 %0 6]]
+				[%0 6]
+				[%9 2 [[%0 2] [%4 %0 6] [%0 7]]]
+			]
+			[0 s]
+		]
+		[0 2]
+	]
+]
+	*[
+		[
+			[ %6
+				[%5 [%0 7] [%4 %0 6]]
+				[%0 6]
+				[%9 2 [[%0 2] [%4 %0 6] [%0 7]]]
+			]
+			[0 s]
+		]
+		[0 2]
+	]
+	[ %6
+		[%5 [%0 7] [%4 %0 6]]
+		[%0 6]
+		[%9 2 [[%0 2] [%4 %0 6] [%0 7]]]
+	]
+*[
+	[
+		[ %6
+			[%5 [%0 7] [%4 %0 6]]
+			[%0 6]
+			[%9 2 [[%0 2] [%4 %0 6] [%0 7]]]
+		]
+		[0 s]
+	]
+	[ %6
+		[%5 [%0 7] [%4 %0 6]]
+		[%0 6]
+		[%9 2 [[%0 2] [%4 %0 6] [%0 7]]]
+	]
+]
+
+honestly I can't figure out why this doesn't work... maybe it's time for a new prototype
