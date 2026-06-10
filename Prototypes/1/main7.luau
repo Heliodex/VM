@@ -1155,7 +1155,7 @@ local tests: {
 				1
 			*[[1 2] [1 [0 1]]]
 				[0 1]
-		
+
 		*[1 [0 1]]
 		1
 
@@ -1167,7 +1167,7 @@ local tests: {
 				{1}
 			*{a={{1} {2}} {TAKE {PART 0}}}
 				{PART 0}
-		
+
 		*{{1} {PART 0}}
 		1
 	]=]
@@ -1276,7 +1276,7 @@ local tests: {
 			*[[c d] 0 *[[2 3] 0 *[a 4 4 b]]]
 				*[[2 3] 0 *[a 4 4 b]]
 					*[a 4 4 b]
-		
+
 		{a {IF {b c d}}} -> part(*{a b}, {*{a c} *{a d}})
 		{a {IF {b c d}}} -> *{{*{a c} *{a d}} {PART *{a b}}}
 
@@ -1597,7 +1597,7 @@ local tests: {
 			{1 1}
 		sum({1 1})
 		2
-		
+
 		There we go
 	]=]
 	{
