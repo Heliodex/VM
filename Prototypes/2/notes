@@ -297,10 +297,11 @@ ok now we need something to allow us to write actual programs
 
 *[x [PART 0]] -> x
 *[[x .y] [PART 1]] -> x
-*[x [PART [.y]] -> *[x [PART y]]
+*[x [PART [.y]]] -> *[x [PART y]]
 *[[x .y] [PART z]] -> *[y [PART z - 1]]
 
 *[[.x] [START y]] -> [y .x]
+
 *[[.x] [END y]] -> [.x y]
 
 *[[.x] TYPE] -> 0
@@ -313,12 +314,12 @@ ok now we need something to allow us to write actual programs
 
 *[[] LEN] -> 0
 *[[x] LEN] -> 1
-*[[x .y] LEN] -> 1 + *[.y LEN]
+*[[x .y] LEN] -> 1 + *[y LEN]
 
 *[[x y z] SPLIT] -> *[*[x y] *[x z]]
 
-*[0 [IF y z]] -> y
-*[1 [IF y z]] -> z
+*[0 [IF x y]] -> x
+*[1 [IF x y]] -> y
 
 *[x y] -> *[x y]
 *[x y .z] -> *[*[x y] .z]
