@@ -16,9 +16,9 @@ type List = {
 local NUM: "@" = "@"
 local LIST: "$" = "$"
 
-local function serialise(t: Thing, useOps: boolean): string
+local function serialise(t: Thing, noOps: boolean?): string
 	if t.type == NUM then
-		if useOps and t.op then
+		if not noOps and t.op then
 			return t.op
 		end
 		return tostring(t.value)
@@ -26,7 +26,7 @@ local function serialise(t: Thing, useOps: boolean): string
 
 	local elements: { string } = {}
 	for i, elem in t.things do
-		elements[i] = serialise(elem, useOps)
+		elements[i] = serialise(elem, noOps)
 	end
 
 	return `[{table.concat(elements, " ")}]`
@@ -133,12 +133,12 @@ local function reduce1(e: Thing, depth: number): Thing?
 
 	local function printReturn(a: Thing?)
 		if a then
-			print(start .. serialise(a, true))
+			print(start .. serialise(a))
 		end
 		return a
 	end
 
-	print(`{start}*{serialise(e, true)}`)
+	print(`{start}*{serialise(e)}`)
 	if e.type == NUM then
 		-- *x -> *x
 		print(`{start}! evaluate number`)
@@ -168,6 +168,8 @@ local function reduce1(e: Thing, depth: number): Thing?
 		end
 
 		-- *[[x .y] SUM] -> x + *[y SUM]
+		print(`{start}{serialise(x)} + *[{serialise(y)} SUM]`)
+
 		local ysum = reduce1(list { y, SUM }, depth + 1)
 		if ysum == nil then
 			return nil
@@ -176,6 +178,8 @@ local function reduce1(e: Thing, depth: number): Thing?
 		if ysum.type ~= NUM then
 			error "Expected a number"
 		end
+
+		print(`{start}{x.value} + {ysum.value}`)
 
 		return printReturn(num(x.value + ysum.value))
 	end
@@ -214,10 +218,13 @@ local function reduce1(e: Thing, depth: number): Thing?
 		if a.type == LIST and len(a) >= 1 then
 			local _, y = firstrest(a)
 
-			return printReturn(list {
-				y,
-				list { PART, num(b2.value - 1) },
-			})
+			return reduce1(
+				list {
+					y,
+					list { PART, num(b2.value - 1) },
+				},
+				depth
+			)
 		end
 	end
 
@@ -231,6 +238,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 		end
 	end
 
+	-- END
 	if b.type == LIST and len(b) == 2 and equal(b.things[1], END) then
 		-- *[[.x] [END y]] -> [.x y]
 		if a.type == LIST then
@@ -300,6 +308,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 		return printReturn(num(1 + ylen.value))
 	end
 
+	-- SPLIT
 	if equal(b, SPLIT) and a.type == LIST then
 		-- *[[x y z] SPLIT] -> *[*[x y] *[x z]]
 		if len(a) == 3 then
@@ -321,6 +330,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 		end
 	end
 
+	-- IF
 	if b.type == LIST and len(b) == 3 and equal(b.things[1], IF) then
 		local x, y = b.things[2], b.things[3]
 
@@ -368,6 +378,59 @@ local tests: {
 	{
 		eval = num(1),
 	},
+
+	-- SUM
+	{
+		eval = list { list {}, SUM },
+		res = num(0),
+	},
+	{
+		eval = list { list { num(1) }, SUM },
+		res = num(1),
+	},
+	{
+		eval = list { list { num(1), num(2) }, SUM },
+		res = num(3),
+	},
+
+	-- REST
+	{
+		eval = list { list {}, REST },
+	},
+	{
+		eval = list { num(1), REST },
+	},
+	{
+		eval = list { list { num(1), num(2), num(3) }, REST },
+		res = list { num(2), num(3) },
+	},
+
+	-- PART
+	{
+		eval = list { list { num(1), num(2), num(3) }, PART },
+	},
+	{
+		eval = list { list { num(1), num(2), num(3) }, list { PART } },
+	},
+	{
+		eval = list { list { num(1), num(2), num(3) }, list { PART, num(0) } },
+		res = list { num(1), num(2), num(3) },
+	},
+	{
+		eval = list { list { num(1), num(2), num(3) }, list { PART, num(1) } },
+		res = num(1),
+	},
+	{
+		eval = list { list { num(1), num(2), num(3) }, list { PART, num(2) } },
+		res = num(2),
+	},
+	{
+		eval = list { list { num(1), num(2), num(3) }, list { PART, num(3) } },
+		res = num(3),
+	},
+	{
+		eval = list { list { num(1), num(2), num(3) }, list { PART, num(4) } },
+	},
 }
 
 for i, test in tests do
@@ -377,12 +440,12 @@ for i, test in tests do
 		print "~~"
 		print()
 	else
-		out = serialise(rd, true)
+		out = serialise(rd)
 		print("=", out)
 		print()
 	end
 
-	local expected = test.res and serialise(test.res, true)
+	local expected = test.res and serialise(test.res)
 	if out ~= expected then
 		print(`Test failed: expected {expected}, got {out}`)
 		break
