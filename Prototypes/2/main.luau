@@ -140,8 +140,15 @@ local function reduce1(e: Thing, depth: number): Thing?
 
 	print(`{start}*{serialise(e, true)}`)
 	if e.type == NUM then
+		-- *x -> *x
 		print(`{start}! evaluate number`)
-		return nil -- *x -> *x
+		return nil
+	end
+
+	if len(e) <= 1 then
+		-- *x -> *x
+		print(`{start}! not enough elements to match any rules`)
+		return nil
 	end
 
 	local a, b = e.things[1], e.things[2]
