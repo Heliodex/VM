@@ -85,17 +85,19 @@ end
 
 local TRUE, FALSE = num(0, "TRUE"), num(1, "FALSE") -- imagine loobeans but if they were loobeans
 
-local SUM, REST, PART, START, END, TYPE, CHECK, LEN, SPLIT, IF =
-	num(0, "SUM"),
-	num(1, "REST"),
-	num(2, "PART"),
-	num(3, "START"),
-	num(4, "END"),
-	num(5, "TYPE"),
-	num(6, "CHECK"),
-	num(7, "LEN"),
-	num(8, "SPLIT"),
-	num(9, "IF")
+local TAKE, SUM, REST, PART, START, END, TYPE, CHECK, LEN, SPLIT, IF, EXEC =
+	num(0, "TAKE"),
+	num(1, "SUM"),
+	num(2, "REST"),
+	num(3, "PART"),
+	num(4, "START"),
+	num(5, "END"),
+	num(6, "TYPE"),
+	num(7, "CHECK"),
+	num(8, "LEN"),
+	num(9, "SPLIT"),
+	num(10, "IF"),
+	num(11, "EXEC")
 
 local function firstrest(s: List): (Thing, List)
 	if #s.things == 0 then
@@ -152,6 +154,13 @@ local function reduce1(e: Thing, depth: number): Thing?
 	end
 
 	local a, b = e.things[1], e.things[2]
+
+	-- TAKE
+	if b.type == LIST and len(b) == 2 and equal(b.things[1], TAKE) then
+		-- *[x [TAKE y]] -> y
+		local y = b.things[2]
+		return printReturn(y)
+	end
 
 	-- SUM
 	if equal(b, SUM) and a.type == LIST then
@@ -315,31 +324,31 @@ local function reduce1(e: Thing, depth: number): Thing?
 	end
 
 	-- SPLIT
-	if equal(b, SPLIT) and a.type == LIST then
-		-- *[[x y z] SPLIT] -> *[*[x y] *[x z]]
-		if len(a) == 3 then
-			local x, y, z = a.things[1], a.things[2], a.things[3]
+	-- if equal(b, SPLIT) and a.type == LIST then
+	-- *[[x y z] SPLIT] -> *[*[x y] *[x z]]
+	if b.type == LIST and len(b) == 3 and equal(b.things[1], SPLIT) then
+		local x, y, z = a, b.things[2], b.things[3]
 
-			print(
-				`{start}*[*[{serialise(x)} {serialise(y)}] *[{serialise(x)} {serialise(
-					z
-				)}]]`
-			)
+		-- *[x [SPLIT y z]] -> *[*[x y] *[x z]]
+		print(
+			`{start}*[*[{serialise(x)} {serialise(y)}] *[{serialise(x)} {serialise(
+				z
+			)}]]`
+		)
 
-			local rxy = reduce1(list { x, y }, depth + 1)
-			if rxy == nil then
-				return nil
-			end
-
-			print(`{start}*[{serialise(rxy)} *[{serialise(x)} {serialise(z)}]]`)
-
-			local rxz = reduce1(list { x, z }, depth + 1)
-			if rxz == nil then
-				return nil
-			end
-
-			return reduce1(list { rxy, rxz }, depth)
+		local rxy = reduce1(list { x, y }, depth + 1)
+		if rxy == nil then
+			return nil
 		end
+
+		print(`{start}*[{serialise(rxy)} *[{serialise(x)} {serialise(z)}]]`)
+
+		local rxz = reduce1(list { x, z }, depth + 1)
+		if rxz == nil then
+			return nil
+		end
+
+		return reduce1(list { rxy, rxz }, depth)
 	end
 
 	-- IF
@@ -355,6 +364,22 @@ local function reduce1(e: Thing, depth: number): Thing?
 		if equal(a, FALSE) then
 			return printReturn(y)
 		end
+	end
+
+	-- EXEC
+	if b.type == LIST and len(b) == 3 and equal(b.things[1], EXEC) then
+		-- *[x [EXEC y z]] -> *[[*[x y] x] z]
+		local x, y, z = a, b.things[2], b.things[3]
+
+		local sx = serialise(x)
+		print(`{start}*[[*[{sx} {serialise(y)}] {sx}] {serialise(z)}]`)
+
+		local rxy = reduce1(list { x, y }, depth + 1)
+		if rxy == nil then
+			return nil
+		end
+
+		return reduce1(list { list { rxy, x }, z }, depth)
 	end
 
 	-- *[x y] -> *[x y]
@@ -519,27 +544,22 @@ local tests: {
 
 	-- SPLIT
 	{
-		eval = list { list { num(1, "x"), num(2, "y"), num(3, "z") }, SPLIT },
+		eval = list {
+			num(1, "x"),
+			list { SPLIT, num(2, "y"), num(3, "z") },
+		},
 	},
 	-- lifecycle test ig
 	{
 		eval = list {
-			list {
-				list { num(1, "x"), num(2, "y") },
-				list { PART, num(2) },
-				list { PART, num(1) },
-			},
-			SPLIT,
+			list { num(1, "x"), num(2, "y") },
+			list { SPLIT, list { PART, num(2) }, list { PART, num(1) } },
 		},
 	},
 	{
 		eval = list {
-			list {
-				list { LEN, list { num(1), num(2) } },
-				list { PART, num(2) },
-				list { PART, num(1) },
-			},
-			SPLIT,
+			list { LEN, list { num(1), num(2) } },
+			list { SPLIT, list { PART, num(2) }, list { PART, num(1) } },
 		},
 		res = num(2),
 	},
@@ -555,7 +575,51 @@ local tests: {
 	},
 	{
 		eval = list { num(3), list { IF, num(1), num(2) } },
-	}
+	},
+
+	-- EXEC
+	{
+		eval = list {
+			num(1),
+			list { EXEC, list { TAKE, num(0) }, list { PART, num(0) } },
+		},
+		res = list { num(0), num(1) },
+	},
+
+	-- loop
+	--[=[
+		[%8
+			[%1 0]
+			[ %8
+			[ %1
+				[ %6
+					[%5 [%0 7] [%4 %0 6]]
+					[%0 6]
+					[%9 2 [[%0 2] [%4 %0 6] [%0 7]]]
+				]
+			]
+			[%9 2 %0 1]
+			]
+		]
+	  ]=]
+	{
+		eval = (function()
+			local x = list { PART, num(0, "x0") }
+			local y = list {
+				TAKE,
+				list { SPLIT, list { PART, num(0, "y0") }, list { PART, num(0, "z0") } },
+			}
+
+			-- lifecycle
+			local z =
+				list { SPLIT, list { PART, num(2) }, list { PART, num(1) } }
+
+			return list {
+				x,
+				list { EXEC, y, z },
+			}
+		end)(),
+	},
 }
 
 for i, test in tests do

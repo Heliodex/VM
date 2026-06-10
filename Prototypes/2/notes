@@ -353,3 +353,53 @@ ok now we need something to allow us to write actual programs
 
 *[2 [IF 1 2]]
 ~
+
+
+ok we need a constant ig
+
+[.x] -> x
+
+*[x [TAKE y]] -> y
+
+*[[] SUM] -> 0
+*[[[.x] .y] SUM] -> *[[x .y] SUM]
+*[[x .y] SUM] -> x + *[y SUM]
+
+*[[x .y] REST] -> y
+
+*[x [PART 0]] -> x
+*[[x .y] [PART 1]] -> x
+*[x [PART [.y]]] -> *[x [PART y]]
+*[[x .y] [PART z]] -> *[y [PART z - 1]]
+
+*[[.x] [START y]] -> [y .x]
+
+*[[.x] [END y]] -> [.x y]
+
+*[[.x] TYPE] -> 0
+*[x TYPE] -> 1
+
+*[[] CHECK] -> 0
+*[[x] CHECK] -> 0
+*[[x x .y] CHECK] -> *[[x .y] CHECK]
+*[[x y .z] CHECK] -> 1
+
+*[[] LEN] -> 0
+*[[x] LEN] -> 1
+*[[x .y] LEN] -> 1 + *[y LEN]
+
+*[x [SPLIT y z]] -> *[*[x y] *[x z]]
+
+*[w [IF x y z]] -> ?[*[w x] *[w y] *[w z]]
+	?[0 x y] -> x
+	?[1 x y] -> y
+
+*[x [EXEC y z]] -> *[[*[x y] x] z]
+
+*[x y] -> *[x y]
+*[x y .z] -> *[*[x y] .z]
+*x -> *x
+
+
+Again this is starting to look too much like Nock. Honestly I don't think this has much more potential than as displayed here
+
