@@ -252,33 +252,35 @@ local function reduce1(e: Thing, depth: number): Thing?
 	if equal(b, TYPE) then
 		-- *[[.x] TYPE] -> 0
 		if a.type == LIST then
-			return printReturn(num(0))
+			return printReturn(TRUE)
 		end
 
 		-- *[x TYPE] -> 1
-		return printReturn(num(1))
+		return printReturn(FALSE)
 	end
 
 	-- CHECK
 	if equal(b, CHECK) and a.type == LIST then
 		-- *[[] CHECK] -> 0
 		if equal(a, empty) then
-			return printReturn(num(0))
+			return printReturn(TRUE)
 		end
 
 		-- *[[x] CHECK] -> 0
 		if len(a) == 1 then
-			return printReturn(num(0))
+			return printReturn(TRUE)
 		end
 
 		-- *[[x x .y] CHECK] -> *[[x .y] CHECK]
 		local p1, p2, rest = firstsecondrest(a)
 		if equal(p1, p2) then
-			return printReturn(list { addStart(p1, rest), CHECK })
+			return printReturn(
+				reduce1(list { addStart(p1, rest), CHECK }, depth + 1)
+			)
 		end
 
 		-- *[[x y .z] CHECK] -> 1
-		return printReturn(num(1))
+		return printReturn(FALSE)
 	end
 
 	-- LEN
@@ -296,6 +298,8 @@ local function reduce1(e: Thing, depth: number): Thing?
 		-- *[[x .y] LEN] -> 1 + *[y LEN]
 		local _, y = firstrest(a)
 
+		print(`{start}1 + *[{serialise(y)} LEN]`)
+
 		local ylen = reduce1(list { y, LEN }, depth + 1)
 		if ylen == nil then
 			return nil
@@ -304,6 +308,8 @@ local function reduce1(e: Thing, depth: number): Thing?
 		if ylen.type ~= NUM then
 			error "Expected a number"
 		end
+
+		print(`{start}1 + {ylen.value}`)
 
 		return printReturn(num(1 + ylen.value))
 	end
@@ -314,19 +320,25 @@ local function reduce1(e: Thing, depth: number): Thing?
 		if len(a) == 3 then
 			local x, y, z = a.things[1], a.things[2], a.things[3]
 
-			local rxy = reduce1(list { list { x, y }, SPLIT }, depth + 1)
+			print(
+				`{start}*[*[{serialise(x)} {serialise(y)}] *[{serialise(x)} {serialise(
+					z
+				)}]]`
+			)
+
+			local rxy = reduce1(list { x, y }, depth + 1)
 			if rxy == nil then
 				return nil
 			end
 
-			local rxz = reduce1(list { list { x, z }, SPLIT }, depth + 1)
+			print(`{start}*[{serialise(rxy)} *[{serialise(x)} {serialise(z)}]]`)
+
+			local rxz = reduce1(list { x, z }, depth + 1)
 			if rxz == nil then
 				return nil
 			end
 
-			return printReturn(
-				reduce1(list { list { rxy, rxz }, SPLIT }, depth + 1)
-			)
+			return reduce1(list { rxy, rxz }, depth)
 		end
 	end
 
@@ -335,12 +347,12 @@ local function reduce1(e: Thing, depth: number): Thing?
 		local x, y = b.things[2], b.things[3]
 
 		-- 	*[0 [IF x y]] -> x
-		if equal(a, num(0)) then
+		if equal(a, TRUE) then
 			return printReturn(x)
 		end
 
 		-- *[1 [IF x y]] -> y
-		if equal(a, num(1)) then
+		if equal(a, FALSE) then
 			return printReturn(y)
 		end
 	end
@@ -431,6 +443,119 @@ local tests: {
 	{
 		eval = list { list { num(1), num(2), num(3) }, list { PART, num(4) } },
 	},
+
+	-- START
+	{
+		eval = list { list { num(1) }, START },
+	},
+	{
+		eval = list { list { num(1) }, list { START } },
+	},
+	{
+		eval = list { list { num(1) }, list { START, num(2) } },
+		res = list { num(2), num(1) },
+	},
+
+	-- END
+	{
+		eval = list { list { num(1) }, END },
+	},
+	{
+		eval = list { list { num(1) }, list { END } },
+	},
+	{
+		eval = list { list { num(1) }, list { END, num(2) } },
+		res = list { num(1), num(2) },
+	},
+
+	-- TYPE
+	{
+		eval = list { list {}, TYPE },
+		res = TRUE,
+	},
+	{
+		eval = list { num(0), TYPE },
+		res = FALSE,
+	},
+
+	-- CHECK
+	{
+		eval = list { list {}, CHECK },
+		res = TRUE,
+	},
+	{
+		eval = list { list { num(1) }, CHECK },
+		res = TRUE,
+	},
+	{
+		eval = list { list { num(1), num(1) }, CHECK },
+		res = TRUE,
+	},
+	{
+		eval = list { list { num(1), num(2) }, CHECK },
+		res = FALSE,
+	},
+
+	-- LEN
+	{
+		eval = list { list {}, LEN },
+		res = num(0),
+	},
+	{
+		eval = list { num(1), LEN },
+	},
+	{
+		eval = list { list { num(1) }, LEN },
+		res = num(1),
+	},
+	{
+		eval = list { list { num(1), num(2) }, LEN },
+		res = num(2),
+	},
+	{
+		eval = list { list { num(1), num(2), num(3) }, LEN },
+		res = num(3),
+	},
+
+	-- SPLIT
+	{
+		eval = list { list { num(1, "x"), num(2, "y"), num(3, "z") }, SPLIT },
+	},
+	-- lifecycle test ig
+	{
+		eval = list {
+			list {
+				list { num(1, "x"), num(2, "y") },
+				list { PART, num(2) },
+				list { PART, num(1) },
+			},
+			SPLIT,
+		},
+	},
+	{
+		eval = list {
+			list {
+				list { LEN, list { num(1), num(2) } },
+				list { PART, num(2) },
+				list { PART, num(1) },
+			},
+			SPLIT,
+		},
+		res = num(2),
+	},
+
+	-- IF
+	{
+		eval = list { TRUE, list { IF, num(1), num(2) } },
+		res = num(1),
+	},
+	{
+		eval = list { FALSE, list { IF, num(1), num(2) } },
+		res = num(2),
+	},
+	{
+		eval = list { num(3), list { IF, num(1), num(2) } },
+	}
 }
 
 for i, test in tests do
@@ -440,12 +565,12 @@ for i, test in tests do
 		print "~~"
 		print()
 	else
-		out = serialise(rd)
+		out = serialise(rd, true)
 		print("=", out)
 		print()
 	end
 
-	local expected = test.res and serialise(test.res)
+	local expected = test.res and serialise(test.res, true)
 	if out ~= expected then
 		print(`Test failed: expected {expected}, got {out}`)
 		break
