@@ -58,8 +58,7 @@ end
 local function list(things: { Thing }): List
 	return table.freeze {
 		type = LIST,
-		--[[table.freeze(things)]]
-		things = things,
+		things = table.freeze(things),
 	}
 end
 
@@ -101,16 +100,6 @@ local function firstrest(s: List): (Thing, List)
 		error "Cannot take first/rest of an empty list"
 	end
 	return s.things[1], list { unpack(s.things, 2) }
-end
-
-local function firstsecondrest(s: List): (Thing, Thing, List)
-	if #s.things == 0 then
-		error "Cannot take first/second/rest of an empty list"
-	end
-	if #s.things == 1 then
-		error "Cannot take second/rest of a list with only one element"
-	end
-	return s.things[1], s.things[2], list { unpack(s.things, 3) }
 end
 
 local function addStart(x: Thing, y: List): List
@@ -201,9 +190,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 			local _, y = firstrest(xy)
 			local z = num(z1.value - 1)
 
-			return printReturn(
-				reduce1(list { pin(num(1)), list { y, z } }, depth + 1)
-			)
+			return reduce1(list { pin(num(1)), list { y, z } }, depth)
 		end
 		--[=[
 			*[!2 [.x]] = 0
@@ -290,7 +277,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 		]=]
 		if a.value == 9 and b.type == LIST and len(b) == 2 then
 			-- might be useless idk let's find out
-			return printReturn(reduce1(list { b }, depth + 1))
+			return reduce1(b, depth)
 		end
 	end
 
@@ -304,17 +291,17 @@ local function reduce1(e: Thing, depth: number): Thing?
 		--[=[
 			*[![x .y] z] = *[!y *[x z]]
 		]=]
-		local x, y = firstsecondrest(a)
+		local x, y = firstrest(a)
+
+		print(`{start}*[!{serialise(y)} *[{serialise(x)} {serialise(b)}]]`)
 
 		local rxz = reduce1(list { x, b }, depth + 1)
 		if not rxz then
-			print(`{start}! failed to reduce *[x z]`)
+			print(`{start}! failed to reduce *[{serialise(x)} {serialise(b)}]`)
 			return nil
 		end
 
-		print(`{start}*[!y {serialise(rxz)}]`)
-
-		return printReturn(reduce1(list { pin(y), rxz }, depth + 1))
+		return reduce1(list { pin(y), rxz }, depth)
 	end
 
 	print(`{start}! no matching reduction rule`)
@@ -334,6 +321,32 @@ local tests: {
 	{
 		eval = list { pin(num(0)), list { num(5) } },
 		res = pin(list { num(5) }),
+	},
+	{
+		eval = list { pin(num(1)), list { list { num(5), num(6) }, num(1) } },
+		res = num(5),
+	},
+	{
+		eval = list { pin(num(1)), list { list { num(5), num(6) }, num(2) } },
+		res = num(6),
+	},
+	{
+		eval = list { pin(num(9)), list { pin(num(4)), num(1) } },
+		res = num(2),
+	},
+	{
+		eval = list { pin(list { pin(num(4)), pin(num(4)) }), num(2) },
+		res = num(4),
+	},
+	{
+		eval = list {
+			pin(list {
+				pin(num(4)),
+				pin(list { pin(num(1)) }),
+			}),
+			num(2),
+		},
+		res = num(2),
 	},
 }
 
