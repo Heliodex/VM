@@ -135,7 +135,50 @@ local function addEnd(y: List, x: Thing): List
 	return list { unpack(y.things), x }
 end
 
-local function reduce1(e: Thing, depth: number): Thing?
+local reduce1
+
+local function replace(x: Thing, y: Thing, depth: number): Thing?
+	-- &[# x] = x
+	if x.type == HASH then
+		return y
+	end
+	-- &[*x y] = *&[x y]
+	if x.type == EVAL then
+		local r = replace(x.eval, y, depth)
+		if not r then
+			return nil
+		end
+
+		return reduce1(r, depth)
+	end
+	-- &[[] x] = []
+	if equal(x, empty) then
+		return empty
+	end
+	if x.type == LIST and len(x) >= 2 then
+		-- &[[# x] y] = [# x]
+		if x.things[1].type == HASH then
+			return x
+		end
+		-- &[[x .y] z] = [&[x z] .&[y z]]
+		local x2, y2 = firstrest(x)
+		local rxz = replace(x2, y, depth)
+		if not rxz then
+			return nil
+		end
+
+		local ryz = replace(y2, y, depth)
+		if not ryz then
+			return nil
+		end
+
+		return list { rxz, ryz }
+	end
+	-- &[x y] = x
+	return x
+end
+
+function reduce1(e: Thing, depth: number): Thing?
 	if depth < 0 then
 		error "Invalid depth"
 	end
@@ -302,13 +345,21 @@ local function reduce1(e: Thing, depth: number): Thing?
 			return reduce1(b, depth)
 		end
 	end
-
 	if a.type == LIST then
 		--[=[
 			*[[] x] = x
 		]=]
 		if len(a) == 0 then
 			return printReturn(b)
+		end
+		--[=[
+			*[[# x] y] = &[x y]
+		]=]
+		if len(a) == 2 then
+			local h, x = a.things[1], a.things[2]
+			if h.type == HASH then
+				return printReturn(replace(x, b, depth + 1))
+			end
 		end
 		--[=[
 			*[[x .y] z] = *[y *[x z]]
