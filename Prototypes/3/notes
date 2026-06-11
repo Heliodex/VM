@@ -1,0 +1,84 @@
+Num = integer
+Pin = !Thing
+List = [.Thing]
+Thing = Num | Pin | List
+
+That's our data model, we need a better way to define functions. Most operations in previous VMs need a convoluted system to define and extract the operands (like the constant operator). I think some kind of placeholder for substituting a function parameter could work better here
+
+function !x = [.y]
+call = *[!x y]
+
+
+*[!0 [.x]] = !x
+
+*[!1 [x 0]]  = x
+*[!1 [[x .y] 1]] = x
+*[!1 [x .y]] = *~
+*[!1 [[x .y] 1 + z]] = *[!1 [y z]]
+
+*[!2 [.x]] = 0
+*[!2 x] = 1
+
+*[!3 [x x]] = 0
+*[!3 [x y]] = 1
+
+*[!4 [.x]] = *~
+*[!4 !x] = *~
+*[!4 x] = 1 + x
+
+*[!5 [0 x y]] = x
+*[!5 [1 x y]] = y
+
+*[!6 [[.x] y]] = [y .x]
+
+*[!7 [[.x] y]] = [.x y]
+
+*[!8 [x .y]] = y
+
+*[!9 [!x y]] = *[!x y]
+
+*[![] x] = x
+*[![x .y] z] = *[!y *[x z]]
+
+*x = *x
+
+
+now for some evals
+
+
+*[!4 1]
+2
+
+*[!0 [5]]
+![5]
+
+*[!1 [[5 6] 1]]
+5
+
+*[!1 [[5 6 7] 2]]
+*[!1 [[6 7] 1]]
+6
+
+*[!9 [!4 1]]
+*[!4 1]
+
+
+*[![!4 !4] 2]
+*[![!4] *[!4 2]]
+	*[!4 2]
+	3
+*[![!4] 3]
+*[![] *[!4 3]]
+	*[!4 3]
+	4
+*[![] 4]
+4
+
+*[![!4 x] 2]
+*[![x] *[!4 2]]
+	*[!4 2]
+	3
+*[![x] 3]
+*[![] *[x 3]]
+	*[x 3]
+
