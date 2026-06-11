@@ -83,3 +83,87 @@ now for some evals
 *[![] *[x 3]]
 	*[x 3]
 
+
+though trying with something more complex:
+
+*[![!4 ![!1]] 2]
+*[![![!1]] *[!4 2]]
+    *[!4 2]
+    3
+*[![![!1]] 3]
+*[![] *[![!1] 3]]
+    *[![!1] 3]
+    *[![] *[!1 3]]
+        *[!1 3]
+        ! no matching reduction rule
+    ! failed to reduce *[!1 3]
+! failed to reduce *[![!1] 3]
+
+The VM doesn't have a good implementation of the placeholder. Let's say we use a pinned num, say !69, as the placeholder for a parameter to a function. So this function will (probably) have some operands inside it which are !69, and when we call the function, we substitute !69 with the actual argument, lambda-calculus style. Kind of like the first ever prototype in this repo.
+
+All fine and dandy: if we encounter a pinned num that hasn't been substituted yet, then it's an invalid argument and the whole program can go suck a fat one.
+
+Though a problem is if functions are embedded within each other, like a higher-order function. (1) the inner functions may be able to access the parameters of the outer functions (2) making sure the inner function placeholders don't get replaced when calling the outer function.
+
+Let's load some more types in, just for convenience
+
+Hash = #
+Eval = *List
+List = [.Thing]
+Num = integer
+Thing =  Hash | Eval | List | Num
+
+with Eval allowing us to do things lazily I suppose. Yes, you can do that with an opcode, though the circumstances for doing that are restrictive. The hash will be substituted throughout the function EXCEPT for its dependencies.
+
+function = [# y]
+call = *[function z]
+
+
+&[# x] = x
+&[*x y] = *&[x y]
+&[[] x] = []
+&[[# x] y] = [# x]
+&[[x .y] z] = [&[x z] .&[y z]]
+&[x y] = x
+
+*[1 [x #]] = *~
+*[1 [x *y]] = *~
+*[1 [x [.y]]] = *~
+*[1 [x 0]]  = x
+*[1 [[x .y] 1]] = x
+*[1 [[x .y] 1 + z]] = *[1 [y z]]
+
+*[2 #] = 0
+*[2 *x] = 1
+*[2 [.x]] = 2
+*[2 x] = 3
+
+*[3 [x x]] = 0
+*[3 [x y]] = 1
+
+*[4 #] = *~
+*[4 *x] = *~
+*[4 [.x]] = *~
+*[4 x] = 1 + x
+
+*[5 [0 x y]] = x
+*[5 [1 x y]] = y
+
+*[6 [[.x] y]] = [y .x]
+
+*[7 [[.x] y]] = [.x y]
+
+*[8 [x .y]] = y
+
+*[9 [x y]] = *[x y]
+
+*[[# x] y] = &[x y]
+
+*[[] x] = x
+*[[x .y] z] = *[y *[x z]]
+
+*x = *x
+
+
+More implementation time!
+
