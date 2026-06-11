@@ -164,14 +164,46 @@ local function reduce1(e: Thing, depth: number): Thing?
 			*[!0 [.x]] = !x
 		]=]
 		if a.value == 0 and b.type == LIST then
+			return printReturn(pin(b))
 		end
 		--[=[
+			*[!1 [x !y]] = *~
+			*[!1 [x [.y]]] = *~
 			*[!1 [x 0]]  = x
 			*[!1 [[x .y] 1]] = x
-			*[!1 [x .y]] = *~
 			*[!1 [[x .y] 1 + z]] = *[!1 [y z]]
 		]=]
 		if a.value == 1 and b.type == LIST then
+			if len(b) ~= 2 then
+				print(`{start}! !1 on non-2-list`)
+				return nil
+			end
+
+			local xy, z1 = b.things[1], b.things[2]
+			if z1.type ~= NUM then
+				print(`{start}! !1 non-num index`)
+				return nil
+			end
+
+			if equal(z1, num(0)) then
+				return printReturn(xy)
+			end
+
+			if xy.type ~= LIST then
+				print(`{start}! !1 positive index on non-list`)
+				return nil
+			end
+
+			if equal(z1, num(1)) then
+				return printReturn(xy.things[1])
+			end
+
+			local _, y = firstrest(xy)
+			local z = num(z1.value - 1)
+
+			return printReturn(
+				reduce1(list { pin(num(1)), list { y, z } }, depth + 1)
+			)
 		end
 		--[=[
 			*[!2 [.x]] = 0
@@ -294,7 +326,16 @@ local tests: {
 		read eval: Thing,
 		read res: Thing?,
 	}
-} = {}
+} = {
+	{
+		eval = list { pin(num(4)), num(1) },
+		res = num(2),
+	},
+	{
+		eval = list { pin(num(0)), list { num(5) } },
+		res = pin(list { num(5) }),
+	},
+}
 
 for i, test in tests do
 	local rd = reduce1(test.eval, 0)
