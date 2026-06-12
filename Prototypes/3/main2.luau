@@ -3,9 +3,9 @@
 type Hash = {
 	read type: "#",
 }
-type Eval = {
-	read type: "*",
-	read eval: List,
+type Pin = {
+	read type: "!",
+	read pin: List,
 }
 type List = {
 	read type: "$",
@@ -16,10 +16,10 @@ type Num = {
 	read value: number,
 	read op: string?,
 }
-type Thing = Hash | Eval | List | Num
+type Thing = Hash | Pin | List | Num
 
 local HASH: "#" = "#"
-local EVAL: "*" = "*"
+local PIN: "!" = "!"
 local LIST: "$" = "$"
 local NUM: "@" = "@"
 
@@ -35,8 +35,8 @@ local function serialise(t: Thing, noOps: boolean?): string
 		return HASH
 	end
 
-	if t.type == EVAL then
-		return EVAL .. serialise(t.eval, noOps)
+	if t.type == PIN then
+		return PIN .. serialise(t.pin, noOps)
 	end
 
 	local elements: { string } = {}
@@ -49,8 +49,8 @@ end
 
 local hash = table.freeze { type = HASH }
 
-local function eval(list: List): Eval
-	return table.freeze { type = EVAL, eval = list }
+local function pin(list: List): Pin
+	return table.freeze { type = PIN, pin = list }
 end
 
 local function list(things: { Thing }): List
@@ -85,8 +85,8 @@ local empty = list {}
 
 local equal
 
-local function equalEval(a: Eval, b: Eval): boolean
-	return equal(a.eval, b.eval)
+local function equalEval(a: Pin, b: Pin): boolean
+	return equal(a.pin, b.pin)
 end
 
 local function equalList(a: List, b: List): boolean
@@ -110,7 +110,7 @@ end
 function equal(a: Thing, b: Thing): boolean
 	return if a.type == HASH and b.type == HASH
 		then true
-		elseif a.type == EVAL and b.type == EVAL then equalEval(a, b)
+		elseif a.type == PIN and b.type == PIN then equalEval(a, b)
 		elseif a.type == LIST and b.type == LIST then equalList(a, b)
 		elseif a.type == NUM and b.type == NUM then equalNum(a, b)
 		else false
@@ -135,47 +135,75 @@ local function addEnd(y: List, x: Thing): List
 	return list { unpack(y.things), x }
 end
 
-local reduce1
+local reduce1, replace
 
-local function replace(x: Thing, y: Thing, depth: number): Thing?
+local function replaceList(x: List, y: Thing, depth: number): List?
+	local start = string.rep("    ", depth)
+
+	local function printReturn(a: List?)
+		if a then
+			print(start .. serialise(a))
+		end
+		return a
+	end
+
+	-- &[[] x] = []
+	if len(x) == 0 then
+		return printReturn(empty)
+	end
+
+	-- &[[x .y] z] = [&[x z] .&[y z]]
+	local x2, y2 = firstrest(x)
+
+	local sy = serialise(y)
+	print(`{start}[&[{serialise(x2)} {sy}] .&[{serialise(y2)} {sy}]]`)
+
+	local rxz = replace(x2, y, depth + 1)
+	if not rxz then
+		return nil
+	end
+
+	print(`{start}[{serialise(rxz)} .&[{serialise(y2)} {sy}]]`)
+
+	print(`{start}    &[{serialise(y2)} {sy}]]`)
+
+	local ryz = replaceList(y2, y, depth + 1)
+	if not ryz then
+		return nil
+	end
+
+	return printReturn(addStart(rxz, ryz))
+end
+
+function replace(x: Thing, y: Thing, depth: number): Thing?
+	local start = string.rep("    ", depth)
+
+	local function printReturn(a: Thing?)
+		if a then
+			print(start .. serialise(a))
+		end
+		return a
+	end
+
+	print(`{start}&[{serialise(x)} {serialise(y)}]`)
+
 	-- &[# x] = x
 	if x.type == HASH then
 		return y
 	end
-	-- &[*x y] = *&[x y]
-	if x.type == EVAL then
-		local r = replace(x.eval, y, depth)
-		if not r then
-			return nil
-		end
-
-		return reduce1(r, depth)
+	-- &[!x y] = !x
+	if x.type == PIN then
+		return x
 	end
+
 	-- &[[] x] = []
-	if equal(x, empty) then
-		return empty
+	-- &[[x .y] z] = [&[x z] .&[y z]]
+	if x.type == LIST then
+		return replaceList(x, y, depth)
 	end
-	if x.type == LIST and len(x) >= 2 then
-		-- &[[# x] y] = [# x]
-		if x.things[1].type == HASH then
-			return x
-		end
-		-- &[[x .y] z] = [&[x z] .&[y z]]
-		local x2, y2 = firstrest(x)
-		local rxz = replace(x2, y, depth)
-		if not rxz then
-			return nil
-		end
 
-		local ryz = replace(y2, y, depth)
-		if not ryz then
-			return nil
-		end
-
-		return list { rxz, ryz }
-	end
 	-- &[x y] = x
-	return x
+	return printReturn(x)
 end
 
 function reduce1(e: Thing, depth: number): Thing?
@@ -257,7 +285,7 @@ function reduce1(e: Thing, depth: number): Thing?
 		if a.value == 2 then
 			local n = if b.type == HASH
 				then 0
-				elseif b.type == EVAL then 1
+				elseif b.type == PIN then 1
 				elseif b.type == LIST then 2
 				else 3
 
@@ -280,7 +308,7 @@ function reduce1(e: Thing, depth: number): Thing?
 		]=]
 		if a.value == 4 then
 			if b.type ~= NUM then
-				print(`{start}! !4 on non-num`)
+				print(`{start}! 4 on non-num`)
 				return nil
 			end
 
@@ -300,7 +328,7 @@ function reduce1(e: Thing, depth: number): Thing?
 				return printReturn(y)
 			end
 
-			print(`{start}! !5 on non-loobean`)
+			print(`{start}! 5 on non-loobean`)
 			return nil
 		end
 		--[=[
@@ -323,7 +351,7 @@ function reduce1(e: Thing, depth: number): Thing?
 			local x, y = b.things[1], b.things[2]
 
 			if x.type ~= LIST then
-				print(`{start}! !7 arg 1 non-list`)
+				print(`{start}! 7 arg 1 non-list`)
 				return nil
 			end
 
@@ -358,7 +386,7 @@ function reduce1(e: Thing, depth: number): Thing?
 		if len(a) == 2 then
 			local h, x = a.things[1], a.things[2]
 			if h.type == HASH then
-				return printReturn(replace(x, b, depth + 1))
+				return replace(x, b, depth)
 			end
 		end
 		--[=[
@@ -410,12 +438,32 @@ local tests: {
 	{
 		eval = list {
 			list {
-				OP4,
-				list { OP1 },
+				hash,
+				list {
+					num(1),
+					num(2),
+					list {
+						num(5),
+						num(6),
+						hash,
+						list { num(7), hash, num(8) },
+					},
+					num(4),
+				},
 			},
-			num(2),
+			num(9),
 		},
-		res = num(2),
+		res = list {
+			num(1),
+			num(2),
+			list {
+				num(5),
+				num(6),
+				num(9),
+				list { num(7), num(9), num(8) },
+			},
+			num(4),
+		},
 	},
 }
 

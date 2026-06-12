@@ -108,21 +108,20 @@ Though a problem is if functions are embedded within each other, like a higher-o
 Let's load some more types in, just for convenience
 
 Hash = #
-Eval = *List
+Pin = !List
 List = [.Thing]
 Num = integer
-Thing =  Hash | Eval | List | Num
+Thing =  Hash | Pin | List | Num
 
-with Eval allowing us to do things lazily I suppose. Yes, you can do that with an opcode, though the circumstances for doing that are restrictive. The hash will be substituted throughout the function EXCEPT for its dependencies.
+with Pin (formerly Eval) allowing us to do things lazily I suppose. Yes, you can do that with an opcode, though the circumstances for doing that are restrictive. The hash will be substituted throughout the function EXCEPT for its dependencies.
 
-function = [# y]
+function = !y
 call = *[function z]
 
 
 &[# x] = x
-&[*x y] = *&[x y]
+&[!x y] = !x
 &[[] x] = []
-&[[# x] y] = [# x]
 &[[x .y] z] = [&[x z] .&[y z]]
 &[x y] = x
 
