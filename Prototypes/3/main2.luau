@@ -388,21 +388,19 @@ function reduce1(e: Thing, depth: number): Thing?
 			return reduce1(b, depth)
 		end
 	end
+	--[=[
+		*[!x y] = &[x y]
+	]=]
+	if a.type == PIN then
+		return replace(a.pin, b, depth)
+	end
+
 	if a.type == LIST then
 		--[=[
 			*[[] x] = x
 		]=]
 		if len(a) == 0 then
 			return printReturn(b)
-		end
-		--[=[
-			*[[# x] y] = &[x y]
-		]=]
-		if len(a) == 2 then
-			local h, x = a.things[1], a.things[2]
-			if h.type == HASH then
-				return replace(x, b, depth)
-			end
 		end
 		--[=[
 			*[[x .y] z] = *[y *[x z]]
@@ -431,10 +429,6 @@ local tests: {
 	}
 } = {
 	{
-		eval = list { OP4, num(1) },
-		res = num(2),
-	},
-	{
 		eval = list { OP1, list { list { num(5), num(6) }, num(1) } },
 		res = num(5),
 	},
@@ -449,30 +443,34 @@ local tests: {
 		},
 		res = num(8),
 	},
+
+	{
+		eval = list { OP4, num(1) },
+		res = num(2),
+	},
+
 	{
 		eval = list { OP9, list { OP4, num(1) } },
 		res = num(2),
 	},
+
 	{
 		eval = list { list { OP4, OP4 }, num(2) },
 		res = num(4),
 	},
 	{
 		eval = list {
-			list {
-				hash,
+			pin(list {
+				num(1),
+				num(2),
 				list {
-					num(1),
-					num(2),
-					list {
-						num(5),
-						num(6),
-						hash,
-						list { num(7), hash, num(8) },
-					},
-					num(4),
+					num(5),
+					num(6),
+					hash,
+					list { num(7), hash, num(8) },
 				},
-			},
+				num(4),
+			}),
 			num(9),
 		},
 		res = list {
