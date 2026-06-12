@@ -128,11 +128,16 @@ local function firstrest(s: List): (Thing, List)
 end
 
 local function addStart(x: Thing, y: List): List
-	return list { x, unpack(y.things) }
+	local yc = table.clone(y.things)
+	table.move(yc, 1, #yc, 2)
+	yc[1] = x
+	return list(yc)
 end
 
 local function addEnd(y: List, x: Thing): List
-	return list { unpack(y.things), x }
+	local yc = table.clone(y.things)
+	table.insert(yc, x)
+	return list(yc)
 end
 
 local function index(x: Thing, y: Thing, depth: number): Thing?
@@ -353,7 +358,7 @@ function reduce1(e: Thing, depth: number): Thing?
 			local x, y = b.things[1], b.things[2]
 
 			if x.type ~= LIST then
-				print(`{start}! !6 arg 1 non-list`)
+				print(`{start}! 6 arg 1 non-list`)
 				return nil
 			end
 
@@ -459,6 +464,16 @@ local tests: {
 	},
 
 	{
+		eval = list { OP6, list { list { num(5), num(6) }, num(4) } },
+		res = list { num(4), num(5), num(6) },
+	},
+
+	{
+		eval = list { OP7, list { list { num(5), num(6) }, num(7) } },
+		res = list { num(5), num(6), num(7) },
+	},
+
+	{
 		eval = list { OP9, list { OP4, num(1) } },
 		res = num(2),
 	},
@@ -521,6 +536,26 @@ local tests: {
 			num(5),
 		},
 		res = num(7),
+	},
+	{
+		eval = list {
+			list {
+				pin(list {
+					num(4),
+					hash,
+				}),
+				pin(list {
+					num(6),
+					list { list { num(4) }, hash },
+				}),
+				pin(list {
+					num(7),
+					list { hash, num(5) },
+				}),
+			},
+			num(5),
+		},
+		res = list { num(6), num(4), num(5) },
 	},
 }
 
