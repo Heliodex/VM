@@ -389,10 +389,19 @@ function reduce1(e: Thing, depth: number): Thing?
 		end
 	end
 	--[=[
-		*[!x y] = &[x y]
+		*[!x y] = *&[x y]
 	]=]
 	if a.type == PIN then
-		return replace(a.pin, b, depth)
+		local ap = a.pin
+		print(`{start}*&[{serialise(ap)} {serialise(b)}]`)
+
+		local axy = replace(ap, b, depth + 1)
+		if not axy then
+			print(`{start}! failed to replace in pin`)
+			return nil
+		end
+
+		return printReturn(reduce1(axy, depth + 1))
 	end
 
 	if a.type == LIST then
@@ -458,6 +467,7 @@ local tests: {
 		eval = list { list { OP4, OP4 }, num(2) },
 		res = num(4),
 	},
+	--[[
 	{
 		eval = list {
 			pin(list {
@@ -484,6 +494,33 @@ local tests: {
 			},
 			num(4),
 		},
+	},
+	]]
+	{
+		eval = list {
+			pin(list {
+				num(4),
+				hash,
+			}),
+			num(5),
+		},
+		res = num(6),
+	},
+	{
+		eval = list {
+			list {
+				pin(list {
+					num(4),
+					hash,
+				}),
+				pin(list {
+					num(4),
+					hash,
+				}),
+			},
+			num(5),
+		},
+		res = num(7),
 	},
 }
 

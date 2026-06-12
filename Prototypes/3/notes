@@ -157,7 +157,7 @@ call = *[function z]
 
 *[9 [x y]] = *[x y]
 
-*[!x y] = &[x y]
+*[!x y] = *&[x y]
 *[[] x] = x
 *[[x .y] z] = *[y *[x z]]
 
