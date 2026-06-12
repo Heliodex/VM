@@ -118,6 +118,12 @@ with Pin (formerly Eval) allowing us to do things lazily I suppose. Yes, you can
 function = !y
 call = *[function z]
 
+/[x #] = *~
+/[x !y] = *~
+/[x [.y]] = *~
+/[x 0] = x
+/[[x .y] 1] = x
+/[[x .y] 1 + z] = /[y z]
 
 &[# x] = x
 &[!x y] = !x
@@ -125,15 +131,10 @@ call = *[function z]
 &[[x .y] z] = [&[x z] .&[y z]]
 &[x y] = x
 
-*[1 [x #]] = *~
-*[1 [x *y]] = *~
-*[1 [x [.y]]] = *~
-*[1 [x 0]]  = x
-*[1 [[x .y] 1]] = x
-*[1 [[x .y] 1 + z]] = *[1 [y z]]
+*[1 [x y]] = /[x y]
 
 *[2 #] = 0
-*[2 *x] = 1
+*[2 !x] = 1
 *[2 [.x]] = 2
 *[2 x] = 3
 
@@ -141,7 +142,7 @@ call = *[function z]
 *[3 [x y]] = 1
 
 *[4 #] = *~
-*[4 *x] = *~
+*[4 !x] = *~
 *[4 [.x]] = *~
 *[4 x] = 1 + x
 

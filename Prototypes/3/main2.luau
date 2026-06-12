@@ -85,7 +85,7 @@ local empty = list {}
 
 local equal
 
-local function equalEval(a: Pin, b: Pin): boolean
+local function equalPin(a: Pin, b: Pin): boolean
 	return equal(a.pin, b.pin)
 end
 
@@ -110,7 +110,7 @@ end
 function equal(a: Thing, b: Thing): boolean
 	return if a.type == HASH and b.type == HASH
 		then true
-		elseif a.type == PIN and b.type == PIN then equalEval(a, b)
+		elseif a.type == PIN and b.type == PIN then equalPin(a, b)
 		elseif a.type == LIST and b.type == LIST then equalList(a, b)
 		elseif a.type == NUM and b.type == NUM then equalNum(a, b)
 		else false
@@ -133,6 +133,48 @@ end
 
 local function addEnd(y: List, x: Thing): List
 	return list { unpack(y.things), x }
+end
+
+local function index(x: Thing, y: Thing, depth: number): Thing?
+	local start = string.rep("    ", depth)
+
+	local function printReturn(a: Thing?)
+		if a then
+			print(start .. serialise(a))
+		end
+		return a
+	end
+
+	print(`{start}/[{serialise(x)} {serialise(y)}]`)
+
+	-- /[x #] = *~
+	-- /[x !y] = *~
+	-- /[x [.y]] = *~
+	if y.type ~= NUM then
+		print(`{start}! / non-num index`)
+		return nil
+	end
+
+	-- /[x 0] = x
+	if equal(y, num(0)) then
+		return printReturn(x)
+	end
+
+	if x.type ~= LIST then
+		print(`{start}! / positive index on non-list`)
+		return nil
+	end
+
+	-- /[[x .y] 1] = x
+	-- /[[x .y] 1 + z] = /[y z]
+	if equal(y, num(1)) then
+		return printReturn(x.things[1])
+	end
+
+	local _, y2 = firstrest(x)
+	local z = num(y.value - 1)
+
+	return index(y2, z, depth)
 end
 
 local reduce1, replace
@@ -246,35 +288,8 @@ function reduce1(e: Thing, depth: number): Thing?
 			*[1 [[x .y] 1]] = x
 			*[1 [[x .y] 1 + z]] = *[1 [y z]]
 		]=]
-		if a.value == 1 and b.type == LIST then
-			if len(b) ~= 2 then
-				print(`{start}! !1 on non-2-list`)
-				return nil
-			end
-
-			local xy, z1 = b.things[1], b.things[2]
-			if z1.type ~= NUM then
-				print(`{start}! 1 non-num index`)
-				return nil
-			end
-
-			if equal(z1, num(0)) then
-				return printReturn(xy)
-			end
-
-			if xy.type ~= LIST then
-				print(`{start}! 1 positive index on non-list`)
-				return nil
-			end
-
-			if equal(z1, num(1)) then
-				return printReturn(xy.things[1])
-			end
-
-			local _, y = firstrest(xy)
-			local z = num(z1.value - 1)
-
-			return reduce1(list { num(1), list { y, z } }, depth)
+		if a.value == 1 and b.type == LIST and len(b) == 2 then
+			return index(b.things[1], b.things[2], depth)
 		end
 		--[=[
 			*[2 #] = 0
@@ -426,6 +441,13 @@ local tests: {
 	{
 		eval = list { OP1, list { list { num(5), num(6) }, num(2) } },
 		res = num(6),
+	},
+	{
+		eval = list {
+			OP1,
+			list { list { num(5), num(6), num(7), num(8) }, num(4) },
+		},
+		res = num(8),
 	},
 	{
 		eval = list { OP9, list { OP4, num(1) } },
