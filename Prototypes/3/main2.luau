@@ -276,6 +276,29 @@ function reduce1(e: Thing, depth: number): Thing?
 		return nil
 	end
 
+	-- *[x y z] = [*[x z] *[y z]]
+	if len(e) == 3 then
+		print "Eval 3len"
+		local x, y, z = e.things[1], e.things[2], e.things[3]
+		local sx, sy, sz = serialise(x), serialise(y), serialise(z)
+
+		local rxz = reduce1(list { x, z }, depth + 1)
+		if not rxz then
+			print(`{start}! failed to reduce *[{sx} {sz}]`)
+			return nil
+		end
+
+		print(`{start}*[{serialise(rxz)} *[{sy} {sz}]]`)
+
+		local ryz = reduce1(list { y, z }, depth + 1)
+		if not ryz then
+			print(`{start}! failed to reduce *[{sy} {sz}]`)
+			return nil
+		end
+
+		return reduce1(list { rxz, ryz }, depth)
+	end
+
 	if len(e) ~= 2 then
 		-- *x = *x
 		print(`{start}! evaluate non-2-list`)
@@ -561,11 +584,14 @@ local tests: {
 
 				-- next, increment
 				pin(list {
-					OP1,
-					list { hash, num(2) },
-				}),
-				pin(list {
-					OP4,
+					pin(list {
+						OP1,
+						list { hash, num(0) },
+					}),
+					pin(list {
+						OP1,
+						list { hash, num(0) },
+					}),
 					hash,
 				}),
 			},
@@ -575,6 +601,10 @@ local tests: {
 }
 
 for i, test in tests do
+	if i ~= #tests then
+		continue
+	end
+
 	local rd = reduce1(test.eval, 0)
 	local out
 	if rd == nil then

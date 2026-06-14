@@ -131,6 +131,8 @@ call = *[function z]
 &[[x .y] z] = [&[x z] .&[y z]]
 &[x y] = x
 
+*[x y z] = [*[x z] *[y z]]
+
 *[1 [x y]] = /[x y]
 
 *[2 #] = 0
