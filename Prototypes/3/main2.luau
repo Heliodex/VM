@@ -582,21 +582,31 @@ local tests: {
 					},
 				}),
 
-				-- next, increment
+				-- next, increment c
 				pin(list {
 					pin(list {
 						OP1,
-						list { hash, num(0) },
+						list { hash, num(1) },
 					}),
 					pin(list {
-						OP1,
-						list { hash, num(0) },
+						list {
+							pin(list {
+								OP1,
+								list { hash, num(2) },
+							}),
+							OP4,
+						},
+						hash,
 					}),
 					hash,
 				}),
+
+				-- compare the 2
+				OP3
 			},
 			num(5, "a"),
 		},
+		res = num(1),
 	},
 }
 
