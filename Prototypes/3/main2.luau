@@ -602,11 +602,75 @@ local tests: {
 				}),
 
 				-- compare the 2
-				OP3
+				OP3,
 			},
 			num(5, "a"),
 		},
 		res = num(1),
+	},
+	{
+		eval = list {
+			list {
+				-- first, make an [a c]
+				pin(list {
+					OP6,
+					list {
+						list { num(0, "c") }, -- counter
+						hash,
+					},
+				}),
+
+				-- next, increment c
+				pin(list {
+					pin(list {
+						OP1,
+						list { hash, num(1) },
+					}),
+					pin(list {
+						list {
+							pin(list {
+								OP1,
+								list { hash, num(2) },
+							}),
+							OP4,
+						},
+						hash,
+					}),
+					hash,
+				}),
+
+				-- compare the 2
+				OP3,
+
+				pin(list {
+					OP9,
+					list {
+						hash,
+						pin(list {
+							OP1,
+							list {
+								pin(list {
+									OP1,
+									list { hash, num(0) },
+								}),
+								num(0),
+							},
+						}),
+						-- if time
+						pin(list {
+							OP5,
+							list {
+								hash,
+								num(10),
+								num(20),
+							},
+						}),
+					},
+				}),
+			},
+			num(5, "a"),
+		},
+		res = num(20),
 	},
 }
 
