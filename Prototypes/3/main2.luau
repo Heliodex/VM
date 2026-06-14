@@ -386,11 +386,28 @@ function reduce1(e: Thing, depth: number): Thing?
 			return printReturn(y)
 		end
 		--[=[
-			*[9 [x y]] = *[x y]
+		*[9 [x y z]] = *[*[y x] *[z x]]
 		]=]
-		if a.value == 9 and b.type == LIST and len(b) == 2 then
-			-- might be useless idk let's find out
-			return reduce1(b, depth)
+		if a.value == 9 and b.type == LIST and len(b) == 3 then
+			local x, y, z = b.things[1], b.things[2], b.things[3]
+
+			local sx = serialise(x)
+			local s2 = `*[{serialise(z)} {sx}]`
+			print(`{start}*[*[{serialise(y)} {sx}] {s2}]`)
+
+			local ryx = reduce1(list { y, x }, depth + 1)
+			if ryx == nil then
+				return nil
+			end
+
+			print(`{start}*[{serialise(ryx)} {s2}]`)
+
+			local rzx = reduce1(list { z, x }, depth + 1)
+			if rzx == nil then
+				return nil
+			end
+
+			return reduce1(list { ryx, rzx }, depth)
 		end
 	end
 	--[=[
@@ -473,48 +490,19 @@ local tests: {
 		res = list { num(5), num(6), num(7) },
 	},
 
-	{
-		eval = list { OP9, list { OP4, num(1) } },
-		res = num(2),
-	},
+	-- {
+	-- 	eval = list { OP9, list { OP4, num(1) } },
+	-- 	res = num(2),
+	-- },
 
 	{
 		eval = list { list { OP4, OP4 }, num(2) },
 		res = num(4),
 	},
-	--[[
 	{
 		eval = list {
 			pin(list {
-				num(1),
-				num(2),
-				list {
-					num(5),
-					num(6),
-					hash,
-					list { num(7), hash, num(8) },
-				},
-				num(4),
-			}),
-			num(9),
-		},
-		res = list {
-			num(1),
-			num(2),
-			list {
-				num(5),
-				num(6),
-				num(9),
-				list { num(7), num(9), num(8) },
-			},
-			num(4),
-		},
-	},
-	]]
-	{
-		eval = list {
-			pin(list {
-				num(4),
+				OP4,
 				hash,
 			}),
 			num(5),
@@ -525,11 +513,11 @@ local tests: {
 		eval = list {
 			list {
 				pin(list {
-					num(4),
+					OP4,
 					hash,
 				}),
 				pin(list {
-					num(4),
+					OP4,
 					hash,
 				}),
 			},
@@ -541,21 +529,48 @@ local tests: {
 		eval = list {
 			list {
 				pin(list {
-					num(4),
+					OP4,
 					hash,
 				}),
 				pin(list {
-					num(6),
+					OP6,
 					list { list { num(4) }, hash },
 				}),
 				pin(list {
-					num(7),
+					OP7,
 					list { hash, num(5) },
 				}),
 			},
 			num(5),
 		},
 		res = list { num(6), num(4), num(5) },
+	},
+
+	-- decrement attempt
+	{
+		eval = list {
+			list {
+				-- first, make an [a c]
+				pin(list {
+					OP6,
+					list {
+						list { num(0, "c") }, -- counter
+						hash,
+					},
+				}),
+
+				-- next, increment
+				pin(list {
+					OP1,
+					list { hash, num(2) },
+				}),
+				pin(list {
+					OP4,
+					hash,
+				}),
+			},
+			num(5, "a"),
+		},
 	},
 }
 
