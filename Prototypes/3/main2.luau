@@ -288,7 +288,7 @@ function reduce1(e: Thing, depth: number): Thing?
 			return nil
 		end
 
-		print(`{start}*[{serialise(rxz)} *[{sy} {sz}]]`)
+		print(`{start}[{serialise(rxz)} *[{sy} {sz}]]`)
 
 		local ryz = reduce1(list { y, z }, depth + 1)
 		if not ryz then
@@ -296,7 +296,7 @@ function reduce1(e: Thing, depth: number): Thing?
 			return nil
 		end
 
-		return reduce1(list { rxz, ryz }, depth)
+		return list { rxz, ryz }
 	end
 
 	if len(e) ~= 2 then
