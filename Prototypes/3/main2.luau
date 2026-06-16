@@ -672,6 +672,32 @@ local tests: {
 		},
 		res = num(20),
 	},
+
+	-- fixed-point combinator
+	{
+		eval = list {
+			-- λf.(λx.f(xx))(λx.f(xx))
+			pin(list {
+				OP9,
+				list {
+					-- λf.
+					hash,
+
+					-- (λx.f(xx))
+					pin(list {
+						-- # = f
+					}),
+					
+					-- (λx.f(xx))
+					pin(list {
+						-- # = f
+					}),
+				},
+			}),
+
+			num(5, "a"),
+		},
+	},
 }
 
 for i, test in tests do
