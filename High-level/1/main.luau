@@ -188,6 +188,30 @@ local function parseAST(p: ToParse): Result<AST, string>
 	return parseFunction(p, scope)
 end
 
+local function deepEqual(a: any, b: any): boolean
+	if type(a) ~= type(b) then
+		return false
+	end
+
+	if type(a) ~= "table" then
+		return a == b
+	end
+
+	for k, v in a do
+		if not deepEqual(v, b[k]) then
+			return false
+		end
+	end
+
+	for k, v in b do
+		if not deepEqual(v, a[k]) then
+			return false
+		end
+	end
+
+	return true
+end
+
 local function printTable(t: any, i: number?)
 	local indent = i or 0
 
@@ -204,15 +228,39 @@ local function printTable(t: any, i: number?)
 	end
 end
 
-local source = [[
-(x x)
-]]
+type TestCase = {
+	read source: string,
+	read expected: AST,
+}
 
-local input = toParse(source)
-local result = parseAST(input)
+local tests: { TestCase } = {
+	{
+		source = [[
+			(x x)
+		]],
+		expected = {
+			kind = "Fn",
+			binding = "x",
+			expr = {
+				kind = "Name",
+				name = "x",
+			},
+		},
+	},
+}
 
-if result.ok then
+for _, test in tests do
+	local input = toParse(test.source)
+	local result = parseAST(input)
+
+	if not result.ok then
+		error(`Test failed: {result.error}`)
+	end
+
+	if not deepEqual(result.value, test.expected) then
+		error "Test failed: AST does not match expected"
+	end
+
 	printTable(result.value)
-else
-	print("Error:", result.error)
+	print()
 end
