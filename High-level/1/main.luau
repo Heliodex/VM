@@ -167,13 +167,7 @@ local function parseFn(p: ToParse, scope: { [string]: true }): Result<Fn>
 
 	skipWhitespace(p)
 
-	local fn: Fn = {
-		kind = "Fn",
-		binding = binding,
-		expr = rexpr,
-	}
-
-	return ok(fn)
+	return ok(fn(binding, rexpr) :: Fn)
 end
 
 local function parseApp(p: ToParse, scope: { [string]: true }): Result<Expr>
@@ -216,13 +210,7 @@ local function parseApp(p: ToParse, scope: { [string]: true }): Result<Expr>
 
 	skipWhitespace(p)
 
-	local rapp: App = {
-		kind = "App",
-		fn = rfn,
-		arg = rarg,
-	}
-
-	return ok(rapp)
+	return ok(app(rfn, rarg) :: App)
 end
 
 function parseName(p: ToParse): Result<string>
@@ -279,10 +267,7 @@ function parseExpr(p: ToParse, scope: { [string]: true }): Result<Expr>
 		return errUndefinedVariable(rname)
 	end
 
-	return ok({
-		kind = "Name",
-		name = rname,
-	} :: Expr)
+	return ok(name(rname) :: Expr)
 end
 
 local function parseAST(p: ToParse): Result<AST>
@@ -347,14 +332,7 @@ local tests: { TestCase } = {
 		source = [[
 			(x x)
 		]],
-		expected = ok({
-			kind = "Fn",
-			binding = "x",
-			expr = {
-				kind = "Name",
-				name = "x",
-			},
-		} :: AST),
+		expected = ok(fn("x", name "x")),
 	},
 	{
 		source = [[
@@ -372,18 +350,7 @@ local tests: { TestCase } = {
 		source = [[
 			(x (y x))
 		]],
-		expected = ok({
-			kind = "Fn",
-			binding = "x",
-			expr = {
-				kind = "Fn",
-				binding = "y",
-				expr = {
-					kind = "Name",
-					name = "x",
-				},
-			},
-		} :: AST),
+		expected = ok(fn("x", fn("y", name "x")) :: AST),
 	},
 }
 
