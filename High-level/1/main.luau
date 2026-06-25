@@ -445,6 +445,12 @@ local tests: { TestCase } = {
 		]],
 		expected = ok(fn("x", app(num(1), num(123))) :: AST),
 	},
+	{
+		source = [[
+			(x [(y [x y]) 123])
+		]],
+		expected = ok(fn("x", app(fn("y", app(name "x", name "y")), num(123))) :: AST),
+	},
 }
 
 for _, test in tests do
