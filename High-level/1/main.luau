@@ -55,9 +55,33 @@ local function isControl(c: string): boolean
 	return c == "(" or c == ")" or isWhitespace(c)
 end
 
-type Result<T, E> = { ok: true, value: T } | { ok: false, error: E }
+type Ok<T> = { ok: true, value: T }
+type Err = { ok: false, error: string }
+type Result<T> = Ok<T> | Err
 
-local function parseName(p: ToParse): Result<string, string>
+local function ok<T>(value: T): Result<T>
+	return { ok = true, value = value }
+end
+
+local function err(error: string): Err
+	return { ok = false, error = error }
+end
+
+local errExpectedName = err "Expected a name"
+
+local function errUndefinedVariable(name: string): Result<any>
+	return err(`Undefined variable '{name}'`)
+end
+
+local function errExpectedChar(expected: string, got: string): Result<any>
+	return err(`Expected '{expected}', got '{got}'`)
+end
+
+local function wrapErr(pre: string, e: Err): Result<any>
+	return err(`{pre}: {e.error}`)
+end
+
+local function parseName(p: ToParse): Result<string>
 	local name: { string } = {}
 
 	while true do
@@ -75,10 +99,10 @@ local function parseName(p: ToParse): Result<string, string>
 	end
 
 	if #name == 0 then
-		return { ok = false, error = "Expected a name" }
+		return errExpectedName
 	end
 
-	return { ok = true, value = table.concat(name) }
+	return ok(table.concat(name))
 end
 
 local function skipWhitespace(p: ToParse)
@@ -97,57 +121,45 @@ end
 
 local parseFunction
 
-local function parseExpr(
-	p: ToParse,
-	scope: { [string]: true }
-): Result<Expr, string>
-	if next(p) == "(" then
+local function parseExpr(p: ToParse, scope: { [string]: true }): Result<Expr>
+	if current(p) == "(" then
 		local fnResult = parseFunction(p, scope)
 		if not fnResult.ok then
 			return fnResult
 		end
 
-		return {
-			ok = true,
-			value = fnResult.value,
-		}
+		return ok(fnResult.value)
 	end
 
 	local nameResult = parseName(p)
 	if not nameResult.ok then
-		return nameResult
+		return wrapErr("parseExpr", nameResult)
 	end
 
 	if not scope[nameResult.value] then
-		return { ok = false, error = `Undefined variable '{nameResult.value}'` }
+		return errUndefinedVariable(nameResult.value)
 	end
 
-	return {
-		ok = true,
-		value = {
-			kind = "Name",
-			name = nameResult.value,
-		},
-	}
+	return ok({
+		kind = "Name",
+		name = nameResult.value,
+	} :: Expr)
 end
 
-function parseFunction(
-	p: ToParse,
-	scope: { [string]: true }
-): Result<Fn, string>
+function parseFunction(p: ToParse, scope: { [string]: true }): Result<Fn>
 	skipWhitespace(p)
 
 	do
 		local c = current(p)
 		if c ~= "(" then
-			return { ok = false, error = `Expected '(', got '{c}'` }
+			return errExpectedChar("(", c or "EOF")
 		end
 		advance(p)
 	end
 
 	local paramResult = parseName(p)
 	if not paramResult.ok then
-		return paramResult
+		return wrapErr("parseFunction", paramResult)
 	end
 
 	local binding = paramResult.value
@@ -165,24 +177,23 @@ function parseFunction(
 	do
 		local c = current(p)
 		if c ~= ")" then
-			return { ok = false, error = `Expected ')', got '{c}'` }
+			return errExpectedChar(")", c or "EOF")
 		end
 		advance(p)
 	end
 
 	skipWhitespace(p)
 
-	return {
-		ok = true,
-		value = {
-			kind = "Fn",
-			binding = binding,
-			expr = expr,
-		},
+	local ast: AST = {
+		kind = "Fn",
+		binding = binding,
+		expr = expr,
 	}
+
+	return ok(ast)
 end
 
-local function parseAST(p: ToParse): Result<AST, string>
+local function parseAST(p: ToParse): Result<AST>
 	local scope: { [string]: true } = {}
 
 	return parseFunction(p, scope)
@@ -230,22 +241,57 @@ end
 
 type TestCase = {
 	read source: string,
-	read expected: AST,
+	read expected: Result<AST>,
 }
 
 local tests: { TestCase } = {
 	{
 		source = [[
+			b
+		]],
+		expected = errExpectedChar("(", "b"),
+	},
+	{
+		source = [[
 			(x x)
 		]],
-		expected = {
+		expected = ok({
 			kind = "Fn",
 			binding = "x",
 			expr = {
 				kind = "Name",
 				name = "x",
 			},
-		},
+		} :: AST),
+	},
+	{
+		source = [[
+			(x y)
+		]],
+		expected = errUndefinedVariable "y",
+	},
+	{
+		source = [[
+			(xy)
+		]],
+		expected = wrapErr("parseExpr", errExpectedName),
+	},
+	{
+		source = [[
+			(x (y x))
+		]],
+		expected = ok({
+			kind = "Fn",
+			binding = "x",
+			expr = {
+				kind = "Fn",
+				binding = "y",
+				expr = {
+					kind = "Name",
+					name = "x",
+				},
+			},
+		} :: AST),
 	},
 }
 
@@ -253,14 +299,21 @@ for _, test in tests do
 	local input = toParse(test.source)
 	local result = parseAST(input)
 
-	if not result.ok then
-		error(`Test failed: {result.error}`)
+	if not deepEqual(result, test.expected) then
+		-- error "Test failed: AST does not match expected"
+		print "Expected:\n"
+		printTable(test.expected)
+		print "\nGot:\n"
+		printTable(result)
+		return
 	end
 
-	if not deepEqual(result.value, test.expected) then
-		error "Test failed: AST does not match expected"
+	if result.ok then
+		printTable(result.value)
+	else
+		print(`Error: {result.error}`)
 	end
-
-	printTable(result.value)
 	print()
 end
+
+print "PASS"
