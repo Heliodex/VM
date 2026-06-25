@@ -73,12 +73,28 @@ local function app(fn: Expr, arg: Expr): App
 	}
 end
 
-type Expr = Fn | Name | App
+type Num = {
+	read kind: "Num",
+	read value: number,
+}
+
+local function num(value: number): Num
+	return {
+		kind = "Num",
+		value = value,
+	}
+end
+
+type Expr = Fn | Name | App | Num
 
 type AST = Fn
 
 local function isWhitespace(c: string): boolean
 	return c == " " or c == "\n" or c == "\t"
+end
+
+local function isDigit(c: string): boolean
+	return c >= "0" and c <= "9"
 end
 
 local function isControl(c: string): boolean
@@ -98,6 +114,8 @@ local function err(error: string): Err
 end
 
 local errExpectedName = err "Expected a name"
+local errExpectedNumber = err "Expected a number"
+local errConvertNumber = err "Failed to convert digits to number"
 
 local function errUndefinedVariable(name: string): Result<any>
 	return err(`Undefined variable '{name}'`)
@@ -125,7 +143,7 @@ local function skipWhitespace(p: ToParse)
 	end
 end
 
-local parseName, parseExpr
+local parseName, parseNum, parseExpr
 
 local function parseFn(p: ToParse, scope: { [string]: true }): Result<Fn>
 	skipWhitespace(p)
@@ -168,6 +186,30 @@ local function parseFn(p: ToParse, scope: { [string]: true }): Result<Fn>
 	skipWhitespace(p)
 
 	return ok(fn(binding, rexpr) :: Fn)
+end
+
+function parseName(p: ToParse): Result<string>
+	local name: { string } = {}
+
+	while true do
+		local c = current(p)
+		if not c then
+			break
+		end
+
+		if isControl(c) then
+			break
+		end
+
+		table.insert(name, c)
+		advance(p)
+	end
+
+	if #name == 0 then
+		return errExpectedName
+	end
+
+	return ok(table.concat(name))
 end
 
 local function parseApp(p: ToParse, scope: { [string]: true }): Result<Expr>
@@ -213,8 +255,8 @@ local function parseApp(p: ToParse, scope: { [string]: true }): Result<Expr>
 	return ok(app(rfn, rarg) :: App)
 end
 
-function parseName(p: ToParse): Result<string>
-	local name: { string } = {}
+function parseNum(p: ToParse): Result<Num>
+	local digits: { string } = {}
 
 	while true do
 		local c = current(p)
@@ -222,19 +264,24 @@ function parseName(p: ToParse): Result<string>
 			break
 		end
 
-		if isControl(c) then
+		if not isDigit(c) then
 			break
 		end
 
-		table.insert(name, c)
+		table.insert(digits, c)
 		advance(p)
 	end
 
-	if #name == 0 then
-		return errExpectedName
+	if #digits == 0 then
+		return errExpectedNumber
 	end
 
-	return ok(table.concat(name))
+	local value = tonumber(table.concat(digits))
+	if not value then
+		return errConvertNumber
+	end
+
+	return ok(num(value) :: Num)
 end
 
 function parseExpr(p: ToParse, scope: { [string]: true }): Result<Expr>
@@ -254,6 +301,15 @@ function parseExpr(p: ToParse, scope: { [string]: true }): Result<Expr>
 		end
 
 		return ok(appResult.value :: Expr)
+	end
+
+	if isDigit(current(p) or "") then
+		local numResult = parseNum(p)
+		if not numResult.ok then
+			return numResult
+		end
+
+		return ok(numResult.value :: Expr)
 	end
 
 	local nameResult = parseName(p)
@@ -329,6 +385,8 @@ local tests: { TestCase } = {
 		]],
 		expected = errExpectedChar("(", "b"),
 	},
+
+	-- fn, name
 	{
 		source = [[
 			(x x)
@@ -353,11 +411,39 @@ local tests: { TestCase } = {
 		]],
 		expected = ok(fn("x", fn("y", name "x")) :: AST),
 	},
+
+	-- app
 	{
 		source = [[
 			(x (y [y x]))
 		]],
 		expected = ok(fn("x", fn("y", app(name "y", name "x"))) :: AST),
+	},
+
+	-- num
+	{
+		source = [[
+			(x 123)
+		]],
+		expected = ok(fn("x", num(123)) :: AST),
+	},
+	{
+		source = [[
+			(1 123)
+		]],
+		expected = ok(fn("1", num(123)) :: AST),
+	},
+	{
+		source = [[
+			(x [x 123])
+		]],
+		expected = ok(fn("x", app(name "x", num(123))) :: AST),
+	},
+	{
+		source = [[
+			(x [1 123])
+		]],
+		expected = ok(fn("x", app(num(1), num(123))) :: AST),
 	},
 }
 
