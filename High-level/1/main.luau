@@ -82,7 +82,7 @@ local function isWhitespace(c: string): boolean
 end
 
 local function isControl(c: string): boolean
-	return c == "(" or c == ")" or isWhitespace(c)
+	return isWhitespace(c) or c == "(" or c == ")" or c == "[" or c == "]"
 end
 
 type Ok<T> = { ok: true, value: T }
@@ -307,12 +307,13 @@ local function printTable(t: any, i: number?)
 		if type(v) == "table" then
 			print(`{string.rep("  ", indent)}{k}:`)
 			printTable(v, indent + 1)
-		else
-			if type(v) == "string" then
-				v = `"{v}"`
-			end
-			print(`{string.rep("  ", indent)}{k}: {v}`)
+			continue
 		end
+
+		if type(v) == "string" then
+			v = `"{v}"`
+		end
+		print(`{string.rep("  ", indent)}{k}: {v}`)
 	end
 end
 
@@ -351,6 +352,12 @@ local tests: { TestCase } = {
 			(x (y x))
 		]],
 		expected = ok(fn("x", fn("y", name "x")) :: AST),
+	},
+	{
+		source = [[
+			(x (y [y x]))
+		]],
+		expected = ok(fn("x", fn("y", app(name "y", name "x"))) :: AST),
 	},
 }
 
