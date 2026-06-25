@@ -38,12 +38,42 @@ type Fn = {
 	read binding: string,
 	read expr: Expr,
 }
+
+local function fn(binding: string, expr: Expr): Fn
+	return {
+		kind = "Fn",
+		binding = binding,
+		expr = expr,
+	}
+end
+
 type Name = {
 	read kind: "Name",
 	read name: string,
 }
 
-type Expr = Fn | Name
+local function name(name: string): Name
+	return {
+		kind = "Name",
+		name = name,
+	}
+end
+
+type App = {
+	read kind: "App",
+	read fn: Expr,
+	read arg: Expr,
+}
+
+local function app(fn: Expr, arg: Expr): App
+	return {
+		kind = "App",
+		fn = fn,
+		arg = arg,
+	}
+end
+
+type Expr = Fn | Name | App
 
 type AST = Fn
 
@@ -81,7 +111,121 @@ local function wrapErr(pre: string, e: Err): Result<any>
 	return err(`{pre}: {e.error}`)
 end
 
-local function parseName(p: ToParse): Result<string>
+local function skipWhitespace(p: ToParse)
+	while true do
+		local c = current(p)
+		if not c then
+			break
+		end
+
+		if not isWhitespace(c) then
+			break
+		end
+		advance(p)
+	end
+end
+
+local parseName, parseExpr
+
+local function parseFn(p: ToParse, scope: { [string]: true }): Result<Fn>
+	skipWhitespace(p)
+
+	do
+		local c = current(p)
+		local expected = "("
+		if c ~= expected then
+			return errExpectedChar(expected, c or "EOF")
+		end
+		advance(p)
+	end
+
+	local paramResult = parseName(p)
+	if not paramResult.ok then
+		return wrapErr("parseFunction", paramResult)
+	end
+
+	local binding = paramResult.value
+	scope[binding] = true
+
+	skipWhitespace(p)
+
+	local exprResult = parseExpr(p, scope)
+	if not exprResult.ok then
+		return exprResult
+	end
+
+	local rexpr = exprResult.value
+
+	do
+		local c = current(p)
+		local expected = ")"
+		if c ~= expected then
+			return errExpectedChar(expected, c or "EOF")
+		end
+		advance(p)
+	end
+
+	skipWhitespace(p)
+
+	local fn: Fn = {
+		kind = "Fn",
+		binding = binding,
+		expr = rexpr,
+	}
+
+	return ok(fn)
+end
+
+local function parseApp(p: ToParse, scope: { [string]: true }): Result<Expr>
+	skipWhitespace(p)
+
+	do
+		local c = current(p)
+		local expected = "["
+		if c ~= expected then
+			return errExpectedChar(expected, c or "EOF")
+		end
+		advance(p)
+	end
+
+	local fnResult = parseExpr(p, scope)
+	if not fnResult.ok then
+		return wrapErr("parseApp fn", fnResult)
+	end
+
+	local rfn = fnResult.value
+	scope[rfn] = true
+
+	skipWhitespace(p)
+
+	local argResult = parseExpr(p, scope)
+	if not argResult.ok then
+		return wrapErr("parseApp arg", argResult)
+	end
+
+	local rarg = argResult.value
+
+	do
+		local c = current(p)
+		local expected = "]"
+		if c ~= expected then
+			return errExpectedChar(expected, c or "EOF")
+		end
+		advance(p)
+	end
+
+	skipWhitespace(p)
+
+	local rapp: App = {
+		kind = "App",
+		fn = rfn,
+		arg = rarg,
+	}
+
+	return ok(rapp)
+end
+
+function parseName(p: ToParse): Result<string>
 	local name: { string } = {}
 
 	while true do
@@ -105,30 +249,23 @@ local function parseName(p: ToParse): Result<string>
 	return ok(table.concat(name))
 end
 
-local function skipWhitespace(p: ToParse)
-	while true do
-		local c = current(p)
-		if not c then
-			break
-		end
-
-		if not isWhitespace(c) then
-			break
-		end
-		advance(p)
-	end
-end
-
-local parseFunction
-
-local function parseExpr(p: ToParse, scope: { [string]: true }): Result<Expr>
+function parseExpr(p: ToParse, scope: { [string]: true }): Result<Expr>
 	if current(p) == "(" then
-		local fnResult = parseFunction(p, scope)
+		local fnResult = parseFn(p, scope)
 		if not fnResult.ok then
 			return fnResult
 		end
 
-		return ok(fnResult.value)
+		return ok(fnResult.value :: Expr)
+	end
+
+	if current(p) == "[" then
+		local appResult = parseApp(p, scope)
+		if not appResult.ok then
+			return appResult
+		end
+
+		return ok(appResult.value :: Expr)
 	end
 
 	local nameResult = parseName(p)
@@ -136,67 +273,22 @@ local function parseExpr(p: ToParse, scope: { [string]: true }): Result<Expr>
 		return wrapErr("parseExpr", nameResult)
 	end
 
-	if not scope[nameResult.value] then
-		return errUndefinedVariable(nameResult.value)
+	local rname = nameResult.value
+
+	if not scope[rname] then
+		return errUndefinedVariable(rname)
 	end
 
 	return ok({
 		kind = "Name",
-		name = nameResult.value,
+		name = rname,
 	} :: Expr)
-end
-
-function parseFunction(p: ToParse, scope: { [string]: true }): Result<Fn>
-	skipWhitespace(p)
-
-	do
-		local c = current(p)
-		if c ~= "(" then
-			return errExpectedChar("(", c or "EOF")
-		end
-		advance(p)
-	end
-
-	local paramResult = parseName(p)
-	if not paramResult.ok then
-		return wrapErr("parseFunction", paramResult)
-	end
-
-	local binding = paramResult.value
-	scope[binding] = true
-
-	skipWhitespace(p)
-
-	local exprResult = parseExpr(p, scope)
-	if not exprResult.ok then
-		return exprResult
-	end
-
-	local expr = exprResult.value
-
-	do
-		local c = current(p)
-		if c ~= ")" then
-			return errExpectedChar(")", c or "EOF")
-		end
-		advance(p)
-	end
-
-	skipWhitespace(p)
-
-	local ast: AST = {
-		kind = "Fn",
-		binding = binding,
-		expr = expr,
-	}
-
-	return ok(ast)
 end
 
 local function parseAST(p: ToParse): Result<AST>
 	local scope: { [string]: true } = {}
 
-	return parseFunction(p, scope)
+	return parseFn(p, scope)
 end
 
 local function deepEqual(a: any, b: any): boolean
