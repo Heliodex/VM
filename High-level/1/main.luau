@@ -18,14 +18,6 @@ local function advance(p: ToParse)
 	p.pos += 1
 end
 
-local function next(p: ToParse): string?
-	if p.pos + 1 > #p.src then
-		return nil
-	end
-
-	return p.src[p.pos + 1]
-end
-
 local function toParse(src: string): ToParse
 	return {
 		src = string.split(src, ""),
@@ -143,18 +135,23 @@ local function skipWhitespace(p: ToParse)
 	end
 end
 
+local function expect(p: ToParse, expected: string): Result<nil>
+	local c = current(p)
+	if c ~= expected then
+		return errExpectedChar(expected, c or "EOF")
+	end
+	advance(p)
+	return ok(nil)
+end
+
 local parseName, parseNum, parseExpr
 
 local function parseFn(p: ToParse, scope: { [string]: true }): Result<Fn>
 	skipWhitespace(p)
 
-	do
-		local c = current(p)
-		local expected = "("
-		if c ~= expected then
-			return errExpectedChar(expected, c or "EOF")
-		end
-		advance(p)
+	local expectResult1 = expect(p, "(")
+	if not expectResult1.ok then
+		return expectResult1
 	end
 
 	local paramResult = parseName(p)
@@ -174,13 +171,9 @@ local function parseFn(p: ToParse, scope: { [string]: true }): Result<Fn>
 
 	local rexpr = exprResult.value
 
-	do
-		local c = current(p)
-		local expected = ")"
-		if c ~= expected then
-			return errExpectedChar(expected, c or "EOF")
-		end
-		advance(p)
+	local expectResult2 = expect(p, ")")
+	if not expectResult2.ok then
+		return expectResult2
 	end
 
 	skipWhitespace(p)
@@ -215,13 +208,9 @@ end
 local function parseApp(p: ToParse, scope: { [string]: true }): Result<Expr>
 	skipWhitespace(p)
 
-	do
-		local c = current(p)
-		local expected = "["
-		if c ~= expected then
-			return errExpectedChar(expected, c or "EOF")
-		end
-		advance(p)
+	local expectResult1 = expect(p, "[")
+	if not expectResult1.ok then
+		return expectResult1
 	end
 
 	local fnResult = parseExpr(p, scope)
@@ -241,13 +230,9 @@ local function parseApp(p: ToParse, scope: { [string]: true }): Result<Expr>
 
 	local rarg = argResult.value
 
-	do
-		local c = current(p)
-		local expected = "]"
-		if c ~= expected then
-			return errExpectedChar(expected, c or "EOF")
-		end
-		advance(p)
+	local expectResult2 = expect(p, "]")
+	if not expectResult2.ok then
+		return expectResult2
 	end
 
 	skipWhitespace(p)
