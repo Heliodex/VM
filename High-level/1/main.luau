@@ -1,85 +1,12 @@
 --!strict
 
--- A program is a list of functions.
-type ToParse = {
-	read src: { string },
-	pos: number,
-}
+local parser = require "./parser"
+local types = require "./types"
 
-local function current(p: ToParse): string?
-	if p.pos > #p.src then
-		return nil
-	end
+type ToParse = parser.ToParse
 
-	return p.src[p.pos]
-end
-
-local function advance(p: ToParse)
-	p.pos += 1
-end
-
-local function toParse(src: string): ToParse
-	return {
-		src = string.split(src, ""),
-		pos = 1,
-	}
-end
-
-type Fn = {
-	read kind: "Fn",
-	read binding: string,
-	read expr: Expr,
-}
-
-local function fn(binding: string, expr: Expr): Fn
-	return {
-		kind = "Fn",
-		binding = binding,
-		expr = expr,
-	}
-end
-
-type Name = {
-	read kind: "Name",
-	read name: string,
-}
-
-local function name(name: string): Name
-	return {
-		kind = "Name",
-		name = name,
-	}
-end
-
-type App = {
-	read kind: "App",
-	read fn: Expr,
-	read arg: Expr,
-}
-
-local function app(fn: Expr, arg: Expr): App
-	return {
-		kind = "App",
-		fn = fn,
-		arg = arg,
-	}
-end
-
-type Num = {
-	read kind: "Num",
-	read value: number,
-}
-
-local function num(value: number): Num
-	return {
-		kind = "Num",
-		value = value,
-	}
-end
-
-type Expr = Fn | Name | App | Num
-
-type AST = Fn
+local fn, app, num, name = types.fn, types.app, types.num, types.name
+local current, advance, toParse = parser.current, parser.advance, parser.toParse
 
 local function isWhitespace(c: string): boolean
 	return c == " " or c == "\n" or c == "\t"
@@ -109,8 +36,8 @@ local errExpectedName = err "Expected a name"
 local errExpectedNumber = err "Expected a number"
 local errConvertNumber = err "Failed to convert digits to number"
 
-local function errUndefinedVariable(name: string): Result<any>
-	return err(`Undefined variable '{name}'`)
+local function errUndefinedVariable(n: string): Result<any>
+	return err(`Undefined variable '{n}'`)
 end
 
 local function errExpectedChar(expected: string, got: string): Result<any>
@@ -146,7 +73,7 @@ end
 
 local parseName, parseNum, parseExpr
 
-local function parseFn(p: ToParse, scope: { [string]: true }): Result<Fn>
+local function parseFn(p: ToParse, scope: { [string]: true }): Result<types.Fn>
 	skipWhitespace(p)
 
 	local expectResult1 = expect(p, "(")
@@ -178,7 +105,7 @@ local function parseFn(p: ToParse, scope: { [string]: true }): Result<Fn>
 
 	skipWhitespace(p)
 
-	return ok(fn(binding, rexpr) :: Fn)
+	return ok(fn(binding, rexpr) :: types.Fn)
 end
 
 function parseName(p: ToParse): Result<string>
@@ -205,7 +132,7 @@ function parseName(p: ToParse): Result<string>
 	return ok(table.concat(name))
 end
 
-local function parseApp(p: ToParse, scope: { [string]: true }): Result<Expr>
+local function parseApp(p: ToParse, scope: { [string]: true }): Result<types.Expr>
 	skipWhitespace(p)
 
 	local expectResult1 = expect(p, "[")
@@ -237,10 +164,10 @@ local function parseApp(p: ToParse, scope: { [string]: true }): Result<Expr>
 
 	skipWhitespace(p)
 
-	return ok(app(rfn, rarg) :: App)
+	return ok(app(rfn, rarg) :: types.App)
 end
 
-function parseNum(p: ToParse): Result<Num>
+function parseNum(p: ToParse): Result<types.Num>
 	local digits: { string } = {}
 
 	while true do
@@ -266,17 +193,17 @@ function parseNum(p: ToParse): Result<Num>
 		return errConvertNumber
 	end
 
-	return ok(num(value) :: Num)
+	return ok(num(value) :: types.Num)
 end
 
-function parseExpr(p: ToParse, scope: { [string]: true }): Result<Expr>
+function parseExpr(p: ToParse, scope: { [string]: true }): Result<types.Expr>
 	if current(p) == "(" then
 		local fnResult = parseFn(p, scope)
 		if not fnResult.ok then
 			return fnResult
 		end
 
-		return ok(fnResult.value :: Expr)
+		return ok(fnResult.value :: types.Expr)
 	end
 
 	if current(p) == "[" then
@@ -285,7 +212,7 @@ function parseExpr(p: ToParse, scope: { [string]: true }): Result<Expr>
 			return appResult
 		end
 
-		return ok(appResult.value :: Expr)
+		return ok(appResult.value :: types.Expr)
 	end
 
 	if isDigit(current(p) or "") then
@@ -294,7 +221,7 @@ function parseExpr(p: ToParse, scope: { [string]: true }): Result<Expr>
 			return numResult
 		end
 
-		return ok(numResult.value :: Expr)
+		return ok(numResult.value :: types.Expr)
 	end
 
 	local nameResult = parseName(p)
@@ -308,10 +235,10 @@ function parseExpr(p: ToParse, scope: { [string]: true }): Result<Expr>
 		return errUndefinedVariable(rname)
 	end
 
-	return ok(name(rname) :: Expr)
+	return ok(name(rname) :: types.Expr)
 end
 
-local function parseAST(p: ToParse): Result<AST>
+local function parseAST(p: ToParse): Result<types.AST>
 	local scope: { [string]: true } = {}
 
 	return parseFn(p, scope)
@@ -360,7 +287,7 @@ end
 
 type TestCase = {
 	read source: string,
-	read expected: Result<AST>,
+	read expected: Result<types.AST>,
 }
 
 local tests: { TestCase } = {
@@ -394,7 +321,7 @@ local tests: { TestCase } = {
 		source = [[
 			(x (y x))
 		]],
-		expected = ok(fn("x", fn("y", name "x")) :: AST),
+		expected = ok(fn("x", fn("y", name "x")) :: types.AST),
 	},
 
 	-- app
@@ -402,7 +329,7 @@ local tests: { TestCase } = {
 		source = [[
 			(x (y [y x]))
 		]],
-		expected = ok(fn("x", fn("y", app(name "y", name "x"))) :: AST),
+		expected = ok(fn("x", fn("y", app(name "y", name "x"))) :: types.AST),
 	},
 
 	-- num
@@ -410,31 +337,33 @@ local tests: { TestCase } = {
 		source = [[
 			(x 123)
 		]],
-		expected = ok(fn("x", num(123)) :: AST),
+		expected = ok(fn("x", num(123)) :: types.AST),
 	},
 	{
 		source = [[
 			(1 123)
 		]],
-		expected = ok(fn("1", num(123)) :: AST),
+		expected = ok(fn("1", num(123)) :: types.AST),
 	},
 	{
 		source = [[
 			(x [x 123])
 		]],
-		expected = ok(fn("x", app(name "x", num(123))) :: AST),
+		expected = ok(fn("x", app(name "x", num(123))) :: types.AST),
 	},
 	{
 		source = [[
 			(x [1 123])
 		]],
-		expected = ok(fn("x", app(num(1), num(123))) :: AST),
+		expected = ok(fn("x", app(num(1), num(123))) :: types.AST),
 	},
 	{
 		source = [[
 			(x [(y [x y]) 123])
 		]],
-		expected = ok(fn("x", app(fn("y", app(name "x", name "y")), num(123))) :: AST),
+		expected = ok(
+			fn("x", app(fn("y", app(name "x", name "y")), num(123))) :: types.AST
+		),
 	},
 }
 
