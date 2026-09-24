@@ -168,3 +168,5 @@ call = *[function z]
 
 More implementation time!
 
+
+Okay, clearly this doesn't work too well given that a function can only access its own parameters, so multi-argument functions aren't possible. Not too much of a problem, as we can give functions a single argument which is a list of arguments, and then we can extract the arguments with OP1. Nice, though OP1 takes a list, so we need to construct it with a function rather than using the opcode alone. Welp, that requires 2 arguments, which we can't do. I feel like we've engineered ourselves into a hole with another useless operator set.
