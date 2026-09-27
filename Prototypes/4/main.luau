@@ -61,13 +61,13 @@ end
 
 const function alloc(net: Net, symbol: Symbol): Cell
 	-- 1. pick a slot: reuse a freed cell id, else grow by one
-	local c = table.remove(net.Free) or (#net.Tag + 1)
+	const c = table.remove(net.Free) or (#net.Tag + 1)
 
 	-- 2. record the symbol l(c)
 	net.Tag[c] = symbol
 
 	-- 3. clear all three of its ports (mark them as free ports)
-	local p = principal(c)
+	const p = principal(c)
 	net.Link[p], net.Link[p + 1], net.Link[p + 2] = 0, 0, 0
 
 	-- 4. give the caller a handle
@@ -75,7 +75,7 @@ const function alloc(net: Net, symbol: Symbol): Cell
 end
 
 const function release(net: Net, c: Cell)
-	local p = principal(c)
+	const p = principal(c)
 	net.Link[p], net.Link[p + 1], net.Link[p + 2] = 0, 0, 0
 	table.insert(net.Free, c)
 end
@@ -201,7 +201,7 @@ const function erase(net: Net, a: Cell, b: Cell)
 		x, e = b, a
 	end
 
-	local e1, e2 = alloc(net, EPSILON), alloc(net, EPSILON)
+	const e1, e2 = alloc(net, EPSILON), alloc(net, EPSILON)
 	move(net, aux1(x), principal(e1))
 	move(net, aux2(x), principal(e2))
 	release(net, x)
@@ -215,19 +215,19 @@ RULES[EPSILON][DELTA] = erase
 
 -- Perform a single interaction, if any. Returns whether one happened.
 const function step(net: Net): boolean
-	local active = net.Active
+	const active = net.Active
 	while #active > 0 do
-		local n = #active
-		local p = active[n]
+		const n = #active
+		const p = active[n]
 		active[n] = nil
 
-		local q = net.Link[p]
+		const q = net.Link[p]
 		if q == 0 or not isPrincipal(q) or net.Link[q] ~= p then
 			continue -- free port, stale entry, or already reduced
 		end
 
-		local a, b = owner(p), owner(q)
-		local rule = RULES[net.Tag[a]][net.Tag[b]]
+		const a, b = owner(p), owner(q)
+		const rule = RULES[net.Tag[a]][net.Tag[b]]
 		if not rule then
 			error(`No rule for {net.Tag[a]} meeting {net.Tag[b]}`)
 		end
@@ -252,14 +252,14 @@ end
 type Spec = { { string } }
 
 const function compile(spec: Spec): Net
-	local net = newNet()
-	local endpoints: { [string]: { Port } } = {}
+	const net = newNet()
+	const endpoints: { [string]: { Port } } = {}
 	for _, cell in spec do
-		local c = alloc(net, cell[1] :: Symbol)
-		local ports = { principal(c), aux1(c), aux2(c) }
+		const c = alloc(net, cell[1] :: Symbol)
+		const ports = { principal(c), aux1(c), aux2(c) }
 		for i = 2, #cell do
-			local label = cell[i]
-			local group = endpoints[label]
+			const label = cell[i]
+			const group = endpoints[label]
 			if group then
 				table.insert(group, ports[i - 1])
 			else
@@ -288,11 +288,11 @@ end
 
 -- The cells that are still alive (release() keeps Tag around for slot reuse).
 const function liveCells(net: Net): { Cell }
-	local freed: { [Cell]: boolean } = {}
+	const freed: { [Cell]: boolean } = {}
 	for _, c in net.Free do
 		freed[c] = true
 	end
-	local live = {}
+	const live = {}
 	for c = 1, #net.Tag do
 		if net.Tag[c] ~= nil and not freed[c] then
 			table.insert(live, c)
@@ -304,20 +304,20 @@ end
 -- Same net up to renaming of cells. Cell ids are recycled during reduction, so
 -- two equal results usually have completely different ids.
 const function isomorphic(a: Net, b: Net): boolean
-	local left, right = liveCells(a), liveCells(b)
+	const left, right = liveCells(a), liveCells(b)
 	if #left ~= #right then
 		return false
 	end
 
-	local map: { [Cell]: Cell } = {}
-	local taken: { [Cell]: boolean } = {}
+	const map: { [Cell]: Cell } = {}
+	const taken: { [Cell]: boolean } = {}
 
 	const function verify(): boolean
 		for _, ca in left do
-			local cb = map[ca]
-			local pa, pb = (ca - 1) * STRIDE, (cb - 1) * STRIDE
+			const cb = map[ca]
+			const pa, pb = (ca - 1) * STRIDE, (cb - 1) * STRIDE
 			for slot = 1, STRIDE do
-				local x, y = a.Link[pa + slot] or 0, b.Link[pb + slot] or 0
+				const x, y = a.Link[pa + slot] or 0, b.Link[pb + slot] or 0
 				if (x == 0) ~= (y == 0) then
 					return false
 				end
@@ -339,7 +339,7 @@ const function isomorphic(a: Net, b: Net): boolean
 		if i > #left then
 			return verify()
 		end
-		local ca = left[i]
+		const ca = left[i]
 		for _, cb in right do
 			if not taken[cb] and a.Tag[ca] == b.Tag[cb] then
 				map[ca], taken[cb] = cb, true
@@ -368,7 +368,7 @@ type Test = {
 	read budget: number?,
 }
 
-local tests: { Test } = {
+const tests: { Test } = {
 	{
 		name = "epsilon-epsilon annihilates to nothing",
 		start = { { EPSILON, "p" }, { EPSILON, "p" } },
@@ -460,7 +460,7 @@ local tests: { Test } = {
 }
 
 for _, test in tests do
-	local net = compile(test.start)
+	const net = compile(test.start)
 	local finished = false
 	for _ = 1, test.budget or 1000 do
 		if not step(net) then
@@ -470,7 +470,7 @@ for _, test in tests do
 	end
 
 	if test.expect then
-		local ok = finished
+		const ok = finished
 			and wellFormed(net)
 			and isomorphic(net, compile(test.expect))
 		check(test.name, ok)
