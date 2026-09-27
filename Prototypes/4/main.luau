@@ -206,11 +206,14 @@ RULES[EPSILON][DELTA] = erase
 
 -- Perform a single interaction, if any. Returns whether one happened.
 const function step(net: Net): boolean
+	-- Pop the *oldest* redex, not the newest. With a LIFO stack, freshly created
+	-- redexes keep landing on top of older ones, so an older pair can be starved
+	-- forever; delta(epsilon, x) = gamma(x, epsilon) then grows without bound
+	-- instead of cycling. FIFO is fair: every enqueued pair is eventually taken.
 	const active = net.Active
 	while #active > 0 do
-		const n = #active
-		const p = active[n]
-		active[n] = nil
+		const p = active[1]
+		table.remove(active, 1)
 
 		const q = net.Link[p]
 		if q == 0 or not isPrincipal(q) or net.Link[q] ~= p then
