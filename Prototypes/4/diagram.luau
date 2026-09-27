@@ -4,6 +4,11 @@
 -- pointing along the wire attached to it; epsilon cells are circles; wires are
 -- curves; free ports are short dangling stubs.
 --
+-- Cells are laid out to keep wired ports near each other, and a wire leaves its
+-- port aimed at the partner. When the body of a cell lies between a port and its
+-- partner the wire leaves tangentially instead of reversing, so it never doubles
+-- back on itself immediately after leaving the cell.
+--
 --   const toSvg = require("./diagram")
 --   print(toSvg(net))
 --
@@ -59,8 +64,10 @@ const function layout(net: Net, cells: { Cell }): { [Cell]: Vec }
 	end
 
 	const W, H = 640, 640
-	const k = 0.85 * math.sqrt((W * H) / n)
-	local temp = W / 8
+	-- Cap the natural FR spacing so small nets do not drift apart into huge,
+	-- mostly-empty drawings. Larger nets still spread out to fill the area.
+	const k = math.min(96, 0.9 * math.sqrt((W * H) / n))
+	local temp = 72
 	const radius = 34 * math.sqrt(n)
 	for i, c in cells do
 		const angle = 2 * math.pi * (i - 1) / n
@@ -134,6 +141,8 @@ const CIRCLE_RADIUS = 14 -- epsilon radius
 const FREE_LEN = 18 -- length of a free-port stub
 const STUB_RADIUS = 3.5
 const WIRE_TENSION = 0.32 -- how far a wire bulges along the port normal
+const WIRE_TENSION_MAX = 90 -- cap on that bulge, so wraps stay tight
+const LEAVE_BIAS = 0.3 -- lift wires skimming a cell edge a little off the body
 const LOOP_LEN = 26
 const MARGIN = 28
 const ORIENT_ITERS = 8
@@ -180,6 +189,28 @@ const function place(a: Vec, b: Vec, t: number): Vec
 	return { x = a.x + (b.x - a.x) * t, y = a.y + (b.y - a.y) * t }
 end
 
+-- Which way a wire should leave a port. Normally that is straight at the
+-- partner, but a port whose body lies between it and the partner must leave
+-- tangentially instead. Clamping the desired direction to the outward half-plane
+-- turns what would be an immediate 180-degree hairpin into at worst a smooth
+-- quarter turn, while the small outward bias keeps the wire from hugging the
+-- cell's edge.
+const function leaveTangent(n: Vec, P: Vec, Q: Vec): Vec
+	const dx, dy = unit(Q.x - P.x, Q.y - P.y, n.x, n.y)
+	const dn = dx * n.x + dy * n.y
+	if dn >= 0 then
+		return { x = dx, y = dy }
+	end
+	const tx, ty = unit(dx - dn * n.x, dy - dn * n.y, -n.y, n.x)
+	const bx, by = unit(
+		tx + n.x * LEAVE_BIAS,
+		ty + n.y * LEAVE_BIAS,
+		tx,
+		ty
+	)
+	return { x = bx, y = by }
+end
+
 -- Where a cell's principal port wants to point: at the partner of its principal
 -- wire, or away from the centre when that wire is free.
 const function principalTarget(
@@ -223,6 +254,7 @@ const function toSvg(net: Net): string
 
 	local point: { [Port]: Vec } = {} -- where a wire meets the cell
 	local out: { [Port]: Vec } = {} -- outward normal: wires leave along this
+	local tan: { [Port]: Vec } = {} -- actual leave direction for a wired port
 	local tip: { [Cell]: Vec } = {}
 	local e1: { [Cell]: Vec } = {}
 	local e2: { [Cell]: Vec } = {}
@@ -273,6 +305,31 @@ const function toSvg(net: Net): string
 		end
 	end
 	computePorts()
+
+	-- The tip always points along its own wire, so the principal port keeps its
+	-- normal. Auxiliary ports have no such constraint: let their wires leave
+	-- towards their partner, avoiding a hairpin around the base of the triangle.
+	const function computeTangents()
+		tan = {}
+		for _, c in cells do
+			for slot = 1, arity(net.Tag[c]) + 1 do
+				const p = portOf(c, slot)
+				tan[p] = out[p]
+			end
+		end
+		for _, c in cells do
+			if arity(net.Tag[c]) == 2 then
+				for slot = 2, 3 do
+					const p = portOf(c, slot)
+					const q = net.Link[p] or 0
+					if q ~= 0 and owner(q) ~= c then
+						tan[p] = leaveTangent(out[p], point[p], point[q])
+					end
+				end
+			end
+		end
+	end
+	computeTangents()
 
 	local minX, minY = math.huge, math.huge
 	local maxX, maxY = -math.huge, -math.huge
@@ -339,9 +396,9 @@ const function toSvg(net: Net): string
 						0.01,
 						math.sqrt((Q.x - P.x) ^ 2 + (Q.y - P.y) ^ 2)
 					)
-					const k = d * WIRE_TENSION
-					c1 = { x = P.x + out[p].x * k, y = P.y + out[p].y * k }
-					c2 = { x = Q.x + out[q].x * k, y = Q.y + out[q].y * k }
+					const k = math.min(d * WIRE_TENSION, WIRE_TENSION_MAX)
+					c1 = { x = P.x + tan[p].x * k, y = P.y + tan[p].y * k }
+					c2 = { x = Q.x + tan[q].x * k, y = Q.y + tan[q].y * k }
 				end
 				include(c1)
 				include(c2)
