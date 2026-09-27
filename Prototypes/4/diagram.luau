@@ -9,7 +9,10 @@
 -- partner the wire leaves tangentially instead of reversing, so it never doubles
 -- back on itself immediately after leaving the cell. Each cell also picks its
 -- own tip direction to minimise the total bending of its wires, so cells of the
--- same type are free to face different ways when their wiring differs.
+-- same type are free to face different ways when their wiring differs. Finally,
+-- parts of a net that share no wires are laid out separately and packed into
+-- their own boxes, so their wires cannot cross and they stay a sensible
+-- distance apart.
 --
 --   const toSvg = require("./diagram")
 --   print(toSvg(net))
@@ -51,23 +54,72 @@ end
 
 -- layout ----------------------------------------------------------------------
 
--- Fruchterman-Reingold: repulsion between every pair of cells, springs along
--- the wires. Deterministic (starts on a circle), so a given net always draws
--- the same way.
-const function layout(net: Net, cells: { Cell }): { [Cell]: Vec }
+-- Group cells into connected parts: two cells belong to the same part when a
+-- wire joins one of their ports. Different parts have no wires, cells or ports
+-- in common, so they can be laid out independently and then packed.
+const function components(net: Net, cells: { Cell }): { { Cell } }
+	const parent: { [Cell]: Cell } = {}
+	for _, c in cells do
+		parent[c] = c
+	end
+
+	const function find(c: Cell): Cell
+		local root = c
+		while parent[root] ~= root do
+			root = parent[root]
+		end
+		while parent[c] ~= root do
+			parent[c], c = root, parent[c]
+		end
+		return root
+	end
+
+	for _, c in cells do
+		for slot = 1, arity(net.Tag[c]) + 1 do
+			const q = net.Link[portOf(c, slot)] or 0
+			if q ~= 0 and owner(q) ~= c then
+				const a, b = find(c), find(owner(q))
+				if a ~= b then
+					parent[a] = b
+				end
+			end
+		end
+	end
+
+	const byRoot: { [Cell]: { Cell } } = {}
+	const order: { Cell } = {}
+	for _, c in cells do
+		const root = find(c)
+		local group = byRoot[root]
+		if not group then
+			group = {}
+			byRoot[root] = group
+			table.insert(order, root)
+		end
+		table.insert(group, c)
+	end
+
+	const parts: { { Cell } } = {}
+	for _, root in order do
+		table.insert(parts, byRoot[root])
+	end
+	return parts
+end
+
+-- Fruchterman-Reingold on one connected part: repulsion between every pair of
+-- cells, springs along the wires. Deterministic (starts on a circle), so a
+-- given part always draws the same way.
+const function layoutPart(net: Net, cells: { Cell }): { [Cell]: Vec }
 	const n = #cells
 	const pos: { [Cell]: Vec } = {}
-	if n == 0 then
-		return pos
-	end
 	if n == 1 then
 		pos[cells[1]] = { x = 0, y = 0 }
 		return pos
 	end
 
 	const W, H = 640, 640
-	-- Cap the natural FR spacing so small nets do not drift apart into huge,
-	-- mostly-empty drawings. Larger nets still spread out to fill the area.
+	-- Cap the natural FR spacing so small parts do not drift apart into huge,
+	-- mostly-empty drawings. Larger parts still spread out to fill the area.
 	const k = math.min(96, 0.9 * math.sqrt((W * H) / n))
 	local temp = 72
 	const radius = 34 * math.sqrt(n)
@@ -132,6 +184,108 @@ const function layout(net: Net, cells: { Cell }): { [Cell]: Vec }
 		temp *= 0.95
 	end
 	return pos
+end
+
+-- Room reserved around a part for cell bodies and the bulge of its wires. The
+-- proportional term keeps large parts from having their wires spill into a
+-- neighbour, while lone cells stay tight.
+const PART_MARGIN = 36
+const PART_MARGIN_SCALE = 0.2
+const PART_GAP = 26
+
+type PartBox = {
+	pos: { [Cell]: Vec },
+	minX: number,
+	minY: number,
+	w: number,
+	h: number,
+	margin: number,
+}
+
+-- Lay out every part on its own, then pack the parts into rows sized to keep
+-- the whole drawing roughly square. Each part keeps its own box, so the wires
+-- of one part cannot cross the wires of another, and neighbouring parts stay a
+-- fixed, modest distance apart instead of drifting off to opposite corners.
+const function layout(net: Net, cells: { Cell }): { [Cell]: Vec }
+	if #cells == 0 then
+		return {}
+	end
+	const parts = components(net, cells)
+	if #parts == 1 then
+		return layoutPart(net, cells)
+	end
+
+	const boxes: { PartBox } = {}
+	local area = 0
+	local widest = 0
+	for _, part in parts do
+		const pos = layoutPart(net, part)
+		local minX, minY = math.huge, math.huge
+		local maxX, maxY = -math.huge, -math.huge
+		for _, c in part do
+			minX = math.min(minX, pos[c].x)
+			minY = math.min(minY, pos[c].y)
+			maxX = math.max(maxX, pos[c].x)
+			maxY = math.max(maxY, pos[c].y)
+		end
+		const w = maxX - minX
+		const h = maxY - minY
+		const margin = PART_MARGIN + PART_MARGIN_SCALE * math.max(w, h)
+		area += (w + 2 * margin) * (h + 2 * margin)
+		widest = math.max(widest, w + 2 * margin)
+		table.insert(boxes, {
+			pos = pos,
+			minX = minX,
+			minY = minY,
+			w = w,
+			h = h,
+			margin = margin,
+		})
+	end
+	const targetScale = math.sqrt(area)
+	const placed: { [Cell]: Vec } = {}
+	const function packBoxes(target: number, apply: boolean): (number, number)
+		local x, y, rowH = 0, 0, 0
+		local maxX, maxY = 0, 0
+		for _, b in boxes do
+			const bw = b.w + 2 * b.margin
+			const bh = b.h + 2 * b.margin
+			if x > 0 and x + bw > target then
+				x = 0
+				y += rowH + PART_GAP
+				rowH = 0
+			end
+			if apply then
+				const ox = x + b.margin - b.minX
+				const oy = y + b.margin - b.minY
+				for c, v in b.pos do
+					placed[c] = { x = v.x + ox, y = v.y + oy }
+				end
+			end
+			maxX = math.max(maxX, x + bw)
+			maxY = math.max(maxY, y + bh)
+			x += bw + PART_GAP
+			rowH = math.max(rowH, bh)
+		end
+		return maxX, maxY
+	end
+
+	-- Try several widths and keep the one whose pack is closest to square, so
+	-- two parts sit side by side when that is more compact and many parts form a
+	-- tidy grid rather than one long column.
+	local bestTarget = widest + PART_GAP
+	local bestScore = math.huge
+	for _, scale in { 0.9, 1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4 } do
+		const target = math.max(widest, targetScale * scale) + PART_GAP
+		const maxX, maxY = packBoxes(target, false)
+		const score = math.max(maxX, maxY)
+		if score < bestScore then
+			bestScore = score
+			bestTarget = target
+		end
+	end
+	packBoxes(bestTarget, true)
+	return placed
 end
 
 -- geometry --------------------------------------------------------------------
