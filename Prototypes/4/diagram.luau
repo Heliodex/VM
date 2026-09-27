@@ -7,7 +7,9 @@
 -- Cells are laid out to keep wired ports near each other, and a wire leaves its
 -- port aimed at the partner. When the body of a cell lies between a port and its
 -- partner the wire leaves tangentially instead of reversing, so it never doubles
--- back on itself immediately after leaving the cell.
+-- back on itself immediately after leaving the cell. Each cell also picks its
+-- own tip direction to minimise the total bending of its wires, so cells of the
+-- same type are free to face different ways when their wiring differs.
 --
 --   const toSvg = require("./diagram")
 --   print(toSvg(net))
@@ -146,6 +148,7 @@ const LEAVE_BIAS = 0.3 -- lift wires skimming a cell edge a little off the body
 const LOOP_LEN = 26
 const MARGIN = 28
 const ORIENT_ITERS = 8
+const ORIENT_SAMPLES = 72 -- candidate directions tried per cell (5 degrees apart)
 
 const function fmt(v: number): string
 	return string.format("%.1f", v)
@@ -297,11 +300,87 @@ const function toSvg(net: Net): string
 		end
 	end
 
+	-- Cost of orienting a cell along u, using the leave rules its wires will
+	-- actually use. The principal wire leaves along the tip, so its bend is the
+	-- angle to its partner; auxiliary wires leave adaptively, so a partner in
+	-- front of the base costs at most a quarter turn. Minimising the total lets
+	-- each cell swing to whichever direction best serves all of its wires,
+	-- rather than always facing its principal partner.
+	const function orientationCost(c: Cell, u: Vec): number
+		const center = pos[c]
+		local anchors: { Vec }
+		local normals: { Vec }
+		if net.Tag[c] == "Epsilon" then
+			anchors = {{
+				x = center.x + u.x * CIRCLE_RADIUS,
+				y = center.y + u.y * CIRCLE_RADIUS,
+			}}
+			normals = { u }
+		else
+			const n = { x = -u.y, y = u.x }
+			const neg = { x = -u.x, y = -u.y }
+			const tip = {
+				x = center.x + u.x * TIP_LEN,
+				y = center.y + u.y * TIP_LEN,
+			}
+			const a = {
+				x = center.x - u.x * BASE_LEN + n.x * HALF_WIDTH,
+				y = center.y - u.y * BASE_LEN + n.y * HALF_WIDTH,
+			}
+			const b = {
+				x = center.x - u.x * BASE_LEN - n.x * HALF_WIDTH,
+				y = center.y - u.y * BASE_LEN - n.y * HALF_WIDTH,
+			}
+			anchors = { tip, place(a, b, 1 / 3), place(a, b, 2 / 3) }
+			normals = { u, neg, neg }
+		end
+
+		local total = 0
+		for slot = 1, #anchors do
+			const p = portOf(c, slot)
+			const q = net.Link[p] or 0
+			if q == 0 or owner(q) == c then
+				continue
+			end
+			const A = anchors[slot]
+			const B = point[q]
+			const nrm = normals[slot]
+			const dx, dy = unit(B.x - A.x, B.y - A.y, nrm.x, nrm.y)
+			local t
+			if slot == 1 then
+				t = nrm
+			else
+				t = leaveTangent(nrm, A, B)
+			end
+			total += 1 - (t.x * dx + t.y * dy)
+		end
+		return total
+	end
+
+	-- Swing each cell through a fixed set of candidate directions and keep the
+	-- cheapest. This runs Gauss-Seidel: the ports are refreshed after each cell,
+	-- so later cells see the choices made so far. Ties keep the current
+	-- direction, which keeps the result deterministic and stops it oscillating.
+	const function chooseOrientation(c: Cell)
+		local bx, by = ux[c], uy[c]
+		local best = orientationCost(c, { x = bx, y = by })
+		for k = 0, ORIENT_SAMPLES - 1 do
+			const angle = 2 * math.pi * k / ORIENT_SAMPLES
+			const u = { x = math.cos(angle), y = math.sin(angle) }
+			const cost = orientationCost(c, u)
+			if cost < best - 1e-6 then
+				best = cost
+				bx, by = u.x, u.y
+			end
+		end
+		ux[c], uy[c] = bx, by
+	end
+
 	for _ = 1, ORIENT_ITERS do
 		computePorts()
 		for _, c in cells do
-			const tx, ty = principalTarget(net, c, pos, centroid)
-			ux[c], uy[c] = unit(tx - pos[c].x, ty - pos[c].y, ux[c], uy[c])
+			chooseOrientation(c)
+			computePorts()
 		end
 	end
 	computePorts()
