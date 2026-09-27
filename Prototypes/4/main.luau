@@ -242,7 +242,40 @@ local function reduce(net: Net)
 	end
 end
 
--- self-checks ---------------------------------------------------------------
+-- test layer -----------------------------------------------------------------
+
+-- A net for a test is written as a list of cells, each of the form
+--   { symbol, label, label, ... }   -- principal port first, then auxiliaries
+-- Ports that share a label are wired together; a label used on a single port is
+-- a free port. So { {GAMMA, "p", "a", "b"}, {GAMMA, "p", "c", "d"} } is two
+-- gammas joined at their principal ports with all four auxiliaries free.
+type Spec = { { string } }
+
+local function compile(spec: Spec): Net
+	local net = newNet()
+	local endpoints: { [string]: { Port } } = {}
+	for _, cell in spec do
+		local c = alloc(net, cell[1] :: Symbol)
+		local ports = { principal(c), aux1(c), aux2(c) }
+		for i = 2, #cell do
+			local label = cell[i]
+			local group = endpoints[label]
+			if group then
+				table.insert(group, ports[i - 1])
+			else
+				endpoints[label] = { ports[i - 1] }
+			end
+		end
+	end
+	for label, group in endpoints do
+		if #group == 2 then
+			link(net, group[1], group[2])
+		elseif #group > 2 then
+			error(`label "{label}" is used {#group} times`)
+		end
+	end
+	return net
+end
 
 local function wellFormed(net: Net): boolean
 	for p, q in net.Link do
@@ -253,91 +286,195 @@ local function wellFormed(net: Net): boolean
 	return true
 end
 
+-- The cells that are still alive (release() keeps Tag around for slot reuse).
+local function liveCells(net: Net): { Cell }
+	local freed: { [Cell]: boolean } = {}
+	for _, c in net.Free do
+		freed[c] = true
+	end
+	local live = {}
+	for c = 1, #net.Tag do
+		if net.Tag[c] ~= nil and not freed[c] then
+			table.insert(live, c)
+		end
+	end
+	return live
+end
+
+-- Same net up to renaming of cells. Cell ids are recycled during reduction, so
+-- two equal results usually have completely different ids.
+local function isomorphic(a: Net, b: Net): boolean
+	local left, right = liveCells(a), liveCells(b)
+	if #left ~= #right then
+		return false
+	end
+
+	local map: { [Cell]: Cell } = {}
+	local taken: { [Cell]: boolean } = {}
+
+	local function verify(): boolean
+		for _, ca in left do
+			local cb = map[ca]
+			local pa, pb = (ca - 1) * STRIDE, (cb - 1) * STRIDE
+			for slot = 1, STRIDE do
+				local x, y = a.Link[pa + slot] or 0, b.Link[pb + slot] or 0
+				if (x == 0) ~= (y == 0) then
+					return false
+				end
+				if x == 0 then
+					continue
+				end
+				if
+					map[owner(x)] ~= owner(y)
+					or (x - 1) % STRIDE ~= (y - 1) % STRIDE
+				then
+					return false
+				end
+			end
+		end
+		return true
+	end
+
+	local function search(i: number): boolean
+		if i > #left then
+			return verify()
+		end
+		local ca = left[i]
+		for _, cb in right do
+			if not taken[cb] and a.Tag[ca] == b.Tag[cb] then
+				map[ca], taken[cb] = cb, true
+				if search(i + 1) then
+					return true
+				end
+				map[ca], taken[cb] = nil, nil
+			end
+		end
+		return false
+	end
+
+	return search(1)
+end
+
 local function check(name: string, ok: boolean)
 	print(if ok then `PASS {name}` else `FAIL {name}`)
 end
 
--- annihilation: gamma-gamma swaps auxiliary ports
-do
-	local net = newNet()
-	local g1, g2 = alloc(net, GAMMA), alloc(net, GAMMA)
-	local c1, c2, c3, c4 =
-		alloc(net, DELTA),
-		alloc(net, DELTA),
-		alloc(net, DELTA),
-		alloc(net, DELTA)
-	link(net, principal(g1), principal(g2))
-	link(net, aux1(g1), aux1(c1))
-	link(net, aux2(g1), aux1(c2))
-	link(net, aux1(g2), aux1(c3))
-	link(net, aux2(g2), aux1(c4))
-	reduce(net)
-	check(
-		"gamma-gamma swaps",
-		net.Link[aux1(c1)] == aux1(c4) and net.Link[aux1(c2)] == aux1(c3)
-	)
-end
+-- tests -----------------------------------------------------------------------
 
--- annihilation: delta-delta is straight
-do
-	local net = newNet()
-	local d1, d2 = alloc(net, DELTA), alloc(net, DELTA)
-	local c1, c2, c3, c4 =
-		alloc(net, GAMMA),
-		alloc(net, GAMMA),
-		alloc(net, GAMMA),
-		alloc(net, GAMMA)
-	link(net, principal(d1), principal(d2))
-	link(net, aux1(d1), aux1(c1))
-	link(net, aux2(d1), aux1(c2))
-	link(net, aux1(d2), aux1(c3))
-	link(net, aux2(d2), aux1(c4))
-	reduce(net)
-	check(
-		"delta-delta straight",
-		net.Link[aux1(c1)] == aux1(c3) and net.Link[aux1(c2)] == aux1(c4)
-	)
-end
+type Test = {
+	read name: string,
+	read start: Spec,
+	read expect: Spec?, -- nil means the reduction is expected not to finish
+	read budget: number?,
+}
 
--- erasing must not depend on which principal port was noticed first
-do
-	local net = newNet()
-	local g = alloc(net, GAMMA)
-	local c = alloc(net, DELTA)
-	link(net, aux1(g), aux1(c)) -- a wired continuation on the binary cell
-	local e = alloc(net, EPSILON)
-	link(net, principal(e), principal(g)) -- link() keeps its first argument
-	reduce(net)
+local tests: { Test } = {
+	{
+		name = "epsilon-epsilon annihilates to nothing",
+		start = { { EPSILON, "p" }, { EPSILON, "p" } },
+		expect = {},
+	},
+	{
+		name = "gamma-gamma exchanges its wires",
+		start = {
+			{ GAMMA, "p", "a", "b" },
+			{ GAMMA, "p", "c", "d" },
+			{ DELTA, "e", "a", "f" },
+			{ DELTA, "g", "b", "h" },
+			{ DELTA, "i", "c", "j" },
+			{ DELTA, "k", "d", "l" },
+		},
+		expect = {
+			{ DELTA, "e", "ad", "f" },
+			{ DELTA, "g", "bc", "h" },
+			{ DELTA, "i", "bc", "j" },
+			{ DELTA, "k", "ad", "l" },
+		},
+	},
+	{
+		name = "delta-delta is straight",
+		start = {
+			{ DELTA, "p", "a", "b" },
+			{ DELTA, "p", "c", "d" },
+			{ GAMMA, "e", "a", "f" },
+			{ GAMMA, "g", "b", "h" },
+			{ GAMMA, "i", "c", "j" },
+			{ GAMMA, "k", "d", "l" },
+		},
+		expect = {
+			{ GAMMA, "e", "ac", "f" },
+			{ GAMMA, "g", "bd", "h" },
+			{ GAMMA, "i", "ac", "j" },
+			{ GAMMA, "k", "bd", "l" },
+		},
+	},
+	{
+		name = "gamma-erase spawns one eraser per auxiliary",
+		start = {
+			{ GAMMA, "p", "A", "B" },
+			{ DELTA, "u", "A", "v" },
+			{ DELTA, "w", "B", "x" },
+			{ EPSILON, "p" },
+		},
+		expect = {
+			{ DELTA, "u", "m", "v" },
+			{ DELTA, "w", "n", "x" },
+			{ EPSILON, "m" },
+			{ EPSILON, "n" },
+		},
+	},
+	{
+		name = "gamma meets delta in the commutation square",
+		start = {
+			{ GAMMA, "p", "a", "b" },
+			{ DELTA, "p", "c", "d" },
+		},
+		expect = {
+			{ DELTA, "p1", "m2", "m1" },
+			{ DELTA, "p2", "m4", "m3" },
+			{ GAMMA, "p3", "m1", "m3" },
+			{ GAMMA, "p4", "m2", "m4" },
+		},
+	},
+	{
+		name = "a gamma erased on every port vanishes completely",
+		start = {
+			{ GAMMA, "p", "A", "B" },
+			{ EPSILON, "p" },
+			{ EPSILON, "A" },
+			{ EPSILON, "B" },
+		},
+		expect = {},
+	},
+	{
+		name = "delta(epsilon, x) = gamma(x, epsilon)",
+		start = {
+			{ DELTA, "p", "e", "x" },
+			{ GAMMA, "p", "x", "f" },
+			{ EPSILON, "e" },
+			{ EPSILON, "f" },
+		},
+		expect = nil, -- does not terminate
+		budget = 200,
+	},
+}
 
-	local successor = net.Link[aux1(c)]
-	check("erase is order-insensitive", wellFormed(net))
-	check(
-		"continuation rerouted to an eraser",
-		successor ~= 0 and net.Tag[owner(successor)] == EPSILON
-	)
-end
-
--- the non-terminating net from the interaction calculus:
---   delta(epsilon, x) = gamma(x, epsilon)
--- it reduces forever, never reaching a normal form.
-do
-	local net = newNet()
-	local d, g = alloc(net, DELTA), alloc(net, GAMMA)
-	local e1, e2 = alloc(net, EPSILON), alloc(net, EPSILON)
-	link(net, aux1(d), principal(e1))
-	link(net, aux2(d), aux1(g))
-	link(net, aux2(g), principal(e2))
-	link(net, principal(d), principal(g))
-
-	local steps = 0
-	for _ = 1, 400 do
+for _, test in tests do
+	local net = compile(test.start)
+	local finished = false
+	for _ = 1, test.budget or 1000 do
 		if not step(net) then
+			finished = true
 			break
 		end
-		steps += 1
 	end
-	check(
-		"non-terminating net keeps reducing",
-		steps == 400 and wellFormed(net)
-	)
+
+	if test.expect then
+		local ok = finished
+			and wellFormed(net)
+			and isomorphic(net, compile(test.expect))
+		check(test.name, ok)
+	else
+		check(`{test.name} never finishes`, not finished and wellFormed(net))
+	end
 end
