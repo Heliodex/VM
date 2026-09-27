@@ -21,19 +21,19 @@ const ARITY = table.freeze {
 }
 const STRIDE = 3
 
-local function principal(a: Cell): Port
+const function principal(a: Cell): Port
 	return (a - 1) * STRIDE + 1
 end
-local function aux1(a: Cell): Port
+const function aux1(a: Cell): Port
 	return (a - 1) * STRIDE + 2
 end
-local function aux2(a: Cell): Port
+const function aux2(a: Cell): Port
 	return aux1(a) + 1
 end
-local function owner(p: Port): Cell
+const function owner(p: Port): Cell
 	return (p - 1) // STRIDE + 1
 end
-local function isPrincipal(p: Port): boolean
+const function isPrincipal(p: Port): boolean
 	return (p - 1) % STRIDE == 0
 end
 
@@ -50,7 +50,7 @@ type Net = {
 	read Free: { Cell },
 }
 
-local function newNet(): Net
+const function newNet(): Net
 	return {
 		Tag = {},
 		Link = {},
@@ -59,7 +59,7 @@ local function newNet(): Net
 	}
 end
 
-local function alloc(net: Net, symbol: Symbol): Cell
+const function alloc(net: Net, symbol: Symbol): Cell
 	-- 1. pick a slot: reuse a freed cell id, else grow by one
 	local c = table.remove(net.Free) or (#net.Tag + 1)
 
@@ -74,21 +74,21 @@ local function alloc(net: Net, symbol: Symbol): Cell
 	return c
 end
 
-local function release(net: Net, c: Cell)
+const function release(net: Net, c: Cell)
 	local p = principal(c)
 	net.Link[p], net.Link[p + 1], net.Link[p + 2] = 0, 0, 0
 	table.insert(net.Free, c)
 end
 
 -- Wire two ports. 0 is safe as the "free" sentinel because port ids start at 1.
-local function link(net: Net, p: Port, q: Port)
+const function link(net: Net, p: Port, q: Port)
 	net.Link[p], net.Link[q] = q, p
 	if isPrincipal(p) and isPrincipal(q) then
 		table.insert(net.Active, p)
 	end
 end
 
-local function splice(net: Net, p: Port, q: Port)
+const function splice(net: Net, p: Port, q: Port)
 	-- remember what p and q were wired to
 	local r, s = net.Link[p], net.Link[q]
 
@@ -119,7 +119,7 @@ end
 
 -- Redirect p's wire onto q, leaving p free. Used when a cell dissolves but its
 -- continuations must stay connected. q must be a fresh (unwired) port.
-local function move(net: Net, p: Port, q: Port)
+const function move(net: Net, p: Port, q: Port)
 	const r = net.Link[p]
 	net.Link[p] = 0
 	net.Link[q] = r
@@ -166,7 +166,7 @@ end
 
 -- Commutation of two different binary cells: each becomes two copies, wired
 -- into the square of Fig. 2. a and b must carry different symbols.
-local function commute(net: Net, a: Cell, b: Cell)
+const function commute(net: Net, a: Cell, b: Cell)
 	const atag = net.Tag[a]
 	const btag = net.Tag[b]
 
@@ -195,7 +195,7 @@ RULES[DELTA][GAMMA] = commute
 -- Commutation with an eraser: every auxiliary port gets its own eraser.
 -- Exactly one of a, b is the eraser, so the binary cell is found regardless of
 -- the order in which the active pair happened to be discovered.
-local function erase(net: Net, a: Cell, b: Cell)
+const function erase(net: Net, a: Cell, b: Cell)
 	local x, e = a, b
 	if net.Tag[x] == EPSILON then
 		x, e = b, a
@@ -214,7 +214,7 @@ RULES[DELTA][EPSILON] = erase
 RULES[EPSILON][DELTA] = erase
 
 -- Perform a single interaction, if any. Returns whether one happened.
-local function step(net: Net): boolean
+const function step(net: Net): boolean
 	local active = net.Active
 	while #active > 0 do
 		local n = #active
@@ -237,7 +237,7 @@ local function step(net: Net): boolean
 	return false
 end
 
-local function reduce(net: Net)
+const function reduce(net: Net)
 	while step(net) do
 	end
 end
@@ -251,7 +251,7 @@ end
 -- gammas joined at their principal ports with all four auxiliaries free.
 type Spec = { { string } }
 
-local function compile(spec: Spec): Net
+const function compile(spec: Spec): Net
 	local net = newNet()
 	local endpoints: { [string]: { Port } } = {}
 	for _, cell in spec do
@@ -277,7 +277,7 @@ local function compile(spec: Spec): Net
 	return net
 end
 
-local function wellFormed(net: Net): boolean
+const function wellFormed(net: Net): boolean
 	for p, q in net.Link do
 		if q ~= 0 and net.Link[q] ~= p then
 			return false
@@ -287,7 +287,7 @@ local function wellFormed(net: Net): boolean
 end
 
 -- The cells that are still alive (release() keeps Tag around for slot reuse).
-local function liveCells(net: Net): { Cell }
+const function liveCells(net: Net): { Cell }
 	local freed: { [Cell]: boolean } = {}
 	for _, c in net.Free do
 		freed[c] = true
@@ -303,7 +303,7 @@ end
 
 -- Same net up to renaming of cells. Cell ids are recycled during reduction, so
 -- two equal results usually have completely different ids.
-local function isomorphic(a: Net, b: Net): boolean
+const function isomorphic(a: Net, b: Net): boolean
 	local left, right = liveCells(a), liveCells(b)
 	if #left ~= #right then
 		return false
@@ -312,7 +312,7 @@ local function isomorphic(a: Net, b: Net): boolean
 	local map: { [Cell]: Cell } = {}
 	local taken: { [Cell]: boolean } = {}
 
-	local function verify(): boolean
+	const function verify(): boolean
 		for _, ca in left do
 			local cb = map[ca]
 			local pa, pb = (ca - 1) * STRIDE, (cb - 1) * STRIDE
@@ -335,7 +335,7 @@ local function isomorphic(a: Net, b: Net): boolean
 		return true
 	end
 
-	local function search(i: number): boolean
+	const function search(i: number): boolean
 		if i > #left then
 			return verify()
 		end
@@ -355,7 +355,7 @@ local function isomorphic(a: Net, b: Net): boolean
 	return search(1)
 end
 
-local function check(name: string, ok: boolean)
+const function check(name: string, ok: boolean)
 	print(if ok then `PASS {name}` else `FAIL {name}`)
 end
 
