@@ -286,7 +286,7 @@ const function liveCells(net: Net): { Cell }
 	for _, c in net.Free do
 		freed[c] = true
 	end
-	const live = {}
+	const live: { Cell } = {}
 	for c = 1, #net.Tag do
 		if net.Tag[c] ~= nil and not freed[c] then
 			table.insert(live, c)
@@ -518,14 +518,9 @@ for _, test in tests do
 		)
 	end
 
-	local ok
-	if test.expect then
-		ok = finished
-			and wellFormed(net)
-			and isomorphic(net, compile(test.expect))
-	else
-		ok = not finished and wellFormed(net)
-	end
+	const ok = if test.expect
+		then finished and wellFormed(net) and isomorphic(net, compile(test.expect))
+		else not finished and wellFormed(net)
 	print(if ok then '<p class="pass">PASS</p>' else '<p class="fail">FAIL</p>')
 	print "</section>"
 end
