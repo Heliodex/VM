@@ -1,24 +1,20 @@
 --!strict
 -- PROTOTYPE BASED ON INTERACTION COMBINATORS
 
-type Gamma = "Gamma"
-type Delta = "Delta"
-type Epsilon = "Epsilon"
+const Types = require "./types"
+const toSvg = require "./diagram"
 
-type Symbol = Gamma | Delta | Epsilon
-
-type Cell = number
-type Port = number
+type Gamma = Types.Gamma
+type Delta = Types.Delta
+type Epsilon = Types.Epsilon
+type Symbol = Types.Symbol
+type Cell = Types.Cell
+type Port = Types.Port
 
 const GAMMA: Gamma = "Gamma"
 const DELTA: Delta = "Delta"
 const EPSILON: Epsilon = "Epsilon"
 
-const ARITY = table.freeze {
-	[GAMMA] = 2,
-	[DELTA] = 2,
-	[EPSILON] = 0,
-}
 const STRIDE = 3
 
 const function principal(a: Cell): Port
@@ -43,12 +39,7 @@ end
 --     a symbol l(c) for each c ∈ C,
 --     a finite set W (of wires),
 --     a set δw of 0 or 2 ports for each w ∈ W.
-type Net = {
-	read Tag: { Symbol },
-	read Link: { Port },
-	read Active: { Port },
-	read Free: { Cell },
-}
+type Net = Types.Net
 
 const function newNet(): Net
 	return {
@@ -355,10 +346,6 @@ const function isomorphic(a: Net, b: Net): boolean
 	return search(1)
 end
 
-const function check(name: string, ok: boolean)
-	print(if ok then `PASS {name}` else `FAIL {name}`)
-end
-
 -- tests -----------------------------------------------------------------------
 
 type Test = {
@@ -459,22 +446,85 @@ const tests: { Test } = {
 	},
 }
 
+-- runner ----------------------------------------------------------------------
+
+print [[<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>Interaction Combinator reductions</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 2rem auto; max-width: 1100px; background: black; color: white; }
+  h1 { font-size: 1.4rem; }
+  h2 { font-size: 1.05rem; margin: 0 0 0.75rem; }
+  section { border-top: 1px solid #ddd; padding: 1.5rem 0; }
+  figure { margin: 0 0 1rem; }
+  figcaption { font-size: 0.75rem; color: #ccc; margin-top: 0.2rem; }
+  svg { max-width: 100%; height: auto; border: 1px solid #eee; background: #111; }
+  .pass { color: #2e7d32; font-weight: 600; }
+  .fail { color: #c62828; font-weight: 600; }
+  .note { color: #ccc; font-style: italic; }
+</style>
+</head>
+<body>
+<h1>Interaction Combinator reductions</h1>]]
+
+const MAX_STEPS_SHOWN = 60
+
 for _, test in tests do
+	const limit = test.budget or 1000
+
+	-- Reduce first (no SVG): find out how many steps it takes and whether it
+	-- reaches a normal form. Only then decide which diagrams to draw, so the
+	-- (expensive) layout is never paid for steps that will be omitted.
 	const net = compile(test.start)
+	local steps = 0
 	local finished = false
-	for _ = 1, test.budget or 1000 do
+	while steps < limit do
 		if not step(net) then
 			finished = true
 			break
 		end
+		steps += 1
 	end
 
+	print "<section>"
+	print(`<h2>{test.name}</h2>`)
+	print(
+		`<figure>{toSvg(compile(test.start))}<figcaption>start</figcaption></figure>`
+	)
+
+	if finished and steps <= MAX_STEPS_SHOWN then
+		-- replay the reduction, drawing each step
+		const walk = compile(test.start)
+		for i = 1, steps do
+			step(walk)
+			print(
+				`<figure>{toSvg(walk)}<figcaption>after {i} step{if i == 1
+					then ""
+					else "s"}</figcaption></figure>`
+			)
+		end
+	elseif finished then
+		print(
+			`<p class="note">{steps} steps omitted: more than the {MAX_STEPS_SHOWN}-step display limit.</p>`
+		)
+	else
+		print(
+			`<p class="note">Reduction did not finish within the {limit}-step budget; steps omitted.</p>`
+		)
+	end
+
+	local ok
 	if test.expect then
-		const ok = finished
+		ok = finished
 			and wellFormed(net)
 			and isomorphic(net, compile(test.expect))
-		check(test.name, ok)
 	else
-		check(`{test.name} never finishes`, not finished and wellFormed(net))
+		ok = not finished and wellFormed(net)
 	end
+	print(if ok then '<p class="pass">PASS</p>' else '<p class="fail">FAIL</p>')
+	print "</section>"
 end
+
+print "</body></html>"
