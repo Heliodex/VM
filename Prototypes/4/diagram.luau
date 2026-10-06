@@ -41,6 +41,9 @@ end
 const function arity(symbol: Symbol): number
 	return if symbol == "Epsilon" then 0 else 2
 end
+const function isPrincipalPort(p: Port): boolean
+	return (p - 1) % STRIDE == 0
+end
 const function liveCells(net: Net): { Cell }
 	const freed: { [Cell]: boolean } = {}
 	for _, c in net.Free do
@@ -419,14 +422,36 @@ const function toSvg(net: Net): string
 		centroid.y /= #cells
 	end
 
+	-- Cells whose principal port is wired to another cell's principal port form
+	-- an active pair. Their two tips are forced to face each other along the
+	-- line joining the cell centres, which makes that wire perfectly straight.
+	-- The orientation pass below leaves these cells alone and only swings the
+	-- remaining cells; a principal port wired to an auxiliary port, or left
+	-- free, is still free to rotate to minimise bends.
+	const ppPartner: { [Cell]: Cell } = {}
+	const paired: { [Cell]: boolean } = {}
+	for _, c in cells do
+		const q = net.Link[portOf(c, 1)] or 0
+		if q ~= 0 and owner(q) ~= c and isPrincipalPort(q) then
+			ppPartner[c] = owner(q)
+			paired[c] = true
+		end
+	end
+
 	-- u[c] is the unit direction of cell c's principal port (the tip). Port
 	-- positions depend on the orientations and vice-versa, so iterate to a
-	-- fixed point: each cell aims its tip at the partner of its principal wire.
+	-- fixed point: a paired cell faces its active partner, while any other cell
+	-- aims its tip at the partner of its principal wire.
 	const ux: { [Cell]: number } = {}
 	const uy: { [Cell]: number } = {}
 	for _, c in cells do
-		const tx, ty = principalTarget(net, c, pos, centroid)
-		ux[c], uy[c] = unit(tx - pos[c].x, ty - pos[c].y, 0, 1)
+		if paired[c] then
+			const d = ppPartner[c]
+			ux[c], uy[c] = unit(pos[d].x - pos[c].x, pos[d].y - pos[c].y, 0, 1)
+		else
+			const tx, ty = principalTarget(net, c, pos, centroid)
+			ux[c], uy[c] = unit(tx - pos[c].x, ty - pos[c].y, 0, 1)
+		end
 	end
 
 	local point: { [Port]: Vec } = {} -- where a wire meets the cell
@@ -476,10 +501,11 @@ const function toSvg(net: Net): string
 
 	-- Cost of orienting a cell along u, using the leave rules its wires will
 	-- actually use. The principal wire leaves along the tip, so its bend is the
-	-- angle to its partner; auxiliary wires leave adaptively, so a partner in
-	-- front of the base costs at most a quarter turn. Minimising the total lets
-	-- each cell swing to whichever direction best serves all of its wires,
-	-- rather than always facing its principal partner.
+	-- angle to its partner; auxiliary wires leave adaptively but are clamped to
+	-- the same range as the drawn wire, so the cost reflects the bend that will
+	-- actually be drawn. Minimising the total lets each cell swing to whichever
+	-- direction best serves all of its wires, rather than always facing its
+	-- principal partner.
 	const function orientationCost(c: Cell, u: Vec): number
 		const center = pos[c]
 		local anchors: { Vec }
@@ -524,7 +550,7 @@ const function toSvg(net: Net): string
 			if slot == 1 then
 				t = nrm
 			else
-				t = leaveTangent(nrm, A, B)
+				t = clampToNormal(nrm, leaveTangent(nrm, A, B))
 			end
 			total += 1 - (t.x * dx + t.y * dy)
 		end
@@ -553,8 +579,10 @@ const function toSvg(net: Net): string
 	for _ = 1, ORIENT_ITERS do
 		computePorts()
 		for _, c in cells do
-			chooseOrientation(c)
-			computePorts()
+			if not paired[c] then
+				chooseOrientation(c)
+				computePorts()
+			end
 		end
 	end
 	computePorts()
@@ -651,6 +679,14 @@ const function toSvg(net: Net): string
 					wires[#wires + 1] = `<path d="M {fmt(P.x)} {fmt(P.y)} C {fmt(
 						c1.x
 					)} {fmt(c1.y)} {fmt(c2.x)} {fmt(c2.y)} {fmt(Q.x)} {fmt(Q.y)}" {wireStyle}/>`
+				elseif isPrincipalPort(p) and isPrincipalPort(q) then
+					-- Both ends are principal ports (an active pair) and the
+					-- two cells have been oriented to face each other, so the
+					-- wire is a single straight segment.
+					wires[#wires + 1] =
+						`<line x1="{fmt(P.x)}" y1="{fmt(P.y)}" x2="{fmt(Q.x)}" y2="{fmt(
+							Q.y
+						)}" {wireStyle}/>`
 				else
 					const d = math.max(
 						0.01,
