@@ -1,21 +1,19 @@
 --!strict
 -- SVG rendering of an interaction-combinator net, in the style of Lafont's
--- paper: gamma/delta cells are triangles whose tip is the principal port, drawn
--- pointing along the wire attached to it; epsilon cells are circles; wires are
--- curves; free ports are short dangling stubs.
+-- paper: gamma/delta cells are triangles whose tip is the principal port;
+-- epsilon cells are circles; wires join ports; free ports are short dangling
+-- stubs.
 --
--- Cells are laid out to keep wired ports near each other. A wire leaves its port
--- straight for a short run, then meets a curve that carries it to the partner.
--- The straight run is kept close to the port's outward normal: never more than a
--- quarter turn away, and less for auxiliary ports, so the wire comes out of the
--- cell cleanly and the two auxiliary ports stay easy to tell apart. When the
--- body of a cell lies between a port and its partner the run only turns part of
--- the way (never reversing into a hairpin), so the rest of the turn is spread
--- smoothly over the curve. Each cell also picks its own tip direction to
--- minimise the total bending of its wires, so cells of the same type are free to
--- face different ways when their wiring differs. Finally, parts of a net that
--- share no wires are laid out separately and packed into their own boxes, so
--- their wires cannot cross and they stay a sensible distance apart.
+-- The drawing is deliberately regular. Cells sit on a square grid at a fixed
+-- pitch, so neighbours are evenly spaced and never crowded; a branch is folded
+-- into a compact block rather than trailing off into a long line. Each cell is
+-- turned in quarter turns only, so its ports always point along the grid axes.
+-- A wire leaves a port along the port's outward normal and curves to its
+-- partner, and every cell chooses the quarter turn that keeps its wires
+-- straightest. Cells joined at their principal ports (an active pair) face each
+-- other, so that wire is a straight step between the two tips. Parts of a net
+-- that share no wires are laid out on their own grids and packed a fixed
+-- distance apart.
 --
 --   const toSvg = require("./diagram")
 --   print(toSvg(net))
@@ -56,6 +54,117 @@ const function liveCells(net: Net): { Cell }
 		end
 	end
 	return live
+end
+
+-- geometry --------------------------------------------------------------------
+
+const PITCH = 100 -- distance between neighbouring grid slots, in pixels
+const TIP_LEN = 19 -- centre -> principal tip
+const BASE_LEN = 13 -- centre -> base edge
+const HALF_WIDTH = 15 -- half the base edge length
+const CIRCLE_RADIUS = 13 -- epsilon radius
+const FREE_LEN = 15 -- length of a free-port stub
+const STUB_RADIUS = 3.5
+const LOOP_LEN = 22
+const MARGIN = 24
+const ORIENT_ITERS = 6
+const WIRE_BULGE = 0.5 -- fraction of the gap a wire uses to leave its port
+const WIRE_BULGE_MAX = 48
+
+-- Quarter-turn directions, in a fixed order so a net always draws the same way.
+const DIRS: { Vec } = {
+	{ x = 1, y = 0 },
+	{ x = 0, y = 1 },
+	{ x = -1, y = 0 },
+	{ x = 0, y = -1 },
+}
+
+const function fmt(v: number): string
+	return string.format("%.1f", v)
+end
+
+const function colorOf(symbol: Symbol): (string, string, string)
+	if symbol == "Gamma" then
+		return "#c8e6c9", "#2e7d32", "#1b5e20"
+	elseif symbol == "Delta" then
+		return "#bbdefb", "#1565c0", "#0d47a1"
+	else
+		return "#f8bbd0", "#c2185b", "#880e4f"
+	end
+end
+
+const function labelOf(symbol: Symbol): string
+	if symbol == "Gamma" then
+		return "γ"
+	elseif symbol == "Delta" then
+		return "δ"
+	else
+		return "ε"
+	end
+end
+
+-- Unit vector, falling back to (fx, fy) when the input is degenerate.
+const function unit(
+	x: number,
+	y: number,
+	fx: number,
+	fy: number
+): (number, number)
+	const d = math.sqrt(x * x + y * y)
+	if d < 0.01 then
+		return fx, fy
+	end
+	return x / d, y / d
+end
+
+const function place(a: Vec, b: Vec, t: number): Vec
+	return { x = a.x + (b.x - a.x) * t, y = a.y + (b.y - a.y) * t }
+end
+
+-- The direction (one of the four quarter turns) that points most nearly from
+-- `a` towards `b`.
+const function dirToward(a: Vec, b: Vec): number
+	local best, bestDot = 0, -math.huge
+	for i, d in DIRS do
+		const dot = (b.x - a.x) * d.x + (b.y - a.y) * d.y
+		if dot > bestDot then
+			bestDot = dot
+			best = i - 1
+		end
+	end
+	return best
+end
+
+-- The position of a port, for a cell centred at `center` and turned to face `d`.
+const function anchorOf(center: Vec, d: Vec, symbol: Symbol, slot: number): Vec
+	if symbol == "Epsilon" then
+		return {
+			x = center.x + d.x * CIRCLE_RADIUS,
+			y = center.y + d.y * CIRCLE_RADIUS,
+		}
+	end
+	if slot == 1 then
+		return { x = center.x + d.x * TIP_LEN, y = center.y + d.y * TIP_LEN }
+	end
+	const n = { x = -d.y, y = d.x }
+	const a = {
+		x = center.x - d.x * BASE_LEN + n.x * HALF_WIDTH,
+		y = center.y - d.y * BASE_LEN + n.y * HALF_WIDTH,
+	}
+	const b = {
+		x = center.x - d.x * BASE_LEN - n.x * HALF_WIDTH,
+		y = center.y - d.y * BASE_LEN - n.y * HALF_WIDTH,
+	}
+	return place(a, b, if slot == 2 then 1 / 3 else 2 / 3)
+end
+
+-- The outward normal of a port: principal points along the tip, auxiliary ports
+-- point back out of the base.
+const function normalOf(d: Vec, slot: number): Vec
+	if slot == 1 then
+		return d
+	end
+	return { x = -d.x, y = -d.y }
 end
 
 -- layout ----------------------------------------------------------------------
@@ -112,10 +221,11 @@ const function components(net: Net, cells: { Cell }): { { Cell } }
 	return parts
 end
 
--- Fruchterman-Reingold on one connected part: repulsion between every pair of
--- cells, springs along the wires. Deterministic (starts on a circle), so a
--- given part always draws the same way.
-const function layoutPart(net: Net, cells: { Cell }): { [Cell]: Vec }
+-- Fruchterman-Reingold on one part. The result is not drawn directly: it only
+-- suggests which way each wire should run, so that the grid placement below
+-- keeps wired cells on the side of each other that the springs prefer. It is
+-- deterministic (starts on a circle), so a given part always draws the same way.
+const function guidePart(net: Net, cells: { Cell }): { [Cell]: Vec }
 	const n = #cells
 	const pos: { [Cell]: Vec } = {}
 	if n == 1 then
@@ -124,8 +234,6 @@ const function layoutPart(net: Net, cells: { Cell }): { [Cell]: Vec }
 	end
 
 	const W, H = 640, 640
-	-- Cap the natural FR spacing so small parts do not drift apart into huge,
-	-- mostly-empty drawings. Larger parts still spread out to fill the area.
 	const k = math.min(96, 0.9 * math.sqrt((W * H) / n))
 	local temp = 72
 	const radius = 34 * math.sqrt(n)
@@ -192,15 +300,204 @@ const function layoutPart(net: Net, cells: { Cell }): { [Cell]: Vec }
 	return pos
 end
 
--- Room reserved around a part for cell bodies and the bulge of its wires. The
--- proportional term keeps large parts from having their wires spill into a
--- neighbour, while lone cells stay tight.
-const PART_MARGIN = 36
-const PART_MARGIN_SCALE = 0.2
-const PART_GAP = 26
+type Grid = { x: number, y: number }
+
+const function key(g: Grid): string
+	return `{g.x},{g.y}`
+end
+
+-- The nearest free grid slot to `origin`, searched outwards in rings. Only used
+-- when every immediate neighbour of a cell is already taken.
+const function freeNear(origin: Grid, occ: { [string]: boolean }): Grid
+	local r = 1
+	while r < 128 do
+		for dx = -r, r do
+			for dy = -r, r do
+				if math.abs(dx) + math.abs(dy) == r then
+					const g = { x = origin.x + dx, y = origin.y + dy }
+					if not occ[key(g)] then
+						return g
+					end
+				end
+			end
+		end
+		r += 1
+	end
+	return { x = origin.x + 1, y = origin.y }
+end
+
+-- Place one connected part on the integer grid. A breadth-first walk starts at
+-- an arbitrary cell and puts every wired neighbour in a free slot beside the
+-- cell it grows from; the spring guide decides which side. The guide is tried
+-- in each of the four quarter-turn rotations, and the placement with the most
+-- compact bounding box (shortest wires breaking the tie) is kept, so a branch
+-- whose springs point straight up and down is laid out as an L-shape instead
+-- of trailing off into a long line.
+const function placePart(net: Net, cells: { Cell }): { [Cell]: Grid }
+	if #cells == 1 then
+		return { [cells[1]] = { x = 0, y = 0 } }
+	end
+
+	const guide = guidePart(net, cells)
+	const inPart: { [Cell]: boolean } = {}
+	for _, c in cells do
+		inPart[c] = true
+	end
+
+	const function wiredNeighbours(c: Cell): { Cell }
+		const list: { Cell } = {}
+		for slot = 1, arity(net.Tag[c]) + 1 do
+			const q = net.Link[portOf(c, slot)] or 0
+			if q ~= 0 and owner(q) ~= c and inPart[owner(q)] then
+				table.insert(list, owner(q))
+			end
+		end
+		return list
+	end
+
+	const edges: { { Cell } } = {}
+	for _, c in cells do
+		for _, v in wiredNeighbours(c) do
+			if c < v then
+				table.insert(edges, { c, v })
+			end
+		end
+	end
+
+	const function build(rot: number): { [Cell]: Grid }
+		const grid: { [Cell]: Grid } = {}
+		const occ: { [string]: boolean } = {}
+		const root = cells[1]
+		grid[root] = { x = 0, y = 0 }
+		occ[key(grid[root])] = true
+		const queue: { Cell } = { root }
+		local head = 1
+		while head <= #queue do
+			const u = queue[head]
+			head += 1
+			for _, v in wiredNeighbours(u) do
+				if grid[v] then
+					continue
+				end
+				local dxf, dyf =
+					guide[v].x - guide[u].x, guide[v].y - guide[u].y
+				for _ = 1, rot do
+					dxf, dyf = -dyf, dxf
+				end
+				local best: Grid? = nil
+				local bestDot = -math.huge
+				for _, d in DIRS do
+					const g = { x = grid[u].x + d.x, y = grid[u].y + d.y }
+					if not occ[key(g)] then
+						const dot = d.x * dxf + d.y * dyf
+						if dot > bestDot then
+							bestDot = dot
+							best = g
+						end
+					end
+				end
+				const slot = best or freeNear(grid[u], occ)
+				grid[v] = slot
+				occ[key(slot)] = true
+				table.insert(queue, v)
+			end
+		end
+		return grid
+	end
+
+	const function score(grid: { [Cell]: Grid }): number
+		local minX, minY = math.huge, math.huge
+		local maxX, maxY = -math.huge, -math.huge
+		for _, v in grid do
+			minX = math.min(minX, v.x)
+			minY = math.min(minY, v.y)
+			maxX = math.max(maxX, v.x)
+			maxY = math.max(maxY, v.y)
+		end
+		local wires = 0
+		for _, edge in edges do
+			const a, b = grid[edge[1]], grid[edge[2]]
+			wires += math.abs(a.x - b.x) + math.abs(a.y - b.y)
+		end
+		return math.max(maxX - minX, maxY - minY) * 1000 + wires
+	end
+
+	local best = build(0)
+	local bestScore = score(best)
+	for rot = 1, 3 do
+		const candidate = build(rot)
+		const s = score(candidate)
+		if s < bestScore - 1e-9 then
+			bestScore = s
+			best = candidate
+		end
+	end
+
+	-- Nudge cells into nearby free slots while that shrinks the part's longest
+	-- side, so a star laid out as a line folds into an L. The move must be a
+	-- strict improvement, so a clean chain is left as a straight run.
+	const occ: { [string]: boolean } = {}
+	for _, v in best do
+		occ[key(v)] = true
+	end
+
+	const function compactScore(): number
+		local minX, minY = math.huge, math.huge
+		local maxX, maxY = -math.huge, -math.huge
+		for _, v in best do
+			minX = math.min(minX, v.x)
+			minY = math.min(minY, v.y)
+			maxX = math.max(maxX, v.x)
+			maxY = math.max(maxY, v.y)
+		end
+		local wires = 0
+		for _, edge in edges do
+			const a, b = best[edge[1]], best[edge[2]]
+			wires += math.abs(a.x - b.x) + math.abs(a.y - b.y)
+		end
+		return math.max(maxX - minX, maxY - minY) * 1000 + wires
+	end
+
+	for _ = 1, 30 do
+		local improved = false
+		for _, c in cells do
+			const home = best[c]
+			local bestSlot = home
+			local bestValue = compactScore()
+			for dx = -2, 2 do
+				for dy = -2, 2 do
+					if dx == 0 and dy == 0 then
+						continue
+					end
+					const g = { x = home.x + dx, y = home.y + dy }
+					if occ[key(g)] then
+						continue
+					end
+					best[c] = g
+					const value = compactScore()
+					if value < bestValue - 1e-9 then
+						bestValue = value
+						bestSlot = g
+					end
+					best[c] = home
+				end
+			end
+			if bestSlot ~= home then
+				occ[key(home)] = false
+				best[c] = bestSlot
+				occ[key(bestSlot)] = true
+				improved = true
+			end
+		end
+		if not improved then
+			break
+		end
+	end
+	return best
+end
 
 type PartBox = {
-	pos: { [Cell]: Vec },
+	grid: { [Cell]: Grid },
 	minX: number,
 	minY: number,
 	w: number,
@@ -208,202 +505,74 @@ type PartBox = {
 	margin: number,
 }
 
--- Lay out every part on its own, then pack the parts into rows sized to keep
--- the whole drawing roughly square. Each part keeps its own box, so the wires
--- of one part cannot cross the wires of another, and neighbouring parts stay a
--- fixed, modest distance apart instead of drifting off to opposite corners.
+-- Lay out every part on its own grid, then pack the parts into rows so the
+-- whole drawing stays roughly square. Each part keeps a one-slot halo, and
+-- neighbouring parts stay a fixed two-slot gap apart.
+const PART_MARGIN = 1
+const PART_GAP = 2
 const function layout(net: Net, cells: { Cell }): { [Cell]: Vec }
 	if #cells == 0 then
 		return {}
 	end
 	const parts = components(net, cells)
+
+	const pixel = function(g: { [Cell]: Grid }): { [Cell]: Vec }
+		const pos: { [Cell]: Vec } = {}
+		for c, v in g do
+			pos[c] = { x = v.x * PITCH, y = v.y * PITCH }
+		end
+		return pos
+	end
+
 	if #parts == 1 then
-		return layoutPart(net, cells)
+		return pixel(placePart(net, cells))
 	end
 
 	const boxes: { PartBox } = {}
 	local area = 0
 	local widest = 0
 	for _, part in parts do
-		const pos = layoutPart(net, part)
+		const g = placePart(net, part)
 		local minX, minY = math.huge, math.huge
 		local maxX, maxY = -math.huge, -math.huge
-		for _, c in part do
-			minX = math.min(minX, pos[c].x)
-			minY = math.min(minY, pos[c].y)
-			maxX = math.max(maxX, pos[c].x)
-			maxY = math.max(maxY, pos[c].y)
+		for _, v in g do
+			minX = math.min(minX, v.x)
+			minY = math.min(minY, v.y)
+			maxX = math.max(maxX, v.x)
+			maxY = math.max(maxY, v.y)
 		end
-		const w = maxX - minX
-		const h = maxY - minY
-		const margin = PART_MARGIN + PART_MARGIN_SCALE * math.max(w, h)
-		area += (w + 2 * margin) * (h + 2 * margin)
-		widest = math.max(widest, w + 2 * margin)
+		const w = maxX - minX + 2 * PART_MARGIN
+		const h = maxY - minY + 2 * PART_MARGIN
+		area += w * h
+		widest = math.max(widest, w)
 		table.insert(boxes, {
-			pos = pos,
+			grid = g,
 			minX = minX,
 			minY = minY,
 			w = w,
 			h = h,
-			margin = margin,
+			margin = PART_MARGIN,
 		})
 	end
-	const targetScale = math.sqrt(area)
-	const placed: { [Cell]: Vec } = {}
-	const function packBoxes(target: number, apply: boolean): (number, number)
-		local x, y, rowH = 0, 0, 0
-		local maxX, maxY = 0, 0
-		for _, b in boxes do
-			const bw = b.w + 2 * b.margin
-			const bh = b.h + 2 * b.margin
-			if x > 0 and x + bw > target then
-				x = 0
-				y += rowH + PART_GAP
-				rowH = 0
-			end
-			if apply then
-				const ox = x + b.margin - b.minX
-				const oy = y + b.margin - b.minY
-				for c, v in b.pos do
-					placed[c] = { x = v.x + ox, y = v.y + oy }
-				end
-			end
-			maxX = math.max(maxX, x + bw)
-			maxY = math.max(maxY, y + bh)
-			x += bw + PART_GAP
-			rowH = math.max(rowH, bh)
+
+	const target = math.max(widest, math.sqrt(area))
+	const placed: { [Cell]: Grid } = {}
+	local x, y, rowH = 0, 0, 0
+	for _, b in boxes do
+		if x > 0 and x + b.w > target then
+			x = 0
+			y += rowH + PART_GAP
+			rowH = 0
 		end
-		return maxX, maxY
-	end
-
-	-- Try several widths and keep the one whose pack is closest to square, so
-	-- two parts sit side by side when that is more compact and many parts form a
-	-- tidy grid rather than one long column.
-	local bestTarget = widest + PART_GAP
-	local bestScore = math.huge
-	for _, scale in { 0.9, 1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4 } do
-		const target = math.max(widest, targetScale * scale) + PART_GAP
-		const maxX, maxY = packBoxes(target, false)
-		const score = math.max(maxX, maxY)
-		if score < bestScore then
-			bestScore = score
-			bestTarget = target
+		const ox = x + b.margin - b.minX
+		const oy = y + b.margin - b.minY
+		for c, v in b.grid do
+			placed[c] = { x = v.x + ox, y = v.y + oy }
 		end
+		x += b.w + PART_GAP
+		rowH = math.max(rowH, b.h)
 	end
-	packBoxes(bestTarget, true)
-	return placed
-end
-
--- geometry --------------------------------------------------------------------
-
-const TIP_LEN = 20 -- centre -> principal tip
-const BASE_LEN = 14 -- centre -> base edge
-const HALF_WIDTH = 16 -- half the base edge length
-const CIRCLE_RADIUS = 14 -- epsilon radius
-const FREE_LEN = 18 -- length of a free-port stub
-const STUB_RADIUS = 3.5
-const WIRE_TENSION = 0.45 -- how far a wire bulges along the port normal
-const WIRE_TENSION_MAX = 90 -- cap on that bulge, so wraps stay tight
-const LEAD_LEN = 14 -- straight run out of a port before the wire starts to turn
-const LOOP_LEN = 26
-const MARGIN = 28
-const ORIENT_ITERS = 8
-const ORIENT_SAMPLES = 72 -- candidate directions tried per cell (5 degrees apart)
-
-const function fmt(v: number): string
-	return string.format("%.1f", v)
-end
-
-const function colorOf(symbol: Symbol): (string, string, string)
-	if symbol == "Gamma" then
-		return "#c8e6c9", "#2e7d32", "#1b5e20"
-	elseif symbol == "Delta" then
-		return "#bbdefb", "#1565c0", "#0d47a1"
-	else
-		return "#f8bbd0", "#c2185b", "#880e4f"
-	end
-end
-
-const function labelOf(symbol: Symbol): string
-	if symbol == "Gamma" then
-		return "γ"
-	elseif symbol == "Delta" then
-		return "δ"
-	else
-		return "ε"
-	end
-end
-
--- Unit vector, falling back to (fx, fy) when the input is degenerate.
-const function unit(
-	x: number,
-	y: number,
-	fx: number,
-	fy: number
-): (number, number)
-	const d = math.sqrt(x * x + y * y)
-	if d < 0.01 then
-		return fx, fy
-	end
-	return x / d, y / d
-end
-
-const function place(a: Vec, b: Vec, t: number): Vec
-	return { x = a.x + (b.x - a.x) * t, y = a.y + (b.y - a.y) * t }
-end
-
--- Which way a wire should leave a port. Normally that is straight at the
--- partner. When the body of the cell lies between the port and the partner the
--- wire may only turn so far from the port's outward normal; it leaves the port
--- near-perpendicular and lets the curve (after a straight lead-out) take up the
--- rest of the turn. Keeping the departure close to the normal makes the wire
--- come out of the cell cleanly instead of kinking sideways at the port.
-const AUX_TURN = 1.25 -- radians (~72 degrees) away from the port normal
-const function leaveTangent(n: Vec, P: Vec, Q: Vec): Vec
-	const dx, dy = unit(Q.x - P.x, Q.y - P.y, n.x, n.y)
-	const dn = dx * n.x + dy * n.y
-	if dn >= 0 then
-		return { x = dx, y = dy }
-	end
-	-- component of the direction to the partner that is tangent to the port
-	const px, py = unit(dx - dn * n.x, dy - dn * n.y, -n.y, n.x)
-	const c, s = math.cos(AUX_TURN), math.sin(AUX_TURN)
-	return { x = c * n.x + s * px, y = c * n.y + s * py }
-end
-
--- The straight run out of a port is clamped to this much from the port normal,
--- even when the partner lies in front. `leaveTangent` aims straight at a front
--- partner, which can send an auxiliary wire out almost parallel to the base
--- edge; there it hugs the other auxiliary wire and it is hard to tell which
--- port each belongs to. Clamping the departure keeps the wire coming out of the
--- cell near-perpendicular, and the curve takes up the rest of the turn. Only
--- the drawn wire is clamped, not `leaveTangent` itself, so the orientation pass
--- keeps the preferences it already had.
-const WIRE_TURN = 0.8 -- radians (~46 degrees) away from the port normal
-const WIRE_COS = math.cos(WIRE_TURN)
-const function clampToNormal(n: Vec, t: Vec): Vec
-	const dn = t.x * n.x + t.y * n.y
-	if dn >= WIRE_COS then
-		return t
-	end
-	const px, py = unit(t.x - dn * n.x, t.y - dn * n.y, -n.y, n.x)
-	const c, s = math.cos(WIRE_TURN), math.sin(WIRE_TURN)
-	return { x = c * n.x + s * px, y = c * n.y + s * py }
-end
-
--- Where a cell's principal port wants to point: at the partner of its principal
--- wire, or away from the centre when that wire is free.
-const function principalTarget(
-	net: Net,
-	c: Cell,
-	pos: { [Cell]: Vec },
-	centroid: Vec
-): (number, number)
-	const q = net.Link[portOf(c, 1)] or 0
-	if q ~= 0 and owner(q) ~= c then
-		return pos[owner(q)].x, pos[owner(q)].y
-	end
-	return pos[c].x - centroid.x, pos[c].y - centroid.y
+	return pixel(placed)
 end
 
 -- render ----------------------------------------------------------------------
@@ -423,11 +592,9 @@ const function toSvg(net: Net): string
 	end
 
 	-- Cells whose principal port is wired to another cell's principal port form
-	-- an active pair. Their two tips are forced to face each other along the
-	-- line joining the cell centres, which makes that wire perfectly straight.
-	-- The orientation pass below leaves these cells alone and only swings the
-	-- remaining cells; a principal port wired to an auxiliary port, or left
-	-- free, is still free to rotate to minimise bends.
+	-- an active pair. Their two tips are forced to face each other, so that wire
+	-- is a straight step between the tips. Every other cell is free to turn to
+	-- whichever quarter turn best serves its wires.
 	const ppPartner: { [Cell]: Cell } = {}
 	const paired: { [Cell]: boolean } = {}
 	for _, c in cells do
@@ -438,25 +605,22 @@ const function toSvg(net: Net): string
 		end
 	end
 
-	-- u[c] is the unit direction of cell c's principal port (the tip). Port
-	-- positions depend on the orientations and vice-versa, so iterate to a
-	-- fixed point: a paired cell faces its active partner, while any other cell
-	-- aims its tip at the partner of its principal wire.
-	const ux: { [Cell]: number } = {}
-	const uy: { [Cell]: number } = {}
+	const ori: { [Cell]: number } = {}
 	for _, c in cells do
 		if paired[c] then
-			const d = ppPartner[c]
-			ux[c], uy[c] = unit(pos[d].x - pos[c].x, pos[d].y - pos[c].y, 0, 1)
+			ori[c] = dirToward(pos[c], pos[ppPartner[c]])
 		else
-			const tx, ty = principalTarget(net, c, pos, centroid)
-			ux[c], uy[c] = unit(tx - pos[c].x, ty - pos[c].y, 0, 1)
+			const q = net.Link[portOf(c, 1)] or 0
+			if q ~= 0 and owner(q) ~= c then
+				ori[c] = dirToward(pos[c], pos[owner(q)])
+			else
+				ori[c] = dirToward(pos[c], centroid)
+			end
 		end
 	end
 
 	local point: { [Port]: Vec } = {} -- where a wire meets the cell
 	local out: { [Port]: Vec } = {} -- outward normal: wires leave along this
-	local tan: { [Port]: Vec } = {} -- actual leave direction for a wired port
 	local tip: { [Cell]: Vec } = {}
 	local e1: { [Cell]: Vec } = {}
 	local e2: { [Cell]: Vec } = {}
@@ -466,114 +630,74 @@ const function toSvg(net: Net): string
 		point, out, tip, e1, e2, hub = {}, {}, {}, {}, {}, {}
 		for _, c in cells do
 			const center = pos[c]
-			const u = { x = ux[c], y = uy[c] }
+			const d = DIRS[ori[c] + 1]
 			if net.Tag[c] == "Epsilon" then
 				hub[c] = center
-				point[portOf(c, 1)] = {
-					x = center.x + u.x * CIRCLE_RADIUS,
-					y = center.y + u.y * CIRCLE_RADIUS,
-				}
-				out[portOf(c, 1)] = u
+				point[portOf(c, 1)] = anchorOf(center, d, net.Tag[c], 1)
+				out[portOf(c, 1)] = d
 			else
-				const n = { x = -u.y, y = u.x }
+				const n = { x = -d.y, y = d.x }
 				tip[c] = {
-					x = center.x + u.x * TIP_LEN,
-					y = center.y + u.y * TIP_LEN,
+					x = center.x + d.x * TIP_LEN,
+					y = center.y + d.y * TIP_LEN,
 				}
 				e1[c] = {
-					x = center.x - u.x * BASE_LEN + n.x * HALF_WIDTH,
-					y = center.y - u.y * BASE_LEN + n.y * HALF_WIDTH,
+					x = center.x - d.x * BASE_LEN + n.x * HALF_WIDTH,
+					y = center.y - d.y * BASE_LEN + n.y * HALF_WIDTH,
 				}
 				e2[c] = {
-					x = center.x - u.x * BASE_LEN - n.x * HALF_WIDTH,
-					y = center.y - u.y * BASE_LEN - n.y * HALF_WIDTH,
+					x = center.x - d.x * BASE_LEN - n.x * HALF_WIDTH,
+					y = center.y - d.y * BASE_LEN - n.y * HALF_WIDTH,
 				}
 				point[portOf(c, 1)] = tip[c]
-				out[portOf(c, 1)] = u
+				out[portOf(c, 1)] = d
 				-- auxiliary ports sit on the base edge, opposite the tip
 				point[portOf(c, 2)] = place(e1[c], e2[c], 1 / 3)
 				point[portOf(c, 3)] = place(e1[c], e2[c], 2 / 3)
-				out[portOf(c, 2)] = { x = -u.x, y = -u.y }
-				out[portOf(c, 3)] = { x = -u.x, y = -u.y }
+				out[portOf(c, 2)] = { x = -d.x, y = -d.y }
+				out[portOf(c, 3)] = { x = -d.x, y = -d.y }
 			end
 		end
 	end
 
-	-- Cost of orienting a cell along u, using the leave rules its wires will
-	-- actually use. The principal wire leaves along the tip, so its bend is the
-	-- angle to its partner; auxiliary wires leave adaptively but are clamped to
-	-- the same range as the drawn wire, so the cost reflects the bend that will
-	-- actually be drawn. Minimising the total lets each cell swing to whichever
-	-- direction best serves all of its wires, rather than always facing its
-	-- principal partner.
-	const function orientationCost(c: Cell, u: Vec): number
-		const center = pos[c]
-		local anchors: { Vec }
-		local normals: { Vec }
-		if net.Tag[c] == "Epsilon" then
-			anchors = {{
-				x = center.x + u.x * CIRCLE_RADIUS,
-				y = center.y + u.y * CIRCLE_RADIUS,
-			}}
-			normals = { u }
-		else
-			const n = { x = -u.y, y = u.x }
-			const neg = { x = -u.x, y = -u.y }
-			const tip = {
-				x = center.x + u.x * TIP_LEN,
-				y = center.y + u.y * TIP_LEN,
-			}
-			const a = {
-				x = center.x - u.x * BASE_LEN + n.x * HALF_WIDTH,
-				y = center.y - u.y * BASE_LEN + n.y * HALF_WIDTH,
-			}
-			const b = {
-				x = center.x - u.x * BASE_LEN - n.x * HALF_WIDTH,
-				y = center.y - u.y * BASE_LEN - n.y * HALF_WIDTH,
-			}
-			anchors = { tip, place(a, b, 1 / 3), place(a, b, 2 / 3) }
-			normals = { u, neg, neg }
-		end
-
+	-- Cost of turning a cell to face `idx`: how far each of its wired ports has
+	-- to swing from its outward normal to point at the partner. A wire is drawn
+	-- leaving along that normal, so a smaller cost means a straighter wire. A
+	-- principal-to-principal wire is weighted up, so an active pair stays facing
+	-- each other even if an auxiliary wire would prefer otherwise.
+	const function orientationCost(c: Cell, idx: number): number
+		const d = DIRS[idx + 1]
 		local total = 0
-		for slot = 1, #anchors do
+		for slot = 1, arity(net.Tag[c]) + 1 do
 			const p = portOf(c, slot)
 			const q = net.Link[p] or 0
 			if q == 0 or owner(q) == c then
 				continue
 			end
-			const A = anchors[slot]
+			const A = anchorOf(pos[c], d, net.Tag[c], slot)
 			const B = point[q]
-			const nrm = normals[slot]
-			const dx, dy = unit(B.x - A.x, B.y - A.y, nrm.x, nrm.y)
-			local t
-			if slot == 1 then
-				t = nrm
-			else
-				t = clampToNormal(nrm, leaveTangent(nrm, A, B))
-			end
-			total += 1 - (t.x * dx + t.y * dy)
+			const n = normalOf(d, slot)
+			const dx, dy = unit(B.x - A.x, B.y - A.y, n.x, n.y)
+			const weight = if slot == 1 and isPrincipalPort(q) then 3 else 1
+			total += weight * (1 - (n.x * dx + n.y * dy))
 		end
 		return total
 	end
 
-	-- Swing each cell through a fixed set of candidate directions and keep the
-	-- cheapest. This runs Gauss-Seidel: the ports are refreshed after each cell,
-	-- so later cells see the choices made so far. Ties keep the current
-	-- direction, which keeps the result deterministic and stops it oscillating.
+	-- Swing each free cell through the four quarter turns and keep the cheapest.
+	-- Ties keep the current direction, which keeps the result deterministic and
+	-- stops it oscillating.
 	const function chooseOrientation(c: Cell)
-		local bx, by = ux[c], uy[c]
-		local best = orientationCost(c, { x = bx, y = by })
-		for k = 0, ORIENT_SAMPLES - 1 do
-			const angle = 2 * math.pi * k / ORIENT_SAMPLES
-			const u = { x = math.cos(angle), y = math.sin(angle) }
-			const cost = orientationCost(c, u)
-			if cost < best - 1e-6 then
+		local best = orientationCost(c, ori[c])
+		local bestIdx = ori[c]
+		for idx = 0, 3 do
+			const cost = orientationCost(c, idx)
+			if cost < best - 1e-9 then
 				best = cost
-				bx, by = u.x, u.y
+				bestIdx = idx
 			end
 		end
-		ux[c], uy[c] = bx, by
+		ori[c] = bestIdx
 	end
 
 	for _ = 1, ORIENT_ITERS do
@@ -586,34 +710,6 @@ const function toSvg(net: Net): string
 		end
 	end
 	computePorts()
-
-	-- The tip always points along its own wire, so the principal port keeps its
-	-- normal. Auxiliary ports have no such constraint: let their wires leave
-	-- towards their partner, avoiding a hairpin around the base of the triangle.
-	const function computeTangents()
-		tan = {}
-		for _, c in cells do
-			for slot = 1, arity(net.Tag[c]) + 1 do
-				const p = portOf(c, slot)
-				tan[p] = out[p]
-			end
-		end
-		for _, c in cells do
-			if arity(net.Tag[c]) == 2 then
-				for slot = 2, 3 do
-					const p = portOf(c, slot)
-					const q = net.Link[p] or 0
-					if q ~= 0 and owner(q) ~= c then
-						tan[p] = clampToNormal(
-							out[p],
-							leaveTangent(out[p], point[p], point[q])
-						)
-					end
-				end
-			end
-		end
-	end
-	computeTangents()
 
 	local minX, minY = math.huge, math.huge
 	local maxX, maxY = -math.huge, -math.huge
@@ -676,57 +772,33 @@ const function toSvg(net: Net): string
 					}
 					include(c1)
 					include(c2)
-					wires[#wires + 1] = `<path d="M {fmt(P.x)} {fmt(P.y)} C {fmt(
-						c1.x
-					)} {fmt(c1.y)} {fmt(c2.x)} {fmt(c2.y)} {fmt(Q.x)} {fmt(Q.y)}" {wireStyle}/>`
-				elseif isPrincipalPort(p) and isPrincipalPort(q) then
-					-- Both ends are principal ports (an active pair) and the
-					-- two cells have been oriented to face each other, so the
-					-- wire is a single straight segment.
 					wires[#wires + 1] =
-						`<line x1="{fmt(P.x)}" y1="{fmt(P.y)}" x2="{fmt(Q.x)}" y2="{fmt(
-							Q.y
-						)}" {wireStyle}/>`
+						`<path d="M {fmt(P.x)} {fmt(P.y)} C {fmt(c1.x)} {fmt(
+							c1.y
+						)} {fmt(c2.x)} {fmt(c2.y)} {fmt(Q.x)} {fmt(Q.y)}" {wireStyle}/>`
 				else
-					const d = math.max(
+					-- The wire leaves each port along its normal and bends to the
+					-- partner over one smooth curve, so it always meets the cell
+					-- cleanly and the turn is never concentrated in a kink.
+					const gap = math.max(
 						0.01,
 						math.sqrt((Q.x - P.x) ^ 2 + (Q.y - P.y) ^ 2)
 					)
-					-- Leave each port straight for a short run, then join the
-					-- two runs with a curve. The wire meets its port head-on
-					-- and the turn is spread over the curve instead of being
-					-- concentrated in a kink right at the cell.
-					const lead = math.min(LEAD_LEN, d * 0.25)
-					const lp = {
-						x = P.x + tan[p].x * lead,
-						y = P.y + tan[p].y * lead,
-					}
-					const lq = {
-						x = Q.x + tan[q].x * lead,
-						y = Q.y + tan[q].y * lead,
-					}
-					const dl = math.max(
-						0.01,
-						math.sqrt((lq.x - lp.x) ^ 2 + (lq.y - lp.y) ^ 2)
-					)
-					const k = math.min(dl * WIRE_TENSION, WIRE_TENSION_MAX)
+					const k = math.min(gap * WIRE_BULGE, WIRE_BULGE_MAX)
 					const c1 = {
-						x = lp.x + tan[p].x * k,
-						y = lp.y + tan[p].y * k,
+						x = P.x + out[p].x * k,
+						y = P.y + out[p].y * k,
 					}
 					const c2 = {
-						x = lq.x + tan[q].x * k,
-						y = lq.y + tan[q].y * k,
+						x = Q.x + out[q].x * k,
+						y = Q.y + out[q].y * k,
 					}
-					include(lp)
-					include(lq)
 					include(c1)
 					include(c2)
-					wires[#wires + 1] = `<path d="M {fmt(P.x)} {fmt(P.y)} L {fmt(
-						lp.x
-					)} {fmt(lp.y)} C {fmt(c1.x)} {fmt(c1.y)} {fmt(c2.x)} {fmt(c2.y)} {fmt(
-						lq.x
-					)} {fmt(lq.y)} L {fmt(Q.x)} {fmt(Q.y)}" {wireStyle}/>`
+					wires[#wires + 1] =
+						`<path d="M {fmt(P.x)} {fmt(P.y)} C {fmt(c1.x)} {fmt(
+							c1.y
+						)} {fmt(c2.x)} {fmt(c2.y)} {fmt(Q.x)} {fmt(Q.y)}" {wireStyle}/>`
 				end
 			end
 		end
