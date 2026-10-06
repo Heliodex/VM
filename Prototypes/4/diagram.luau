@@ -5,15 +5,16 @@
 -- stubs.
 --
 -- The drawing is deliberately regular. Cells sit on a square grid at a fixed
--- pitch, so neighbours are evenly spaced and never crowded; a branch is folded
--- into a compact block rather than trailing off into a long line. Each cell is
--- turned in quarter turns only, so its ports always point along the grid axes.
--- A wire leaves a port along the port's outward normal and curves to its
--- partner, and every cell chooses the quarter turn that keeps its wires
--- straightest. Cells joined at their principal ports (an active pair) face each
--- other, so that wire is a straight step between the two tips. Parts of a net
--- that share no wires are laid out on their own grids and packed a fixed
--- distance apart.
+-- pitch, so neighbours are evenly spaced and never crowded. Each cell is turned
+-- in quarter turns only, so its ports always point along the grid axes. Branches
+-- that the wiring cannot tell apart are placed as mirror images, so a symmetric
+-- net is drawn symmetrically rather than lurching to one side. A wire leaves a
+-- port along the port's outward normal and curves to its partner; a curve that
+-- would cut across another cell is routed around it instead, so a wire never
+-- crosses a cell it does not start or end on. Cells joined at their principal
+-- ports (an active pair) face each other, so that wire is a straight step
+-- between the two tips. Parts of a net that share no wires are laid out on their
+-- own grids and packed a fixed distance apart.
 --
 --   const toSvg = require("./diagram")
 --   print(toSvg(net))
@@ -121,6 +122,40 @@ const function place(a: Vec, b: Vec, t: number): Vec
 	return { x = a.x + (b.x - a.x) * t, y = a.y + (b.y - a.y) * t }
 end
 
+-- Distance from a point to a line segment.
+const function segDist(
+	px: number,
+	py: number,
+	ax: number,
+	ay: number,
+	bx: number,
+	by: number
+): number
+	const dx, dy = bx - ax, by - ay
+	const l2 = dx * dx + dy * dy
+	if l2 < 1e-9 then
+		return math.sqrt((px - ax) ^ 2 + (py - ay) ^ 2)
+	end
+	local t = ((px - ax) * dx + (py - ay) * dy) / l2
+	t = math.max(0, math.min(1, t))
+	return math.sqrt((px - (ax + t * dx)) ^ 2 + (py - (ay + t * dy)) ^ 2)
+end
+
+const function pointInTri(
+	px: number,
+	py: number,
+	a: Vec,
+	b: Vec,
+	c: Vec
+): boolean
+	const d1 = (b.x - a.x) * (py - a.y) - (b.y - a.y) * (px - a.x)
+	const d2 = (c.x - b.x) * (py - b.y) - (c.y - b.y) * (px - b.x)
+	const d3 = (a.x - c.x) * (py - c.y) - (a.y - c.y) * (px - c.x)
+	const neg = d1 < 0 or d2 < 0 or d3 < 0
+	const pos = d1 > 0 or d2 > 0 or d3 > 0
+	return not (neg and pos)
+end
+
 -- The direction (one of the four quarter turns) that points most nearly from
 -- `a` towards `b`.
 const function dirToward(a: Vec, b: Vec): number
@@ -133,6 +168,14 @@ const function dirToward(a: Vec, b: Vec): number
 		end
 	end
 	return best
+end
+
+-- The quarter-turn index of a vector: 0 = +x, 1 = -x, 2 = +y, 3 = -y.
+const function dirIndexOf(vx: number, vy: number): number
+	if math.abs(vx) >= math.abs(vy) then
+		return if vx >= 0 then 0 else 1
+	end
+	return if vy >= 0 then 2 else 3
 end
 
 -- The position of a port, for a cell centred at `center` and turned to face `d`.
@@ -326,13 +369,165 @@ const function freeNear(origin: Grid, occ: { [string]: boolean }): Grid
 	return { x = origin.x + 1, y = origin.y }
 end
 
--- Place one connected part on the integer grid. A breadth-first walk starts at
--- an arbitrary cell and puts every wired neighbour in a free slot beside the
--- cell it grows from; the spring guide decides which side. The guide is tried
--- in each of the four quarter-turn rotations, and the placement with the most
--- compact bounding box (shortest wires breaking the tie) is kept, so a branch
--- whose springs point straight up and down is laid out as an L-shape instead
--- of trailing off into a long line.
+-- Symmetry --------------------------------------------------------------------
+
+-- A port's signature: whether it is principal or auxiliary, whether it is free,
+-- and, when wired, the kind of port it meets and which cell owns that port.
+-- `pi`, when given, maps the owning cell of a wired partner first, so a
+-- candidate symmetry can be checked against the wiring.
+const function portSignature(
+	net: Net,
+	c: Cell,
+	slot: number,
+	pi: { [Cell]: Cell }?
+): string
+	const mine = if slot == 1 then "P" else "A"
+	const q = net.Link[portOf(c, slot)] or 0
+	if q == 0 then
+		return `{mine}:free`
+	end
+	const theirs = if isPrincipalPort(q) then "P" else "A"
+	const ownerCell = owner(q)
+	const image = if pi then pi[ownerCell] else ownerCell
+	return `{mine}:{theirs}:{image}`
+end
+
+-- How many page-aligned symmetries a placement has: a half-turn and reflections
+-- in a vertical or horizontal line that send every cell to a cell of the same
+-- symbol and preserve the wiring. Diagonal mirrors are left out on purpose, so
+-- a drawing that only lines up on the slant is not preferred over one that
+-- lines up with the page.
+const function symmetryCount(
+	net: Net,
+	grid: { [Cell]: Grid },
+	cells: { Cell }
+): number
+	local minX, minY = math.huge, math.huge
+	local maxX, maxY = -math.huge, -math.huge
+	for _, v in grid do
+		minX = math.min(minX, v.x)
+		minY = math.min(minY, v.y)
+		maxX = math.max(maxX, v.x)
+		maxY = math.max(maxY, v.y)
+	end
+	const cx, cy = (minX + maxX) / 2, (minY + maxY) / 2
+
+	const at: { [string]: Cell } = {}
+	for _, c in cells do
+		at[key(grid[c])] = c
+	end
+
+	-- Turn an isometry into a permutation of the cells, or nil when it does not
+	-- map the placement onto itself.
+	const function permutation(fn: (Grid) -> Grid): { [Cell]: Cell }?
+		const pi: { [Cell]: Cell } = {}
+		const used: { [Cell]: boolean } = {}
+		for _, c in cells do
+			const d = at[key(fn(grid[c]))]
+			if not d or used[d] then
+				return nil
+			end
+			used[d] = true
+			pi[c] = d
+		end
+		return pi
+	end
+
+	const function preserves(pi: { [Cell]: Cell }): boolean
+		local moved = false
+		for _, c in cells do
+			if pi[c] ~= c then
+				moved = true
+				break
+			end
+		end
+		if not moved then
+			return false
+		end
+		for _, c in cells do
+			const a: { string } = {}
+			const b: { string } = {}
+			for slot = 1, arity(net.Tag[c]) + 1 do
+				table.insert(a, portSignature(net, c, slot, pi))
+			end
+			for slot = 1, arity(net.Tag[pi[c]]) + 1 do
+				table.insert(b, portSignature(net, pi[c], slot, nil))
+			end
+			table.sort(a)
+			table.sort(b)
+			if table.concat(a, "|") ~= table.concat(b, "|") then
+				return false
+			end
+		end
+		return true
+	end
+
+	const function check(pi: { [Cell]: Cell }?): number
+		if pi and preserves(pi) then
+			return 1
+		end
+		return 0
+	end
+
+	const halfTurn = permutation(function(g: Grid): Grid
+		return { x = 2 * cx - g.x, y = 2 * cy - g.y }
+	end)
+	const vertical = permutation(function(g: Grid): Grid
+		return { x = 2 * cx - g.x, y = g.y }
+	end)
+	const horizontal = permutation(function(g: Grid): Grid
+		return { x = g.x, y = 2 * cy - g.y }
+	end)
+	return check(halfTurn) + check(vertical) + check(horizontal)
+end
+
+-- Refine cells into colour classes by repeatedly folding in the kinds of the
+-- ports they use and the current colours of their partners. Cells of the same
+-- colour are interchangeable as far as the wiring can tell, which is close
+-- enough to an automorphism orbit for these small nets.
+const function refineColors(net: Net, cells: { Cell }): { [Cell]: string }
+	const color: { [Cell]: string } = {}
+	for _, c in cells do
+		color[c] = net.Tag[c]
+	end
+	for _ = 1, #cells do
+		local changed = false
+		const next: { [Cell]: string } = {}
+		for _, c in cells do
+			const parts: { string } = {}
+			for slot = 1, arity(net.Tag[c]) + 1 do
+				const mine = if slot == 1 then "P" else "A"
+				const q = net.Link[portOf(c, slot)] or 0
+				if q == 0 then
+					table.insert(parts, `{mine}free`)
+				else
+					const theirs = if isPrincipalPort(q) then "P" else "A"
+					table.insert(parts, `{mine}{theirs}{color[owner(q)]}`)
+				end
+			end
+			table.sort(parts)
+			next[c] = `{net.Tag[c]}({table.concat(parts, ",")})`
+		end
+		for _, c in cells do
+			if next[c] ~= color[c] then
+				changed = true
+				color[c] = next[c]
+			end
+		end
+		if not changed then
+			break
+		end
+	end
+	return color
+end
+
+-- Place one connected part on the integer grid. A breadth-first walk starts at a
+-- cell and puts every wired neighbour in a free slot beside the cell it grows
+-- from; the spring guide decides which side. Every choice of root, quarter-turn
+-- and reflection of the guide is tried and then folded onto nearby free slots.
+-- The candidate with the most page-aligned symmetry wins, with the most compact
+-- and shortest-wired layout breaking ties, so equivalent branches spread out
+-- evenly instead of the whole part lurching to one side.
 const function placePart(net: Net, cells: { Cell }): { [Cell]: Grid }
 	if #cells == 1 then
 		return { [cells[1]] = { x = 0, y = 0 } }
@@ -364,48 +559,158 @@ const function placePart(net: Net, cells: { Cell }): { [Cell]: Grid }
 		end
 	end
 
-	const function build(rot: number): { [Cell]: Grid }
+	const colors = refineColors(net, cells)
+
+	const function build(
+		root: Cell,
+		rot: number,
+		mirror: boolean
+	): { [Cell]: Grid }
 		const grid: { [Cell]: Grid } = {}
 		const occ: { [string]: boolean } = {}
-		const root = cells[1]
 		grid[root] = { x = 0, y = 0 }
 		occ[key(grid[root])] = true
 		const queue: { Cell } = { root }
 		local head = 1
+
+		-- Direction from u towards v, after the guide's rotation and reflection.
+		const function lean(u: Cell, v: Cell): (number, number)
+			local dxf, dyf = guide[v].x - guide[u].x, guide[v].y - guide[u].y
+			if mirror then
+				dxf = -dxf
+			end
+			for _ = 1, rot do
+				dxf, dyf = -dyf, dxf
+			end
+			return dxf, dyf
+		end
+
+		const function freeAt(u: Cell): { Vec }
+			const list: { Vec } = {}
+			for _, d in DIRS do
+				const g = { x = grid[u].x + d.x, y = grid[u].y + d.y }
+				if not occ[key(g)] then
+					table.insert(list, d)
+				end
+			end
+			return list
+		end
+
+		const function put(u: Cell, v: Cell, d: Vec)
+			const g = { x = grid[u].x + d.x, y = grid[u].y + d.y }
+			grid[v] = g
+			occ[key(g)] = true
+			table.insert(queue, v)
+		end
+
+		-- Fall back to the free slot nearest the spring guide.
+		const function greedy(u: Cell, v: Cell)
+			local dxf, dyf = lean(u, v)
+			local best: Grid? = nil
+			local bestDot = -math.huge
+			for _, d in DIRS do
+				const g = { x = grid[u].x + d.x, y = grid[u].y + d.y }
+				if not occ[key(g)] then
+					const dot = d.x * dxf + d.y * dyf
+					if dot > bestDot then
+						bestDot = dot
+						best = g
+					end
+				end
+			end
+			const slot = best or freeNear(grid[u], occ)
+			grid[v] = slot
+			occ[key(slot)] = true
+			table.insert(queue, v)
+		end
+
+		-- Lets two branches of u be recognised as a matching pair: same colour,
+		-- and the same kind of port on u and on the partner.
+		const function branchKey(u: Cell, slot: number, v: Cell): string
+			const mine = if slot == 1 then "P" else "A"
+			const q = net.Link[portOf(u, slot)] or 0
+			const theirs = if q ~= 0 and isPrincipalPort(q) then "P" else "A"
+			return `{mine}{theirs}{colors[v]}`
+		end
+
 		while head <= #queue do
 			const u = queue[head]
 			head += 1
-			for _, v in wiredNeighbours(u) do
-				if grid[v] then
+			const pending: { { v: Cell, key: string } } = {}
+			for slot = 1, arity(net.Tag[u]) + 1 do
+				const q = net.Link[portOf(u, slot)] or 0
+				const v = if q ~= 0 then owner(q) else u
+				if q ~= 0 and v ~= u and inPart[v] and not grid[v] then
+					table.insert(
+						pending,
+						{ v = v, key = branchKey(u, slot, v) }
+					)
+				end
+			end
+
+			const done: { [number]: boolean } = {}
+			-- Equivalent branches go into opposite slots, so a pair of matching
+			-- sub-trees mirrors each other on the page.
+			for i = 1, #pending do
+				if done[i] then
 					continue
 				end
-				local dxf, dyf =
-					guide[v].x - guide[u].x, guide[v].y - guide[u].y
-				for _ = 1, rot do
-					dxf, dyf = -dyf, dxf
-				end
-				local best: Grid? = nil
-				local bestDot = -math.huge
-				for _, d in DIRS do
-					const g = { x = grid[u].x + d.x, y = grid[u].y + d.y }
-					if not occ[key(g)] then
-						const dot = d.x * dxf + d.y * dyf
-						if dot > bestDot then
-							bestDot = dot
-							best = g
+				for j = i + 1, #pending do
+					if done[j] or pending[i].key ~= pending[j].key then
+						continue
+					end
+					local bestScore = -math.huge
+					local first: Vec? = nil
+					local second: Vec? = nil
+					local firstCell: Cell? = nil
+					local secondCell: Cell? = nil
+					const free = freeAt(u)
+					for _, da in free do
+						for _, db in free do
+							if da.x ~= -db.x or da.y ~= -db.y then
+								continue
+							end
+							const dix, diy = lean(u, pending[i].v)
+							const djx, djy = lean(u, pending[j].v)
+							const straight = da.x * dix
+								+ da.y * diy
+								+ db.x * djx
+								+ db.y * djy
+							const swapped = da.x * djx
+								+ da.y * djy
+								+ db.x * dix
+								+ db.y * diy
+							const score = math.max(straight, swapped)
+							local c1, c2 = pending[i].v, pending[j].v
+							local g1, g2 = da, db
+							if swapped > straight then
+								c1, c2 = pending[j].v, pending[i].v
+								g1, g2 = db, da
+							end
+							if score > bestScore then
+								bestScore = score
+								first, second = g1, g2
+								firstCell, secondCell = c1, c2
+							end
 						end
 					end
+					if first and second and firstCell and secondCell then
+						put(u, firstCell, first)
+						put(u, secondCell, second)
+						done[i], done[j] = true, true
+					end
 				end
-				const slot = best or freeNear(grid[u], occ)
-				grid[v] = slot
-				occ[key(slot)] = true
-				table.insert(queue, v)
+			end
+			for i = 1, #pending do
+				if not done[i] then
+					greedy(u, pending[i].v)
+				end
 			end
 		end
 		return grid
 	end
 
-	const function score(grid: { [Cell]: Grid }): number
+	const function spanAndWires(grid: { [Cell]: Grid }): (number, number)
 		local minX, minY = math.huge, math.huge
 		local maxX, maxY = -math.huge, -math.huge
 		for _, v in grid do
@@ -419,81 +724,95 @@ const function placePart(net: Net, cells: { Cell }): { [Cell]: Grid }
 			const a, b = grid[edge[1]], grid[edge[2]]
 			wires += math.abs(a.x - b.x) + math.abs(a.y - b.y)
 		end
-		return math.max(maxX - minX, maxY - minY) * 1000 + wires
-	end
-
-	local best = build(0)
-	local bestScore = score(best)
-	for rot = 1, 3 do
-		const candidate = build(rot)
-		const s = score(candidate)
-		if s < bestScore - 1e-9 then
-			bestScore = s
-			best = candidate
-		end
+		return math.max(maxX - minX, maxY - minY), wires
 	end
 
 	-- Nudge cells into nearby free slots while that shrinks the part's longest
-	-- side, so a star laid out as a line folds into an L. The move must be a
-	-- strict improvement, so a clean chain is left as a straight run.
-	const occ: { [string]: boolean } = {}
-	for _, v in best do
-		occ[key(v)] = true
-	end
-
-	const function compactScore(): number
-		local minX, minY = math.huge, math.huge
-		local maxX, maxY = -math.huge, -math.huge
-		for _, v in best do
-			minX = math.min(minX, v.x)
-			minY = math.min(minY, v.y)
-			maxX = math.max(maxX, v.x)
-			maxY = math.max(maxY, v.y)
+	-- side. The move must be a strict improvement, so a clean chain is left as a
+	-- straight run.
+	const function compact(start: { [Cell]: Grid }): { [Cell]: Grid }
+		const occ: { [string]: boolean } = {}
+		for _, v in start do
+			occ[key(v)] = true
 		end
-		local wires = 0
-		for _, edge in edges do
-			const a, b = best[edge[1]], best[edge[2]]
-			wires += math.abs(a.x - b.x) + math.abs(a.y - b.y)
+		const function value(): number
+			const span, wires = spanAndWires(start)
+			return span * 1000 + wires
 		end
-		return math.max(maxX - minX, maxY - minY) * 1000 + wires
-	end
-
-	for _ = 1, 30 do
-		local improved = false
-		for _, c in cells do
-			const home = best[c]
-			local bestSlot = home
-			local bestValue = compactScore()
-			for dx = -2, 2 do
-				for dy = -2, 2 do
-					if dx == 0 and dy == 0 then
-						continue
+		for _ = 1, 30 do
+			local improved = false
+			for _, c in cells do
+				const home = start[c]
+				local bestSlot = home
+				local bestValue = value()
+				for dx = -2, 2 do
+					for dy = -2, 2 do
+						if dx == 0 and dy == 0 then
+							continue
+						end
+						const g = { x = home.x + dx, y = home.y + dy }
+						if occ[key(g)] then
+							continue
+						end
+						start[c] = g
+						const v = value()
+						if v < bestValue - 1e-9 then
+							bestValue = v
+							bestSlot = g
+						end
+						start[c] = home
 					end
-					const g = { x = home.x + dx, y = home.y + dy }
-					if occ[key(g)] then
-						continue
-					end
-					best[c] = g
-					const value = compactScore()
-					if value < bestValue - 1e-9 then
-						bestValue = value
-						bestSlot = g
-					end
-					best[c] = home
+				end
+				if bestSlot ~= home then
+					occ[key(home)] = false
+					start[c] = bestSlot
+					occ[key(bestSlot)] = true
+					improved = true
 				end
 			end
-			if bestSlot ~= home then
-				occ[key(home)] = false
-				best[c] = bestSlot
-				occ[key(bestSlot)] = true
-				improved = true
+			if not improved then
+				break
 			end
 		end
-		if not improved then
-			break
+		return start
+	end
+
+	-- Try every root, quarter-turn and reflection. Keep the candidate with the
+	-- most page-aligned symmetry, and only accept a folded version when folding
+	-- does not cost it any symmetry, so symmetric parts stay symmetric.
+	local best: { [Cell]: Grid }? = nil
+	local bestSym = -1
+	local bestSpan, bestWires = math.huge, math.huge
+	for _, root in cells do
+		for rot = 0, 3 do
+			for _, mirror in { false, true } do
+				const straight = build(root, rot, mirror)
+				const straightSym = symmetryCount(net, straight, cells)
+				const folded = compact(build(root, rot, mirror))
+				local sym = symmetryCount(net, folded, cells)
+				local candidate = folded
+				if sym < straightSym then
+					candidate = straight
+					sym = straightSym
+				end
+				const span, wires = spanAndWires(candidate)
+				if
+					sym > bestSym
+					or (
+						sym == bestSym
+						and (
+							span < bestSpan
+							or (span == bestSpan and wires < bestWires)
+						)
+					)
+				then
+					bestSym, bestSpan, bestWires = sym, span, wires
+					best = candidate
+				end
+			end
 		end
 	end
-	return best
+	return best :: { [Cell]: Grid }
 end
 
 type PartBox = {
@@ -711,6 +1030,286 @@ const function toSvg(net: Net): string
 	end
 	computePorts()
 
+	-- Routing ---------------------------------------------------------------------
+
+	-- How far a point lies outside a cell body (0 when inside it). A wire that
+	-- would otherwise cut through a cell is re-routed along the free lanes, so
+	-- a curve never crosses a cell unless it starts or ends on it.
+	const function bodyDist(x: number, y: number, c: Cell): number
+		if net.Tag[c] == "Epsilon" then
+			return math.max(
+				0,
+				math.sqrt((x - hub[c].x) ^ 2 + (y - hub[c].y) ^ 2)
+					- CIRCLE_RADIUS
+			)
+		end
+		if pointInTri(x, y, tip[c], e1[c], e2[c]) then
+			return 0
+		end
+		return math.min(
+			segDist(x, y, tip[c].x, tip[c].y, e1[c].x, e1[c].y),
+			segDist(x, y, e1[c].x, e1[c].y, e2[c].x, e2[c].y),
+			segDist(x, y, e2[c].x, e2[c].y, tip[c].x, tip[c].y)
+		)
+	end
+
+	const ROUTE_STEP = PITCH / 8
+	const ROUTE_CLEAR = PITCH / 8
+	const ROUTE_LEAD = PITCH / 4
+	const ROUTE_TURN = ROUTE_STEP * 2
+	const ROUTE_DX = { 1, -1, 0, 0 }
+	const ROUTE_DY = { 0, 0, 1, -1 }
+
+	const function blockedAt(x: number, y: number): boolean
+		for _, c in cells do
+			if bodyDist(x, y, c) < ROUTE_CLEAR then
+				return true
+			end
+		end
+		return false
+	end
+
+	-- A* over a fine lattice of the free space, preferring long straights (a
+	-- turn costs extra). Returns the polyline P, A, ..., B, Q, or nil when the
+	-- ports are boxed in.
+	const function route(P: Vec, np: Vec, Q: Vec, nq: Vec): { Vec }?
+		const A = { x = P.x + np.x * ROUTE_LEAD, y = P.y + np.y * ROUTE_LEAD }
+		const B = { x = Q.x + nq.x * ROUTE_LEAD, y = Q.y + nq.y * ROUTE_LEAD }
+		local loX, loY = math.huge, math.huge
+		local hiX, hiY = -math.huge, -math.huge
+		for _, c in cells do
+			if net.Tag[c] == "Epsilon" then
+				loX = math.min(loX, hub[c].x - CIRCLE_RADIUS)
+				loY = math.min(loY, hub[c].y - CIRCLE_RADIUS)
+				hiX = math.max(hiX, hub[c].x + CIRCLE_RADIUS)
+				hiY = math.max(hiY, hub[c].y + CIRCLE_RADIUS)
+			else
+				loX = math.min(loX, tip[c].x, e1[c].x, e2[c].x)
+				loY = math.min(loY, tip[c].y, e1[c].y, e2[c].y)
+				hiX = math.max(hiX, tip[c].x, e1[c].x, e2[c].x)
+				hiY = math.max(hiY, tip[c].y, e1[c].y, e2[c].y)
+			end
+		end
+		loX = math.min(loX, P.x, Q.x, A.x, B.x) - 2 * PITCH
+		loY = math.min(loY, P.y, Q.y, A.y, B.y) - 2 * PITCH
+		hiX = math.max(hiX, P.x, Q.x, A.x, B.x) + 2 * PITCH
+		hiY = math.max(hiY, P.y, Q.y, A.y, B.y) + 2 * PITCH
+
+		const step = ROUTE_STEP
+		const cols = math.floor((hiX - loX) / step) + 1
+		const rows = math.floor((hiY - loY) / step) + 1
+		const function ix(x: number): number
+			return math.floor((x - loX) / step + 0.5)
+		end
+		const function iy(y: number): number
+			return math.floor((y - loY) / step + 0.5)
+		end
+		const function freeNode(ax: number, ay: number): Vec?
+			const si, sj = ix(ax), iy(ay)
+			for r = 0, 5 do
+				for di = -r, r do
+					for dj = -r, r do
+						if math.max(math.abs(di), math.abs(dj)) == r then
+							const i, j = si + di, sj + dj
+							if i >= 0 and i < cols and j >= 0 and j < rows then
+								const x, y = loX + i * step, loY + j * step
+								if not blockedAt(x, y) then
+									return { x = x, y = y }
+								end
+							end
+						end
+					end
+				end
+			end
+			return nil
+		end
+
+		const startNode = freeNode(A.x, A.y)
+		const finishNode = freeNode(B.x, B.y)
+		if not startNode or not finishNode then
+			return nil
+		end
+		const si, sj = ix(startNode.x), iy(startNode.y)
+		const gi, gj = ix(finishNode.x), iy(finishNode.y)
+
+		const stateCount = cols * rows * 4
+		const g: { number } = table.create(stateCount, math.huge)
+		const back: { number } = table.create(stateCount, -1)
+		const heap: { { cost: number, s: number } } = {}
+		const function push(cost: number, s: number)
+			table.insert(heap, { cost = cost, s = s })
+			local i = #heap
+			while i > 1 do
+				const par = i // 2
+				if heap[par].cost <= heap[i].cost then
+					break
+				end
+				heap[par], heap[i] = heap[i], heap[par]
+				i = par
+			end
+		end
+		const function pop(): { cost: number, s: number }
+			const top = heap[1]
+			const last = table.remove(heap) :: { cost: number, s: number }
+			if #heap > 0 then
+				heap[1] = last
+				local i = 1
+				while true do
+					local m = i
+					const l, r = i * 2, i * 2 + 1
+					if l <= #heap and heap[l].cost < heap[m].cost then
+						m = l
+					end
+					if r <= #heap and heap[r].cost < heap[m].cost then
+						m = r
+					end
+					if m == i then
+						break
+					end
+					heap[i], heap[m] = heap[m], heap[i]
+					i = m
+				end
+			end
+			return top
+		end
+
+		const startState = ((sj * cols) + si) * 4 + dirIndexOf(np.x, np.y)
+		g[startState + 1] = 0
+		push(0, startState)
+		local goalState = -1
+		while #heap > 0 do
+			const top = pop()
+			if top.cost > g[top.s + 1] then
+				continue
+			end
+			const dir = top.s % 4
+			const pos = top.s // 4
+			const i = pos % cols
+			const j = pos // cols
+			if i == gi and j == gj then
+				goalState = top.s
+				break
+			end
+			for nd = 0, 3 do
+				const ni, nj = i + ROUTE_DX[nd + 1], j + ROUTE_DY[nd + 1]
+				if ni < 0 or ni >= cols or nj < 0 or nj >= rows then
+					continue
+				end
+				if blockedAt(loX + ni * step, loY + nj * step) then
+					continue
+				end
+				const move = step + (if nd == dir then 0 else ROUTE_TURN)
+				const ns = ((nj * cols) + ni) * 4 + nd
+				const ng = top.cost + move
+				if ng < g[ns + 1] - 1e-6 then
+					g[ns + 1] = ng
+					back[ns + 1] = top.s
+					const h = (math.abs(ni - gi) + math.abs(nj - gj)) * step
+					push(ng + h, ns)
+				end
+			end
+		end
+		if goalState < 0 then
+			return nil
+		end
+
+		const nodes: { Vec } = {}
+		local s = goalState
+		while s >= 0 do
+			const pos = s // 4
+			const i = pos % cols
+			const j = pos // cols
+			table.insert(nodes, { x = loX + i * step, y = loY + j * step })
+			s = back[s + 1]
+		end
+
+		const raw: { Vec } = { P, A }
+		for k = #nodes, 1, -1 do
+			table.insert(raw, nodes[k])
+		end
+		table.insert(raw, B)
+		table.insert(raw, Q)
+		const poly: { Vec } = {}
+		for _, v in raw do
+			const last = poly[#poly]
+			if
+				last
+				and math.abs(last.x - v.x) < 0.5
+				and math.abs(last.y - v.y) < 0.5
+			then
+				continue
+			end
+			table.insert(poly, v)
+		end
+		local k = 2
+		while k < #poly do
+			const a, b = poly[k - 1], poly[k + 1]
+			const cross = (poly[k].x - a.x) * (b.y - a.y)
+				- (poly[k].y - a.y) * (b.x - a.x)
+			if math.abs(cross) < 0.5 then
+				table.remove(poly, k)
+			else
+				k += 1
+			end
+		end
+		return poly
+	end
+
+	const function roundedPath(pts: { Vec }): string
+		const r = ROUTE_STEP * 0.9
+		local d = `M {fmt(pts[1].x)} {fmt(pts[1].y)}`
+		for k = 2, #pts - 1 do
+			const prev, cur, nxt = pts[k - 1], pts[k], pts[k + 1]
+			const inx, iny = unit(cur.x - prev.x, cur.y - prev.y, 0, 0)
+			const outx, outy = unit(nxt.x - cur.x, nxt.y - cur.y, 0, 0)
+			if inx * outx + iny * outy < -0.999 then
+				d ..= ` L {fmt(cur.x)} {fmt(cur.y)}`
+			else
+				const lenIn =
+					math.sqrt((cur.x - prev.x) ^ 2 + (cur.y - prev.y) ^ 2)
+				const lenOut =
+					math.sqrt((nxt.x - cur.x) ^ 2 + (nxt.y - cur.y) ^ 2)
+				const rr = math.min(r, lenIn * 0.5, lenOut * 0.5)
+				const ax, ay = cur.x - inx * rr, cur.y - iny * rr
+				const bx, by = cur.x + outx * rr, cur.y + outy * rr
+				d ..= ` L {fmt(ax)} {fmt(ay)} Q {fmt(cur.x)} {fmt(cur.y)} {fmt(
+					bx
+				)} {fmt(by)}`
+			end
+		end
+		d ..= ` L {fmt(pts[#pts].x)} {fmt(pts[#pts].y)}`
+		return d
+	end
+
+	-- Does a bend pass through a cell that is neither of the two it joins?
+	const function cubicHits(
+		P: Vec,
+		c1: Vec,
+		c2: Vec,
+		Q: Vec,
+		skipA: Cell,
+		skipB: Cell
+	): boolean
+		for k = 2, 23 do
+			const t = k / 25
+			const mt = 1 - t
+			const x = mt * mt * mt * P.x
+				+ 3 * mt * mt * t * c1.x
+				+ 3 * mt * t * t * c2.x
+				+ t * t * t * Q.x
+			const y = mt * mt * mt * P.y
+				+ 3 * mt * mt * t * c1.y
+				+ 3 * mt * t * t * c2.y
+				+ t * t * t * Q.y
+			for _, c in cells do
+				if c ~= skipA and c ~= skipB and bodyDist(x, y, c) < 1 then
+					return true
+				end
+			end
+		end
+		return false
+	end
+
 	local minX, minY = math.huge, math.huge
 	local maxX, maxY = -math.huge, -math.huge
 	const function include(v: Vec)
@@ -778,8 +1377,8 @@ const function toSvg(net: Net): string
 						)} {fmt(c2.x)} {fmt(c2.y)} {fmt(Q.x)} {fmt(Q.y)}" {wireStyle}/>`
 				else
 					-- The wire leaves each port along its normal and bends to the
-					-- partner over one smooth curve, so it always meets the cell
-					-- cleanly and the turn is never concentrated in a kink.
+					-- partner over one smooth curve. If that bend would cut
+					-- through another cell it is routed around instead.
 					const gap = math.max(
 						0.01,
 						math.sqrt((Q.x - P.x) ^ 2 + (Q.y - P.y) ^ 2)
@@ -793,12 +1392,32 @@ const function toSvg(net: Net): string
 						x = Q.x + out[q].x * k,
 						y = Q.y + out[q].y * k,
 					}
-					include(c1)
-					include(c2)
-					wires[#wires + 1] =
-						`<path d="M {fmt(P.x)} {fmt(P.y)} C {fmt(c1.x)} {fmt(
-							c1.y
-						)} {fmt(c2.x)} {fmt(c2.y)} {fmt(Q.x)} {fmt(Q.y)}" {wireStyle}/>`
+					const detour = if cubicHits(
+							P,
+							c1,
+							c2,
+							Q,
+							owner(p),
+							owner(q)
+						)
+						then route(P, out[p], Q, out[q])
+						else nil
+					if detour then
+						for _, v in detour do
+							include(v)
+						end
+						wires[#wires + 1] =
+							`<path d="{roundedPath(detour)}" {wireStyle}/>`
+					else
+						include(c1)
+						include(c2)
+						wires[#wires + 1] =
+							`<path d="M {fmt(P.x)} {fmt(P.y)} C {fmt(c1.x)} {fmt(
+								c1.y
+							)} {fmt(c2.x)} {fmt(c2.y)} {fmt(Q.x)} {fmt(
+								Q.y
+							)}" {wireStyle}/>`
+					end
 				end
 			end
 		end
