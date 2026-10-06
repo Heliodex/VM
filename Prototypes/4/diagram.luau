@@ -4,15 +4,18 @@
 -- pointing along the wire attached to it; epsilon cells are circles; wires are
 -- curves; free ports are short dangling stubs.
 --
--- Cells are laid out to keep wired ports near each other, and a wire leaves its
--- port aimed at the partner. When the body of a cell lies between a port and its
--- partner the wire leaves tangentially instead of reversing, so it never doubles
--- back on itself immediately after leaving the cell. Each cell also picks its
--- own tip direction to minimise the total bending of its wires, so cells of the
--- same type are free to face different ways when their wiring differs. Finally,
--- parts of a net that share no wires are laid out separately and packed into
--- their own boxes, so their wires cannot cross and they stay a sensible
--- distance apart.
+-- Cells are laid out to keep wired ports near each other. A wire leaves its port
+-- straight for a short run, then meets a curve that carries it to the partner.
+-- The straight run is kept close to the port's outward normal: never more than a
+-- quarter turn away, and less for auxiliary ports, so the wire comes out of the
+-- cell cleanly and the two auxiliary ports stay easy to tell apart. When the
+-- body of a cell lies between a port and its partner the run only turns part of
+-- the way (never reversing into a hairpin), so the rest of the turn is spread
+-- smoothly over the curve. Each cell also picks its own tip direction to
+-- minimise the total bending of its wires, so cells of the same type are free to
+-- face different ways when their wiring differs. Finally, parts of a net that
+-- share no wires are laid out separately and packed into their own boxes, so
+-- their wires cannot cross and they stay a sensible distance apart.
 --
 --   const toSvg = require("./diagram")
 --   print(toSvg(net))
@@ -296,9 +299,9 @@ const HALF_WIDTH = 16 -- half the base edge length
 const CIRCLE_RADIUS = 14 -- epsilon radius
 const FREE_LEN = 18 -- length of a free-port stub
 const STUB_RADIUS = 3.5
-const WIRE_TENSION = 0.32 -- how far a wire bulges along the port normal
+const WIRE_TENSION = 0.45 -- how far a wire bulges along the port normal
 const WIRE_TENSION_MAX = 90 -- cap on that bulge, so wraps stay tight
-const LEAVE_BIAS = 0.3 -- lift wires skimming a cell edge a little off the body
+const LEAD_LEN = 14 -- straight run out of a port before the wire starts to turn
 const LOOP_LEN = 26
 const MARGIN = 28
 const ORIENT_ITERS = 8
@@ -347,25 +350,42 @@ const function place(a: Vec, b: Vec, t: number): Vec
 end
 
 -- Which way a wire should leave a port. Normally that is straight at the
--- partner, but a port whose body lies between it and the partner must leave
--- tangentially instead. Clamping the desired direction to the outward half-plane
--- turns what would be an immediate 180-degree hairpin into at worst a smooth
--- quarter turn, while the small outward bias keeps the wire from hugging the
--- cell's edge.
+-- partner. When the body of the cell lies between the port and the partner the
+-- wire may only turn so far from the port's outward normal; it leaves the port
+-- near-perpendicular and lets the curve (after a straight lead-out) take up the
+-- rest of the turn. Keeping the departure close to the normal makes the wire
+-- come out of the cell cleanly instead of kinking sideways at the port.
+const AUX_TURN = 1.25 -- radians (~72 degrees) away from the port normal
 const function leaveTangent(n: Vec, P: Vec, Q: Vec): Vec
 	const dx, dy = unit(Q.x - P.x, Q.y - P.y, n.x, n.y)
 	const dn = dx * n.x + dy * n.y
 	if dn >= 0 then
 		return { x = dx, y = dy }
 	end
-	const tx, ty = unit(dx - dn * n.x, dy - dn * n.y, -n.y, n.x)
-	const bx, by = unit(
-		tx + n.x * LEAVE_BIAS,
-		ty + n.y * LEAVE_BIAS,
-		tx,
-		ty
-	)
-	return { x = bx, y = by }
+	-- component of the direction to the partner that is tangent to the port
+	const px, py = unit(dx - dn * n.x, dy - dn * n.y, -n.y, n.x)
+	const c, s = math.cos(AUX_TURN), math.sin(AUX_TURN)
+	return { x = c * n.x + s * px, y = c * n.y + s * py }
+end
+
+-- The straight run out of a port is clamped to this much from the port normal,
+-- even when the partner lies in front. `leaveTangent` aims straight at a front
+-- partner, which can send an auxiliary wire out almost parallel to the base
+-- edge; there it hugs the other auxiliary wire and it is hard to tell which
+-- port each belongs to. Clamping the departure keeps the wire coming out of the
+-- cell near-perpendicular, and the curve takes up the rest of the turn. Only
+-- the drawn wire is clamped, not `leaveTangent` itself, so the orientation pass
+-- keeps the preferences it already had.
+const WIRE_TURN = 0.8 -- radians (~46 degrees) away from the port normal
+const WIRE_COS = math.cos(WIRE_TURN)
+const function clampToNormal(n: Vec, t: Vec): Vec
+	const dn = t.x * n.x + t.y * n.y
+	if dn >= WIRE_COS then
+		return t
+	end
+	const px, py = unit(t.x - dn * n.x, t.y - dn * n.y, -n.y, n.x)
+	const c, s = math.cos(WIRE_TURN), math.sin(WIRE_TURN)
+	return { x = c * n.x + s * px, y = c * n.y + s * py }
 end
 
 -- Where a cell's principal port wants to point: at the partner of its principal
@@ -556,7 +576,10 @@ const function toSvg(net: Net): string
 					const p = portOf(c, slot)
 					const q = net.Link[p] or 0
 					if q ~= 0 and owner(q) ~= c then
-						tan[p] = leaveTangent(out[p], point[p], point[q])
+						tan[p] = clampToNormal(
+							out[p],
+							leaveTangent(out[p], point[p], point[q])
+						)
 					end
 				end
 			end
@@ -614,30 +637,61 @@ const function toSvg(net: Net): string
 					`<circle cx="{fmt(E.x)}" cy="{fmt(E.y)}" r="{STUB_RADIUS}" {dotStyle}/>`
 			elseif p < q then
 				const P, Q = point[p], point[q]
-				local c1, c2
 				if owner(q) == c then
-					c1 = {
+					const c1 = {
 						x = P.x + out[p].x * LOOP_LEN,
 						y = P.y + out[p].y * LOOP_LEN,
 					}
-					c2 = {
+					const c2 = {
 						x = Q.x + out[q].x * LOOP_LEN,
 						y = Q.y + out[q].y * LOOP_LEN,
 					}
+					include(c1)
+					include(c2)
+					wires[#wires + 1] = `<path d="M {fmt(P.x)} {fmt(P.y)} C {fmt(
+						c1.x
+					)} {fmt(c1.y)} {fmt(c2.x)} {fmt(c2.y)} {fmt(Q.x)} {fmt(Q.y)}" {wireStyle}/>`
 				else
 					const d = math.max(
 						0.01,
 						math.sqrt((Q.x - P.x) ^ 2 + (Q.y - P.y) ^ 2)
 					)
-					const k = math.min(d * WIRE_TENSION, WIRE_TENSION_MAX)
-					c1 = { x = P.x + tan[p].x * k, y = P.y + tan[p].y * k }
-					c2 = { x = Q.x + tan[q].x * k, y = Q.y + tan[q].y * k }
+					-- Leave each port straight for a short run, then join the
+					-- two runs with a curve. The wire meets its port head-on
+					-- and the turn is spread over the curve instead of being
+					-- concentrated in a kink right at the cell.
+					const lead = math.min(LEAD_LEN, d * 0.25)
+					const lp = {
+						x = P.x + tan[p].x * lead,
+						y = P.y + tan[p].y * lead,
+					}
+					const lq = {
+						x = Q.x + tan[q].x * lead,
+						y = Q.y + tan[q].y * lead,
+					}
+					const dl = math.max(
+						0.01,
+						math.sqrt((lq.x - lp.x) ^ 2 + (lq.y - lp.y) ^ 2)
+					)
+					const k = math.min(dl * WIRE_TENSION, WIRE_TENSION_MAX)
+					const c1 = {
+						x = lp.x + tan[p].x * k,
+						y = lp.y + tan[p].y * k,
+					}
+					const c2 = {
+						x = lq.x + tan[q].x * k,
+						y = lq.y + tan[q].y * k,
+					}
+					include(lp)
+					include(lq)
+					include(c1)
+					include(c2)
+					wires[#wires + 1] = `<path d="M {fmt(P.x)} {fmt(P.y)} L {fmt(
+						lp.x
+					)} {fmt(lp.y)} C {fmt(c1.x)} {fmt(c1.y)} {fmt(c2.x)} {fmt(c2.y)} {fmt(
+						lq.x
+					)} {fmt(lq.y)} L {fmt(Q.x)} {fmt(Q.y)}" {wireStyle}/>`
 				end
-				include(c1)
-				include(c2)
-				wires[#wires + 1] = `<path d="M {fmt(P.x)} {fmt(P.y)} C {fmt(
-					c1.x
-				)} {fmt(c1.y)} {fmt(c2.x)} {fmt(c2.y)} {fmt(Q.x)} {fmt(Q.y)}" {wireStyle}/>`
 			end
 		end
 	end
