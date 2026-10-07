@@ -8,13 +8,15 @@
 -- pitch, so neighbours are evenly spaced and never crowded. Each cell is turned
 -- in quarter turns only, so its ports always point along the grid axes. Branches
 -- that the wiring cannot tell apart are placed as mirror images, so a symmetric
--- net is drawn symmetrically rather than lurching to one side. A wire leaves a
--- port along the port's outward normal and curves to its partner; a curve that
--- would cut across another cell is routed around it instead, so a wire never
--- crosses a cell it does not start or end on. Cells joined at their principal
--- ports (an active pair) face each other, so that wire is a straight step
--- between the two tips. Parts of a net that share no wires are laid out on their
--- own grids and packed a fixed distance apart.
+-- net is drawn symmetrically rather than lurching to one side; if two such
+-- interchangeable cells still end up on the wrong sides of a shared partner, so
+-- that their wires cross, their positions are swapped to untangle them. A wire
+-- leaves a port along the port's outward normal and curves to its partner; a
+-- curve that would cut across another cell is routed around it instead, so a
+-- wire never crosses a cell it does not start or end on. Cells joined at their
+-- principal ports (an active pair) face each other, so that wire is a straight
+-- step between the two tips. Parts of a net that share no wires are laid out on
+-- their own grids and packed a fixed distance apart.
 --
 --   const toSvg = require("./diagram")
 --   print(toSvg(net))
@@ -139,6 +141,25 @@ const function segDist(
 	local t = ((px - ax) * dx + (py - ay) * dy) / l2
 	t = math.max(0, math.min(1, t))
 	return math.sqrt((px - (ax + t * dx)) ^ 2 + (py - (ay + t * dy)) ^ 2)
+end
+
+-- Whether two open segments cross: shared endpoints and touching do not count.
+const function segmentsCross(
+	ax: number,
+	ay: number,
+	bx: number,
+	by: number,
+	cx: number,
+	cy: number,
+	dx: number,
+	dy: number
+): boolean
+	const d1 = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax)
+	const d2 = (bx - ax) * (dy - ay) - (by - ay) * (dx - ax)
+	const d3 = (dx - cx) * (ay - cy) - (dy - cy) * (ax - cx)
+	const d4 = (dx - cx) * (by - cy) - (dy - cy) * (bx - cx)
+	return ((d1 > 0 and d2 < 0) or (d1 < 0 and d2 > 0))
+		and ((d3 > 0 and d4 < 0) or (d3 < 0 and d4 > 0))
 end
 
 const function pointInTri(
@@ -925,18 +946,21 @@ const function toSvg(net: Net): string
 	end
 
 	const ori: { [Cell]: number } = {}
-	for _, c in cells do
-		if paired[c] then
-			ori[c] = dirToward(pos[c], pos[ppPartner[c]])
-		else
-			const q = net.Link[portOf(c, 1)] or 0
-			if q ~= 0 and owner(q) ~= c then
-				ori[c] = dirToward(pos[c], pos[owner(q)])
+	const function resetOrientations()
+		for _, c in cells do
+			if paired[c] then
+				ori[c] = dirToward(pos[c], pos[ppPartner[c]])
 			else
-				ori[c] = dirToward(pos[c], centroid)
+				const q = net.Link[portOf(c, 1)] or 0
+				if q ~= 0 and owner(q) ~= c then
+					ori[c] = dirToward(pos[c], pos[owner(q)])
+				else
+					ori[c] = dirToward(pos[c], centroid)
+				end
 			end
 		end
 	end
+	resetOrientations()
 
 	local point: { [Port]: Vec } = {} -- where a wire meets the cell
 	local out: { [Port]: Vec } = {} -- outward normal: wires leave along this
@@ -1019,16 +1043,116 @@ const function toSvg(net: Net): string
 		ori[c] = bestIdx
 	end
 
-	for _ = 1, ORIENT_ITERS do
+	-- Swing every free cell to its cheapest quarter turn, refreshing the ports
+	-- after each choice, and repeat to a fixed point.
+	const function settleOrientations()
+		for _ = 1, ORIENT_ITERS do
+			computePorts()
+			for _, c in cells do
+				if not paired[c] then
+					chooseOrientation(c)
+					computePorts()
+				end
+			end
+		end
 		computePorts()
+	end
+	settleOrientations()
+
+	-- How many pairs of wires cross, counted on the straight chords between their
+	-- port anchors. The drawn wires leave along the port normals, so a chord
+	-- crossing is a good enough signal for choosing between placements.
+	const function chordCrossings(): number
+		const segs: { { Vec } } = {}
 		for _, c in cells do
-			if not paired[c] then
-				chooseOrientation(c)
-				computePorts()
+			for slot = 1, arity(net.Tag[c]) + 1 do
+				const p = portOf(c, slot)
+				const q = net.Link[p] or 0
+				if q ~= 0 and p < q and owner(q) ~= c then
+					table.insert(segs, { point[p], point[q] })
+				end
+			end
+		end
+		local count = 0
+		for i = 1, #segs do
+			for j = i + 1, #segs do
+				const a, b = segs[i], segs[j]
+				if
+					segmentsCross(
+						a[1].x,
+						a[1].y,
+						a[2].x,
+						a[2].y,
+						b[1].x,
+						b[1].y,
+						b[2].x,
+						b[2].y
+					)
+				then
+					count += 1
+				end
+			end
+		end
+		return count
+	end
+
+	-- Cells the wiring cannot tell apart can still land on the wrong sides of a
+	-- shared partner, which puts their wires across each other. Swapping the
+	-- positions of two such siblings untangles them without changing the drawing
+	-- up to a renaming, so try each pair and keep a swap only when it strictly
+	-- reduces the number of crossings.
+	local crossings = chordCrossings()
+	if crossings > 0 then
+		const colors = refineColors(net, cells)
+		const wired: { [Cell]: { [Cell]: boolean } } = {}
+		for _, c in cells do
+			wired[c] = {}
+		end
+		for _, c in cells do
+			for slot = 1, arity(net.Tag[c]) + 1 do
+				const q = net.Link[portOf(c, slot)] or 0
+				if q ~= 0 and owner(q) ~= c then
+					wired[c][owner(q)] = true
+					wired[owner(q)][c] = true
+				end
+			end
+		end
+		const function siblings(u: Cell, v: Cell): boolean
+			for w, _ in wired[u] do
+				if wired[v][w] then
+					return true
+				end
+			end
+			return false
+		end
+
+		for _ = 1, 4 do
+			local improved = false
+			for i = 1, #cells do
+				for j = i + 1, #cells do
+					const u, v = cells[i], cells[j]
+					if colors[u] ~= colors[v] or not siblings(u, v) then
+						continue
+					end
+					pos[u], pos[v] = pos[v], pos[u]
+					resetOrientations()
+					settleOrientations()
+					const next = chordCrossings()
+					if next < crossings then
+						crossings = next
+						improved = true
+					else
+						pos[u], pos[v] = pos[v], pos[u]
+						resetOrientations()
+						settleOrientations()
+					end
+				end
+			end
+			if not improved then
+				break
 			end
 		end
 	end
-	computePorts()
 
 	-- Routing ---------------------------------------------------------------------
 
