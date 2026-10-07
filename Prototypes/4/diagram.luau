@@ -12,11 +12,12 @@
 -- interchangeable cells still end up on the wrong sides of a shared partner, so
 -- that their wires cross, their positions are swapped to untangle them. A wire
 -- leaves a port along the port's outward normal and curves to its partner; a
--- curve that would cut across another cell is routed around it instead, so a
--- wire never crosses a cell it does not start or end on. Cells joined at their
--- principal ports (an active pair) face each other, so that wire is a straight
--- step between the two tips. Parts of a net that share no wires are laid out on
--- their own grids and packed a fixed distance apart.
+-- curve that would cut through a cell body -- even that of one of the two cells
+-- it joins, when it has to double back on itself -- is routed around it, so a
+-- wire touches a cell only where it is attached, at its port. Cells joined at
+-- their principal ports (an active pair) face each other, so that wire is a
+-- straight step between the two tips. Parts of a net that share no wires are
+-- laid out on their own grids and packed a fixed distance apart.
 --
 --   const toSvg = require("./diagram")
 --   print(toSvg(net))
@@ -1259,32 +1260,36 @@ const function toSvg(net: Net): string
 		const stateCount = cols * rows * 4
 		const g: { number } = table.create(stateCount, math.huge)
 		const back: { number } = table.create(stateCount, -1)
-		const heap: { { cost: number, s: number } } = {}
-		const function push(cost: number, s: number)
-			table.insert(heap, { cost = cost, s = s })
+		-- Heap entries carry both the A* priority (f = g + h) and the path cost
+		-- g they were queued with, so a stale entry can be told apart from the
+		-- current best for the same state.
+		const heap: { { f: number, g: number, s: number } } = {}
+		const function push(f: number, g: number, s: number)
+			table.insert(heap, { f = f, g = g, s = s })
 			local i = #heap
 			while i > 1 do
 				const par = i // 2
-				if heap[par].cost <= heap[i].cost then
+				if heap[par].f <= heap[i].f then
 					break
 				end
 				heap[par], heap[i] = heap[i], heap[par]
 				i = par
 			end
 		end
-		const function pop(): { cost: number, s: number }
+		const function pop(): { f: number, g: number, s: number }
 			const top = heap[1]
-			const last = table.remove(heap) :: { cost: number, s: number }
+			const last =
+				table.remove(heap) :: { f: number, g: number, s: number }
 			if #heap > 0 then
 				heap[1] = last
 				local i = 1
 				while true do
 					local m = i
 					const l, r = i * 2, i * 2 + 1
-					if l <= #heap and heap[l].cost < heap[m].cost then
+					if l <= #heap and heap[l].f < heap[m].f then
 						m = l
 					end
-					if r <= #heap and heap[r].cost < heap[m].cost then
+					if r <= #heap and heap[r].f < heap[m].f then
 						m = r
 					end
 					if m == i then
@@ -1299,11 +1304,11 @@ const function toSvg(net: Net): string
 
 		const startState = ((sj * cols) + si) * 4 + dirIndexOf(np.x, np.y)
 		g[startState + 1] = 0
-		push(0, startState)
+		push(0, 0, startState)
 		local goalState = -1
 		while #heap > 0 do
 			const top = pop()
-			if top.cost > g[top.s + 1] then
+			if top.g > g[top.s + 1] + 1e-6 then
 				continue
 			end
 			const dir = top.s % 4
@@ -1324,12 +1329,12 @@ const function toSvg(net: Net): string
 				end
 				const move = step + (if nd == dir then 0 else ROUTE_TURN)
 				const ns = ((nj * cols) + ni) * 4 + nd
-				const ng = top.cost + move
+				const ng = top.g + move
 				if ng < g[ns + 1] - 1e-6 then
 					g[ns + 1] = ng
 					back[ns + 1] = top.s
 					const h = (math.abs(ni - gi) + math.abs(nj - gj)) * step
-					push(ng + h, ns)
+					push(ng + h, ng, ns)
 				end
 			end
 		end
@@ -1347,11 +1352,14 @@ const function toSvg(net: Net): string
 			s = back[s + 1]
 		end
 
-		const raw: { Vec } = { P, A }
+		-- Join the lattice at the free node nearest A (and B). Keeping A and B
+		-- as well would leave a small kink wherever the lead-in from the port
+		-- reverses into the first lattice step; the nearest node is only a few
+		-- pixels from A, so leaving the port straight to it is cleaner.
+		const raw: { Vec } = { P }
 		for k = #nodes, 1, -1 do
 			table.insert(raw, nodes[k])
 		end
-		table.insert(raw, B)
 		table.insert(raw, Q)
 		const poly: { Vec } = {}
 		for _, v in raw do
@@ -1405,7 +1413,10 @@ const function toSvg(net: Net): string
 		return d
 	end
 
-	-- Does a bend pass through a cell that is neither of the two it joins?
+	-- Does a bend cut through a cell? The bend leaves `skipA` at P and arrives at
+	-- `skipB` at Q, so it may touch those two cells at the ports, but it must not
+	-- cut through any cell body -- including those two, which it still clips when
+	-- it doubles back on itself.
 	const function cubicHits(
 		P: Vec,
 		c1: Vec,
@@ -1426,8 +1437,16 @@ const function toSvg(net: Net): string
 				+ 3 * mt * t * t * c2.y
 				+ t * t * t * Q.y
 			for _, c in cells do
-				if c ~= skipA and c ~= skipB and bodyDist(x, y, c) < 1 then
-					return true
+				if bodyDist(x, y, c) < 1 then
+					-- A sample right at P or Q is the wire meeting its own
+					-- port, not a crossing; anywhere else is a real hit.
+					const atPort = (
+						c == skipA and (x - P.x) ^ 2 + (y - P.y) ^ 2 < 4
+					)
+						or (c == skipB and (x - Q.x) ^ 2 + (y - Q.y) ^ 2 < 4)
+					if not atPort then
+						return true
+					end
 				end
 			end
 		end
