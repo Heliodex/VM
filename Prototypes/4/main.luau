@@ -279,18 +279,10 @@ const function step(
 	return false
 end
 
-const function reduce(
-	net: Net
-)
-	while step(net) do
-end end
-
 -- test layer -----------------------------------------------------------------
 -- A net for a test is written as a list of cells, each of the form
 --   { symbol, label, label, ... }   -- principal port first, then auxiliaries
--- Ports that share a label are wired together; a label used on a single port is
--- a free port. So { {GAMMA, "p", "a", "b"}, {GAMMA, "p", "c", "d"} } is two
--- gammas joined at their principal ports with all four auxiliaries free.
+-- Ports that share a label are wired together; a label used on a single port is a free port. So { {GAMMA, "p", "a", "b"}, {GAMMA, "p", "c", "d"} } is two gammas joined at their principal ports with all four auxiliaries free.
 type Spec = { { string } }
 
 const function compile(
@@ -364,8 +356,7 @@ const function liveCells(
 	return live
 end
 
--- Same net up to renaming of cells. Cell ids are recycled during reduction, so
--- two equal results usually have completely different ids.
+-- Same net up to renaming of cells. Cell ids are recycled during reduction, so two equal results usually have completely different ids.
 const function isomorphic(
 	a: Net,
 	b: Net
@@ -739,9 +730,7 @@ const MAX_STEPS_SHOWN = 60
 
 for _, test in tests do
 	const limit = test.budget or 1000
-	-- Reduce first (no SVG): find out how many steps it takes and whether it
-	-- reaches a normal form. Only then decide which diagrams to draw, so the
-	-- (expensive) layout is never paid for steps that will be omitted.
+	-- Reduce first (no SVG): find out how many steps it takes and whether it reaches a normal form. Only then decide which diagrams to draw, so the (expensive) layout is never paid for steps that will be omitted.
 	const net = compile(test.start)
 	local steps = 0
 	local finished = false
