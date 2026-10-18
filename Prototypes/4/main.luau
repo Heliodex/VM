@@ -1,372 +1,166 @@
 --!strict
 -- PROTOTYPE BASED ON INTERACTION COMBINATORS
 --
--- Drives the engine in net.luau over the nets below and prints the whole reduction of each one as a page of SVG diagrams.
+-- Drives the engine in net.luau over the nets below and prints the whole
+-- reduction of each one as a page of SVG diagrams. The nets themselves are
+-- built with builder.luau, which is also how anything above the calculus would
+-- build one.
 
+const B = require "./builder"
 const toSvg = require "./diagram"
 const Net = require "./net"
 const Types = require "./types"
 
-type Gamma = Types.Gamma
-type Delta = Types.Delta
-type Epsilon = Types.Epsilon
-type Symbol = Types.Symbol
-type Cell = Types.Cell
-type Port = Types.Port
 type Net = Types.Net
-const GAMMA = Net.GAMMA
-const DELTA = Net.DELTA
-const EPSILON = Net.EPSILON
-const principal = Net.principal
-const aux1 = Net.aux1
-const aux2 = Net.aux2
-const newNet = Net.newNet
-const alloc = Net.alloc
-const link = Net.link
 const step = Net.step
 const wellFormed = Net.wellFormed
 const isomorphic = Net.isomorphic
--- test layer -----------------------------------------------------------------
--- A net for a test is written as a list of cells, each of the form
---   { symbol, label, label, ... }   -- principal port first, then auxiliaries
--- Ports that share a label are wired together; a label used on a single port is a free port. So { {GAMMA, "p", "a", "b"}, {GAMMA, "p", "c", "d"} } is two gammas joined at their principal ports with all four auxiliaries free.
-type Spec = { { string } }
-
-const function compile(
-	spec: Spec
-): Net
-	const net = newNet()
-	const endpoints: {
-		[string]: { Port },
-	} = {}
-
-	for _, cell in spec do
-		const c = alloc(net, cell[1] :: Symbol)
-		const ports = {
-			principal(c),
-			aux1(c),
-			aux2(c),
-		}
-
-		for i = 2, #cell do
-			const label = cell[i]
-			const group = endpoints[label]
-
-			if group then
-				table.insert(group, ports[i - 1])
-			else
-				endpoints[label] = {
-					ports[i - 1],
-				}
-	end end end
-
-	for label, group in endpoints do
-		if #group == 2 then
-			link(net, group[1], group[2])
-		elseif #group > 2 then
-			error(`label "{label}" is used {#group} times`)
-	end end
-
-	return net
-end
-
 -- tests -----------------------------------------------------------------------
+-- A net is described by a function that builds one and hands it back. Free
+-- ports are whatever the builder left unwired, and are where the answer of a
+-- reduction is expected to show up.
+type Build = () -> Net
 type Test = {
 	read name: string,
-	read start: Spec,
-	read expect: Spec?,
+	read start: Build,
+	read expect: Build?,
 	read budget: number?,
 }
 -- nil means the reduction is expected not to finish
 const tests: { Test } = {
 	{
 		name = "epsilon-epsilon annihilates to nothing",
-		start = {
-			{
-				EPSILON,
-				"p",
-			},
-			{
-				EPSILON,
-				"p",
-			},
-		},
-		expect = {},
+		start = function()
+			local b = B.new()
+			local e1, e2 = b:epsilon(), b:epsilon()
+			b:meet(e1, e2)
+
+			return b:finish()
+		end,
+		expect = function()
+			return B.new():finish()
+		end,
 	},
 	{
 		name = "gamma-gamma exchanges its wires",
-		start = {
-			{
-				GAMMA,
-				"p",
-				"a",
-				"b",
-			},
-			{
-				GAMMA,
-				"p",
-				"c",
-				"d",
-			},
-			{
-				DELTA,
-				"e",
-				"a",
-				"f",
-			},
-			{
-				DELTA,
-				"g",
-				"b",
-				"h",
-			},
-			{
-				DELTA,
-				"i",
-				"c",
-				"j",
-			},
-			{
-				DELTA,
-				"k",
-				"d",
-				"l",
-			},
-		},
-		expect = {
-			{
-				DELTA,
-				"e",
-				"ad",
-				"f",
-			},
-			{
-				DELTA,
-				"g",
-				"bc",
-				"h",
-			},
-			{
-				DELTA,
-				"i",
-				"bc",
-				"j",
-			},
-			{
-				DELTA,
-				"k",
-				"ad",
-				"l",
-			},
-		},
+		start = function()
+			local b = B.new()
+			local g1, g2 = b:gamma(), b:gamma()
+			local d1, d2, d3, d4 = b:delta(), b:delta(), b:delta(), b:delta()
+			b:meet(g1, g2)
+			b:wire(g1.aux1, d1.aux1)
+			b:wire(g1.aux2, d2.aux1)
+			b:wire(g2.aux1, d3.aux1)
+			b:wire(g2.aux2, d4.aux1)
+
+			return b:finish()
+		end,
+		-- the crossed pairs become the deltas' own auxiliaries
+		expect = function()
+			local b = B.new()
+			local d1, d2, d3, d4 = b:delta(), b:delta(), b:delta(), b:delta()
+			b:wire(d1.aux1, d4.aux1)
+			b:wire(d2.aux1, d3.aux1)
+
+			return b:finish()
+		end,
 	},
 	{
 		name = "delta-delta is straight",
-		start = {
-			{
-				DELTA,
-				"p",
-				"a",
-				"b",
-			},
-			{
-				DELTA,
-				"p",
-				"c",
-				"d",
-			},
-			{
-				GAMMA,
-				"e",
-				"a",
-				"f",
-			},
-			{
-				GAMMA,
-				"g",
-				"b",
-				"h",
-			},
-			{
-				GAMMA,
-				"i",
-				"c",
-				"j",
-			},
-			{
-				GAMMA,
-				"k",
-				"d",
-				"l",
-			},
-		},
-		expect = {
-			{
-				GAMMA,
-				"e",
-				"ac",
-				"f",
-			},
-			{
-				GAMMA,
-				"g",
-				"bd",
-				"h",
-			},
-			{
-				GAMMA,
-				"i",
-				"ac",
-				"j",
-			},
-			{
-				GAMMA,
-				"k",
-				"bd",
-				"l",
-			},
-		},
+		start = function()
+			local b = B.new()
+			local d1, d2 = b:delta(), b:delta()
+			local g1, g2, g3, g4 = b:gamma(), b:gamma(), b:gamma(), b:gamma()
+			b:meet(d1, d2)
+			b:wire(d1.aux1, g1.aux1)
+			b:wire(d1.aux2, g2.aux1)
+			b:wire(d2.aux1, g3.aux1)
+			b:wire(d2.aux2, g4.aux1)
+
+			return b:finish()
+		end,
+		expect = function()
+			local b = B.new()
+			local g1, g2, g3, g4 = b:gamma(), b:gamma(), b:gamma(), b:gamma()
+			b:wire(g1.aux1, g3.aux1)
+			b:wire(g2.aux1, g4.aux1)
+
+			return b:finish()
+		end,
 	},
 	{
 		name = "gamma-erase spawns one eraser per auxiliary",
-		start = {
-			{
-				GAMMA,
-				"p",
-				"A",
-				"B",
-			},
-			{
-				DELTA,
-				"u",
-				"A",
-				"v",
-			},
-			{
-				DELTA,
-				"w",
-				"B",
-				"x",
-			},
-			{
-				EPSILON,
-				"p",
-			},
-		},
-		expect = {
-			{
-				DELTA,
-				"u",
-				"m",
-				"v",
-			},
-			{
-				DELTA,
-				"w",
-				"n",
-				"x",
-			},
-			{
-				EPSILON,
-				"m",
-			},
-			{
-				EPSILON,
-				"n",
-			},
-		},
+		start = function()
+			local b = B.new()
+			local g = b:gamma()
+			local d1, d2 = b:delta(), b:delta()
+			local e = b:epsilon()
+			b:meet(g, e)
+			b:wire(g.aux1, d1.aux1)
+			b:wire(g.aux2, d2.aux1)
+
+			return b:finish()
+		end,
+		expect = function()
+			local b = B.new()
+			local d1, d2 = b:delta(), b:delta()
+			local e1, e2 = b:epsilon(), b:epsilon()
+			b:wire(d1.aux1, e1.principal)
+			b:wire(d2.aux1, e2.principal)
+
+			return b:finish()
+		end,
 	},
 	{
 		name = "gamma meets delta in the commutation square",
-		start = {
-			{
-				GAMMA,
-				"p",
-				"a",
-				"b",
-			},
-			{
-				DELTA,
-				"p",
-				"c",
-				"d",
-			},
-		},
-		expect = {
-			{
-				DELTA,
-				"p1",
-				"m2",
-				"m1",
-			},
-			{
-				DELTA,
-				"p2",
-				"m4",
-				"m3",
-			},
-			{
-				GAMMA,
-				"p3",
-				"m1",
-				"m3",
-			},
-			{
-				GAMMA,
-				"p4",
-				"m2",
-				"m4",
-			},
-		},
+		start = function()
+			local b = B.new()
+			local g, d = b:gamma(), b:delta()
+			b:meet(g, d)
+
+			return b:finish()
+		end,
+		expect = function()
+			local b = B.new()
+			local d1, d2 = b:delta(), b:delta()
+			local g1, g2 = b:gamma(), b:gamma()
+			b:wire(d1.aux2, g1.aux1)
+			b:wire(d1.aux1, g2.aux1)
+			b:wire(d2.aux2, g1.aux2)
+			b:wire(d2.aux1, g2.aux2)
+
+			return b:finish()
+		end,
 	},
 	{
 		name = "a gamma erased on every port vanishes completely",
-		start = {
-			{
-				GAMMA,
-				"p",
-				"A",
-				"B",
-			},
-			{
-				EPSILON,
-				"p",
-			},
-			{
-				EPSILON,
-				"A",
-			},
-			{
-				EPSILON,
-				"B",
-			},
-		},
-		expect = {},
+		start = function()
+			local b = B.new()
+			local g = b:gamma()
+			local e1, e2, e3 = b:epsilon(), b:epsilon(), b:epsilon()
+			b:meet(g, e1)
+			b:wire(g.aux1, e2.principal)
+			b:wire(g.aux2, e3.principal)
+
+			return b:finish()
+		end,
+		expect = function()
+			return B.new():finish()
+		end,
 	},
 	{
 		name = "delta(epsilon, x) = gamma(x, epsilon)",
-		start = {
-			{
-				DELTA,
-				"p",
-				"e",
-				"x",
-			},
-			{
-				GAMMA,
-				"p",
-				"x",
-				"f",
-			},
-			{
-				EPSILON,
-				"e",
-			},
-			{
-				EPSILON,
-				"f",
-			},
-		},
+		start = function()
+			local b = B.new()
+			local d, g = b:delta(), b:gamma()
+			local e1, e2 = b:epsilon(), b:epsilon()
+			b:meet(d, g)
+			b:wire(d.aux1, e1.principal)
+			b:wire(d.aux2, g.aux1)
+			b:wire(g.aux2, e2.principal)
+
+			return b:finish()
+		end,
 		expect = nil, -- does not terminate
 		budget = 200,
 	},
@@ -378,7 +172,7 @@ const MAX_STEPS_SHOWN = 60
 for _, test in tests do
 	const limit = test.budget or 1000
 	-- Reduce first (no SVG): find out how many steps it takes and whether it reaches a normal form. Only then decide which diagrams to draw, so the (expensive) layout is never paid for steps that will be omitted.
-	const net = compile(test.start)
+	const net = test.start()
 	local steps = 0
 	local finished = false
 
@@ -393,11 +187,11 @@ for _, test in tests do
 
 	print "<section>"
 	print(`<h2>{test.name}</h2>`)
-	print(`<figure>{toSvg(compile(test.start))}<figcaption>start</figcaption></figure>`)
+	print(`<figure>{toSvg(test.start())}<figcaption>start</figcaption></figure>`)
 
 	if finished and steps <= MAX_STEPS_SHOWN then
 		-- replay the reduction, drawing each step
-		const walk = compile(test.start)
+		local walk = test.start()
 
 		for i = 1, steps do
 			step(walk)
@@ -418,7 +212,7 @@ for _, test in tests do
 
 	const ok =
 		if test.expect then
-			finished and wellFormed(net) and isomorphic(net, compile(test.expect))
+			finished and wellFormed(net) and isomorphic(net, test.expect())
 		else
 			not finished and wellFormed(net)
 	print(
@@ -428,6 +222,9 @@ for _, test in tests do
 			'<p class="fail">FAIL</p>'
 	)
 	print "</section>"
-end
+
+	if not ok then
+		error "fail"
+end end
 
 print "</body></html>"
