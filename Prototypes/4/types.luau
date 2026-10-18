@@ -4,11 +4,12 @@
 export type Gamma = "Gamma"
 export type Delta = "Delta"
 export type Epsilon = "Epsilon"
-export type Symbol = Gamma | Delta | Epsilon
-
+export type Symbol =
+	| Gamma
+	| Delta
+	| Epsilon
 export type Cell = number
 export type Port = number
-
 -- A net is completely described by:
 --     a finite set X (of free ports),
 --     a finite set C (of cells),
