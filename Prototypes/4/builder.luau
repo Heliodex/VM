@@ -36,17 +36,27 @@ export type Handle = {
 	read aux1: Port?,
 	read aux2: Port?,
 }
+-- What `require "./builder"` hands back: the table holding the methods, which doubles as the type of a builder because a builder reaches those methods through it.
+-- The methods are listed as plain functions taking a builder rather than as `:` methods, since this is the type of the module and not of the metatable.
 export type Builder = {
-	net: Net,
+	read net: Net,
+	new: () -> Builder,
+	gamma: (Builder) -> Handle,
+	delta: (Builder) -> Handle,
+	epsilon: (Builder) -> Handle,
+	meet: (Builder, Handle, Handle) -> (),
+	wire: (Builder, Port?, Port?) -> (),
+	finish: (Builder) -> Net,
 }
-local Builder = {}
-Builder.__index = Builder
+-- The table the methods actually live on, which has to allow `__index` and so cannot be a Builder.
+local BuilderClass = {}
+BuilderClass.__index = BuilderClass
 
-function Builder.new(): Builder
+function BuilderClass.new(): Builder
 	return setmetatable(
 		{
 			net = Net.newNet(),
-		} :: Builder, Builder
+		} :: Builder, BuilderClass
 	)
 end
 
@@ -72,19 +82,19 @@ local function make(
 	}
 end
 
-function Builder.gamma(
+function BuilderClass.gamma(
 	self: Builder
 ): Handle
 	return make(self, Net.GAMMA)
 end
 
-function Builder.delta(
+function BuilderClass.delta(
 	self: Builder
 ): Handle
 	return make(self, Net.DELTA)
 end
 
-function Builder.epsilon(
+function BuilderClass.epsilon(
 	self: Builder
 ): Handle
 	return make(self, Net.EPSILON)
@@ -92,7 +102,7 @@ end
 
 -- Join two principal ports.
 -- This is the only wire that can start a net reducing: everything else is a continuation waiting on one.
-function Builder.meet(
+function BuilderClass.meet(
 	self: Builder,
 	a: Handle,
 	b: Handle
@@ -102,7 +112,7 @@ end
 
 -- Join any two ports.
 -- An eraser has no auxiliaries, so wiring to one is rejected here rather than silently producing a net no rule can match.
-function Builder.wire(
+function BuilderClass.wire(
 	self: Builder,
 	a: Port?,
 	b: Port?
@@ -116,10 +126,10 @@ end
 
 -- The net as it stands.
 -- A builder is finished with once: cells made after this point belong to a net nothing else refers to.
-function Builder.finish(
+function BuilderClass.finish(
 	self: Builder
 ): Net
 	return self.net
 end
 
-return Builder
+return BuilderClass
