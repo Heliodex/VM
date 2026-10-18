@@ -1,11 +1,9 @@
 --!strict
 -- A COMPOSITIONAL INTERFACE FOR BUILDING NETS
 --
--- net.luau can rewire ports, but building a net from nothing with it means
--- tracking cell ids and port numbers by hand. A builder resolves a port once,
--- when the cell that owns it is made, and hands back a handle for it; wires
--- then join handles rather than integers, so a net is written in the order it
--- reads instead of in the order its labels happen to fall.
+-- net.luau can rewire ports, but building a net from nothing with it means tracking cell ids and port numbers by hand.
+-- A builder resolves a port once, when the cell that owns it is made, and hands back a handle for it.
+-- Wires then join handles rather than integers, so a net is written in the order it reads instead of in the order its labels happen to fall.
 --
 --   local B = require "./builder"
 --
@@ -16,13 +14,11 @@
 --   b:wire(g.aux1, d.aux2)
 --   local net = b:finish()
 --
--- A port that is never wired stays free. That is how a gadget hands its inputs
--- and outputs to whatever net it gets plugged into, and how a test net says
--- where its answer is expected to appear.
+-- A port that is never wired stays free.
+-- That is how a gadget hands its inputs and outputs to whatever net it gets plugged into, and how a test net says where its answer is expected to appear.
 --
 -- There is deliberately nothing here for arithmetic, lists or control flow.
--- Anything a program computes has to come out of the six interaction rules,
--- not out of this file.
+-- Anything a program computes has to come out of the six interaction rules, not out of this file.
 
 local Net = require "./net"
 local Types = require "./types"
@@ -31,8 +27,8 @@ type Net = Types.Net
 type Symbol = Types.Symbol
 type Cell = Types.Cell
 type Port = Types.Port
--- One cell, with its ports already resolved. An eraser has no auxiliaries, so
--- its aux1 and aux2 are nil rather than ports that do not exist.
+-- One cell, with its ports already resolved.
+-- An eraser has no auxiliaries, so its aux1 and aux2 are nil rather than ports that do not exist.
 export type Handle = {
 	read cell: Cell,
 	read symbol: Symbol,
@@ -94,8 +90,8 @@ function Builder.epsilon(
 	return make(self, Net.EPSILON)
 end
 
--- Join two principal ports. This is the only wire that can start a net
--- reducing: everything else is a continuation waiting on one.
+-- Join two principal ports.
+-- This is the only wire that can start a net reducing: everything else is a continuation waiting on one.
 function Builder.meet(
 	self: Builder,
 	a: Handle,
@@ -104,8 +100,8 @@ function Builder.meet(
 	Net.link(self.net, a.principal, b.principal)
 end
 
--- Join any two ports. An eraser has no auxiliaries, so wiring to one is
--- rejected here rather than silently producing a net no rule can match.
+-- Join any two ports.
+-- An eraser has no auxiliaries, so wiring to one is rejected here rather than silently producing a net no rule can match.
 function Builder.wire(
 	self: Builder,
 	a: Port?,
@@ -118,8 +114,8 @@ function Builder.wire(
 	Net.link(self.net, a, b)
 end
 
--- The net as it stands. A builder is finished with once: cells made after
--- this point belong to a net nothing else refers to.
+-- The net as it stands.
+-- A builder is finished with once: cells made after this point belong to a net nothing else refers to.
 function Builder.finish(
 	self: Builder
 ): Net

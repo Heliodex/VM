@@ -1,10 +1,8 @@
 --!strict
 -- PROTOTYPE BASED ON INTERACTION COMBINATORS
 --
--- Drives the engine in net.luau over the nets below and prints the whole
--- reduction of each one as a page of SVG diagrams. The nets themselves are
--- built with builder.luau, which is also how anything above the calculus would
--- build one.
+-- Drives the engine in net.luau over the nets below and prints the whole reduction of each one as a page of SVG diagrams.
+-- The nets themselves are built with builder.luau, which is also how anything above the calculus would build one.
 
 const B = require "./builder"
 const toSvg = require "./diagram"
@@ -16,9 +14,8 @@ const step = Net.step
 const wellFormed = Net.wellFormed
 const isomorphic = Net.isomorphic
 -- tests -----------------------------------------------------------------------
--- A net is described by a function that builds one and hands it back. Free
--- ports are whatever the builder left unwired, and are where the answer of a
--- reduction is expected to show up.
+-- A net is described by a function that builds one and hands it back.
+-- Free ports are whatever the builder left unwired, and are where the answer of a reduction is expected to show up.
 type Build = () -> Net
 type Test = {
 	read name: string,

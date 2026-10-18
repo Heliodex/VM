@@ -296,8 +296,7 @@ const function anchorOf(
 	)
 end
 
--- The outward normal of a port: principal points along the tip, auxiliary ports
--- point back out of the base.
+-- The outward normal of a port: principal points along the tip, auxiliary ports point back out of the base.
 const function normalOf(
 	d: Vec,
 	slot: number
@@ -313,9 +312,7 @@ const function normalOf(
 end
 
 -- layout ----------------------------------------------------------------------
--- Group cells into connected parts: two cells belong to the same part when a
--- wire joins one of their ports. Different parts have no wires, cells or ports
--- in common, so they can be laid out independently and then packed.
+-- Group cells into connected parts: two cells belong to the same part when a wire joins one of their ports. Different parts have no wires, cells or ports in common, so they can be laid out independently and then packed.
 const function components(
 	net: Net,
 	cells: { Cell }
@@ -382,10 +379,7 @@ const function components(
 	return parts
 end
 
--- Fruchterman-Reingold on one part. The result is not drawn directly: it only
--- suggests which way each wire should run, so that the grid placement below
--- keeps wired cells on the side of each other that the springs prefer. It is
--- deterministic (starts on a circle), so a given part always draws the same way.
+-- Fruchterman-Reingold on one part. The result is not drawn directly: it only suggests which way each wire should run, so that the grid placement below keeps wired cells on the side of each other that the springs prefer. It is deterministic (starts on a circle), so a given part always draws the same way.
 const function guidePart(
 	net: Net,
 	cells: { Cell }
@@ -496,8 +490,7 @@ const function key(
 	return `{g.x},{g.y}`
 end
 
--- The nearest free grid slot to `origin`, searched outwards in rings. Only used
--- when every immediate neighbour of a cell is already taken.
+-- The nearest free grid slot to `origin`, searched outwards in rings. Only used when every immediate neighbour of a cell is already taken.
 const function freeNear(
 	origin: Grid,
 	occ: {
@@ -529,10 +522,8 @@ const function freeNear(
 end
 
 -- Symmetry --------------------------------------------------------------------
--- A port's signature: whether it is principal or auxiliary, whether it is free,
--- and, when wired, the kind of port it meets and which cell owns that port.
--- `pi`, when given, maps the owning cell of a wired partner first, so a
--- candidate symmetry can be checked against the wiring.
+-- A port's signature: whether it is principal or auxiliary, whether it is free, and, when wired, the kind of port it meets and which cell owns that port.
+-- `pi`, when given, maps the owning cell of a wired partner first, so a candidate symmetry can be checked against the wiring.
 const function portSignature(
 	net: Net,
 	c: Cell,
@@ -567,11 +558,7 @@ const function portSignature(
 	return `{mine}:{theirs}:{image}`
 end
 
--- How many page-aligned symmetries a placement has: a half-turn and reflections
--- in a vertical or horizontal line that send every cell to a cell of the same
--- symbol and preserve the wiring. Diagonal mirrors are left out on purpose, so
--- a drawing that only lines up on the slant is not preferred over one that
--- lines up with the page.
+-- How many page-aligned symmetries a placement has: a half-turn and reflections in a vertical or horizontal line that send every cell to a cell of the same symbol and preserve the wiring. Diagonal mirrors are left out on purpose, so a drawing that only lines up on the slant is not preferred over one that lines up with the page.
 const function symmetryCount(
 	net: Net,
 	grid: {
@@ -598,8 +585,7 @@ const function symmetryCount(
 		at[key(grid[c])] = c
 	end
 
-	-- Turn an isometry into a permutation of the cells, or nil when it does not
-	-- map the placement onto itself.
+	-- Turn an isometry into a permutation of the cells, or nil when it does not map the placement onto itself.
 	const function permutation(
 		fn: (Grid) -> Grid
 	): {
@@ -705,10 +691,7 @@ const function symmetryCount(
 	return check(halfTurn) + check(vertical) + check(horizontal)
 end
 
--- Refine cells into colour classes by repeatedly folding in the kinds of the
--- ports they use and the current colours of their partners. Cells of the same
--- colour are interchangeable as far as the wiring can tell, which is close
--- enough to an automorphism orbit for these small nets.
+-- Refine cells into colour classes by repeatedly folding in the kinds of the ports they use and the current colours of their partners. Cells of the same colour are interchangeable as far as the wiring can tell, which is close enough to an automorphism orbit for these small nets.
 const function refineColors(
 	net: Net,
 	cells: { Cell }
@@ -768,13 +751,8 @@ const function refineColors(
 	return color
 end
 
--- Place one connected part on the integer grid. A breadth-first walk starts at a
--- cell and puts every wired neighbour in a free slot beside the cell it grows
--- from; the spring guide decides which side. Every choice of root, quarter-turn
--- and reflection of the guide is tried and then folded onto nearby free slots.
--- The candidate with the most page-aligned symmetry wins, with the most compact
--- and shortest-wired layout breaking ties, so equivalent branches spread out
--- evenly instead of the whole part lurching to one side.
+-- Place one connected part on the integer grid. A breadth-first walk starts at a cell and puts every wired neighbour in a free slot beside the cell it grows from; the spring guide decides which side. Every choice of root, quarter-turn and reflection of the guide is tried and then folded onto nearby free slots.
+-- The candidate with the most page-aligned symmetry wins, with the most compact and shortest-wired layout breaking ties, so equivalent branches spread out evenly instead of the whole part lurching to one side.
 const function placePart(
 	net: Net,
 	cells: { Cell }
@@ -931,8 +909,7 @@ const function placePart(
 			table.insert(queue, v)
 		end
 
-		-- Lets two branches of u be recognised as a matching pair: same colour,
-		-- and the same kind of port on u and on the partner.
+		-- Lets two branches of u be recognised as a matching pair: same colour, and the same kind of port on u and on the partner.
 		const function branchKey(
 			u: Cell,
 			slot: number,
@@ -980,8 +957,7 @@ const function placePart(
 
 			const done: { boolean } = {}
 
-			-- Equivalent branches go into opposite slots, so a pair of matching
-			-- sub-trees mirrors each other on the page.
+			-- Equivalent branches go into opposite slots, so a pair of matching sub-trees mirrors each other on the page.
 			for i = 1, #pending do
 				if done[i] then
 					continue
@@ -1063,9 +1039,7 @@ const function placePart(
 		return math.max(maxX - minX, maxY - minY), wires
 	end
 
-	-- Nudge cells into nearby free slots while that shrinks the part's longest
-	-- side. The move must be a strict improvement, so a clean chain is left as a
-	-- straight run.
+	-- Nudge cells into nearby free slots while that shrinks the part's longest side. The move must be a strict improvement, so a clean chain is left as a straight run.
 	const function compact(
 		start: {
 			[Cell]: Grid,
@@ -1135,9 +1109,7 @@ const function placePart(
 		return start
 	end
 
-	-- Try every root, quarter-turn and reflection. Keep the candidate with the
-	-- most page-aligned symmetry, and only accept a folded version when folding
-	-- does not cost it any symmetry, so symmetric parts stay symmetric.
+	-- Try every root, quarter-turn and reflection. Keep the candidate with the most page-aligned symmetry, and only accept a folded version when folding does not cost it any symmetry, so symmetric parts stay symmetric.
 	local best: {
 		[Cell]: Grid,
 	}? = nil
@@ -1183,9 +1155,7 @@ type PartBox = {
 	h: number,
 	margin: number,
 }
--- Lay out every part on its own grid, then pack the parts into rows so the
--- whole drawing stays roughly square. Each part keeps a one-slot halo, and
--- neighbouring parts stay a fixed two-slot gap apart.
+-- Lay out every part on its own grid, then pack the parts into rows so the whole drawing stays roughly square. Each part keeps a one-slot halo, and neighbouring parts stay a fixed two-slot gap apart.
 const PART_MARGIN = 1
 const PART_GAP = 2
 
@@ -1309,10 +1279,7 @@ const function toSvg(
 		centroid.y /= #cells
 	end
 
-	-- Cells whose principal port is wired to another cell's principal port form
-	-- an active pair. Their two tips are forced to face each other, so that wire
-	-- is a straight step between the tips. Every other cell is free to turn to
-	-- whichever quarter turn best serves its wires.
+	-- Cells whose principal port is wired to another cell's principal port form an active pair. Their two tips are forced to face each other, so that wire is a straight step between the tips. Every other cell is free to turn to whichever quarter turn best serves its wires.
 	const ppPartner: {
 		[Cell]: Cell,
 	} = {}
@@ -1408,11 +1375,7 @@ const function toSvg(
 				}
 	end end end
 
-	-- Cost of turning a cell to face `idx`: how far each of its wired ports has
-	-- to swing from its outward normal to point at the partner. A wire is drawn
-	-- leaving along that normal, so a smaller cost means a straighter wire. A
-	-- principal-to-principal wire is weighted up, so an active pair stays facing
-	-- each other even if an auxiliary wire would prefer otherwise.
+	-- Cost of turning a cell to face `idx`: how far each of its wired ports has to swing from its outward normal to point at the partner. A wire is drawn leaving along that normal, so a smaller cost means a straighter wire. A principal-to-principal wire is weighted up, so an active pair stays facing each other even if an auxiliary wire would prefer otherwise.
 	const function orientationCost(
 		c: Cell,
 		idx: number
@@ -1444,8 +1407,7 @@ const function toSvg(
 	end
 
 	-- Swing each free cell through the four quarter turns and keep the cheapest.
-	-- Ties keep the current direction, which keeps the result deterministic and
-	-- stops it oscillating.
+	-- Ties keep the current direction, which keeps the result deterministic and stops it oscillating.
 	const function chooseOrientation(
 		c: Cell
 	)
@@ -1463,8 +1425,7 @@ const function toSvg(
 		ori[c] = bestIdx
 	end
 
-	-- Swing every free cell to its cheapest quarter turn, refreshing the ports
-	-- after each choice, and repeat to a fixed point.
+	-- Swing every free cell to its cheapest quarter turn, refreshing the ports after each choice, and repeat to a fixed point.
 	const function settleOrientations()
 		for _ = 1, ORIENT_ITERS do
 			computePorts()
@@ -1480,9 +1441,7 @@ const function toSvg(
 
 	settleOrientations()
 
-	-- How many pairs of wires cross, counted on the straight chords between their
-	-- port anchors. The drawn wires leave along the port normals, so a chord
-	-- crossing is a good enough signal for choosing between placements.
+	-- How many pairs of wires cross, counted on the straight chords between their port anchors. The drawn wires leave along the port normals, so a chord crossing is a good enough signal for choosing between placements.
 	const function chordCrossings(): number
 		const segs: { { Vec } } = {}
 
@@ -1513,11 +1472,7 @@ const function toSvg(
 		return count
 	end
 
-	-- Cells the wiring cannot tell apart can still land on the wrong sides of a
-	-- shared partner, which puts their wires across each other. Swapping the
-	-- positions of two such siblings untangles them without changing the drawing
-	-- up to a renaming, so try each pair and keep a swap only when it strictly
-	-- reduces the number of crossings.
+	-- Cells the wiring cannot tell apart can still land on the wrong sides of a shared partner, which puts their wires across each other. Swapping the positions of two such siblings untangles them without changing the drawing up to a renaming, so try each pair and keep a swap only when it strictly reduces the number of crossings.
 	local crossings = chordCrossings()
 
 	if crossings > 0 then
@@ -1583,9 +1538,7 @@ const function toSvg(
 	end end end
 
 	-- Routing ---------------------------------------------------------------------
-	-- How far a point lies outside a cell body (0 when inside it). A wire that
-	-- would otherwise cut through a cell is re-routed along the free lanes, so
-	-- a curve never crosses a cell unless it starts or ends on it.
+	-- How far a point lies outside a cell body (0 when inside it). A wire that would otherwise cut through a cell is re-routed along the free lanes, so a curve never crosses a cell unless it starts or ends on it.
 	const function bodyDist(
 		x: number,
 		y: number,
@@ -1631,9 +1584,7 @@ const function toSvg(
 		return false
 	end
 
-	-- A* over a fine lattice of the free space, preferring long straights (a
-	-- turn costs extra). Returns the polyline P, A, ..., B, Q, or nil when the
-	-- ports are boxed in.
+	-- A* over a fine lattice of the free space, preferring long straights (a turn costs extra). Returns the polyline P, A, ..., B, Q, or nil when the ports are boxed in.
 	const function route(
 		P: Vec,
 		np: Vec,
@@ -1721,9 +1672,7 @@ const function toSvg(
 		const stateCount = cols * rows * 4
 		const g: { number } = table.create(stateCount, math.huge)
 		const back: { number } = table.create(stateCount, -1)
-		-- Heap entries carry both the A* priority (f = g + h) and the path cost
-		-- g they were queued with, so a stale entry can be told apart from the
-		-- current best for the same state.
+		-- Heap entries carry both the A* priority (f = g + h) and the path cost g they were queued with, so a stale entry can be told apart from the current best for the same state.
 		const heap: { {
 			f: number,
 			g: number,
@@ -1863,10 +1812,7 @@ const function toSvg(
 			s = back[s + 1]
 		end
 
-		-- Join the lattice at the free node nearest A (and B). Keeping A and B
-		-- as well would leave a small kink wherever the lead-in from the port
-		-- reverses into the first lattice step; the nearest node is only a few
-		-- pixels from A, so leaving the port straight to it is cleaner.
+		-- Join the lattice at the free node nearest A (and B). Keeping A and B as well would leave a small kink wherever the lead-in from the port reverses into the first lattice step; the nearest node is only a few pixels from A, so leaving the port straight to it is cleaner.
 		const raw: { Vec } = {
 			P,
 		}
@@ -1931,9 +1877,7 @@ const function toSvg(
 	end
 
 	-- Does a bend cut through a cell? The bend leaves `skipA` at P and arrives at
-	-- `skipB` at Q, so it may touch those two cells at the ports, but it must not
-	-- cut through any cell body -- including those two, which it still clips when
-	-- it doubles back on itself.
+	-- `skipB` at Q, so it may touch those two cells at the ports, but it must not cut through any cell body -- including those two, which it still clips when it doubles back on itself.
 	const function cubicHits(
 		P: Vec,
 		c1: Vec,
@@ -1950,8 +1894,7 @@ const function toSvg(
 
 			for _, c in cells do
 				if bodyDist(x, y, c) < 1 then
-					-- A sample right at P or Q is the wire meeting its own
-					-- port, not a crossing; anywhere else is a real hit.
+					-- A sample right at P or Q is the wire meeting its own port, not a crossing; anywhere else is a real hit.
 					const atPort = c == skipA and (x - P.x) ^ 2 + (y - P.y) ^ 2 < 4 or c == skipB and (x - Q.x) ^ 2 + (y - Q.y) ^ 2 < 4
 
 					if not atPort then
@@ -2026,9 +1969,7 @@ const function toSvg(
 					include(c2)
 					wires[#wires + 1] = `<path d="M {fmt(P.x)} {fmt(P.y)} C {fmt(c1.x)} {fmt(c1.y)} {fmt(c2.x)} {fmt(c2.y)} {fmt(Q.x)} {fmt(Q.y)}" {wireStyle}/>`
 				else
-					-- The wire leaves each port along its normal and bends to the
-					-- partner over one smooth curve. If that bend would cut
-					-- through another cell it is routed around instead.
+					-- The wire leaves each port along its normal and bends to the partner over one smooth curve. If that bend would cut through another cell it is routed around instead.
 					const gap = math.max(0.01, math.sqrt((Q.x - P.x) ^ 2 + (Q.y - P.y) ^ 2))
 					const k = math.min(gap * WIRE_BULGE, WIRE_BULGE_MAX)
 					const c1 = {
