@@ -81,10 +81,9 @@ const function fingerprint(
 	end
 
 	for _ = 1, #cells do
-		const next: {
+		const raw: {
 			[Cell]: string,
 		} = {}
-		local changed = false
 
 		for _, c in cells do
 			const parts: { string } = {}
@@ -99,9 +98,31 @@ const function fingerprint(
 			end end
 
 			table.sort(parts)
-			next[c] = `{net.Tag[c]}[{table.concat(parts, ",")}]`
+			raw[c] = `{net.Tag[c]}[{table.concat(parts, ",")}]`
+		end
 
-			if next[c] ~= colour[c] then
+		-- Rename the colours to short numbers before carrying them into the next round, since a colour names the colours it was built from and would otherwise double in length every round.
+		const next: {
+			[Cell]: string,
+		} = {}
+		const ids: {
+			[string]: string,
+		} = {}
+		local count = 0
+		local changed = false
+
+		for _, c in cells do
+			local id = ids[raw[c]]
+
+			if not id then
+				count += 1
+				id = tostring(count)
+				ids[raw[c]] = id
+			end
+
+			next[c] = id
+
+			if id ~= colour[c] then
 				changed = true
 		end end
 
