@@ -216,6 +216,45 @@ const tests: { Test } = {
 		end end,
 	},
 	{
+		name = "T3 meets itself and cancels to nothing",
+		start = function(
+			b
+		)
+			const x = G.autodualMultiplexer(b, 3)
+			const y = G.autodualMultiplexer(b, 3)
+			b:wire(x.principal, y.principal)
+		end,
+		expect = function()
+		end,
+	},
+	{
+		name = "T3 meeting itself joins its ports in order",
+		start = function(
+			b
+		)
+			const x = G.autodualMultiplexer(b, 3)
+			const y = G.autodualMultiplexer(b, 3)
+			b:wire(x.principal, y.principal)
+
+			for k, p in x.ports do
+				probe(b, p, k - 1)
+			end
+
+			for k, p in y.ports do
+				probe(b, p, k - 1)
+		end end,
+		-- a delta chain is its own dual, so this cancels against a plain copy of itself rather than against a mirrored one
+		expect = function(
+			b
+		)
+			for k = 1, 3 do
+				const left, right = b:gamma(), b:gamma()
+				b:wire(left.aux1, right.aux1)
+				tail(b, left, k - 1)
+				tail(b, right, k - 1)
+		end end,
+	},
+	{
 		name = "delta(epsilon, x) = gamma(x, epsilon)",
 		start = function(
 			b
