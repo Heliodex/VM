@@ -6,6 +6,7 @@
 
 const B = require "./builder"
 const toSvg = require "./diagram"
+const H = require "./harness"
 const Net = require "./net"
 const Types = require "./types"
 
@@ -142,20 +143,12 @@ print '<!doctype html>\n<html lang="en-GB">\n<head>\n<meta charset="utf-8">\n<ti
 const MAX_STEPS_SHOWN = 60
 
 for _, test in tests do
-	const limit = test.budget or 1000
-	-- Reduce first (no SVG): find out how many steps it takes and whether it reaches a normal form. Only then decide which diagrams to draw, so the (expensive) layout is never paid for steps that will be omitted.
+	const limit = test.budget or H.DEFAULT_BUDGET
+	-- Reduce first (no SVG): find out how many steps it takes and how the reduction ended. Only then decide which diagrams to draw, so the (expensive) layout is never paid for steps that will be omitted.
 	const net = build(test.start)
-	local steps = 0
-	local finished = false
-
-	while steps < limit do
-		if not step(net) then
-			finished = true
-			break
-		end
-
-		steps += 1
-	end
+	const report = H.reduce(net, limit)
+	const steps = report.steps
+	const finished = report.outcome == "reduced"
 
 	print "<section>"
 	print(`<h2>{test.name}</h2>`)
@@ -179,7 +172,7 @@ for _, test in tests do
 	elseif finished then
 		print(`<p class="note">{steps} steps omitted: more than the {MAX_STEPS_SHOWN}-step display limit.</p>`)
 	else
-		print(`<p class="note">Reduction did not finish within the {limit}-step budget; steps omitted.</p>`)
+		print(`<p class="note">Reduction {H.describe(report)}; steps omitted.</p>`)
 	end
 
 	const ok =
