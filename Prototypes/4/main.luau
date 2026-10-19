@@ -60,6 +60,20 @@ local function probe(
 	return h
 end
 
+-- The net a gadget pair should reduce to when port i of one side meets port image(i) of the other.
+-- Every port carries a tail of its own length, so a pairing other than the one expected ends up joining tails of different lengths and cannot pass for the right one.
+local function paired(
+	b: Builder,
+	n: number,
+	image: (number) -> number
+)
+	for i = 1, n do
+		const left, right = b:gamma(), b:gamma()
+		b:wire(left.aux1, right.aux1)
+		tail(b, left, i - 1)
+		tail(b, right, image(i) - 1)
+end end
+
 type Test = {
 	read name: string,
 	read start: Build,
@@ -253,6 +267,108 @@ const tests: { Test } = {
 				tail(b, left, k - 1)
 				tail(b, right, k - 1)
 		end end,
+	},
+	{
+		name = "T(1,1) meets itself and swaps its first pair",
+		start = function(
+			b
+		)
+			const x = G.transpositor(b, 1, 1)
+			const y = G.transpositor(b, 1, 1)
+			b:wire(x.principal, y.principal)
+
+			for i, p in x.ports do
+				probe(b, p, i - 1)
+			end
+
+			for i, p in y.ports do
+				probe(b, p, i - 1)
+		end end,
+		expect = function(
+			b
+		)
+			paired(
+				b, 3, function(
+					i
+				)
+					return
+						if i <= 2 then
+							3 - i
+						else
+							i
+				end
+			)
+		end,
+	},
+	{
+		name = "T(2,1) meets itself and swaps both its pairs",
+		start = function(
+			b
+		)
+			const x = G.transpositor(b, 2, 1)
+			const y = G.transpositor(b, 2, 1)
+			b:wire(x.principal, y.principal)
+
+			for i, p in x.ports do
+				probe(b, p, i - 1)
+			end
+
+			for i, p in y.ports do
+				probe(b, p, i - 1)
+		end end,
+		-- the first four ports are swapped in pairs and the fifth is left alone
+		expect = function(
+			b
+		)
+			paired(
+				b, 5, function(
+					i
+				)
+					return
+						if i <= 4 then
+							if i % 2 == 1 then
+								i + 1
+							else
+								i - 1
+						else
+							i
+				end
+			)
+		end,
+	},
+	{
+		name = "T(sigma) meets itself and realises sigma",
+		start = function(
+			b
+		)
+			const sigma = {
+				3,
+				2,
+				1,
+			}
+			const x = G.permutation(b, sigma)
+			const y = G.permutation(b, sigma)
+			b:wire(x.principal, y.principal)
+
+			for i, p in x.ports do
+				probe(b, p, i - 1)
+			end
+
+			for i, p in y.ports do
+				probe(b, p, i - 1)
+		end end,
+		-- a transposition of two ports that are not next to each other, so the relabelling onto the transpositor is doing real work
+		expect = function(
+			b
+		)
+			paired(
+				b, 3, function(
+					i
+				)
+					return 4 - i
+				end
+			)
+		end,
 	},
 	{
 		name = "delta(epsilon, x) = gamma(x, epsilon)",
