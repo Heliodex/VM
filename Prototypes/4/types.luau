@@ -24,5 +24,11 @@ export type Net = {
 	read Active: { Port },
 	read Free: { Cell },
 }
+-- A net with one principal port and some free auxiliary ports: a gadget waiting to be plugged into a bigger net.
+-- The principal port is what another cell has to meet for the gadget to do anything; the ports are free ends that stay free if nothing is wired to them.
+export type Fragment = {
+	read principal: Port,
+	read ports: { Port },
+}
 
 return {}

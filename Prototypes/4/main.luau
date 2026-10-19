@@ -6,12 +6,14 @@
 
 const B = require "./builder"
 const toSvg = require "./diagram"
+const G = require "./gadgets"
 const H = require "./harness"
 const Net = require "./net"
 const Types = require "./types"
 
 type Net = Types.Net
 type Builder = B.Builder
+type Port = Types.Port
 const step = Net.step
 const wellFormed = Net.wellFormed
 const isomorphic = Net.isomorphic
@@ -28,6 +30,34 @@ const function build(
 	f(b)
 
 	return b:finish()
+end
+
+-- gadget tests ----------------------------------------------------------------
+-- A probe closes off a port without anything reducing, since it is wired on an auxiliary.
+-- Left bare, a cancelled multiplexer pair leaves no cells at all, and in a net with no cells every wiring looks like every other, so a probe has to carry a tail whose length says which port it came from before a crossed pairing can be told apart from the identity.
+local function tail(
+	b: Builder,
+	h: B.Handle,
+	depth: number
+)
+	local cur = h
+
+	for _ = 1, depth do
+		const next = b:gamma()
+		b:wire(cur.aux2, next.aux1)
+		cur = next
+end end
+
+local function probe(
+	b: Builder,
+	p: Port,
+	depth: number
+): B.Handle
+	const h = b:gamma()
+	b:wire(h.aux1, p)
+	tail(b, h, depth)
+
+	return h
 end
 
 type Test = {
@@ -145,6 +175,45 @@ const tests: { Test } = {
 		end,
 		expect = function()
 		end,
+	},
+	{
+		name = "M3 meets its dual and cancels to nothing",
+		start = function(
+			b
+		)
+			const m = G.multiplexer(b, 3)
+			const d = G.dualMultiplexer(b, 3)
+			b:wire(m.principal, d.principal)
+		end,
+		expect = function()
+		end,
+	},
+	{
+		name = "M3 meeting its dual joins its ports in order",
+		start = function(
+			b
+		)
+			const m = G.multiplexer(b, 3)
+			const d = G.dualMultiplexer(b, 3)
+			b:wire(m.principal, d.principal)
+
+			for k, p in m.ports do
+				probe(b, p, k - 1)
+			end
+
+			for k, p in d.ports do
+				probe(b, p, k - 1)
+		end end,
+		-- the k-th port on one side has to meet the k-th on the other, so each pair is rebuilt with its tails
+		expect = function(
+			b
+		)
+			for k = 1, 3 do
+				const left, right = b:gamma(), b:gamma()
+				b:wire(left.aux1, right.aux1)
+				tail(b, left, k - 1)
+				tail(b, right, k - 1)
+		end end,
 	},
 	{
 		name = "delta(epsilon, x) = gamma(x, epsilon)",
