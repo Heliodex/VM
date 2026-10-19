@@ -707,8 +707,7 @@ const function refineColors(
 	end
 
 	for _ = 1, #cells do
-		local changed = false
-		const next: {
+		const raw: {
 			[Cell]: string,
 		} = {}
 
@@ -735,13 +734,33 @@ const function refineColors(
 			end end
 
 			table.sort(parts)
-			next[c] = `{net.Tag[c]}({table.concat(parts, ",")})`
+			raw[c] = `{net.Tag[c]}({table.concat(parts, ",")})`
 		end
 
+		-- Rename the colours to short numbers before the next round. A colour names the colours it was built from, so left alone each round it would double in length and a net of any size would run out of memory within a few of them.
+		local changed = false
+		const next: {
+			[Cell]: string,
+		} = {}
+		const ids: {
+			[string]: string,
+		} = {}
+		local count = 0
+
 		for _, c in cells do
-			if next[c] ~= color[c] then
+			local id = ids[raw[c]]
+
+			if not id then
+				count += 1
+				id = tostring(count)
+				ids[raw[c]] = id
+			end
+
+			next[c] = id
+
+			if id ~= color[c] then
 				changed = true
-				color[c] = next[c]
+				color[c] = id
 		end end
 
 		if not changed then
