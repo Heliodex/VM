@@ -326,6 +326,8 @@ const function liveCells(
 end
 
 -- Same net up to renaming of cells. Cell ids are recycled during reduction, so two equal results usually have completely different ids.
+-- One net's cells are walked in the order its wires visit them, and each is committed to a cell of the other, checking as it goes that every wire whose far end is already committed agrees.
+-- Checking only once the whole renaming is built would try every renaming of the net before rejecting any of them, which is hopeless once more than a dozen cells share a symbol.
 const function isomorphic(
 	a: Net,
 	b: Net
@@ -336,33 +338,81 @@ const function isomorphic(
 		return false
 	end
 
-	const map: {
-		[Cell]: Cell,
-	} = {}
-	const taken: {
+	-- Walk the cells in the order the wires lead from one to the next, in each connected part in turn, so that a cell is almost always reached after a neighbour of it has been committed.
+	const order: { Cell } = {}
+	const walked: {
 		[Cell]: boolean,
 	} = {}
 
-	const function verify(): boolean
-		for _, ca in left do
-			const cb = map[ca]
-			const pa, pb = (ca - 1) * STRIDE, (cb - 1) * STRIDE
+	for _, seed in left do
+		if walked[seed] then
+			continue
+		end
+
+		walked[seed] = true
+		const queue: { Cell } = { seed }
+		local head = 1
+
+		while head <= #queue do
+			const c = queue[head]
+			head += 1
+			table.insert(order, c)
 
 			for slot = 1, STRIDE do
-				const x, y = a.Link[pa + slot] or 0, b.Link[pb + slot] or 0
-				const x0, y0 = x == 0, y == 0
+				const q = a.Link[(c - 1) * STRIDE + slot] or 0
 
-				if x0 ~= y0 then
-					return false
-				end
+				if q ~= 0 then
+					const near = owner(q)
 
-				if x == 0 then
-					continue
-				end
+					if near ~= c and not walked[near] then
+						walked[near] = true
+						table.insert(queue, near)
+		end end end end
+	end
 
-				if map[owner(x)] ~= owner(y) or (x - 1) % STRIDE ~= (y - 1) % STRIDE then
-					return false
-		end end end
+	const map: {
+		[Cell]: Cell,
+	} = {}
+	const back: {
+		[Cell]: Cell,
+	} = {}
+
+	-- Whether the two cells agree everywhere their wires already reach a committed cell.
+	-- A wire whose far end is not committed yet cannot be judged, but it will be judged from the other side when that end is committed.
+	const function agrees(
+		ca: Cell,
+		cb: Cell
+	): boolean
+		const pa, pb = (ca - 1) * STRIDE, (cb - 1) * STRIDE
+
+		for slot = 1, STRIDE do
+			const x, y = a.Link[pa + slot] or 0, b.Link[pb + slot] or 0
+			const x0, y0 = x == 0, y == 0
+
+			if x0 ~= y0 then
+				return false
+			end
+
+			if x == 0 then
+				continue
+			end
+
+			if (x - 1) % STRIDE ~= (y - 1) % STRIDE then
+				return false
+			end
+
+			const there, here = owner(x), owner(y)
+			const placed = map[there]
+
+			if placed ~= nil and placed ~= here then
+				return false
+			end
+
+			const claimed = back[here]
+
+			if claimed ~= nil and claimed ~= there then
+				return false
+		end end
 
 		return true
 	end
@@ -370,21 +420,21 @@ const function isomorphic(
 	const function search(
 		i: number
 	): boolean
-		if i > #left then
-			return verify()
+		if i > #order then
+			return true
 		end
 
-		const ca = left[i]
+		const ca = order[i]
 
 		for _, cb in right do
-			if not taken[cb] and a.Tag[ca] == b.Tag[cb] then
-				map[ca], taken[cb] = cb, true
+			if back[cb] == nil and a.Tag[ca] == b.Tag[cb] and agrees(ca, cb) then
+				map[ca], back[cb] = cb, ca
 
 				if search(i + 1) then
 					return true
 				end
 
-				map[ca], taken[cb] = nil, nil
+				map[ca], back[cb] = nil, nil
 		end end
 
 		return false
