@@ -23,23 +23,23 @@ local Types = require "./types"
 type Net = Types.Net
 type Cell = Types.Cell
 type Symbol = Types.Symbol
-
 -- How a reduction ended.
 -- `reduced` reached a normal form, `exhausted` used its whole budget, and `cycled` was caught returning to a state it had already been in.
-export type Outcome = "reduced" | "exhausted" | "cycled"
-
+export type Outcome =
+	| "reduced"
+	| "exhausted"
+	| "cycled"
 export type Report = {
 	read outcome: Outcome,
 	read steps: number,
 	read cells: number,
 	read peakCells: number,
-	-- set only when the outcome is "cycled"
 	read period: number?,
 	read firstSeen: number?,
 }
-
+-- set only when the outcome is "cycled"
 const DEFAULT_BUDGET = 1000
-const MAX_TRACKED = 4096
+const MAX_TRACKED = 0x1000
 
 -- The number of ports a symbol actually has, principal included.
 const function slots(
@@ -96,23 +96,20 @@ const function fingerprint(
 					table.insert(parts, `{slot}f`)
 				else
 					table.insert(parts, `{slot}{portName(q)}{colour[Net.owner(q)]}`)
-				end
-			end
+			end end
 
 			table.sort(parts)
 			next[c] = `{net.Tag[c]}[{table.concat(parts, ",")}]`
 
 			if next[c] ~= colour[c] then
 				changed = true
-			end
-		end
+		end end
 
 		colour = next
 
 		if not changed then
 			break
-		end
-	end
+	end end
 
 	const list: { string } = {}
 
@@ -141,16 +138,18 @@ end
 const function describe(
 	report: Report
 ): string
-	const steps = if report.steps == 1 then
-		"1 step"
-	else
-		`{report.steps} steps`
-
-	if report.outcome == "cycled" then
-		const period = if report.period == 1 then
+	const steps =
+		if report.steps == 1 then
 			"1 step"
 		else
-			`{report.period} steps`
+			`{report.steps} steps`
+
+	if report.outcome == "cycled" then
+		const period =
+			if report.period == 1 then
+				"1 step"
+			else
+				`{report.period} steps`
 
 		return `cycles every {period}, from step {report.firstSeen} ({report.cells} cells, {report.peakCells} peak)`
 	elseif report.outcome == "exhausted" then
@@ -223,8 +222,7 @@ const function reduce(
 		steps += 1
 		cells = #Net.liveCells(net)
 		peak = math.max(peak, cells)
-	end
-end
+end end
 
 -- A net as text, one cell per line, with every port either free or naming the cell and port it is wired to.
 -- Cells keep their ids so that two dumps can be compared by eye.
@@ -244,8 +242,7 @@ const function dump(
 				table.insert(parts, `{name}=free`)
 			else
 				table.insert(parts, `{name}={Net.owner(q)}.{portName(q)}`)
-			end
-		end
+		end end
 
 		table.insert(lines, `  {c} {net.Tag[c]}  {table.concat(parts, "  ")}`)
 	end
@@ -276,12 +273,10 @@ const function assertReducesTo(
 
 	if not Net.isomorphic(start, expect) then
 		error(`the net reduced to something other than expected\n  reduced:\n{dump(start)}\n  expected:\n{dump(expect)}`)
-	end
-end
+end end
 
 return {
 	DEFAULT_BUDGET = DEFAULT_BUDGET,
-
 	fingerprint = fingerprint,
 	describe = describe,
 	reduce = reduce,

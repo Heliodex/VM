@@ -40,15 +40,20 @@ type Test = {
 const tests: { Test } = {
 	{
 		name = "epsilon-epsilon annihilates to nothing",
-		start = function(b)
+		start = function(
+			b
+		)
 			local e1, e2 = b:epsilon(), b:epsilon()
 			b:meet(e1, e2)
 		end,
-		expect = function() end,
+		expect = function()
+		end,
 	},
 	{
 		name = "gamma-gamma exchanges its wires",
-		start = function(b)
+		start = function(
+			b
+		)
 			local g1, g2 = b:gamma(), b:gamma()
 			local d1, d2, d3, d4 = b:delta(), b:delta(), b:delta(), b:delta()
 			b:meet(g1, g2)
@@ -58,7 +63,9 @@ const tests: { Test } = {
 			b:wire(g2.aux2, d4.aux1)
 		end,
 		-- the crossed pairs become the deltas' own auxiliaries
-		expect = function(b)
+		expect = function(
+			b
+		)
 			local d1, d2, d3, d4 = b:delta(), b:delta(), b:delta(), b:delta()
 			b:wire(d1.aux1, d4.aux1)
 			b:wire(d2.aux1, d3.aux1)
@@ -66,7 +73,9 @@ const tests: { Test } = {
 	},
 	{
 		name = "delta-delta is straight",
-		start = function(b)
+		start = function(
+			b
+		)
 			local d1, d2 = b:delta(), b:delta()
 			local g1, g2, g3, g4 = b:gamma(), b:gamma(), b:gamma(), b:gamma()
 			b:meet(d1, d2)
@@ -75,7 +84,9 @@ const tests: { Test } = {
 			b:wire(d2.aux1, g3.aux1)
 			b:wire(d2.aux2, g4.aux1)
 		end,
-		expect = function(b)
+		expect = function(
+			b
+		)
 			local g1, g2, g3, g4 = b:gamma(), b:gamma(), b:gamma(), b:gamma()
 			b:wire(g1.aux1, g3.aux1)
 			b:wire(g2.aux1, g4.aux1)
@@ -83,7 +94,9 @@ const tests: { Test } = {
 	},
 	{
 		name = "gamma-erase spawns one eraser per auxiliary",
-		start = function(b)
+		start = function(
+			b
+		)
 			local g = b:gamma()
 			local d1, d2 = b:delta(), b:delta()
 			local e = b:epsilon()
@@ -91,7 +104,9 @@ const tests: { Test } = {
 			b:wire(g.aux1, d1.aux1)
 			b:wire(g.aux2, d2.aux1)
 		end,
-		expect = function(b)
+		expect = function(
+			b
+		)
 			local d1, d2 = b:delta(), b:delta()
 			local e1, e2 = b:epsilon(), b:epsilon()
 			b:wire(d1.aux1, e1.principal)
@@ -100,11 +115,15 @@ const tests: { Test } = {
 	},
 	{
 		name = "gamma meets delta in the commutation square",
-		start = function(b)
+		start = function(
+			b
+		)
 			local g, d = b:gamma(), b:delta()
 			b:meet(g, d)
 		end,
-		expect = function(b)
+		expect = function(
+			b
+		)
 			local d1, d2 = b:delta(), b:delta()
 			local g1, g2 = b:gamma(), b:gamma()
 			b:wire(d1.aux2, g1.aux1)
@@ -115,18 +134,23 @@ const tests: { Test } = {
 	},
 	{
 		name = "a gamma erased on every port vanishes completely",
-		start = function(b)
+		start = function(
+			b
+		)
 			local g = b:gamma()
 			local e1, e2, e3 = b:epsilon(), b:epsilon(), b:epsilon()
 			b:meet(g, e1)
 			b:wire(g.aux1, e2.principal)
 			b:wire(g.aux2, e3.principal)
 		end,
-		expect = function() end,
+		expect = function()
+		end,
 	},
 	{
 		name = "delta(epsilon, x) = gamma(x, epsilon)",
-		start = function(b)
+		start = function(
+			b
+		)
 			local d, g = b:delta(), b:gamma()
 			local e1, e2 = b:epsilon(), b:epsilon()
 			b:meet(d, g)
@@ -149,7 +173,6 @@ for _, test in tests do
 	const report = H.reduce(net, limit)
 	const steps = report.steps
 	const finished = report.outcome == "reduced"
-
 	print "<section>"
 	print(`<h2>{test.name}</h2>`)
 	print(`<figure>{toSvg(build(test.start))}<figcaption>start</figcaption></figure>`)
