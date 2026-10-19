@@ -102,8 +102,120 @@ const function autodualMultiplexer(
 	return chain(b, Net.DELTA, false, n)
 end
 
+-- T(p, q), the transpositor of arity 2p+q, which cancels against a plain copy of itself to leave the involution t(p, q).
+-- That involution swaps each of the first p pairs of ports, 1 with 2 and so on, and leaves the last q ports alone.
+-- Built as Fig. 5 shows it: the p pairs go through gammas, whose principals reach the same delta chain as the q ports that pass straight through.
+-- A port that passes straight through needs no cell at all, so it is simply the tail port itself and the fragment hands that port back.
+const function transpositor(
+	b: Builder,
+	p: number,
+	q: number
+): Fragment
+	if p + q < 1 then
+		error(`a transpositor needs p + q of at least 1, got {p} + {q}`)
+	end
+
+	if p + q == 1 then
+		if p == 0 then
+			error("T(0, 1) is a bare wire, which has no cell to build")
+		end
+
+		-- T(1, 0) leaves nothing for a tail to do, so its single gamma is the whole construction
+		const only = b:gamma()
+
+		return {
+			principal = only.principal,
+			ports = {
+				only.aux1 :: Port,
+				only.aux2 :: Port,
+			},
+		}
+	end
+
+	const tail = autodualMultiplexer(b, p + q)
+	const ports: { Port } = {}
+
+	for k = 1, p do
+		const cell = b:gamma()
+		b:wire(cell.principal, tail.ports[k])
+		table.insert(ports, cell.aux1 :: Port)
+		table.insert(ports, cell.aux2 :: Port)
+	end
+
+	for j = 1, q do
+		table.insert(ports, tail.ports[p + j])
+	end
+
+	return {
+		principal = tail.principal,
+		ports = ports,
+	}
+end
+
+-- T(sigma), the permutation net of arity n for an involutive permutation sigma, which cancels against a plain copy of itself to leave the wiring sigma.
+-- Any involution is a product of disjoint transpositions, so it is t(p, q) seen under a relabelling: send each pair to the front and each fixed point to the back and a transpositor does the rest.
+-- The relabelling itself costs no cells, because it is only a wiring: the fragment hands back the transpositor's ports in a different order.
+const function permutation(
+	b: Builder,
+	sigma: { number }
+): Fragment
+	const n = #sigma
+
+	for i = 1, n do
+		const image = sigma[i]
+
+		if image < 1 or image > n then
+			error(`port {i} is sent to {image}, which is outside 1 to {n}`)
+		end
+
+		if sigma[image] ~= i then
+			error(`port {i} goes to {image}, which goes to {sigma[image]}, so this is not an involution`)
+		end
+	end
+
+	local pairs = 0
+
+	for i = 1, n do
+		if sigma[i] ~= i then
+			pairs += 1
+		end
+	end
+
+	pairs //= 2
+
+	const transposed = transpositor(b, pairs, n - 2 * pairs)
+	-- the transpositor expects each swapped pair first and each fixed port afterwards, so work out which of its ports each of ours is
+	const where: { number } = {}
+	local pair = 1
+	local fixed = 2 * pairs + 1
+
+	for i = 1, n do
+		if sigma[i] == i then
+			where[i] = fixed
+			fixed += 1
+		elseif where[i] == nil then
+			where[i] = pair
+			where[sigma[i]] = pair + 1
+			pair += 2
+		end
+	end
+
+	const ports: { Port } = {}
+
+	for i = 1, n do
+		ports[i] = transposed.ports[where[i]]
+	end
+
+	return {
+		principal = transposed.principal,
+		ports = ports,
+	}
+end
+
 return {
 	multiplexer = multiplexer,
 	dualMultiplexer = dualMultiplexer,
 	autodualMultiplexer = autodualMultiplexer,
+	transpositor = transpositor,
+	permutation = permutation,
 }
