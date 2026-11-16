@@ -1,5 +1,7 @@
 # Recursion in the interaction-combinator prototype
 
+**Status: solved within the six rules.** `Prototypes/4/recursion.luau` defines `length` and `sum` over Scott lists using Lafont codes, and `validate.luau` checks them. See "Solution" below. The rest of this note is the history of the problem.
+
 Hand-off note. The problem: we need general recursion (for example `length` and `sum` over lists) in the interaction-combinator prototype in `Prototypes/4/`, without adding primitives beyond the six interaction rules. The attempt so far has not terminated for recursive functions over lists, and the reasons are only partly understood.
 
 ## Constraints
@@ -100,7 +102,7 @@ Milestones:
 
 Milestones 1 and 2 are done (`Prototypes/4/codes.luau`, checked in `validate.luau`). The code takes the δ cells out of the net and keeps their ports at the leaves of three γ multiplexers, one for principals and one for each auxiliary. The decoder is a dual multiplexer holding a single δ, which commutes through those trees and grows back into every δ that was taken out. This follows the idea of Fig. 8, but it is my own construction and not a transcription of the figure. So far it has only been checked on multiplexers, a transpositor and numerals 0 to 4. A δ fan copies the code without touching it, and each copy then decodes.
 
-Milestone 3 is still open. A code can be copied, but a recursive call needs the decoder's output to contain the code again. That is the "genetic code" step of §2.7, and it is where the cycle has to be broken.
+Milestone 3 is done too. See "Solution".
 
 ### 3. Unrolling in the builder (works now, bounded)
 
@@ -119,6 +121,23 @@ A variant adds a fuel numeral, decremented at each level, returning a marker whe
 
 HVM2 solves this with `REF` nodes, which unfold only when they meet a constructor, and which are not part of IC. This would work, but it breaks the six-rule constraint, so it needs the author's agreement first.
 
+## Solution
+
+The recursive function never contains itself. Instead it is a closed value `R = λc. ...` that takes the code of itself as an argument, and the recursive call is `recall c = (decode c₁) c₂`, where `c₁, c₂` are δ copies of `c`. Since `R` is closed, it can be reduced to a cut-free normal form on its own and then encoded (`Rec.tie`). Both causes of divergence are gone:
+
+- No δ copies a net that holds δ. The thing being copied is the code, which contains no δ.
+- Nothing unfolds under a lambda. The code reaches the recursive branch as a variable: `l consCase nilCase c`. So `recall` sits on a free variable until the list picks the cons branch and the code is substituted in. The nil branch erases its code, and an eraser that meets a code just dissolves it.
+
+For a fold, `R = λc.λl. l (λh.λt.λc'. step h (recall c' t)) (λc'. 0) c` (`Rec.fold`). `length` uses `step = λh. succ` and `sum` uses `step = add`. On its own, `length` reaches a normal form in 57 steps. `length` of an n-element list takes about 133 + 78n steps (linear), and the net stays under about 160 cells for n = 12.
+
+The idea is Lafont's §2.7: a "genetic code" that is copied and expanded on demand. The code construction itself (`codes.luau`) is my own simplification of Fig. 8: δ ports are kept at the leaves of γ trees, and a single δ in the decoder regrows them.
+
+Limits and open points:
+- `R` must be closed and must reach a normal form on its own before it is encoded. Anything it captures has to be passed in as an argument.
+- Every recursive call pays for a full decode of `R`, which is 27 cells for `length`.
+- Only folds over lists have been tried. Recursion that does not follow the data, for example on numerals or with an accumulator, should work the same way but has not been checked.
+- Divergence detection (below) is still open.
+
 ## Divergence detection (open question, separate from recursion)
 
 Even with a working recursion scheme, the harness needs a way to report non-termination:
@@ -129,15 +148,14 @@ Even with a working recursion scheme, the harness needs a way to report non-term
 
 ## Suggested next steps
 
-1. Decide with the author whether option 2 (Lafont codes, within the rules) or option 4 (a new node) is acceptable. Option 2 is the research path, option 4 is the pragmatic one.
-2. Start Milestone 1 of option 2: encode and decode a cut-free net, with a test in `validate.luau`.
-3. Keep option 3 (with fuel) as the working fallback for literal data.
-4. Decide the divergence semantics (see above) before adding recursion tests to `cases.luau`.
+1. Try non-structural recursion through codes, such as a recursive `fact` on numerals or a fold with an accumulator.
+2. Consider replacing `fix.luau` (Z, divergent) with `recursion.luau` everywhere.
+3. Decide the divergence semantics (see above) before adding recursion tests to `cases.luau`.
 
 ## Verification
 
 - `luau-analyze` on each `.luau` file should be clean.
-- `luau validate.luau` should report all checks passing. Current: 78.
+- `luau validate.luau` should report all checks passing. Current: 94.
 - `luau main.luau` should exit 0 and produce no `class="fail"` entries.
 - Run `luau-format` after each change to `Prototypes/4/*.luau` (project rule).
 
