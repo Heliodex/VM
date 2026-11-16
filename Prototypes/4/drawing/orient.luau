@@ -5,35 +5,51 @@
 -- Each free cell swings to the quarter turn that makes its wires straightest, then wires that still cross are untangled by swapping the positions of two cells the wiring cannot tell apart.
 
 local Canon = require "../canon"
-local G = require "./geometry"
 local Net = require "../net"
 local Types = require "../types"
+local G = require "./geometry"
 
 type Cell = Types.Cell
 type Net = Types.Net
 type Port = Types.Port
 type Vec = G.Vec
-
 -- Everything the drawing needs about where cells and ports are, once they are placed and turned.
 export type Scene = {
 	net: Net,
 	cells: { Cell },
-	pos: { [Cell]: Vec },
-	ori: { [Cell]: number },
-	point: { [Port]: Vec },
-	out: { [Port]: Vec },
-	tip: { [Cell]: Vec },
-	e1: { [Cell]: Vec },
-	e2: { [Cell]: Vec },
-	hub: { [Cell]: Vec },
+	pos: {
+		[Cell]: Vec,
+	},
+	ori: {
+		[Cell]: number,
+	},
+	point: {
+		[Port]: Vec,
+	},
+	out: {
+		[Port]: Vec,
+	},
+	tip: {
+		[Cell]: Vec,
+	},
+	e1: {
+		[Cell]: Vec,
+	},
+	e2: {
+		[Cell]: Vec,
+	},
+	hub: {
+		[Cell]: Vec,
+	},
 }
 
 const function orient(
 	net: Net,
 	cells: { Cell },
-	pos: { [Cell]: Vec }
+	pos: {
+		[Cell]: Vec,
+	}
 ): Scene
-
 	const centroid: G.Vec = {
 		x = 0,
 		y = 0,

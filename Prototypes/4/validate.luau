@@ -18,7 +18,6 @@ for _, test in Cases.tests do
 	const net = Cases.build(test.start)
 	const report = H.reduce(net, limit)
 	const finished = report.outcome == "reduced"
-
 	const ok =
 		if test.expect then
 			finished and Net.wellFormed(net) and Canon.isomorphic(net, Cases.build(test.expect))
@@ -29,7 +28,14 @@ for _, test in Cases.tests do
 		failures += 1
 	end
 
-	print(`{if ok then "PASS" else "FAIL"}  {test.name}  ({H.describe(report)})`)
+	print(
+		`{
+			if ok then
+				"PASS"
+			else
+				"FAIL"
+		}  {test.name}  ({H.describe(report)})`
+	)
 end
 
 if failures > 0 then

@@ -10,7 +10,6 @@ local Types = require "./types"
 type Builder = B.Builder
 type Net = Types.Net
 type Port = Types.Port
-
 -- A net is described by a function that builds one into a builder it is handed.
 -- build owns the builder and finishes it, so a test never has to say where its net begins or ends and can simply end at its last wire.
 -- Free ports are whatever was left unwired, and are where the answer of a reduction is expected to show up.

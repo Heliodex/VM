@@ -16,7 +16,10 @@ type Net = Types.Net
 const function refine(
 	net: Net,
 	cells: { Cell },
-	label: (Cell, { [Cell]: string }) -> string
+	label:
+		(Cell, {
+			[Cell]: string,
+		}) -> string
 ): {
 	[Cell]: string,
 }
@@ -59,15 +62,13 @@ const function refine(
 
 			if id ~= colour[c] then
 				changed = true
-			end
-		end
+		end end
 
 		colour = next
 
 		if not changed then
 			break
-		end
-	end
+	end end
 
 	return colour
 end
@@ -79,36 +80,39 @@ const function refineKinds(
 ): {
 	[Cell]: string,
 }
-	return refine(net, cells, function(
-		c: Cell,
-		colour: { [Cell]: string }
-	): string
-		const parts: { string } = {}
+	return refine(
+		net, cells, function(
+			c: Cell,
+			colour: {
+				[Cell]: string,
+			}
+		): string
+			const parts: { string } = {}
 
-		for slot = 1, Net.portCount(net.Tag[c]) do
-			const mine =
-				if slot == 1 then
-					"P"
-				else
-					"A"
-			const q = net.Link[Net.port(c, slot)] or 0
-
-			if q == 0 then
-				table.insert(parts, `{mine}free`)
-			else
-				const theirs =
-					if Net.isPrincipal(q) then
+			for slot = 1, Net.portCount(net.Tag[c]) do
+				const mine =
+					if slot == 1 then
 						"P"
 					else
 						"A"
-				table.insert(parts, `{mine}{theirs}{colour[Net.owner(q)]}`)
-			end
+				const q = net.Link[Net.port(c, slot)] or 0
+
+				if q == 0 then
+					table.insert(parts, `{mine}free`)
+				else
+					const theirs =
+						if Net.isPrincipal(q) then
+							"P"
+						else
+							"A"
+					table.insert(parts, `{mine}{theirs}{colour[Net.owner(q)]}`)
+			end end
+
+			table.sort(parts)
+
+			return `{net.Tag[c]}({table.concat(parts, ",")})`
 		end
-
-		table.sort(parts)
-
-		return `{net.Tag[c]}({table.concat(parts, ",")})`
-	end)
+	)
 end
 
 -- Same net up to renaming of cells. Cell ids are recycled during reduction, so two equal results usually have completely different ids.

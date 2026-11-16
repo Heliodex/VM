@@ -12,9 +12,9 @@
 
 local G = require "./drawing/geometry"
 local Layout = require "./drawing/layout"
-local Net = require "./net"
 local Orient = require "./drawing/orient"
 local Route = require "./drawing/route"
+local Net = require "./net"
 local Types = require "./types"
 
 type Symbol = Types.Symbol
@@ -49,7 +49,6 @@ const function toSvg(
 	const pos = Layout.layout(net, cells)
 	const scene = Orient.orient(net, cells, pos)
 	const point, out, tip, e1, e2, hub = scene.point, scene.out, scene.tip, scene.e1, scene.e2, scene.hub
-
 	local minX, minY = math.huge, math.huge
 	local maxX, maxY = -math.huge, -math.huge
 

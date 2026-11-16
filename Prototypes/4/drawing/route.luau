@@ -4,9 +4,9 @@
 -- A wire leaves each port along its normal and bends to its partner over one smooth curve.
 -- If that curve would cut through a cell body it is routed instead, along the free lanes between cells, and drawn with its corners rounded.
 
+local Types = require "../types"
 local G = require "./geometry"
 local Orient = require "./orient"
-local Types = require "../types"
 
 type Cell = Types.Cell
 type Vec = G.Vec

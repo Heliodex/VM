@@ -10,9 +10,7 @@ local Types = require "./types"
 type Symbol = Types.Symbol
 type Cell = Types.Cell
 type Net = Types.Net
-
 const GAMMA, DELTA, EPSILON = Net.GAMMA, Net.DELTA, Net.EPSILON
-
 type Rule = (net: Net, a: Cell, b: Cell) -> ()
 const RULES: {
 	[Symbol]: {

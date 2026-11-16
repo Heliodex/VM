@@ -16,7 +16,6 @@ export type Grid = {
 	x: number,
 	y: number,
 }
-
 -- sizes --------------------------------------------------------------------
 const PITCH = 100 -- distance between neighbouring grid slots, in pixels
 const TIP_LEN = 19 -- centre -> principal tip

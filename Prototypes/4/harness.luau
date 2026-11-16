@@ -63,28 +63,29 @@ const function fingerprint(
 	net: Net
 ): string
 	const cells = Net.liveCells(net)
-	const colour = Canon.refine(net, cells, function(
-		c: Cell,
-		colour: {
-			[Cell]: string,
-		}
-	): string
-		const parts: { string } = {}
+	const colour = Canon.refine(
+		net, cells, function(
+			c: Cell,
+			colour: {
+				[Cell]: string,
+			}
+		): string
+			const parts: { string } = {}
 
-		for slot = 1, Net.portCount(net.Tag[c]) do
-			const q = net.Link[Net.port(c, slot)] or 0
+			for slot = 1, Net.portCount(net.Tag[c]) do
+				const q = net.Link[Net.port(c, slot)] or 0
 
-			if q == 0 then
-				table.insert(parts, `{slot}f`)
-			else
-				table.insert(parts, `{slot}{portName(q)}{colour[Net.owner(q)]}`)
-			end
+				if q == 0 then
+					table.insert(parts, `{slot}f`)
+				else
+					table.insert(parts, `{slot}{portName(q)}{colour[Net.owner(q)]}`)
+			end end
+
+			table.sort(parts)
+
+			return `{net.Tag[c]}[{table.concat(parts, ",")}]`
 		end
-
-		table.sort(parts)
-
-		return `{net.Tag[c]}[{table.concat(parts, ",")}]`
-	end)
+	)
 	const list: { string } = {}
 
 	for _, c in cells do

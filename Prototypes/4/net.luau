@@ -29,6 +29,7 @@ const GAMMA: Gamma = "Gamma"
 const DELTA: Delta = "Delta"
 const EPSILON: Epsilon = "Epsilon"
 const STRIDE = 3
+
 -- The port in a given slot of a cell: 1 is the principal port, 2 and 3 the auxiliaries.
 const function port(
 	c: Cell,
@@ -77,7 +78,6 @@ const function portCount(
 		else
 			3
 end
-
 
 -- To sum up, a net is completely described by the following data:
 --     a finite set X (of free ports),

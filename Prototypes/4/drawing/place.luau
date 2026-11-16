@@ -4,10 +4,10 @@
 -- Puts every cell of one connected part on the integer grid. A spring layout suggests which way each wire should run, then a breadth-first walk places cells on the grid to match it.
 
 local Canon = require "../canon"
-local G = require "./geometry"
 local Net = require "../net"
-local Symmetry = require "./symmetry"
 local Types = require "../types"
+local G = require "./geometry"
+local Symmetry = require "./symmetry"
 
 type Cell = Types.Cell
 type Net = Types.Net
