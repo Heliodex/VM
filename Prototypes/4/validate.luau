@@ -18,6 +18,7 @@ const L = require "./lambda"
 const Li = require "./lists"
 const Net = require "./net"
 const N = require "./numerals"
+const Rec = require "./recursion"
 const Rules = require "./rules"
 const Types = require "./types"
 
@@ -380,6 +381,55 @@ for n = 0, 3 do
 	N.church(twice, n)
 	report(taken < ARITH_BUDGET and Canon.isomorphic(net, twice:finish()), `a δ fan copies the code of numeral {n} into two that decode  ({taken} steps)`)
 end
+
+-- Recursion through codes: length and sum fold over a list, and the recursive function on its own reduces to a normal form instead of unfolding.
+do
+	const b = B.new()
+	Rec.length(b)
+	const net = b:finish()
+	const taken = steps(net)
+	report(taken < ARITH_BUDGET, `length on its own reaches a normal form  ({taken} steps)`)
+end
+
+for _, elements in {
+	{},
+	{
+		7,
+	},
+	{
+		7,
+		8,
+	},
+	{
+		1,
+		2,
+		3,
+	},
+} do
+	local expected = 0
+
+	for _, k in elements do
+		expected += k
+	end
+
+	for _, case in {
+		{
+			name = "length",
+			build = Rec.length,
+			want = #elements,
+		},
+		{
+			name = "sum",
+			build = Rec.sum,
+			want = expected,
+		},
+	} do
+		const b = B.new()
+		L.app(b, case.build(b), listOf(b, elements))
+		const net = b:finish()
+		const taken = steps(net)
+		report(taken < ARITH_BUDGET and N.readback(net) == case.want, `{case.name} of {#elements} elements is {case.want}  ({taken} steps)`)
+end end
 
 if failures > 0 then
 	error(`{failures} of {total} checks failed`)
