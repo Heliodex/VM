@@ -98,7 +98,9 @@ Milestones:
 2. **Copy without reduction.** Copy a code and check that no reduction happens until the decoder is attached.
 3. **Recursion.** Store the self-reference as a code and decode it only when the list's case fires (option 1 with a passive self-reference).
 
-Milestone 1 is well defined and testable with the existing harness. Milestone 3 is the riskiest, and I don't know yet how the decoder would be driven from the list.
+Milestones 1 and 2 are done (`Prototypes/4/codes.luau`, checked in `validate.luau`). The code takes the δ cells out of the net and keeps their ports at the leaves of three γ multiplexers, one for principals and one for each auxiliary. The decoder is a dual multiplexer holding a single δ, which commutes through those trees and grows back into every δ that was taken out. This follows the idea of Fig. 8, but it is my own construction and not a transcription of the figure. So far it has only been checked on multiplexers, a transpositor and numerals 0 to 4. A δ fan copies the code without touching it, and each copy then decodes.
+
+Milestone 3 is still open. A code can be copied, but a recursive call needs the decoder's output to contain the code again. That is the "genetic code" step of §2.7, and it is where the cycle has to be broken.
 
 ### 3. Unrolling in the builder (works now, bounded)
 
