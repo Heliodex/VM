@@ -6,6 +6,7 @@
 --
 --   luau validate.luau
 
+const A = require "./arithmetic"
 const B = require "./builder"
 const Canon = require "./canon"
 const Cases = require "./cases"
@@ -13,7 +14,11 @@ const H = require "./harness"
 const L = require "./lambda"
 const Net = require "./net"
 const N = require "./numerals"
+const Types = require "./types"
 
+type Builder = B.Builder
+type Port = Types.Port
+const ARITH_BUDGET = 20000
 local failures = 0
 local total = 0
 
@@ -57,18 +62,81 @@ for n = 0, 5 do
 	report(result.outcome == "reduced" and N.readback(net) == n, `numeral {n} reads back as {n}  ({H.describe(result)})`)
 end
 
--- A value that is not a numeral reads back as nothing.
+-- Arithmetic: apply each operator to numerals in one net, reduce it, and read the result back.
+-- The operands are built into the same net as the operator, so the reduction does all the work.
+local function compute(
+	op: (Builder) -> Port,
+	operands: { number }
+): (H.Report, number?)
+	const b = B.new()
+	local term = op(b)
+
+	for _, k in operands do
+		term = L.app(b, term, N.church(b, k))
+	end
+
+	const net = b:finish()
+	const result = H.reduce(net, ARITH_BUDGET)
+
+	return result, N.readback(net)
+end
+
+for n = 0, 5 do
+	const result, got = compute(
+		A.successor, {
+			n,
+		}
+	)
+	report(result.outcome == "reduced" and got == n + 1, `successor of {n} is {n + 1}  ({H.describe(result)})`)
+end
+
+for m = 0, 3 do
+	for n = 0, 3 do
+		const result, got = compute(
+			A.addition, {
+				m,
+				n,
+			}
+		)
+		report(result.outcome == "reduced" and got == m + n, `{m} + {n} = {m + n}  ({H.describe(result)})`)
+end end
+
+for m = 0, 3 do
+	for n = 0, 3 do
+		const result, got = compute(
+			A.product, {
+				m,
+				n,
+			}
+		)
+		report(result.outcome == "reduced" and got == m * n, `{m} * {n} = {m * n}  ({H.describe(result)})`)
+end end
+
+-- A value that is not a numeral reads back as nothing. λf.λx.λy.x is not one: applied to two values it gives an abstraction, not a chain of applications.
+-- (The identity is not a counterexample: λx.x is η-equal to λf.λx.f x, which is numeral 1.)
 do
 	const b = B.new()
 	L.lam(
 		b, function(
-			x
+			_f
 		)
-			return x
+			return L.lam(
+				b, function(
+					x
+				)
+					return L.lam(
+						b, function(
+							_y
+						)
+							return x
+						end
+					)
+				end
+			)
 		end
 	)
-	const identity = b:finish()
-	report(N.readback(identity) == nil, "the identity does not read back as a numeral")
+	const constant = b:finish()
+	report(N.readback(constant) == nil, "λf.λx.λy.x does not read back as a numeral")
 end
 
 if failures > 0 then

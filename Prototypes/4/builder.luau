@@ -60,6 +60,17 @@ function BuilderClass.new(): Builder
 	)
 end
 
+-- A builder that adds to a net which already exists, so that a value can be applied to new ports without copying it.
+function BuilderClass.from(
+	net: Net
+): Builder
+	return setmetatable(
+		{
+			net = net,
+		} :: Builder, BuilderClass
+	)
+end
+
 local function make(
 	self: Builder,
 	symbol: Symbol
