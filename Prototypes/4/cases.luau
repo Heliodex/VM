@@ -5,6 +5,7 @@
 
 local B = require "./builder"
 local G = require "./gadgets"
+local L = require "./lambda"
 local Types = require "./types"
 
 type Builder = B.Builder
@@ -22,6 +23,18 @@ const function build(
 	f(b)
 
 	return b:finish()
+end
+
+-- lambda tests ---------------------------------------------------------------
+-- The identity abstraction, as a value. Its root is the abstraction's principal port and its variable is used once, straight through to the body.
+const function identity(
+	b: Builder
+): Port
+	return L.lam(b, function(
+		x: Port
+	): Port
+		return x
+	end)
 end
 
 -- gadget tests ----------------------------------------------------------------
@@ -376,6 +389,97 @@ const tests: { Test } = {
 		end,
 		expect = nil, -- does not terminate
 		budget = 200,
+	},
+	{
+		name = "lambda: identity applied to identity is identity",
+		start = function(
+			b
+		)
+			L.app(b, identity(b), identity(b))
+		end,
+		expect = function(
+			b
+		)
+			identity(b)
+		end,
+	},
+	{
+		name = "lambda: constant applied to two values erases the second",
+		start = function(
+			b
+		)
+			const constant = L.lam(b, function(
+				x: Port
+			): Port
+				return L.lam(b, function(
+					_y: Port
+				): Port
+					return x
+				end)
+			end)
+			L.app(b, L.app(b, constant, identity(b)), identity(b))
+		end,
+		expect = function(
+			b
+		)
+			identity(b)
+		end,
+	},
+	{
+		name = "lambda: a variable used twice is shared",
+		start = function(
+			b
+		)
+			const double = L.lam(b, function(
+				x: Port
+			): Port
+				const copies = L.share(b, x, 2)
+				return L.app(b, copies[1], copies[2])
+			end)
+			L.app(b, double, identity(b))
+		end,
+		expect = function(
+			b
+		)
+			identity(b)
+		end,
+	},
+	{
+		name = "lambda: a variable used three times is shared",
+		start = function(
+			b
+		)
+			const triple = L.lam(b, function(
+				x: Port
+			): Port
+				const copies = L.share(b, x, 3)
+				return L.app(b, L.app(b, copies[1], copies[2]), copies[3])
+			end)
+			L.app(b, triple, identity(b))
+		end,
+		expect = function(
+			b
+		)
+			identity(b)
+		end,
+	},
+	{
+		name = "lambda: an unused argument is erased",
+		start = function(
+			b
+		)
+			const ignore = L.lam(b, function(
+				_x: Port
+			): Port
+				return identity(b)
+			end)
+			L.app(b, ignore, identity(b))
+		end,
+		expect = function(
+			b
+		)
+			identity(b)
+		end,
 	},
 }
 
