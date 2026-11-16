@@ -6,6 +6,7 @@
 --   Z = λf. (λx. f (λv. x x v)) (λx. f (λv. x x v))
 -- Both copies of `f` and of `x` are made with `share`, so nothing is left unused.
 --
+-- Use recursion.luau instead, which recurses through codes and terminates. This module is kept to show why Z cannot work here.
 -- Known problem: interaction nets reduce everywhere, including inside lambdas that are never applied. A recursive call under a lambda therefore unfolds as soon as the lambda is built, and the unfolding never stops, so recursion over a list does not finish even for the empty list. Some divergent terms also end in stuck cyclic nets (`Z I` and `(λx.x x)(λx.x x)` both do), which the harness reports as finished. Recursion needs a different design before this module can be used.
 -- There are two causes, both shown by recursionprobe.luau. First, `share` copies with delta, and delta cannot copy a net that holds delta (Lafont's Lemma 3): copying `x` in `x x` meets the fans already inside the value, so `(λx. x x) 2` grows without end. Second, any recursive value holds the fan that copies it, so it copies itself under the lambda for ever. Tying the knot as a cycle instead of with Z avoids self-application but still diverges, even when the result is erased.
 --
