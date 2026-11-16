@@ -1,7 +1,7 @@
 --!strict
 -- OBSERVING A REDUCTION
 --
--- net.luau says how a net changes one step at a time; this says what happened when you let one run.
+-- rules.luau says how a net changes one step at a time; this says what happened when you let one run.
 -- The failure this file exists for is a net that never reaches a normal form, which is the ordinary failure here rather than an exotic one: the calculus is confluent but not strongly normalising, so a bad encoding loops quietly instead of erroring.
 -- Without something like this, that loop spends a budget and reports nothing, which is indistinguishable from a slow computation.
 --
@@ -17,7 +17,9 @@
 -- A cycle is only reported when `isomorphic` confirms the earlier net, so a repeat is never taken on the fingerprint alone.
 -- That comparison covers the cells and the wiring but not the order of the active pairs still pending, so a reported cycle is evidence rather than proof; the state space is finite, which is what makes the evidence good.
 
+local Canon = require "./canon"
 local Net = require "./net"
+local Rules = require "./rules"
 local Types = require "./types"
 
 type Net = Types.Net
@@ -29,6 +31,7 @@ export type Outcome =
 	| "reduced"
 	| "exhausted"
 	| "cycled"
+-- period and firstSeen are set only when the outcome is "cycled"
 export type Report = {
 	read outcome: Outcome,
 	read steps: number,
@@ -37,20 +40,8 @@ export type Report = {
 	read period: number?,
 	read firstSeen: number?,
 }
--- set only when the outcome is "cycled"
 const DEFAULT_BUDGET = 1000
 const MAX_TRACKED = 0x1000
-
--- The number of ports a symbol actually has, principal included.
-const function slots(
-	symbol: Symbol
-): number
-	return
-		if symbol == Net.EPSILON then
-			1
-		else
-			3
-end
 
 -- Which port of a cell a port id refers to, as it is written in a dump.
 const function portName(
@@ -67,71 +58,33 @@ end
 
 -- A summary of a net that does not depend on how its cells happen to be numbered.
 -- Colours start as symbols and are refined against the colours of whatever each port is wired to, so two nets that differ only by a renaming settle on the same summary.
--- This is not a canonical form: two different nets can share a summary, which is why a repeat is only believed once `isomorphic` agrees.
+-- This is not a canonical form: two different nets can share a summary, which is why a repeat is only believed once Canon.isomorphic agrees.
 const function fingerprint(
 	net: Net
 ): string
 	const cells = Net.liveCells(net)
-	local colour: {
-		[Cell]: string,
-	} = {}
-
-	for _, c in cells do
-		colour[c] = net.Tag[c]
-	end
-
-	for _ = 1, #cells do
-		const raw: {
+	const colour = Canon.refine(net, cells, function(
+		c: Cell,
+		colour: {
 			[Cell]: string,
-		} = {}
+		}
+	): string
+		const parts: { string } = {}
 
-		for _, c in cells do
-			const parts: { string } = {}
+		for slot = 1, Net.portCount(net.Tag[c]) do
+			const q = net.Link[Net.port(c, slot)] or 0
 
-			for slot = 1, slots(net.Tag[c]) do
-				const q = net.Link[Net.principal(c) + slot - 1] or 0
-
-				if q == 0 then
-					table.insert(parts, `{slot}f`)
-				else
-					table.insert(parts, `{slot}{portName(q)}{colour[Net.owner(q)]}`)
-			end end
-
-			table.sort(parts)
-			raw[c] = `{net.Tag[c]}[{table.concat(parts, ",")}]`
+			if q == 0 then
+				table.insert(parts, `{slot}f`)
+			else
+				table.insert(parts, `{slot}{portName(q)}{colour[Net.owner(q)]}`)
+			end
 		end
 
-		-- Rename the colours to short numbers before carrying them into the next round, since a colour names the colours it was built from and would otherwise double in length every round.
-		const next: {
-			[Cell]: string,
-		} = {}
-		const ids: {
-			[string]: string,
-		} = {}
-		local count = 0
-		local changed = false
+		table.sort(parts)
 
-		for _, c in cells do
-			local id = ids[raw[c]]
-
-			if not id then
-				count += 1
-				id = tostring(count)
-				ids[raw[c]] = id
-			end
-
-			next[c] = id
-
-			if id ~= colour[c] then
-				changed = true
-		end end
-
-		colour = next
-
-		if not changed then
-			break
-	end end
-
+		return `{net.Tag[c]}[{table.concat(parts, ",")}]`
+	end)
 	const list: { string } = {}
 
 	for _, c in cells do
@@ -203,7 +156,7 @@ const function reduce(
 		const previous = seen[mark]
 
 		if previous then
-			if Net.isomorphic(net, previous.net) then
+			if Canon.isomorphic(net, previous.net) then
 				return {
 					outcome = "cycled",
 					steps = steps,
@@ -231,7 +184,7 @@ const function reduce(
 			}
 		end
 
-		if not Net.step(net) then
+		if not Rules.step(net) then
 			return {
 				outcome = "reduced",
 				steps = steps,
@@ -255,7 +208,7 @@ const function dump(
 	for _, c in Net.liveCells(net) do
 		const parts: { string } = {}
 
-		for slot = 1, slots(net.Tag[c]) do
+		for slot = 1, Net.portCount(net.Tag[c]) do
 			const q = net.Link[Net.principal(c) + slot - 1] or 0
 			const name = portName(Net.principal(c) + slot - 1)
 
@@ -292,7 +245,7 @@ const function assertReducesTo(
 		error(`the net reduced to something that is not well formed\n{dump(start)}`)
 	end
 
-	if not Net.isomorphic(start, expect) then
+	if not Canon.isomorphic(start, expect) then
 		error(`the net reduced to something other than expected\n  reduced:\n{dump(start)}\n  expected:\n{dump(expect)}`)
 end end
 

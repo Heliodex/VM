@@ -1,16 +1,19 @@
 --!strict
--- THE INTERACTION NET ENGINE
+-- THE INTERACTION NET STRUCTURE
 --
--- Everything there is to know about a net and about reducing one: the symbols and the arithmetic on ports, building and rewiring cells and wires, the six interaction rules, and the step that applies one of them. A net is built by hand here -- there is no higher-level syntax for one yet -- and then reduced one step at a time until no redex is left, at which point the normal form is unique up to isomorphism, if there is one at all. Reduction does not always terminate, so a caller is expected to bound it; see main.luau.
+-- What a net is made of and how its ports are wired: the symbols, the arithmetic that turns a cell and a slot into a port, building and rewiring cells and wires, and the queries on a net.
+-- The six interaction rules that reduce a net are in rules.luau, and the test for two nets being the same up to a renaming of cells is in canon.luau.
+-- A net is built by hand here, or with builder.luau, and then reduced one step at a time until no redex is left, at which point the normal form is unique up to isomorphism, if there is one at all. Reduction does not always terminate, so a caller is expected to bound it; see harness.luau.
 --
 --   const Net = require "./net"
+--   const Rules = require "./rules"
 --
 --   const net = Net.newNet()
 --   local a = Net.alloc(net, Net.GAMMA)
 --   local b = Net.alloc(net, Net.GAMMA)
 --   Net.link(net, Net.principal(a), Net.principal(b))
 --
---   while Net.step(net) do
+--   while Rules.step(net) do
 --       ...
 --   end
 
@@ -26,6 +29,13 @@ const GAMMA: Gamma = "Gamma"
 const DELTA: Delta = "Delta"
 const EPSILON: Epsilon = "Epsilon"
 const STRIDE = 3
+-- The port in a given slot of a cell: 1 is the principal port, 2 and 3 the auxiliaries.
+const function port(
+	c: Cell,
+	slot: number
+): Port
+	return (c - 1) * STRIDE + slot
+end
 
 const function principal(
 	a: Cell
@@ -56,6 +66,18 @@ const function isPrincipal(
 ): boolean
 	return (p - 1) % STRIDE == 0
 end
+
+-- How many ports a cell with this symbol has, principal included.
+const function portCount(
+	symbol: Symbol
+): number
+	return
+		if symbol == EPSILON then
+			1
+		else
+			3
+end
+
 
 -- To sum up, a net is completely described by the following data:
 --     a finite set X (of free ports),
@@ -165,132 +187,6 @@ const function move(
 		table.insert(net.Active, q)
 end end
 
-type Rule = (net: Net, a: Cell, b: Cell) -> ()
--- The six interaction rules of Fig. 2, keyed by the pair of symbols meeting.
-const RULES: {
-	[Symbol]: {
-		[Symbol]: Rule,
-	},
-} = {
-	[GAMMA] = {},
-	[DELTA] = {},
-	[EPSILON] = {},
-}
--- Annihilation: gamma-gamma exchanges the auxiliary ports.
-RULES[GAMMA][GAMMA] = function(
-	net,
-	a,
-	b
-)
-	splice(net, aux1(a), aux2(b))
-	splice(net, aux2(a), aux1(b))
-	release(net, a)
-	release(net, b)
-end
--- Annihilation: delta-delta connects them straight.
-RULES[DELTA][DELTA] = function(
-	net,
-	a,
-	b
-)
-	splice(net, aux1(a), aux1(b))
-	splice(net, aux2(a), aux2(b))
-	release(net, a)
-	release(net, b)
-end
--- Annihilation: two erasers simply vanish.
-RULES[EPSILON][EPSILON] = function(
-	net,
-	a,
-	b
-)
-	release(net, a)
-	release(net, b)
-end
-
--- Commutation of two different binary cells: each becomes two copies, wired into the square of Fig. 2. a and b must carry different symbols.
-const function commute(
-	net: Net,
-	a: Cell,
-	b: Cell
-)
-	const atag = net.Tag[a]
-	const btag = net.Tag[b]
-	const a1, a2 = alloc(net, atag), alloc(net, atag)
-	const b1, b2 = alloc(net, btag), alloc(net, btag)
-	-- every continuation now meets the principal port of a copy
-	move(net, aux1(a), principal(b1))
-	move(net, aux2(a), principal(b2))
-	move(net, aux1(b), principal(a2))
-	move(net, aux2(b), principal(a1))
-	-- cross-wire the copies
-	link(net, aux2(b1), aux1(a1))
-	link(net, aux1(b1), aux1(a2))
-	link(net, aux2(b2), aux2(a1))
-	link(net, aux1(b2), aux2(a2))
-	release(net, a)
-	release(net, b)
-end
-
-RULES[GAMMA][DELTA] = commute
-RULES[DELTA][GAMMA] = commute
-
--- Commutation with an eraser: every auxiliary port gets its own eraser.
--- Exactly one of a, b is the eraser, so the binary cell is found regardless of the order in which the active pair happened to be discovered.
-const function erase(
-	net: Net,
-	a: Cell,
-	b: Cell
-)
-	local x, e = a, b
-
-	if net.Tag[x] == EPSILON then
-		x, e = b, a
-	end
-
-	const e1, e2 = alloc(net, EPSILON), alloc(net, EPSILON)
-	move(net, aux1(x), principal(e1))
-	move(net, aux2(x), principal(e2))
-	release(net, x)
-	release(net, e)
-end
-
-RULES[GAMMA][EPSILON] = erase
-RULES[EPSILON][GAMMA] = erase
-RULES[DELTA][EPSILON] = erase
-RULES[EPSILON][DELTA] = erase
-
--- Perform a single interaction, if any. Returns whether one happened.
-const function step(
-	net: Net
-): boolean
-	-- Pop the *oldest* redex, not the newest. With a LIFO stack, freshly created redexes keep landing on top of older ones, so an older pair can be starved forever; delta(epsilon, x) = gamma(x, epsilon) then grows without bound instead of cycling. FIFO is fair: every enqueued pair is eventually taken.
-	const active = net.Active
-
-	while #active > 0 do
-		const p = active[1]
-		table.remove(active, 1)
-		const q = net.Link[p]
-
-		if q == 0 or not isPrincipal(q) or net.Link[q] ~= p then
-			continue -- free port, stale entry, or already reduced
-		end
-
-		const a, b = owner(p), owner(q)
-		const rule = RULES[net.Tag[a]][net.Tag[b]]
-
-		if not rule then
-			error(`No rule for {net.Tag[a]} meeting {net.Tag[b]}`)
-		end
-
-		rule(net, a, b)
-
-		return true
-	end
-
-	return false
-end
-
 -- queries ------------------------------------------------------------------
 const function wellFormed(
 	net: Net
@@ -325,130 +221,13 @@ const function liveCells(
 	return live
 end
 
--- Same net up to renaming of cells. Cell ids are recycled during reduction, so two equal results usually have completely different ids.
--- One net's cells are walked in the order its wires visit them, and each is committed to a cell of the other, checking as it goes that every wire whose far end is already committed agrees.
--- Checking only once the whole renaming is built would try every renaming of the net before rejecting any of them, which is hopeless once more than a dozen cells share a symbol.
-const function isomorphic(
-	a: Net,
-	b: Net
-): boolean
-	const left, right = liveCells(a), liveCells(b)
-
-	if #left ~= #right then
-		return false
-	end
-
-	-- Walk the cells in the order the wires lead from one to the next, in each connected part in turn, so that a cell is almost always reached after a neighbour of it has been committed.
-	const order: { Cell } = {}
-	const walked: {
-		[Cell]: boolean,
-	} = {}
-
-	for _, seed in left do
-		if walked[seed] then
-			continue
-		end
-
-		walked[seed] = true
-		const queue: { Cell } = {
-			seed,
-		}
-		local head = 1
-
-		while head <= #queue do
-			const c = queue[head]
-			head += 1
-			table.insert(order, c)
-
-			for slot = 1, STRIDE do
-				const q = a.Link[(c - 1) * STRIDE + slot] or 0
-
-				if q ~= 0 then
-					const near = owner(q)
-
-					if near ~= c and not walked[near] then
-						walked[near] = true
-						table.insert(queue, near)
-	end end end end end
-
-	const map: {
-		[Cell]: Cell,
-	} = {}
-	const back: {
-		[Cell]: Cell,
-	} = {}
-
-	-- Whether the two cells agree everywhere their wires already reach a committed cell.
-	-- A wire whose far end is not committed yet cannot be judged, but it will be judged from the other side when that end is committed.
-	const function agrees(
-		ca: Cell,
-		cb: Cell
-	): boolean
-		const pa, pb = (ca - 1) * STRIDE, (cb - 1) * STRIDE
-
-		for slot = 1, STRIDE do
-			const x, y = a.Link[pa + slot] or 0, b.Link[pb + slot] or 0
-			const x0, y0 = x == 0, y == 0
-
-			if x0 ~= y0 then
-				return false
-			end
-
-			if x == 0 then
-				continue
-			end
-
-			if (x - 1) % STRIDE ~= (y - 1) % STRIDE then
-				return false
-			end
-
-			const there, here = owner(x), owner(y)
-			const placed = map[there]
-
-			if placed ~= nil and placed ~= here then
-				return false
-			end
-
-			const claimed = back[here]
-
-			if claimed ~= nil and claimed ~= there then
-				return false
-		end end
-
-		return true
-	end
-
-	const function search(
-		i: number
-	): boolean
-		if i > #order then
-			return true
-		end
-
-		const ca = order[i]
-
-		for _, cb in right do
-			if back[cb] == nil and a.Tag[ca] == b.Tag[cb] and agrees(ca, cb) then
-				map[ca], back[cb] = cb, ca
-
-				if search(i + 1) then
-					return true
-				end
-
-				map[ca], back[cb] = nil, nil
-		end end
-
-		return false
-	end
-
-	return search(1)
-end
-
 return {
 	GAMMA = GAMMA,
 	DELTA = DELTA,
 	EPSILON = EPSILON,
 	STRIDE = STRIDE,
+	port = port,
+	portCount = portCount,
 	principal = principal,
 	aux1 = aux1,
 	aux2 = aux2,
@@ -460,8 +239,6 @@ return {
 	link = link,
 	splice = splice,
 	move = move,
-	step = step,
 	wellFormed = wellFormed,
 	liveCells = liveCells,
-	isomorphic = isomorphic,
 }

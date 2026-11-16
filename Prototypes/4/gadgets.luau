@@ -172,19 +172,19 @@ const function permutation(
 			error(`port {i} goes to {image}, which goes to {sigma[image]}, so this is not an involution`)
 	end end
 
-	local pairs = 0
+	local swaps = 0
 
 	for i = 1, n do
 		if sigma[i] ~= i then
-			pairs += 1
+			swaps += 1
 	end end
 
-	pairs //= 2
-	const transposed = transpositor(b, pairs, n - 2 * pairs)
+	swaps //= 2
+	const transposed = transpositor(b, swaps, n - 2 * swaps)
 	-- the transpositor expects each swapped pair first and each fixed port afterwards, so work out which of its ports each of ours is
 	const where: { number } = {}
 	local pair = 1
-	local fixed = 2 * pairs + 1
+	local fixed = 2 * swaps + 1
 
 	for i = 1, n do
 		if sigma[i] == i then

@@ -1,5 +1,5 @@
 --!strict
--- Types shared by main.luau (the reduction engine) and diagram.luau (the SVG renderer). Requiring this module yields an empty table at runtime; the point is the exported types.
+-- Types shared across the engine (net.luau, rules.luau), the builders (builder.luau, gadgets.luau), the observers (harness.luau, canon.luau) and the renderer (diagram.luau and drawing/). Requiring this module yields an empty table at runtime; the point is the exported types.
 
 export type Gamma = "Gamma"
 export type Delta = "Delta"
