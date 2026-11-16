@@ -350,7 +350,9 @@ const function isomorphic(
 		end
 
 		walked[seed] = true
-		const queue: { Cell } = { seed }
+		const queue: { Cell } = {
+			seed,
+		}
 		local head = 1
 
 		while head <= #queue do
@@ -367,8 +369,7 @@ const function isomorphic(
 					if near ~= c and not walked[near] then
 						walked[near] = true
 						table.insert(queue, near)
-		end end end end
-	end
+	end end end end end
 
 	const map: {
 		[Cell]: Cell,
@@ -448,22 +449,18 @@ return {
 	DELTA = DELTA,
 	EPSILON = EPSILON,
 	STRIDE = STRIDE,
-
 	principal = principal,
 	aux1 = aux1,
 	aux2 = aux2,
 	owner = owner,
 	isPrincipal = isPrincipal,
-
 	newNet = newNet,
 	alloc = alloc,
 	release = release,
 	link = link,
 	splice = splice,
 	move = move,
-
 	step = step,
-
 	wellFormed = wellFormed,
 	liveCells = liveCells,
 	isomorphic = isomorphic,

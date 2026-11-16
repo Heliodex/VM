@@ -117,7 +117,7 @@ const function transpositor(
 
 	if p + q == 1 then
 		if p == 0 then
-			error("T(0, 1) is a bare wire, which has no cell to build")
+			error "T(0, 1) is a bare wire, which has no cell to build"
 		end
 
 		-- T(1, 0) leaves nothing for a tail to do, so its single gamma is the whole construction
@@ -170,19 +170,16 @@ const function permutation(
 
 		if sigma[image] ~= i then
 			error(`port {i} goes to {image}, which goes to {sigma[image]}, so this is not an involution`)
-		end
-	end
+	end end
 
 	local pairs = 0
 
 	for i = 1, n do
 		if sigma[i] ~= i then
 			pairs += 1
-		end
-	end
+	end end
 
 	pairs //= 2
-
 	const transposed = transpositor(b, pairs, n - 2 * pairs)
 	-- the transpositor expects each swapped pair first and each fixed port afterwards, so work out which of its ports each of ours is
 	const where: { number } = {}
@@ -197,8 +194,7 @@ const function permutation(
 			where[i] = pair
 			where[sigma[i]] = pair + 1
 			pair += 2
-		end
-	end
+	end end
 
 	const ports: { Port } = {}
 
