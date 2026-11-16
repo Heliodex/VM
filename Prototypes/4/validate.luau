@@ -11,11 +11,14 @@ const Bo = require "./booleans"
 const B = require "./builder"
 const Canon = require "./canon"
 const Cases = require "./cases"
+const Codes = require "./codes"
+const G = require "./gadgets"
 const H = require "./harness"
 const L = require "./lambda"
 const Li = require "./lists"
 const Net = require "./net"
 const N = require "./numerals"
+const Rules = require "./rules"
 const Types = require "./types"
 
 type Builder = B.Builder
@@ -306,6 +309,76 @@ do
 	)
 	const constant = b:finish()
 	report(N.readback(constant) == nil, "λf.λx.λy.x does not read back as a numeral")
+end
+
+-- Codes: a code has no δ in it, decoding it gives back the net it was made from, and a δ fan copies it so that each copy decodes to the same net.
+const function steps(
+	net: Net
+): number
+	local count = 0
+
+	while count < ARITH_BUDGET and Rules.step(net) do
+		count += 1
+	end
+
+	return count
+end
+
+const encodable: { {
+	name: string,
+	make: () -> Net,
+} } = {
+	{
+		name = "T(4)",
+		make = function()
+			const b = B.new()
+			G.autodualMultiplexer(b, 4)
+
+			return b:finish()
+		end,
+	},
+	{
+		name = "T(2, 1)",
+		make = function()
+			const b = B.new()
+			G.transpositor(b, 2, 1)
+
+			return b:finish()
+		end,
+	},
+	{
+		name = "numeral 3",
+		make = function()
+			return N.numeral(3)
+		end,
+	},
+}
+
+for _, case in encodable do
+	const original = case.make()
+	const b = B.new()
+	const code = Codes.encode(b, original)
+	const clean = not Codes.hasDelta(b.net)
+	const d = Codes.decoder(b, #Codes.freePorts(original))
+	b:wire(code, d.principal)
+	const net = b:finish()
+	const taken = steps(net)
+	report(clean and taken < ARITH_BUDGET and Canon.isomorphic(net, case.make()), `the code of {case.name} has no δ and decodes to it  ({taken} steps)`)
+end
+
+for n = 0, 3 do
+	const b = B.new()
+	const code = Codes.encode(b, N.numeral(n))
+	const fan = b:delta()
+	b:wire(code, fan.principal)
+	b:wire(fan.aux1, Codes.decoder(b, 1).principal)
+	b:wire(fan.aux2, Codes.decoder(b, 1).principal)
+	const net = b:finish()
+	const taken = steps(net)
+	const twice = B.new()
+	N.church(twice, n)
+	N.church(twice, n)
+	report(taken < ARITH_BUDGET and Canon.isomorphic(net, twice:finish()), `a δ fan copies the code of numeral {n} into two that decode  ({taken} steps)`)
 end
 
 if failures > 0 then
