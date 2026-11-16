@@ -13,11 +13,13 @@ const Canon = require "./canon"
 const Cases = require "./cases"
 const H = require "./harness"
 const L = require "./lambda"
+const Li = require "./lists"
 const Net = require "./net"
 const N = require "./numerals"
 const Types = require "./types"
 
 type Builder = B.Builder
+type Net = Types.Net
 type Port = Types.Port
 const ARITH_BUDGET = 20000
 local failures = 0
@@ -153,6 +155,118 @@ for _, c in {
 		const result = H.reduce(net, H.DEFAULT_BUDGET)
 		report(result.outcome == "reduced" and Bo.readback(net) == c, `if {c} then true else false is {c}  ({H.describe(result)})`)
 end end
+
+-- Lists: build a list of numerals, take it apart, and read the parts back.
+local function listOf(
+	b: Builder,
+	elements: { number }
+): Port
+	local list = Li.nilValue(b)
+
+	for i = #elements, 1, -1 do
+		list = L.app(b, L.app(b, Li.cons(b), N.church(b, elements[i])), list)
+	end
+
+	return list
+end
+
+-- Build a term with `build`, reduce it, and return the report and the net.
+local function evaluate(
+	build: (Builder) -> Port
+): (H.Report, Net)
+	const b = B.new()
+	build(b)
+	const net = b:finish()
+
+	return H.reduce(net, H.DEFAULT_BUDGET), net
+end
+
+const DEFAULT = 9
+
+for _, elements in {
+	{},
+	{
+		4,
+	},
+	{
+		2,
+		3,
+	},
+} do
+	const want = #elements == 0
+	const result, net = evaluate(function(
+		b
+	)
+		return L.app(b, Li.isNil(b), listOf(b, elements))
+	end)
+	report(result.outcome == "reduced" and Bo.readback(net) == want, `isNil of {#elements} elements is {want}  ({H.describe(result)})`)
+end
+
+do
+	const result, net = evaluate(function(
+		b
+	)
+		return L.app(
+			b, L.app(
+				b, Li.head(b), listOf(
+					b, {
+						2,
+						3,
+					}
+				)
+			), N.church(b, DEFAULT)
+		)
+	end)
+	report(result.outcome == "reduced" and N.readback(net) == 2, `head of [2, 3] is 2  ({H.describe(result)})`)
+end
+
+do
+	const result, net = evaluate(function(
+		b
+	)
+		const rest = L.app(
+			b, L.app(
+				b, Li.tail(b), listOf(
+					b, {
+						2,
+						3,
+					}
+				)
+			), N.church(b, DEFAULT)
+		)
+
+		return L.app(b, L.app(b, Li.head(b), rest), N.church(b, DEFAULT))
+	end)
+	report(result.outcome == "reduced" and N.readback(net) == 3, `head of tail of [2, 3] is 3  ({H.describe(result)})`)
+end
+
+do
+	const result, net = evaluate(function(
+		b
+	)
+		return L.app(b, L.app(b, Li.head(b), Li.nilValue(b)), N.church(b, DEFAULT))
+	end)
+	report(result.outcome == "reduced" and N.readback(net) == DEFAULT, `head of [] is the default {DEFAULT}  ({H.describe(result)})`)
+end
+
+do
+	const result, net = evaluate(function(
+		b
+	)
+		return L.app(
+			b, Li.isNil(b), L.app(
+				b, L.app(
+					b, Li.tail(b), listOf(
+						b, {
+							2,
+						}
+					)
+				), Bo.boolean(b, false)
+			)
+		)
+	end)
+	report(result.outcome == "reduced" and Bo.readback(net) == true, `tail of [2] is empty  ({H.describe(result)})`)
+end
 
 -- Values that are not booleans read back as nothing.
 do

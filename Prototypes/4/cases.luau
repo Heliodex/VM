@@ -30,11 +30,13 @@ end
 const function identity(
 	b: Builder
 ): Port
-	return L.lam(b, function(
-		x: Port
-	): Port
-		return x
-	end)
+	return L.lam(
+		b, function(
+			x: Port
+		): Port
+			return x
+		end
+	)
 end
 
 -- gadget tests ----------------------------------------------------------------
@@ -408,15 +410,19 @@ const tests: { Test } = {
 		start = function(
 			b
 		)
-			const constant = L.lam(b, function(
-				x: Port
-			): Port
-				return L.lam(b, function(
-					_y: Port
+			const constant = L.lam(
+				b, function(
+					x: Port
 				): Port
-					return x
-				end)
-			end)
+					return L.lam(
+						b, function(
+							_y: Port
+						): Port
+							return x
+						end
+					)
+				end
+			)
 			L.app(b, L.app(b, constant, identity(b)), identity(b))
 		end,
 		expect = function(
@@ -430,12 +436,15 @@ const tests: { Test } = {
 		start = function(
 			b
 		)
-			const double = L.lam(b, function(
-				x: Port
-			): Port
-				const copies = L.share(b, x, 2)
-				return L.app(b, copies[1], copies[2])
-			end)
+			const double = L.lam(
+				b, function(
+					x: Port
+				): Port
+					const copies = L.share(b, x, 2)
+
+					return L.app(b, copies[1], copies[2])
+				end
+			)
 			L.app(b, double, identity(b))
 		end,
 		expect = function(
@@ -449,12 +458,15 @@ const tests: { Test } = {
 		start = function(
 			b
 		)
-			const triple = L.lam(b, function(
-				x: Port
-			): Port
-				const copies = L.share(b, x, 3)
-				return L.app(b, L.app(b, copies[1], copies[2]), copies[3])
-			end)
+			const triple = L.lam(
+				b, function(
+					x: Port
+				): Port
+					const copies = L.share(b, x, 3)
+
+					return L.app(b, L.app(b, copies[1], copies[2]), copies[3])
+				end
+			)
 			L.app(b, triple, identity(b))
 		end,
 		expect = function(
@@ -468,11 +480,13 @@ const tests: { Test } = {
 		start = function(
 			b
 		)
-			const ignore = L.lam(b, function(
-				_x: Port
-			): Port
-				return identity(b)
-			end)
+			const ignore = L.lam(
+				b, function(
+					_x: Port
+				): Port
+					return identity(b)
+				end
+			)
 			L.app(b, ignore, identity(b))
 		end,
 		expect = function(
