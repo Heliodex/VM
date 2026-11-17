@@ -16,6 +16,8 @@ export type Expr = {
 	read value: number?,
 	read name: string?,
 	read items: { Expr }?,
+	-- the byte offset where the expression starts in the source, if it came from source
+	read at: number?,
 }
 
 type Token = {
@@ -24,29 +26,35 @@ type Token = {
 }
 
 const function num(
-	n: number
+	n: number,
+	at: number?
 ): Expr
 	return {
 		kind = "num",
 		value = n,
+		at = at,
 	}
 end
 
 const function sym(
-	name: string
+	name: string,
+	at: number?
 ): Expr
 	return {
 		kind = "sym",
 		name = name,
+		at = at,
 	}
 end
 
 const function list(
-	items: { Expr }
+	items: { Expr },
+	at: number?
 ): Expr
 	return {
 		kind = "list",
 		items = items,
+		at = at,
 	}
 end
 
@@ -110,9 +118,9 @@ local function parseAt(
 		const quoted, after = parseAt(tokens, i + 1)
 
 		return list({
-			sym("quote"),
+			sym("quote", t.at),
 			quoted,
-		}), after
+		}, t.at), after
 	end
 
 	if t.text == "(" then
@@ -127,7 +135,7 @@ local function parseAt(
 			end
 
 			if u.text == ")" then
-				return list(items), j + 1
+				return list(items, t.at), j + 1
 			end
 
 			local item: Expr
@@ -137,10 +145,10 @@ local function parseAt(
 	end
 
 	if string.match(t.text, "^%d+$") then
-		return num(tonumber(t.text) :: number), i + 1
+		return num(tonumber(t.text) :: number, t.at), i + 1
 	end
 
-	return sym(t.text), i + 1
+	return sym(t.text, t.at), i + 1
 end
 
 -- Every expression in the source, in order. An empty source has none.

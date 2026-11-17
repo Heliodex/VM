@@ -207,6 +207,9 @@ countIn = function(
 end
 
 local compile: (Expr, Scope, Builder) -> Port
+-- The form being built, by its byte offset, so that an error can say where it is. It is left at the form that raised the error.
+local currentAt: number? = nil
+local compileNode: (Expr, Scope, Builder) -> Port
 
 -- The lambda over names[i], then the ones after it, with the body under all of them. Each parameter's pool holds one copy for each use in what follows it.
 local function bindParams(
@@ -570,7 +573,7 @@ local function quoted(
 end
 
 -- The port that the expression `e` evaluates to, built into `b`.
-compile = function(
+compileNode = function(
 	e: Expr,
 	scope: Scope,
 	b: Builder
@@ -746,6 +749,24 @@ compile = function(
 	return fn
 end
 
+-- The port that the expression `e` evaluates to, built into `b`, and the position of `e` for any error.
+compile = function(
+	e: Expr,
+	scope: Scope,
+	b: Builder
+): Port
+	const saved = currentAt
+
+	if e.at ~= nil then
+		currentAt = e.at
+	end
+
+	const port = compileNode(e, scope, b)
+	currentAt = saved
+
+	return port
+end
+
 -- The name and expression of a top-level definition, or nil for any other form.
 const function asDefinition(
 	form: Expr
@@ -913,6 +934,37 @@ local function lowerForm(
 	return lowerLocal(form, {})
 end
 
+-- Adds a definition (already lowered) to a scope, or says why it cannot be one.
+local function addDefinition(
+	scope: Scope,
+	form: Expr,
+	last: boolean
+)
+	const name, expr = asDefinition(form)
+
+	if name == nil or expr == nil then
+		error "not a definition"
+	end
+
+	if last then
+		error(`the program ends in the definition of {name}, not in a value`)
+	end
+
+	const recursive = countIn(name, expr, false) > 0
+
+	if recursive and not lambdaParts(expr) then
+		error(`{name} refers to itself, but only a function can recurse`)
+	end
+
+	scope[name] = {
+		kind = "def",
+		name = name,
+		expr = expr,
+		scope = table.clone(scope),
+		recursive = recursive,
+	}
+end
+
 -- The port that the whole program evaluates to, built into `b`. The forms are definitions, followed by the one expression whose value it is.
 const function program(
 	forms: { Expr },
@@ -926,26 +978,8 @@ const function program(
 	end
 
 	for i, form in lowered do
-		const name, expr = asDefinition(form)
-
-		if name and expr then
-			if i == #lowered then
-				error(`the program ends in the definition of {name}, not in a value`)
-			end
-
-			const recursive = countIn(name, expr, false) > 0
-
-			if recursive and not lambdaParts(expr) then
-				error(`{name} refers to itself, but only a function can recurse`)
-			end
-
-			scope[name] = {
-				kind = "def",
-				name = name,
-				expr = expr,
-				scope = table.clone(scope),
-				recursive = recursive,
-			}
+		if asDefinition(form) ~= nil then
+			addDefinition(scope, form, i == #lowered)
 		else
 			if i ~= #lowered then
 				error "only the last form of a program may be an expression"
@@ -956,6 +990,54 @@ const function program(
 	end
 
 	error "the program has no expression to evaluate"
+end
+
+-- A session: definitions that persist from one form to the next, as in a REPL.
+export type Session = {
+	scope: Scope,
+}
+
+const function newSession(): Session
+	return {
+		scope = {},
+	}
+end
+
+-- Adds a top-level definition to the session.
+const function define(
+	session: Session,
+	form: Expr
+)
+	addDefinition(session.scope, lowerForm(form), false)
+end
+
+-- Whether a top-level form is a definition.
+const function isDefinition(
+	form: Expr
+): boolean
+	return asDefinition(form) ~= nil
+end
+
+-- The expression as a value to build, in the session's scope. The expression is lowered once, here, so building it again is cheap.
+const function expression(
+	session: Session,
+	form: Expr
+): (Builder) -> Port
+	const lowered = lowerForm(form)
+
+	return function(
+		b: Builder
+	): Port
+		return compile(lowered, session.scope, b)
+	end
+end
+
+-- Where the last error was raised, as a byte offset, or nil if it did not come from a form. Reading it clears it.
+const function failedAt(): number?
+	const at = currentAt
+	currentAt = nil
+
+	return at
 end
 
 -- Reads and compiles the source, then reduces the net under the budget. The program's value is the net's only free port.
@@ -984,6 +1066,11 @@ end
 return {
 	evaluate = evaluate,
 	build = build,
+	newSession = newSession,
+	define = define,
+	isDefinition = isDefinition,
+	expression = expression,
+	failedAt = failedAt,
 	symbolId = V.symbolId,
 	symbolName = V.symbolName,
 }
