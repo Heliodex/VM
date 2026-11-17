@@ -21,6 +21,7 @@ const Li = require "./lists"
 const Net = require "./net"
 const N = require "./numerals"
 const Reader = require "./reader"
+const S = require "./scott"
 const Rec = require "./recursion"
 const Rules = require "./rules"
 const Types = require "./types"
@@ -428,6 +429,123 @@ for _, elements in {
 		report(taken < ARITH_BUDGET and N.readback(net) == case.want, `{case.name} of {#elements} elements is {case.want}  ({taken} steps)`)
 end end
 
+-- Scott numerals ---------------------------------------------------------------
+-- Each numeral reads back as the number it was built from, and the arithmetic gives the right answers.
+for k = 0, 4 do
+	const result, got = S.readback(function(
+		b
+	)
+		return S.numeral(b, k)
+	end)
+	report(got == k, `Scott numeral {k} reads back as {k}  ({H.describe(result)})`)
+end
+
+do
+	const result, got = S.readback(function(
+		b
+	)
+		return L.app(b, S.successor(b), S.numeral(b, 3))
+	end)
+	report(got == 4, `successor of 3 is 4  ({H.describe(result)})`)
+end
+
+for _, case in {
+	{
+		m = 3,
+		want = 2,
+	},
+	{
+		m = 0,
+		want = 0,
+	},
+} do
+	const result, got = S.readback(function(
+		b
+	)
+		return L.app(b, S.predecessor(b), S.numeral(b, case.m))
+	end)
+	report(got == case.want, `predecessor of {case.m} is {case.want}  ({H.describe(result)})`)
+end
+
+for _, case in {
+	{
+		n = 0,
+		want = true,
+	},
+	{
+		n = 3,
+		want = false,
+	},
+} do
+	const result, net = S.evaluate(function(
+		b
+	)
+		return L.app(b, S.isZero(b), S.numeral(b, case.n))
+	end)
+	report(result.outcome == "reduced" and Bo.readback(net) == case.want, `{case.n} is zero is {case.want}  ({H.describe(result)})`)
+end
+
+for _, case in {
+	{
+		m = 2,
+		n = 3,
+		want = 5,
+	},
+	{
+		m = 0,
+		n = 4,
+		want = 4,
+	},
+	{
+		m = 3,
+		n = 0,
+		want = 3,
+	},
+} do
+	const result, got = S.readback(function(
+		b
+	)
+		return L.app(b, L.app(b, S.addition(b), S.numeral(b, case.m)), S.numeral(b, case.n))
+	end, ARITH_BUDGET)
+	report(got == case.want, `{case.m} + {case.n} = {case.want}  ({H.describe(result)})`)
+end
+
+for _, case in {
+	{
+		m = 2,
+		n = 3,
+		want = 6,
+	},
+	{
+		m = 0,
+		n = 5,
+		want = 0,
+	},
+	{
+		m = 3,
+		n = 0,
+		want = 0,
+	},
+} do
+	const result, got = S.readback(function(
+		b
+	)
+		return L.app(b, L.app(b, S.multiplication(b), S.numeral(b, case.m)), S.numeral(b, case.n))
+	end, ARITH_BUDGET * 4)
+	report(got == case.want, `{case.m} * {case.n} = {case.want}  ({H.describe(result)})`)
+end
+
+-- Copies of a numeral are sound now: a value with three uses, and a list used two different ways, are both right.
+do
+	const result, got = S.readback(function(
+		b
+	)
+		const xs = L.share(b, S.numeral(b, 2), 2)
+		return L.app(b, L.app(b, S.addition(b), xs[1]), xs[2])
+	end, ARITH_BUDGET)
+	report(got == 4, `a numeral copied in two and added to itself is 4  ({H.describe(result)})`)
+end
+
 -- Reader ----------------------------------------------------------------------
 -- Each source reads back as the expressions it should, comments and spacing aside.
 for index, case in {
@@ -522,8 +640,34 @@ for _, case in {
 		src = "(define length (lambda (l) (if (isNil l) 0 (succ (length (tail l nil)))))) (length (cons 1 (cons 2 (cons 3 nil))))",
 		want = 3,
 	},
+	-- A copied list, used two different ways: this was wrong with Church numerals.
+	{
+		src = "((lambda (x) (+ (head x 0) (head (tail x 0) 0))) (cons 2 (cons 3 nil)))",
+		want = 5,
+	},
+	{
+		src = "(define sum (lambda (l) (if (isNil l) 0 (+ (head l 0) (sum (tail l 0)))))) (sum (cons 1 (cons 2 (cons 3 nil))))",
+		want = 6,
+	},
+	{
+		src = "((lambda (x) (+ x (+ x x))) 3)",
+		want = 9,
+	},
+	-- A closed closure containing addition, used twice: this was wrong before closed arguments were substituted.
+	{
+		src = "((lambda (f) (+ (f 1) (f 2))) (lambda (n) (+ n 10)))",
+		want = 23,
+	},
+	{
+		src = "((lambda (x) ((lambda (g) (+ (g 1) (g 2))) (lambda (n) (+ n x)))) 10)",
+		want = 23,
+	},
+	{
+		src = "(define twice (lambda (g) (lambda (x) (g (g x))))) ((twice (lambda (n) (+ n 10))) 1)",
+		want = 21,
+	},
 } do
-	const result, built = Compile.evaluate(case.src, ARITH_BUDGET)
+	const result, built = Compile.evaluateNumeral(case.src, ARITH_BUDGET)
 	report(result.outcome == "reduced" and N.readback(built) == case.want, `{case.src}  is {case.want}  ({H.describe(result)})`)
 end
 
@@ -596,26 +740,6 @@ limitation("omega, (λx.x x)(λx.x x)", Cases.build(function(
 	omega(b)
 end))
 
--- A program whose value is wrong today. The value it gives is recorded, so a change either way is noticed.
--- Copying a list that contains numerals goes wrong when its copies are used differently: the fan that copies it is δ, and numerals of two or more are built with δ, so the copy sees δ meeting δ (Lafont's Lemma 3). Both copies being used the same way (head and head) comes out right, which is why this is easy to miss.
-const function wrongValue(
-	label: string,
-	src: string,
-	want: number,
-	got: number
-)
-	const result, built = Compile.evaluate(src, ARITH_BUDGET)
-	const value = N.readback(built)
-
-	if value == got then
-		print(`KNOWN  {label}  (gives {got}, should be {want}; {H.describe(result)})`)
-	else
-		report(false, `{label} now gives {value}, not {got}; if it is right now, move it to the checks  ({H.describe(result)})`)
-	end
-end
-
-wrongValue("two different uses of a copied list", "((lambda (x) (+ (head x 0) (head (tail x 0) 0))) (cons 2 (cons 3 nil)))", 5, 1)
-wrongValue("a recursive sum over a list used three ways", "(define sum (lambda (l) (if (isNil l) 0 (+ (head l 0) (sum (tail l 0)))))) (sum (cons 1 (cons 2 (cons 3 nil))))", 6, 1)
 
 if failures > 0 then
 	error(`{failures} of {total} checks failed`)

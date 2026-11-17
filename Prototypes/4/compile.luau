@@ -12,6 +12,8 @@
 --   (define f e)       a top-level definition, visible to everything after it
 -- The last form of a program is the expression whose value it is. Every form before it is a definition.
 --
+-- Numbers are Scott numerals (scott.luau), so a number can be copied with a δ fan. Numerals of this encoding contain no δ.
+--
 -- Variables are copied with `share` and erased with `erase` automatically. Before a binding is built, its body is counted for uses of its name, and each use takes one copy from the binding's pool, so nothing is left dangling or used twice.
 --
 -- Recursion: a top-level definition of a function may refer to its own name. Such a definition is compiled through recursion.luau, where the name stands for the recursive call, passed in as a code.
@@ -19,24 +21,26 @@
 --
 --   const Compile = require "./compile"
 --
---   const report, net = Compile.evaluate("(define double (lambda (n) (+ n n))) (double 3)")
---   -- reading back net gives 6
+--   const report, net = Compile.evaluateNumeral("(define double (lambda (n) (+ n n))) (double 3)")
+--   -- N.readback(net) is 6
 
-const A = require "./arithmetic"
 const B = require "./builder"
 const Bo = require "./booleans"
 const H = require "./harness"
 const L = require "./lambda"
 const Li = require "./lists"
-const N = require "./numerals"
+const Net = require "./net"
 const Rec = require "./recursion"
 const Reader = require "./reader"
+const S = require "./scott"
 const Types = require "./types"
 
 type Builder = B.Builder
 type Net = Types.Net
 type Port = Types.Port
 type Expr = Reader.Expr
+-- How many steps a program may take before it is given up on.
+const BUDGET = 200000
 
 -- What a name stands for in a scope.
 -- A "param" is a variable of an enclosing lambda, and a "self" is the recursive call of the function being defined. Both hold a pool of copies, one for each use still to come.
@@ -56,9 +60,9 @@ type Scope = {
 const BUILTINS: {
 	[string]: (Builder) -> Port,
 } = {
-	["+"] = A.addition,
-	["*"] = A.product,
-	succ = A.successor,
+	["+"] = S.addition,
+	["*"] = S.multiplication,
+	succ = S.successor,
 	["true"] = Bo.truth,
 	["false"] = Bo.falsity,
 	["nil"] = Li.nilValue,
@@ -352,6 +356,106 @@ local function compileRoutedIf(
 	return L.app(b, L.app(b, L.app(b, condition, yes), no), code)
 end
 
+-- Whether `e` depends on nothing that is only known when the net is built: every name it uses is a builtin, a definition, or one of its own inner lambdas' parameters. A closed argument can be copied by compiling it again, because it does not depend on the net around it.
+local function isClosedIn(
+	e: Expr,
+	scope: Scope,
+	bound: {
+		[string]: boolean,
+	}
+): boolean
+	if e.kind == "num" then
+		return true
+	elseif e.kind == "sym" then
+		const name = e.name :: string
+
+		if bound[name] then
+			return true
+		end
+
+		const binding = scope[name]
+
+		return binding == nil or binding.kind == "def"
+	end
+
+	const lambda = lambdaParts(e)
+
+	if lambda then
+		const inner = table.clone(bound)
+
+		for _, name in lambda.names do
+			inner[name] = true
+		end
+
+		return isClosedIn(lambda.body, scope, inner)
+	end
+
+	for _, item in e.items :: { Expr } do
+		if not isClosedIn(item, scope, bound) then
+			return false
+		end
+	end
+
+	return true
+end
+
+-- An application of a known function to closed arguments, compiled by putting each argument in the place of its parameter as source, so every use builds a fresh copy and nothing is shared.
+-- The function is a lambda written here, or a non-recursive definition whose expression is a lambda. Anything else, or an argument that depends on a variable of an enclosing lambda, is left to the general case.
+local function inlineCall(
+	items: { Expr },
+	scope: Scope,
+	b: Builder
+): Port?
+	const args: { Expr } = {}
+
+	for i = 2, #items do
+		table.insert(args, items[i])
+	end
+
+	if #args == 0 then
+		return nil
+	end
+
+	local lambda: Lambda? = nil
+	local bodyScope = scope
+	const head = items[1]
+
+	if head.kind == "list" then
+		lambda = lambdaParts(head)
+	elseif head.kind == "sym" then
+		const binding = scope[head.name :: string]
+
+		if binding and binding.kind == "def" and not binding.recursive and binding.expr and binding.scope then
+			lambda = lambdaParts(binding.expr)
+			bodyScope = binding.scope
+		end
+	end
+
+	if not lambda or #lambda.names ~= #args then
+		return nil
+	end
+
+	for _, arg in args do
+		if not isClosedIn(arg, scope, {}) then
+			return nil
+		end
+	end
+
+	const inner = table.clone(bodyScope)
+
+	for i, name in lambda.names do
+		inner[name] = {
+			kind = "def",
+			name = name,
+			expr = args[i],
+			scope = scope,
+			recursive = false,
+		}
+	end
+
+	return compile(lambda.body, inner, b)
+end
+
 -- The port that the expression `e` evaluates to, built into `b`.
 compile = function(
 	e: Expr,
@@ -359,7 +463,7 @@ compile = function(
 	b: Builder
 ): Port
 	if e.kind == "num" then
-		return N.church(b, e.value :: number)
+		return S.numeral(b, e.value :: number)
 	elseif e.kind == "sym" then
 		const name = e.name :: string
 		const binding = scope[name]
@@ -417,6 +521,12 @@ compile = function(
 
 	if isSym(items[1], "define") then
 		error "a definition can only be a top-level form"
+	end
+
+	const inlined = inlineCall(items, scope, b)
+
+	if inlined then
+		return inlined
 	end
 
 	local fn = compile(items[1], scope, b)
@@ -495,7 +605,7 @@ const function program(
 	error "the program has no expression to evaluate"
 end
 
--- Reads and compiles the source, then reduces the net under the budget. The program's value is the net's only free port, so N.readback reads it.
+-- Reads and compiles the source, then reduces the net under the budget. The program's value is the net's only free port.
 const function evaluate(
 	source: string,
 	budget: number?
@@ -504,9 +614,22 @@ const function evaluate(
 	program(Reader.read(source), b)
 	const net = b:finish()
 
-	return H.reduce(net, budget or H.DEFAULT_BUDGET), net
+	return H.reduce(net, budget or BUDGET), net
+end
+
+-- As evaluate, but the value is converted to a Church numeral first, so that its net's only free port reads back with numerals.luau. Only a program whose value is a number has a result here.
+const function evaluateNumeral(
+	source: string,
+	budget: number?
+): (H.Report, Net)
+	const b = B.new()
+	L.app(b, S.toChurch(b), program(Reader.read(source), b))
+	const net = b:finish()
+
+	return H.reduce(net, budget or BUDGET), net
 end
 
 return {
 	evaluate = evaluate,
+	evaluateNumeral = evaluateNumeral,
 }
