@@ -4,9 +4,9 @@
 -- Given the grid positions of a part, works out where every port of every cell sits on the page.
 -- Each free cell swings to the quarter turn that makes its wires straightest, then wires that still cross are untangled by swapping the positions of two cells the wiring cannot tell apart.
 
-local Canon = require "../canon"
-local Net = require "../net"
-local Types = require "../types"
+local Canon = require "../../engine/canon"
+local Net = require "../../engine/net"
+local Types = require "../../engine/types"
 local G = require "./geometry"
 
 type Cell = Types.Cell

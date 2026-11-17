@@ -14,8 +14,8 @@ local G = require "./drawing/geometry"
 local Layout = require "./drawing/layout"
 local Orient = require "./drawing/orient"
 local Route = require "./drawing/route"
-local Net = require "./net"
-local Types = require "./types"
+local Net = require "../engine/net"
+local Types = require "../engine/types"
 
 type Symbol = Types.Symbol
 type Net = Types.Net

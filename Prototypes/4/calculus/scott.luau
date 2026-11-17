@@ -15,15 +15,15 @@
 --   end)
 --   -- value is 5
 
-const B = require "./builder"
+const B = require "../engine/builder"
 const Bo = require "./booleans"
-const Canon = require "./canon"
-const H = require "./harness"
+const Canon = require "../engine/canon"
+const H = require "../engine/harness"
 const L = require "./lambda"
-const Net = require "./net"
-const Observe = require "./observe"
+const Net = require "../engine/net"
+const Observe = require "../engine/observe"
 const Rec = require "./recursion"
-const Types = require "./types"
+const Types = require "../engine/types"
 
 type Builder = B.Builder
 type Port = Types.Port

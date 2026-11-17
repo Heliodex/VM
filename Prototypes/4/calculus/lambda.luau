@@ -19,9 +19,9 @@
 --   const v = L.app(b, identity, identity)
 --   b:finish()
 
-const B = require "./builder"
-const G = require "./gadgets"
-const Types = require "./types"
+const B = require "../engine/builder"
+const G = require "../engine/gadgets"
+const Types = require "../engine/types"
 
 type Builder = B.Builder
 type Port = Types.Port

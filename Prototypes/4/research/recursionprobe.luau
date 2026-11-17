@@ -4,17 +4,17 @@
 -- Small nets that show why general recursion does not work with the current lambda encoding. See RECURSION.md for what each result means.
 -- Each probe is reduced with plain stepping under a fixed budget, because the harness fingerprints every state and is too slow for nets that grow.
 --
---   luau recursionprobe.luau
+--   luau research/recursionprobe.luau
 
-const B = require "./builder"
+const B = require "../engine/builder"
 const F = require "./fix"
-const G = require "./gadgets"
-const L = require "./lambda"
-const Li = require "./lists"
-const Net = require "./net"
-const Rules = require "./rules"
-const S = require "./scott"
-const Types = require "./types"
+const G = require "../engine/gadgets"
+const L = require "../calculus/lambda"
+const Li = require "../calculus/lists"
+const Net = require "../engine/net"
+const Rules = require "../engine/rules"
+const S = require "../calculus/scott"
+const Types = require "../engine/types"
 
 type Builder = B.Builder
 type Port = Types.Port

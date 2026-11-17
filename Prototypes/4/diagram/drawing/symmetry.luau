@@ -3,8 +3,8 @@
 --
 -- How many of the page's own axes a placement is symmetric about, so that the placer can prefer a drawing that lines up with the page.
 
-local Net = require "../net"
-local Types = require "../types"
+local Net = require "../../engine/net"
+local Types = require "../../engine/types"
 local G = require "./geometry"
 
 type Cell = Types.Cell

@@ -3,13 +3,13 @@
 --
 -- Each test builds a net, says what it should reduce to, and gives the step budget it is allowed.
 
-local B = require "./builder"
-local Canon = require "./canon"
-local G = require "./gadgets"
-local H = require "./harness"
-local L = require "./lambda"
-local Net = require "./net"
-local Types = require "./types"
+local B = require "../engine/builder"
+local Canon = require "../engine/canon"
+local G = require "../engine/gadgets"
+local H = require "../engine/harness"
+local L = require "../calculus/lambda"
+local Net = require "../engine/net"
+local Types = require "../engine/types"
 
 type Builder = B.Builder
 type Net = Types.Net

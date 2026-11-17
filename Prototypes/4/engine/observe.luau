@@ -6,7 +6,7 @@
 -- Scott numerals and booleans are both read this way. Each has its own readback, which compares an observation with the observations of the canonical values.
 
 const B = require "./builder"
-const L = require "./lambda"
+const L = require "../calculus/lambda"
 const Net = require "./net"
 const Rules = require "./rules"
 const Types = require "./types"

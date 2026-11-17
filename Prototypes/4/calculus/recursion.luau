@@ -8,12 +8,12 @@
 -- `fold` builds R for a fold over a Scott list, given the value for the empty list and the step for each element, and `tie` turns any R into the recursive function. Inside R, `recall` on the code argument is the recursive call.
 -- The folds themselves, such as length and sum, are in lists.luau, which knows what the numbers are.
 
-const B = require "./builder"
-const Codes = require "./codes"
+const B = require "../engine/builder"
+const Codes = require "../engine/codes"
 const L = require "./lambda"
-const Net = require "./net"
-const Rules = require "./rules"
-const Types = require "./types"
+const Net = require "../engine/net"
+const Rules = require "../engine/rules"
+const Types = require "../engine/types"
 
 type Builder = B.Builder
 type Port = Types.Port

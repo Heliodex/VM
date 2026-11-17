@@ -4,26 +4,27 @@
 -- Runs every case and checks only what it should reduce to, then checks that numerals read back to the number they were built from. No diagrams are drawn, so a run is fast.
 -- Prints one line per check and exits with an error if any check fails. main.luau is for looking at reductions; this is for knowing whether they are right.
 --
---   luau validate.luau
+--   lute run checks/validate.luau      (or: luau checks/validate.luau)
+--   run from Prototypes/4, so the relative paths resolve
 
-const Bo = require "./booleans"
-const B = require "./builder"
-const Canon = require "./canon"
+const Bo = require "../calculus/booleans"
+const B = require "../engine/builder"
+const Canon = require "../engine/canon"
 const Cases = require "./cases"
-const Codes = require "./codes"
-const Compile = require "./compile"
-const F = require "./fix"
-const G = require "./gadgets"
-const H = require "./harness"
-const L = require "./lambda"
-const Li = require "./lists"
-const Printer = require "./printer"
-const Session = require "./session"
-const Reader = require "./reader"
-const V = require "./values"
-const S = require "./scott"
-const Rules = require "./rules"
-const Types = require "./types"
+const Codes = require "../engine/codes"
+const Compile = require "../language/compile"
+const F = require "../research/fix"
+const G = require "../engine/gadgets"
+const H = require "../engine/harness"
+const L = require "../calculus/lambda"
+const Li = require "../calculus/lists"
+const Printer = require "../language/printer"
+const Session = require "../language/session"
+const Reader = require "../language/reader"
+const V = require "../language/values"
+const S = require "../calculus/scott"
+const Rules = require "../engine/rules"
+const Types = require "../engine/types"
 
 type Builder = B.Builder
 type Net = Types.Net

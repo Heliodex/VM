@@ -4,8 +4,8 @@
 -- Cells that share no wires are laid out on their own grids, then packed into rows so the whole drawing stays roughly square.
 -- Each part keeps a one-slot halo, and neighbouring parts stay a fixed two-slot gap apart.
 
-local Net = require "../net"
-local Types = require "../types"
+local Net = require "../../engine/net"
+local Types = require "../../engine/types"
 local G = require "./geometry"
 local Place = require "./place"
 

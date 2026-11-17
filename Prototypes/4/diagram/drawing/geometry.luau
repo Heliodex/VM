@@ -4,7 +4,7 @@
 -- The fixed sizes of a drawing and the plane geometry the layout and the router are built from: unit vectors, distances, crossings, quarter turns, and where a port sits on its cell.
 -- Cells sit on a square grid of PITCH pixels and turn in quarter turns only, so every direction a cell can face is one of the four DIRS.
 
-local Types = require "../types"
+local Types = require "../../engine/types"
 
 type Symbol = Types.Symbol
 export type Vec = {

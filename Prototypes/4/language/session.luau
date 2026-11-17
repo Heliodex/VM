@@ -15,7 +15,7 @@
 --   end
 
 const Compile = require "./compile"
-const H = require "./harness"
+const H = require "../engine/harness"
 const Reader = require "./reader"
 const V = require "./values"
 

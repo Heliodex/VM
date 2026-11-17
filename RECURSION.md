@@ -1,6 +1,6 @@
 # Recursion in the interaction-combinator prototype
 
-**Status: solved within the six rules.** `Prototypes/4/recursion.luau` defines `length` and `sum` over Scott lists using Lafont codes, and `validate.luau` checks them. See "Solution" below. The rest of this note is the history of the problem.
+**Status: solved within the six rules.** `Prototypes/4/calculus/recursion.luau` defines `length` and `sum` over Scott lists using Lafont codes, and `validate.luau` checks them. See "Solution" below. The rest of this note is the history of the problem.
 
 Hand-off note. The problem: we need general recursion (for example `length` and `sum` over lists) in the interaction-combinator prototype in `Prototypes/4/`, without adding primitives beyond the six interaction rules. The attempt so far has not terminated for recursive functions over lists, and the reasons are only partly understood.
 
@@ -58,7 +58,7 @@ Literature (see References) agrees with these points. Lafont (1997) shows a non-
 
 ## Findings (follow-up session)
 
-`Prototypes/4/recursionprobe.luau` runs the probes below (budget 20000 steps).
+`Prototypes/4/research/recursionprobe.luau` runs the probes below (budget 20000 steps).
 
 | Probe | Result |
 |---|---|
@@ -100,7 +100,7 @@ Milestones:
 2. **Copy without reduction.** Copy a code and check that no reduction happens until the decoder is attached.
 3. **Recursion.** Store the self-reference as a code and decode it only when the list's case fires (option 1 with a passive self-reference).
 
-Milestones 1 and 2 are done (`Prototypes/4/codes.luau`, checked in `validate.luau`). The code takes the δ cells out of the net and keeps their ports at the leaves of three γ multiplexers, one for principals and one for each auxiliary. The decoder is a dual multiplexer holding a single δ, which commutes through those trees and grows back into every δ that was taken out. This follows the idea of Fig. 8, but it is my own construction and not a transcription of the figure. So far it has only been checked on multiplexers, a transpositor and numerals 0 to 4. A δ fan copies the code without touching it, and each copy then decodes.
+Milestones 1 and 2 are done (`Prototypes/4/engine/codes.luau`, checked in `validate.luau`). The code takes the δ cells out of the net and keeps their ports at the leaves of three γ multiplexers, one for principals and one for each auxiliary. The decoder is a dual multiplexer holding a single δ, which commutes through those trees and grows back into every δ that was taken out. This follows the idea of Fig. 8, but it is my own construction and not a transcription of the figure. So far it has only been checked on multiplexers, a transpositor and numerals 0 to 4. A δ fan copies the code without touching it, and each copy then decodes.
 
 Milestone 3 is done too. See "Solution".
 

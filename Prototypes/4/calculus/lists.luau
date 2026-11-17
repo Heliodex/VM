@@ -11,11 +11,11 @@
 -- A list is read back one cell at a time: `isNil` says whether it is empty, and `head` and `tail` take it apart. Lists have no whole-value readback yet.
 
 const Bo = require "./booleans"
-const B = require "./builder"
+const B = require "../engine/builder"
 const L = require "./lambda"
 const Rec = require "./recursion"
 const S = require "./scott"
-const Types = require "./types"
+const Types = require "../engine/types"
 
 type Builder = B.Builder
 type Port = Types.Port

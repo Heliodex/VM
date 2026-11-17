@@ -15,9 +15,9 @@
 --   const b = B.new()
 --   const fix = F.fixpoint(b)
 
-const B = require "./builder"
-const L = require "./lambda"
-const Types = require "./types"
+const B = require "../engine/builder"
+const L = require "../calculus/lambda"
+const Types = require "../engine/types"
 
 type Builder = B.Builder
 type Port = Types.Port

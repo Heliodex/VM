@@ -27,12 +27,12 @@
 --   const report, net = Compile.evaluate("(define double (lambda (n) (+ n n))) (double 3)")
 --   -- S.readNet(net) is 6
 
-const B = require "./builder"
-const H = require "./harness"
-const L = require "./lambda"
-const Rec = require "./recursion"
+const B = require "../engine/builder"
+const H = require "../engine/harness"
+const L = require "../calculus/lambda"
+const Rec = require "../calculus/recursion"
 const Reader = require "./reader"
-const Types = require "./types"
+const Types = require "../engine/types"
 const V = require "./values"
 
 type Builder = B.Builder

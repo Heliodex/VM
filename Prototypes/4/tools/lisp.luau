@@ -2,18 +2,18 @@
 -- THE LISP REPL AND RUNNER
 --
 -- Run with lute:
---   lute run lisp.luau                 a REPL: type expressions and definitions, one per line
---   lute run lisp.luau program.lisp    run a file, printing the value of each expression
---   lute run lisp.luau -e "(+ 1 2)"    evaluate one expression
+--   lute run tools/lisp.luau                 a REPL: type expressions and definitions, one per line
+--   lute run tools/lisp.luau program.lisp    run a file, printing the value of each expression
+--   lute run tools/lisp.luau -e "(+ 1 2)"    evaluate one expression
 --
 -- In the REPL a form may run over several lines: input continues until its brackets are closed.
 -- `:reset` forgets every definition, and `:quit` leaves.
 -- Each expression may take at most BUDGET steps. An expression that does not finish in that is reported as such, and so is one that loops.
 -- The exit status is 1 if any form in a file or with -e was an error.
 
-const Printer = require "./printer"
-const Reader = require "./reader"
-const Session = require "./session"
+const Printer = require "../language/printer"
+const Reader = require "../language/reader"
+const Session = require "../language/session"
 const io = require "@std/io"
 const fs = require "@std/fs"
 const process = require "@std/process"
@@ -179,7 +179,7 @@ elseif userArgs[1] == "-e" then
 	const source = userArgs[2]
 
 	if source == nil then
-		print "usage: lute run lisp.luau -e \"expression\""
+		print "usage: lute run tools/lisp.luau -e \"expression\""
 		process.exit(2)
 	end
 

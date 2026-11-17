@@ -14,12 +14,12 @@
 --
 --   local result = V.read(function(b) return V.numberValue(b, 3) end)  -- {kind = "number", value = 3}
 
-const B = require "./builder"
-const Bo = require "./booleans"
-const H = require "./harness"
-const L = require "./lambda"
-const S = require "./scott"
-const Types = require "./types"
+const B = require "../engine/builder"
+const Bo = require "../calculus/booleans"
+const H = require "../engine/harness"
+const L = require "../calculus/lambda"
+const S = require "../calculus/scott"
+const Types = require "../engine/types"
 
 type Builder = B.Builder
 type Port = Types.Port

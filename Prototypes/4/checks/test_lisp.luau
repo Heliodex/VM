@@ -1,9 +1,9 @@
 --!strict
 -- TESTS OF THE COMMAND LINE
 --
--- Runs lisp.luau as a program, the way a user would, and checks what it prints and how it exits.
--- Run with: lute run test_lisp.luau
--- The checks in validate.luau cover the session and the values; these cover the runner and the REPL.
+-- Runs tools/lisp.luau as a program, the way a user would, and checks what it prints and how it exits.
+-- Run from Prototypes/4 with: lute run checks/test_lisp.luau
+-- The checks in checks/validate.luau cover the session and the values; these cover the runner and the REPL.
 
 const fs = require "@std/fs"
 const process = require "@std/process"
@@ -24,16 +24,16 @@ local function report(
 	print(`{if ok then "PASS" else "FAIL"}  {label}`)
 end
 
--- Runs lisp.luau with the given arguments, optionally feeding `input` to its standard input through the shell.
+-- Runs tools/lisp.luau with the given arguments, optionally feeding `input` to its standard input through the shell.
 local function lisp(
 	args: { string },
 	input: string?
 ): (string, number)
 	local result
 	if input == nil then
-		result = process.run({ "lute", "run", "lisp.luau", table.unpack(args) })
+		result = process.run({ "lute", "run", "tools/lisp.luau", table.unpack(args) })
 	else
-		result = process.run({ "/bin/sh", "-c", `printf '%s' '{input}' | lute run lisp.luau` })
+		result = process.run({ "/bin/sh", "-c", `printf '%s' '{input}' | lute run tools/lisp.luau` })
 	end
 
 	return result.stdout, result.exitcode
