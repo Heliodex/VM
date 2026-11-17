@@ -12,6 +12,7 @@ const B = require "./builder"
 const Canon = require "./canon"
 const Cases = require "./cases"
 const Codes = require "./codes"
+const F = require "./fix"
 const G = require "./gadgets"
 const H = require "./harness"
 const L = require "./lambda"
@@ -424,6 +425,63 @@ for _, elements in {
 		const taken = steps(net)
 		report(taken < ARITH_BUDGET and N.readback(net) == case.want, `{case.name} of {#elements} elements is {case.want}  ({taken} steps)`)
 end end
+
+-- Known limitations ----------------------------------------------------------
+-- These nets should loop, but they stop with no active pair left and no cycle seen while stepping. The harness reports them as `reduced`, the same as a real normal form, and nothing in the final net separates them from a value (the identity is also a net with a loop in it).
+-- They are printed as KNOWN, not counted as checks. Each still has to be reported as `reduced`: if the harness changes that, it is a failure, so this list gets revisited.
+const function limitation(
+	label: string,
+	net: Net
+)
+	const result = H.reduce(net, H.DEFAULT_BUDGET)
+
+	if result.outcome == "reduced" then
+		print(`KNOWN  {label}  ({H.describe(result)}; should not finish)`)
+	else
+		report(false, `{label} no longer stops as a stuck net, so move it back to the checks  ({H.describe(result)})`)
+	end
+end
+
+-- λx. x x
+const function selfApply(
+	b: Builder
+): Port
+	return L.lam(
+		b, function(
+			x: Port
+		): Port
+			const xs = L.share(b, x, 2)
+
+			return L.app(b, xs[1], xs[2])
+		end
+	)
+end
+
+-- Ω = (λx. x x)(λx. x x)
+const function omega(
+	b: Builder
+): Port
+	return L.app(b, selfApply(b), selfApply(b))
+end
+
+limitation("Z applied to the identity", Cases.build(function(
+	b: Builder
+)
+	L.app(
+		b, F.fixpoint(b), L.lam(
+			b, function(
+				x: Port
+			): Port
+				return x
+			end
+		)
+	)
+end))
+limitation("omega, (λx.x x)(λx.x x)", Cases.build(function(
+	b: Builder
+)
+	omega(b)
+end))
 
 if failures > 0 then
 	error(`{failures} of {total} checks failed`)
