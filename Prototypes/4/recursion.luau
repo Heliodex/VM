@@ -4,21 +4,14 @@
 -- A recursive value cannot hold itself: interaction nets reduce everywhere, so a value that contains its own recursive call unfolds for ever (see RECURSION.md). Instead it holds nothing of itself and takes its own code as an argument, R = λc. ..., and passes the code on to whichever branch needs to recurse. Only that branch copies the code and decodes one copy, and it does so under a variable that stays unbound until the branch is chosen, so nothing unfolds early.
 -- The code has no δ in it, so a δ fan can copy it (codes.luau), and decoding it gives back R, which is then applied to the other copy.
 --
--- Cost is linear in the data: length of an n-element list takes about 133 + 78n steps, and the net stays under a few hundred cells.
---
---   const Rec = require "./recursion"
---
---   const b = B.new()
---   L.app(b, Rec.length(b), list) -- reduces to a numeral
---
--- `fold` builds R for a fold over a Scott list, and `tie` turns any R into the recursive function. Inside R, `recall` on the code argument is the recursive call.
+-- Cost is linear in the data, since each element costs one recursive call.
+-- `fold` builds R for a fold over a Scott list, given the value for the empty list and the step for each element, and `tie` turns any R into the recursive function. Inside R, `recall` on the code argument is the recursive call.
+-- The folds themselves, such as length and sum, are in lists.luau, which knows what the numbers are.
 
-const A = require "./arithmetic"
 const B = require "./builder"
 const Codes = require "./codes"
 const L = require "./lambda"
 const Net = require "./net"
-const N = require "./numerals"
 const Rules = require "./rules"
 const Types = require "./types"
 
@@ -78,9 +71,10 @@ const function size(
 	return #Net.liveCells(r)
 end
 
--- R for a fold over a list: λc.λl. l (λh.λt.λc'. step h (recall c' t)) (λc'. 0) c.
+-- R for a fold over a list: λc.λl. l (λh.λt.λc'. step h (recall c' t)) (λc'. zero) c.
 -- The code goes in as the last argument of the list's case, so the cons branch gets it and the nil branch erases it. `step` builds the function that combines a head with the folded tail.
 const function fold(
+	zero: (Builder) -> Port,
 	step: (Builder) -> Port
 ): (Builder) -> Port
 	return function(
@@ -117,7 +111,7 @@ const function fold(
 							b, function(
 								_again: Port
 							): Port
-								return N.church(b, 0)
+								return zero(b)
 							end
 						)
 
@@ -128,36 +122,8 @@ const function fold(
 		)
 end end
 
--- The length of a list: each head is dropped and the folded tail is incremented.
-const function length(
-	b: Builder
-): Port
-	return tie(
-		b, fold(function(
-			own: Builder
-		): Port
-			return L.lam(
-				own, function(
-					_h: Port
-				): Port
-					return A.successor(own)
-				end
-			)
-		end)
-	)
-end
-
--- The sum of a list of numerals.
-const function sum(
-	b: Builder
-): Port
-	return tie(b, fold(A.addition))
-end
-
 return {
 	fold = fold,
-	length = length,
-	sum = sum,
 	recall = recall,
 	tie = tie,
 	size = size,

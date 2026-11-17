@@ -6,7 +6,6 @@
 --
 --   luau validate.luau
 
-const A = require "./arithmetic"
 const Bo = require "./booleans"
 const B = require "./builder"
 const Canon = require "./canon"
@@ -18,10 +17,8 @@ const G = require "./gadgets"
 const H = require "./harness"
 const L = require "./lambda"
 const Li = require "./lists"
-const N = require "./numerals"
 const Reader = require "./reader"
 const S = require "./scott"
-const Rec = require "./recursion"
 const Rules = require "./rules"
 const Types = require "./types"
 
@@ -29,6 +26,27 @@ type Builder = B.Builder
 type Net = Types.Net
 type Port = Types.Port
 const ARITH_BUDGET = 20000
+
+-- The number that a net stands for, if it is a Scott numeral; nil otherwise.
+local function numeralOf(
+	net: Net
+): number?
+	const _, got = S.readNet(net)
+
+	return got
+end
+
+-- The normal form of the Scott numeral n, which is cut-free and so can be encoded.
+local function numeralNet(
+	n: number
+): Net
+	const b = B.new()
+	S.numeral(b, n)
+	const net = b:finish()
+	H.reduce(net, ARITH_BUDGET)
+
+	return net
+end
 local failures = 0
 local total = 0
 
@@ -59,63 +77,6 @@ for _, test in Cases.tests do
 	report(Cases.verdict(test, net, result), `{test.name}  ({H.describe(result)})`)
 end
 
--- Each numeral reduces to itself and reads back as the number it was built from.
-for n = 0, 5 do
-	const net = N.numeral(n)
-	const result = H.reduce(net, H.DEFAULT_BUDGET)
-	report(result.outcome == "reduced" and N.readback(net) == n, `numeral {n} reads back as {n}  ({H.describe(result)})`)
-end
-
--- Arithmetic: apply each operator to numerals in one net, reduce it, and read the result back.
--- The operands are built into the same net as the operator, so the reduction does all the work.
-local function compute(
-	op: (Builder) -> Port,
-	operands: { number }
-): (H.Report, number?)
-	const b = B.new()
-	local term = op(b)
-
-	for _, k in operands do
-		term = L.app(b, term, N.church(b, k))
-	end
-
-	const net = b:finish()
-	const result = H.reduce(net, ARITH_BUDGET)
-
-	return result, N.readback(net)
-end
-
-for n = 0, 5 do
-	const result, got = compute(
-		A.successor, {
-			n,
-		}
-	)
-	report(result.outcome == "reduced" and got == n + 1, `successor of {n} is {n + 1}  ({H.describe(result)})`)
-end
-
-for m = 0, 3 do
-	for n = 0, 3 do
-		const result, got = compute(
-			A.addition, {
-				m,
-				n,
-			}
-		)
-		report(result.outcome == "reduced" and got == m + n, `{m} + {n} = {m + n}  ({H.describe(result)})`)
-end end
-
-for m = 0, 3 do
-	for n = 0, 3 do
-		const result, got = compute(
-			A.product, {
-				m,
-				n,
-			}
-		)
-		report(result.outcome == "reduced" and got == m * n, `{m} * {n} = {m * n}  ({H.describe(result)})`)
-end end
-
 -- Booleans read back as themselves, and nothing else reads back as a boolean.
 for _, value in {
 	true,
@@ -134,8 +95,8 @@ for _, c in {
 		const b = B.new()
 		local term = Bo.conditional(b)
 		term = L.app(b, term, Bo.boolean(b, c))
-		term = L.app(b, term, N.church(b, 2))
-		term = L.app(b, term, N.church(b, 5))
+		term = L.app(b, term, S.numeral(b, 2))
+		term = L.app(b, term, S.numeral(b, 5))
 		const net = b:finish()
 		const result = H.reduce(net, H.DEFAULT_BUDGET)
 		const want =
@@ -143,7 +104,7 @@ for _, c in {
 				2
 			else
 				5
-		report(result.outcome == "reduced" and N.readback(net) == want, `if {c} then 2 else 5 is {want}  ({H.describe(result)})`)
+		report(result.outcome == "reduced" and numeralOf(net) == want, `if {c} then 2 else 5 is {want}  ({H.describe(result)})`)
 	end
 
 	do
@@ -165,7 +126,7 @@ local function listOf(
 	local list = Li.nilValue(b)
 
 	for i = #elements, 1, -1 do
-		list = L.app(b, L.app(b, Li.cons(b), N.church(b, elements[i])), list)
+		list = L.app(b, L.app(b, Li.cons(b), S.numeral(b, elements[i])), list)
 	end
 
 	return list
@@ -215,10 +176,10 @@ do
 						3,
 					}
 				)
-			), N.church(b, DEFAULT)
+			), S.numeral(b, DEFAULT)
 		)
 	end)
-	report(result.outcome == "reduced" and N.readback(net) == 2, `head of [2, 3] is 2  ({H.describe(result)})`)
+	report(result.outcome == "reduced" and numeralOf(net) == 2, `head of [2, 3] is 2  ({H.describe(result)})`)
 end
 
 do
@@ -233,21 +194,21 @@ do
 						3,
 					}
 				)
-			), N.church(b, DEFAULT)
+			), S.numeral(b, DEFAULT)
 		)
 
-		return L.app(b, L.app(b, Li.head(b), rest), N.church(b, DEFAULT))
+		return L.app(b, L.app(b, Li.head(b), rest), S.numeral(b, DEFAULT))
 	end)
-	report(result.outcome == "reduced" and N.readback(net) == 3, `head of tail of [2, 3] is 3  ({H.describe(result)})`)
+	report(result.outcome == "reduced" and numeralOf(net) == 3, `head of tail of [2, 3] is 3  ({H.describe(result)})`)
 end
 
 do
 	const result, net = evaluate(function(
 		b
 	)
-		return L.app(b, L.app(b, Li.head(b), Li.nilValue(b)), N.church(b, DEFAULT))
+		return L.app(b, L.app(b, Li.head(b), Li.nilValue(b)), S.numeral(b, DEFAULT))
 	end)
-	report(result.outcome == "reduced" and N.readback(net) == DEFAULT, `head of [] is the default {DEFAULT}  ({H.describe(result)})`)
+	report(result.outcome == "reduced" and numeralOf(net) == DEFAULT, `head of [] is the default {DEFAULT}  ({H.describe(result)})`)
 end
 
 do
@@ -282,8 +243,7 @@ do
 	report(Bo.readback(b:finish()) == nil, "the identity does not read back as a boolean")
 end
 
--- A value that is not a numeral reads back as nothing. λf.λx.λy.x is not one: applied to two values it gives an abstraction, not a chain of applications.
--- (The identity is not a counterexample: λx.x is η-equal to λf.λx.f x, which is numeral 1.)
+-- A value that is not a numeral reads back as nothing. λf.λx.λy.x is not one: applied to two values it gives an abstraction, not a numeral.
 do
 	const b = B.new()
 	L.lam(
@@ -306,7 +266,7 @@ do
 		end
 	)
 	const constant = b:finish()
-	report(N.readback(constant) == nil, "λf.λx.λy.x does not read back as a numeral")
+	report(numeralOf(constant) == nil, "λf.λx.λy.x does not read back as a numeral")
 end
 
 -- Codes: a code has no δ in it, decoding it gives back the net it was made from, and a δ fan copies it so that each copy decodes to the same net.
@@ -347,7 +307,7 @@ const encodable: { {
 	{
 		name = "numeral 3",
 		make = function()
-			return N.numeral(3)
+			return numeralNet(3)
 		end,
 	},
 }
@@ -366,7 +326,7 @@ end
 
 for n = 0, 3 do
 	const b = B.new()
-	const code = Codes.encode(b, N.numeral(n))
+	const code = Codes.encode(b, numeralNet(n))
 	const fan = b:delta()
 	b:wire(code, fan.principal)
 	b:wire(fan.aux1, Codes.decoder(b, 1).principal)
@@ -374,15 +334,17 @@ for n = 0, 3 do
 	const net = b:finish()
 	const taken = steps(net)
 	const twice = B.new()
-	N.church(twice, n)
-	N.church(twice, n)
-	report(taken < ARITH_BUDGET and Canon.isomorphic(net, twice:finish()), `a δ fan copies the code of numeral {n} into two that decode  ({taken} steps)`)
+	S.numeral(twice, n)
+	S.numeral(twice, n)
+	const expected = twice:finish()
+	H.reduce(expected, ARITH_BUDGET)
+	report(taken < ARITH_BUDGET and Canon.isomorphic(net, expected), `a δ fan copies the code of numeral {n} into two that decode  ({taken} steps)`)
 end
 
 -- Recursion through codes: length and sum fold over a list, and the recursive function on its own reduces to a normal form instead of unfolding.
 do
 	const b = B.new()
-	Rec.length(b)
+	Li.length(b)
 	const net = b:finish()
 	const taken = steps(net)
 	report(taken < ARITH_BUDGET, `length on its own reaches a normal form  ({taken} steps)`)
@@ -412,12 +374,12 @@ for _, elements in {
 	for _, case in {
 		{
 			name = "length",
-			build = Rec.length,
+			build = Li.length,
 			want = #elements,
 		},
 		{
 			name = "sum",
-			build = Rec.sum,
+			build = Li.sum,
 			want = expected,
 		},
 	} do
@@ -425,7 +387,7 @@ for _, elements in {
 		L.app(b, case.build(b), listOf(b, elements))
 		const net = b:finish()
 		const taken = steps(net)
-		report(taken < ARITH_BUDGET and N.readback(net) == case.want, `{case.name} of {#elements} elements is {case.want}  ({taken} steps)`)
+		report(taken < ARITH_BUDGET and numeralOf(net) == case.want, `{case.name} of {#elements} elements is {case.want}  ({taken} steps)`)
 end end
 
 -- Scott numerals ---------------------------------------------------------------
@@ -666,8 +628,8 @@ for _, case in {
 		want = 21,
 	},
 } do
-	const result, built = Compile.evaluateNumeral(case.src, ARITH_BUDGET)
-	report(result.outcome == "reduced" and N.readback(built) == case.want, `{case.src}  is {case.want}  ({H.describe(result)})`)
+	const result, built = Compile.evaluate(case.src, ARITH_BUDGET)
+	report(result.outcome == "reduced" and numeralOf(built) == case.want, `{case.src}  is {case.want}  ({H.describe(result)})`)
 end
 
 -- Programs that should not compile are rejected with an error.

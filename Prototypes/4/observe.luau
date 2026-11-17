@@ -2,8 +2,8 @@
 -- OBSERVING A VALUE
 --
 -- A value is read by applying it to a probe and an eraser and reducing. What the value does with the probe is what its normal form records, and two values are told apart by comparing those normal forms.
--- This is needed because the normal form of a value can depend on how its copies were arranged, so comparing a value's net directly is not sound (see numerals.luau).
--- Numerals and booleans are both read this way. Each has its own readback, which compares an observation with the observations of the canonical values.
+-- This is needed because the normal form of a value can depend on how its copies were arranged, so comparing a value's net directly is not sound (see scott.luau).
+-- Scott numerals and booleans are both read this way. Each has its own readback, which compares an observation with the observations of the canonical values.
 
 const B = require "./builder"
 const L = require "./lambda"

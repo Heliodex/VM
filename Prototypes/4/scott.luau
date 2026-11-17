@@ -17,9 +17,11 @@
 
 const B = require "./builder"
 const Bo = require "./booleans"
+const Canon = require "./canon"
 const H = require "./harness"
 const L = require "./lambda"
-const N = require "./numerals"
+const Net = require "./net"
+const Observe = require "./observe"
 const Rec = require "./recursion"
 const Types = require "./types"
 
@@ -323,18 +325,121 @@ const function evaluate(
 	return H.reduce(net, budget or BUDGET), net
 end
 
--- The number that the Scott value built by `build` stands for, or nil if the net is not a numeral.
+-- The one free port of a net, if it has exactly one and it is a principal port.
+const function freeRoot(
+	net: Net
+): Port?
+	local root: Port? = nil
+	local free = 0
+
+	for _, c in Net.liveCells(net) do
+		for slot = 1, Net.portCount(net.Tag[c]) do
+			const p = Net.port(c, slot)
+
+			if net.Link[p] == 0 then
+				free += 1
+
+				if Net.isPrincipal(p) then
+					root = p
+				end
+			end
+		end
+	end
+
+	if free == 1 then
+		return root
+	end
+
+	return nil
+end
+
+-- The observation of the Scott value in `original` once it is converted to a Church numeral, or nil if the value or the conversion does not finish.
+-- The value is reduced first, on a copy, so that its root is the principal port of its normal form. The original net is not changed.
+const function observeChurch(
+	original: Net,
+	budget: number?
+): (H.Report, Net?)
+	const net: Net = {
+		Tag = table.clone(original.Tag),
+		Link = table.clone(original.Link),
+		Active = table.clone(original.Active),
+		Free = table.clone(original.Free),
+	}
+	const valueReport = H.reduce(net, budget or BUDGET)
+
+	if valueReport.outcome ~= "reduced" then
+		return valueReport, nil
+	end
+
+	const root = freeRoot(net)
+
+	if not root then
+		error "a value to read back must have exactly one free port, and it must be principal once reduced"
+	end
+
+	const b = B.from(net)
+	L.app(b, toChurch(b), root)
+	const report = H.reduce(net, budget or BUDGET)
+
+	if report.outcome ~= "reduced" then
+		return report, nil
+	end
+
+	return report, Observe.observe(net)
+end
+
+-- The largest numeral that readNet will try.
+const MAX_READBACK = 64
+-- What each numeral observes as, computed once for each numeral that is needed.
+local references: {
+	[number]: Net?,
+} = {}
+
+const function referenceFor(
+	k: number
+): Net?
+	if references[k] == nil then
+		const b = B.new()
+		numeral(b, k)
+		local _, observed = observeChurch(b:finish(), BUDGET)
+		references[k] = observed
+	end
+
+	return references[k]
+end
+
+-- The number that a Scott value stands for, from its net, or nil if it stands for no numeral. The report is the reduction of the conversion, which is what a failure needs to explain itself.
+-- A value is read by its observation, and a numeral is the one whose observation is the same, as in numerals of Church encoding. So a value that is not a numeral can only read back as one if it observes the same way.
+const function readNet(
+	original: Net,
+	budget: number?
+): (H.Report, number?)
+	const report, seen = observeChurch(original, budget)
+
+	if not seen then
+		return report, nil
+	end
+
+	for k = 0, MAX_READBACK do
+		const expected = referenceFor(k)
+
+		if expected and Canon.isomorphic(seen, expected) then
+			return report, k
+		end
+	end
+
+	return report, nil
+end
+
+-- The number that the Scott value built by `build` stands for, or nil if it stands for no numeral.
 const function readback(
 	build: (Builder) -> Port,
 	budget: number?
 ): (H.Report, number?)
 	const b = B.new()
-	const value = build(b)
-	L.app(b, toChurch(b), value)
-	const net = b:finish()
-	const report = H.reduce(net, budget or BUDGET)
+	build(b)
 
-	return report, N.readback(net)
+	return readNet(b:finish(), budget)
 end
 
 return {
@@ -348,5 +453,6 @@ return {
 	multiplication = multiplication,
 	toChurch = toChurch,
 	evaluate = evaluate,
+	readNet = readNet,
 	readback = readback,
 }

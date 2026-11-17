@@ -8,7 +8,7 @@
 -- A conditional applies its condition to the two branches, so `if c x y` is `x` when `c` is true and `y` otherwise.
 --
 -- Readback is observational, as for numerals (see observe.luau). A boolean is applied to the probe and an eraser, and the result is compared with the same observation of `true` and of `false`.
--- That makes `false` and the numeral 0 indistinguishable, since both erase the probe: the two are different values, but nothing observed here separates them. Numerals are read back by numerals.luau, so the two readbacks should not be applied to the same value.
+-- That makes `false` and the numeral 0 indistinguishable, since both erase the probe: the two are different values, but nothing observed here separates them. Numbers are read back by scott.luau, so the two readbacks should not be applied to the same value.
 
 const B = require "./builder"
 const Canon = require "./canon"

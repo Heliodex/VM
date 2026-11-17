@@ -6,20 +6,34 @@
 --
 --   luau recursionprobe.luau
 
-const A = require "./arithmetic"
 const B = require "./builder"
 const F = require "./fix"
 const G = require "./gadgets"
 const L = require "./lambda"
 const Li = require "./lists"
 const Net = require "./net"
-const N = require "./numerals"
 const Rules = require "./rules"
+const S = require "./scott"
 const Types = require "./types"
 
 type Builder = B.Builder
 type Port = Types.Port
 const BUDGET = 20000
+
+-- The number a finished net reads back as, or "nothing" if it does not read back as one.
+local function valueOf(
+	net: Types.Net
+): string
+	local ok, _, value = pcall(function()
+		return S.readNet(net)
+	end)
+
+	if ok and value then
+		return tostring(value)
+	end
+
+	return "nothing"
+end
 
 const function probe(
 	name: string,
@@ -35,7 +49,7 @@ const function probe(
 	end
 
 	if steps < BUDGET then
-		print(`{name}: normal form after {steps} steps, reads back as {N.readback(net) or "nothing"}`)
+		print(`{name}: normal form after {steps} steps, reads back as {valueOf(net)}`)
 	else
 		print(`{name}: no normal form within {BUDGET} steps, {#Net.liveCells(net)} cells live`)
 end end
@@ -90,7 +104,7 @@ const function step(
 						b, function(
 							_r: Port
 						): Port
-							return N.church(b, 0)
+							return S.numeral(b, 0)
 						end
 					)
 
@@ -116,18 +130,19 @@ const function knot(
 end
 
 -- 1. Copying a value that contains a share fan, with another share fan.
+-- These two were the Church-numeral failures. Scott numerals contain no fan, so the self-applications here now apply a numeral to itself, which is not a copy test any more; they are kept to compare with RECURSION.md.
 probe(
 	"(λx. x x) 1", function(
 		b: Builder
 	)
-		L.app(b, selfApply(b), N.church(b, 1))
+		L.app(b, selfApply(b), S.numeral(b, 1))
 	end
 )
 probe(
 	"(λx. x x) 2", function(
 		b: Builder
 	)
-		L.app(b, selfApply(b), N.church(b, 2))
+		L.app(b, selfApply(b), S.numeral(b, 2))
 	end
 )
 probe(
@@ -140,10 +155,10 @@ probe(
 			): Port
 				const ns = L.share(b, n, 2)
 
-				return L.app(b, L.app(b, A.addition(b), ns[1]), ns[2])
+				return L.app(b, L.app(b, S.addition(b), ns[1]), ns[2])
 			end
 		)
-		L.app(b, f, N.church(b, 2))
+		L.app(b, f, S.numeral(b, 2))
 	end
 )
 -- 2. Recursion through Z, which needs x x on a shared x.
@@ -170,7 +185,7 @@ probe(
 			b, function(
 				_r: Port
 			): Port
-				return N.church(b, 0)
+				return S.numeral(b, 0)
 			end
 		)
 		L.app(b, k, knot(b, step(b)))

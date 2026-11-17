@@ -17,9 +17,9 @@ Everything is in `Prototypes/4/`:
 - `net.luau`, `rules.luau`: the net structure and the six rules.
 - `builder.luau`: builds nets with handles. `B.from(net)` builds onto an existing net.
 - `lambda.luau`: values and terms. `lam` (abstraction is a γ with root as principal, variable on aux1, body on aux2), `app` (γ with function as principal, result on aux1, argument on aux2), `share(b, p, n)` (fans a port out to `n` uses via the autodual multiplexer `T(n)`), `erase`.
-- `numerals.luau`: Church numerals and readback.
+- `numerals.luau`: Church numerals and readback. Removed: `scott.luau` replaces it (see the Scott numerals section of validate.luau).
 - `observe.luau`: observation. A value is applied to a probe `T = λy.λz. G(y,z)` and an eraser, then reduced with plain stepping. Readback compares observations, not nets.
-- `booleans.luau`, `lists.luau` (Scott encoding: `nil = λc.λn.n`, `cons h t = λc.λn. c h t`), `arithmetic.luau` (successor, addition, product).
+- `booleans.luau`, `lists.luau` (Scott encoding: `nil = λc.λn.n`, `cons h t = λc.λn. c h t`), Church `arithmetic.luau` (successor, addition, product) was removed; Scott arithmetic is in `scott.luau`.
 - `fix.luau` (uncommitted): the strict Z combinator, `Z f = (λx. f (λv. x x v)) (λx. f (λv. x x v))`, built with `share`. Its header describes the problem below.
 - `validate.luau`: 78 checks, all passing, runs in about 0.06 s. Includes `cases.luau` (calculus cases) and readback checks.
 

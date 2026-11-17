@@ -3,7 +3,7 @@
 --
 -- Turns the expressions of reader.luau into a net, which the six rules then reduce to the value of the program.
 -- The language is small on purpose:
---   3                  a natural number, a Church numeral
+--   3                  a natural number, a Scott numeral
 --   true, false        Church booleans
 --   x                  a variable, or a builtin (see BUILTINS below)
 --   (lambda (x y) e)   a function of two arguments, curried underneath
@@ -12,7 +12,7 @@
 --   (define f e)       a top-level definition, visible to everything after it
 -- The last form of a program is the expression whose value it is. Every form before it is a definition.
 --
--- Numbers are Scott numerals (scott.luau), so a number can be copied with a δ fan. Numerals of this encoding contain no δ.
+-- Numbers are Scott numerals (scott.luau), which contain no δ, so a number can be copied with a δ fan.
 --
 -- Variables are copied with `share` and erased with `erase` automatically. Before a binding is built, its body is counted for uses of its name, and each use takes one copy from the binding's pool, so nothing is left dangling or used twice.
 --
@@ -21,8 +21,8 @@
 --
 --   const Compile = require "./compile"
 --
---   const report, net = Compile.evaluateNumeral("(define double (lambda (n) (+ n n))) (double 3)")
---   -- N.readback(net) is 6
+--   const report, net = Compile.evaluate("(define double (lambda (n) (+ n n))) (double 3)")
+--   -- S.readNet(net) is 6
 
 const B = require "./builder"
 const Bo = require "./booleans"
@@ -616,19 +616,6 @@ const function evaluate(
 	return H.reduce(net, budget or BUDGET), net
 end
 
--- As evaluate, but the value is converted to a Church numeral first, so that its net's only free port reads back with numerals.luau. Only a program whose value is a number has a result here.
-const function evaluateNumeral(
-	source: string,
-	budget: number?
-): (H.Report, Net)
-	const b = B.new()
-	L.app(b, S.toChurch(b), program(Reader.read(source), b))
-	const net = b:finish()
-
-	return H.reduce(net, budget or BUDGET), net
-end
-
 return {
 	evaluate = evaluate,
-	evaluateNumeral = evaluateNumeral,
 }

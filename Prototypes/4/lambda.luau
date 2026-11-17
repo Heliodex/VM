@@ -2,7 +2,7 @@
 -- VALUES AND THE LAMBDA CALCULUS
 --
 -- A value is a net with one free root port, the principal port of its outermost cell. Applying a value to another value is then a principal-to-principal meeting, which the six rules already reduce, so no value needs any rule of its own.
--- A closed value reduces to a normal form with no free port except its root. Two values that compute the same function need not reduce to isomorphic nets, because sharing can leave the copies arranged in different trees. So values are compared by what they do under probes (see numerals.luau), not by comparing nets.
+-- A closed value reduces to a normal form with no free port except its root. Two values that compute the same function need not reduce to isomorphic nets, because sharing can leave the copies arranged in different trees. So values are compared by what they do under probes (see observe.luau), not by comparing nets.
 --
 -- Terms are built with the encoding of Lafont's "Interaction Combinators" for the lambda calculus:
 --   abstraction  gamma cell: principal = root, aux1 = the variable, aux2 = the body
