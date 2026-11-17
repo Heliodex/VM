@@ -18,7 +18,6 @@ const G = require "./gadgets"
 const H = require "./harness"
 const L = require "./lambda"
 const Li = require "./lists"
-const Net = require "./net"
 const N = require "./numerals"
 const Reader = require "./reader"
 const S = require "./scott"
@@ -680,7 +679,9 @@ for _, src in {
 	"(if true 1)",
 	"(define + 1) 0",
 } do
-	report(not pcall(Compile.evaluate, src), `rejects {src}`)
+	report(not pcall(function()
+		Compile.evaluate(src)
+	end), `rejects {src}`)
 end
 
 -- Known limitations ----------------------------------------------------------

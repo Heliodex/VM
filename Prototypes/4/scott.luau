@@ -20,7 +20,6 @@ const Bo = require "./booleans"
 const H = require "./harness"
 const L = require "./lambda"
 const N = require "./numerals"
-const Net = require "./net"
 const Rec = require "./recursion"
 const Types = require "./types"
 

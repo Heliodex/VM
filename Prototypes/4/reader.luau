@@ -60,7 +60,7 @@ const function tokenize(
 	while true do
 		-- skip whitespace, which may be empty
 		const _, stop = string.find(src, "^%s*", pos)
-		pos = stop + 1
+		pos = (stop :: number) + 1
 
 		if pos > #src then
 			break
@@ -70,7 +70,7 @@ const function tokenize(
 
 		if c == ";" then
 			const newline = string.find(src, "\n", pos, true)
-			pos = if newline then newline + 1 else #src + 1
+			pos = if newline then (newline :: number) + 1 else #src + 1
 		elseif c == "(" or c == ")" then
 			table.insert(tokens, {
 				text = c,

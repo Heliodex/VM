@@ -29,7 +29,6 @@ const Bo = require "./booleans"
 const H = require "./harness"
 const L = require "./lambda"
 const Li = require "./lists"
-const Net = require "./net"
 const Rec = require "./recursion"
 const Reader = require "./reader"
 const S = require "./scott"
@@ -161,7 +160,7 @@ end
 
 -- How many copies of `name` the expression `e` takes. An inner lambda that binds the name again hides it.
 -- A recursive name is `routed`: an if passes it into its branches as one code, which the chosen branch then copies for its own uses, so the two branches together take one copy, not one each. Every other name is counted plainly.
-local countIn
+local countIn: (string, Expr, boolean) -> number
 
 -- How many times `name` is used free in (lambda names body).
 local function countFree(
@@ -212,7 +211,7 @@ countIn = function(
 	return total
 end
 
-local compile
+local compile: (Expr, Scope, Builder) -> Port
 
 -- The lambda over names[i], then the ones after it, with the body under all of them. Each parameter's pool holds one copy for each use in what follows it.
 local function bindParams(
@@ -265,7 +264,7 @@ local function takeCopy(
 	return p
 end
 
-local compileRecursive
+local compileRecursive: (Binding, Builder) -> Port
 
 -- A top-level definition, built where it is used. A recursive one is tied through recursion.luau, which builds its code once into the net being built.
 local function useDefinition(
