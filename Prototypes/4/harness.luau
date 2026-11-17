@@ -135,13 +135,24 @@ const function describe(
 	return `reduced in {steps} ({report.cells} cells, {report.peakCells} peak)`
 end
 
--- Reduce to a normal form, or to whatever the budget allows.
--- The net is mutated in place, so pass a net you do not need again.
-const function reduce(
+-- Make `dst` hold the same contents as `src`, in place, so that the caller's net is restored without replacing any of its fields.
+local function restore(
+	dst: { any },
+	src: { any }
+)
+	table.clear(dst)
+
+	for k, v in src do
+		dst[k] = v
+	end
+end
+
+-- Steps the net, fingerprinting it after every step, until it reaches a normal form, repeats a state, or uses up the budget.
+-- This is the only way to tell a cycle from a long reduction, but it costs a fingerprint per step, so reduce only calls it once the plain run has used its whole budget.
+local function detectCycle(
 	net: Net,
-	budget: number?
+	limit: number
 ): Report
-	const limit = budget or DEFAULT_BUDGET
 	const seen: {
 		[string]: {
 			step: number,
@@ -198,7 +209,44 @@ const function reduce(
 		steps += 1
 		cells = #Net.liveCells(net)
 		peak = math.max(peak, cells)
-end end
+	end
+end
+
+-- Reduce to a normal form, or to whatever the budget allows.
+-- The net is mutated in place, so pass a net you do not need again.
+-- A net that reaches its normal form within the budget is reduced by plain stepping, which is cheap. Only a net that uses up the budget is then reduced again from its start, with cycle detection, to tell a cycle from a long run.
+const function reduce(
+	net: Net,
+	budget: number?
+): Report
+	const limit = budget or DEFAULT_BUDGET
+	const start = snapshot(net)
+	local steps = 0
+	local cells = #Net.liveCells(net)
+	local peak = cells
+
+	while steps < limit do
+		if not Rules.step(net) then
+			return {
+				outcome = "reduced",
+				steps = steps,
+				cells = cells,
+				peakCells = peak,
+			}
+		end
+
+		steps += 1
+		cells = #Net.liveCells(net)
+		peak = math.max(peak, cells)
+	end
+
+	restore(net.Tag, start.Tag)
+	restore(net.Link, start.Link)
+	restore(net.Active, start.Active)
+	restore(net.Free, start.Free)
+
+	return detectCycle(net, limit)
+end
 
 -- A net as text, one cell per line, with every port either free or naming the cell and port it is wired to.
 -- Cells keep their ids so that two dumps can be compared by eye.
