@@ -17,6 +17,8 @@ const G = require "./gadgets"
 const H = require "./harness"
 const L = require "./lambda"
 const Li = require "./lists"
+const Printer = require "./printer"
+const Session = require "./session"
 const Reader = require "./reader"
 const V = require "./values"
 const S = require "./scott"
@@ -724,39 +726,6 @@ end), "quote cannot be defined")
 
 -- Tagged values: each program's value, written out, and the errors for values of the wrong kind.
 -- A value is written as Lisp would write it, so a test compares its shape as well as its numbers.
-local function render(
-	value: V.Value?
-): string
-	if value == nil then
-		return "?"
-	elseif value.kind == "number" then
-		return tostring(value.value)
-	elseif value.kind == "symbol" then
-		return value.name :: string
-	elseif value.kind == "boolean" then
-		return if value.truth then "#t" else "#f"
-	elseif value.kind == "nil" then
-		return "()"
-	elseif value.kind == "error" then
-		return "#error"
-	end
-
-	-- a pair: a list if its tail is a list, otherwise a dotted pair
-	const parts: { string } = { render(value.car) }
-	local rest = value.cdr
-
-	while rest ~= nil and rest.kind == "pair" do
-		table.insert(parts, render(rest.car))
-		rest = rest.cdr
-	end
-
-	if rest ~= nil and rest.kind == "nil" then
-		return `({table.concat(parts, " ")})`
-	end
-
-	return `({table.concat(parts, " ")} . {render(rest)})`
-end
-
 for _, case in {
 	{
 		src = "'(1 (2 3))",
@@ -808,7 +777,32 @@ for _, case in {
 	},
 } do
 	const result, value = V.read(Compile.build(case.src), PROGRAM_BUDGET)
-	report(result.outcome == "reduced" and render(value) == case.want, `{case.src}  is {case.want}  (is {render(value)})`)
+	report(result.outcome == "reduced" and Printer.show(value) == case.want, `{case.src}  is {case.want}  (is {Printer.show(value)})`)
+end
+
+-- Sessions: definitions persist, a bad form does not spoil the rest, and errors point at their form.
+do
+	const session = Session.new()
+	const first = Session.evaluate(session, "(define double (lambda (n) (+ n n)))", PROGRAM_BUDGET)
+	report(#first == 1 and first[1].kind == "defined" and first[1].name == "double", "a definition is reported as defined")
+
+	const second = Session.evaluate(session, "(double 4)", PROGRAM_BUDGET)
+	report(#second == 1 and second[1].kind == "value" and numberIs(second[1].value, 8), "a later input uses the definition")
+
+	const third = Session.evaluate(session, "(double x)", PROGRAM_BUDGET)
+	report(#third == 1 and third[1].kind == "error" and third[1].at == 9 and third[1].message == "unbound name x", "an unbound name is an error at its byte offset")
+
+	const fourth = Session.evaluate(session, "(double 1) (car 5) (double 2)", PROGRAM_BUDGET)
+	report(#fourth == 3 and numberIs(fourth[1].value, 2) and Printer.show(fourth[2].value) == "#error" and numberIs(fourth[3].value, 4), "forms after a wrong-kind value are still evaluated")
+
+	const fifth = Session.evaluate(session, "(double 2", PROGRAM_BUDGET)
+	report(#fifth == 1 and fifth[1].kind == "error" and string.find(fifth[1].message or "", "never closed", 1, true) ~= nil, "an unclosed form is a reader error")
+
+	const sixth = Session.evaluate(Session.new(), "(double 2)", PROGRAM_BUDGET)
+	report(#sixth == 1 and sixth[1].kind == "error", "a new session does not have the old definitions")
+
+	const seventh = Session.evaluate(Session.new(), "(define loop (lambda (n) (loop n)))", PROGRAM_BUDGET)
+	report(#seventh == 1 and seventh[1].kind == "defined", "a definition that never runs is still accepted")
 end
 
 -- Reader ----------------------------------------------------------------------
