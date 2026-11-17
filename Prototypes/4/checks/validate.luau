@@ -620,6 +620,21 @@ report(Li.readback(function(
 	return S.numeral(b, 3)
 end) == nil, "a number does not read back as a list")
 
+-- Numerals past 64 read back too, as numerals and as the result of a program.
+for _, k in {
+	81,
+	150,
+} do
+	const result, got = S.readback(function(
+		b: Builder
+	): Port
+		return S.numeral(b, k)
+	end, PROGRAM_BUDGET)
+	report(got == k, `Scott numeral {k} reads back as {k}  ({H.describe(result)})`)
+end
+
+report(numberIs(select(2, V.read(Compile.build("(* 9 9)"), PROGRAM_BUDGET)), 81), "(* 9 9) is 81")
+
 -- Subtraction and comparison, as programs: each result is a number or a branch taken.
 for _, case in {
 	{

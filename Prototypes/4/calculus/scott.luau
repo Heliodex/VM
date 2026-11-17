@@ -506,8 +506,6 @@ const function observeChurch(
 	return report, Observe.observe(net)
 end
 
--- The largest numeral that readNet will try.
-const MAX_READBACK = 64
 -- What each numeral observes as, computed once for each numeral that is needed.
 local references: {
 	[number]: Net?,
@@ -538,12 +536,24 @@ const function readNet(
 		return report, nil
 	end
 
-	for k = 0, MAX_READBACK do
-		const expected = referenceFor(k)
+	-- The observation of numeral k has exactly 2k γ cells, so the count gives the candidate, which the isomorphism then confirms against that numeral alone.
+	local gammas = 0
 
-		if expected and Canon.isomorphic(seen, expected) then
-			return report, k
+	for _, c in Net.liveCells(seen) do
+		if seen.Tag[c] == "Gamma" then
+			gammas += 1
 		end
+	end
+
+	if gammas % 2 ~= 0 then
+		return report, nil
+	end
+
+	const k = gammas // 2
+	const expected = referenceFor(k)
+
+	if expected and Canon.isomorphic(seen, expected) then
+		return report, k
 	end
 
 	return report, nil
