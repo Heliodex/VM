@@ -635,6 +635,19 @@ for _, case in {
 		src = "(define rep (lambda (k l) (if (isNil l) 0 (+ (k (head l 0)) (rep k (tail l nil)))))) ((lambda (x) (rep (lambda (n) (+ n x)) (cons 1 (cons 2 nil)))) 5)",
 		want = 13,
 	},
+	-- A local recursive function may use the variables of the function it is in, which are passed to it.
+	{
+		src = "(define scale (lambda (n l) (if (isNil l) 0 (+ (letrec tot (lambda (m) (if (isNil m) 0 (+ (* n (head m 0)) (tot (tail m nil))))) (tot l)) (scale n (tail l nil)))))) (scale 2 (cons 1 (cons 2 nil)))",
+		want = 10,
+	},
+	{
+		src = "((lambda (k) (letrec sumk (lambda (l) (if (isNil l) 0 (+ (k (head l 0)) (sumk (tail l nil))))) (sumk (cons 1 (cons 2 nil))))) (lambda (x) (+ x 10)))",
+		want = 23,
+	},
+	{
+		src = "(define g (lambda (a b l) (if (isNil l) 0 (+ (letrec h (lambda (m) (if (isNil m) 0 (+ (+ a b) (h (tail m nil))))) (h l)) (g a b (tail l nil)))))) (g 1 2 (cons 0 nil))",
+		want = 3,
+	},
 	-- A closed closure containing addition, used twice: this was wrong before closed arguments were substituted.
 	{
 		src = "((lambda (f) (+ (f 1) (f 2))) (lambda (n) (+ n 10)))",
@@ -665,6 +678,10 @@ for _, src in {
 	"(define g (lambda (l) (if (isNil l) 0 (+ ((lambda (f) (+ (f 1) (f 2))) (lambda (n) (+ n (head l 0)))) (g (tail l nil)))))) (g (cons 5 nil))",
 	-- a recursive call must pass its function arguments on unchanged
 	"(define rep (lambda (k l) (if (isNil l) 0 (+ (k (head l 0)) (rep (lambda (n) (succ n)) (tail l nil)))))) (rep (lambda (n) (+ n 10)) (cons 1 (cons 2 nil)))",
+	-- a local function can only be called
+	"(define g (lambda (n l) (if (isNil l) 0 (letrec h (lambda (m) (if (isNil m) 0 h)) (h l))))) (g 1 nil)",
+	-- a local function cannot call the function it is defined in
+	"(define g (lambda (n l) (if (isNil l) 0 (+ (letrec h (lambda (m) (if (isNil m) 0 (g n m))) (h l)) (g n (tail l nil)))))) (g 1 (cons 1 nil))",
 	-- a recursive function given a function argument is not a value on its own
 	"(define rep (lambda (k l) (if (isNil l) 0 (+ (k (head l 0)) (rep k (tail l nil)))))) (rep (lambda (n) (+ n 10)) rep)",
 } do

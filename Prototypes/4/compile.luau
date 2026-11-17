@@ -10,14 +10,17 @@
 --   (f a b)            application, curried: ((f a) b)
 --   (if c t e)         both branches are built, then c picks one, as in booleans.luau
 --   (define f e)       a top-level definition, visible to everything after it
+--   (letrec f (lambda (x) e) body)
+--                      a local recursive function, visible in body; it may use the variables of the lambdas around it
 -- The last form of a program is the expression whose value it is. Every form before it is a definition.
 --
 -- Numbers are Scott numerals (scott.luau), which contain no δ, so a number can be copied with a δ fan.
 --
 -- Variables are copied with `share` and erased with `erase` automatically. Before a binding is built, its body is counted for uses of its name, and each use takes one copy from the binding's pool, so nothing is left dangling or used twice.
 --
--- Recursion: a top-level definition of a function may refer to its own name. Such a definition is compiled through recursion.luau, where the name stands for the recursive call, passed in as a code.
--- So the body of a recursive function must be closed: it may use its parameters, builtins and earlier definitions, but not variables of an enclosing lambda.
+-- Recursion: a definition of a function may refer to its own name, and so may a letrec. Such a function is compiled through recursion.luau, where its name stands for the recursive call, passed in as a code.
+-- A local recursive function that uses variables of the lambdas around it takes them as extra arguments, which each call passes, so the function itself is closed.
+-- A function that depends on a variable of an enclosing lambda cannot be passed to a call, because it could not be built again at each use. A function that is passed to a recursive function is built into it, so it is never copied at run time.
 --
 --   const Compile = require "./compile"
 --
@@ -623,6 +626,39 @@ compile = function(
 		return L.app(b, L.app(b, condition, yes), no)
 	end
 
+	if isSym(items[1], "local-define") then
+		if #items ~= 4 or items[2].kind ~= "sym" or not lambdaParts(items[3]) then
+			error "a local definition is (local-define name (lambda ...) expression)"
+		end
+
+		const name = items[2].name :: string
+		const selfName = selfNameOf(scope)
+
+		-- The enclosing recursive function's own binding stands for copies in its own net, so the local function is built without it, and may not call that function.
+		if selfName and countIn(selfName, items[3], false) > 0 then
+			error(`a local function cannot call {selfName}, the function it is defined in`)
+		end
+
+		local outer: Scope = {}
+
+		for key, binding in scope do
+			if binding.kind ~= "self" then
+				outer[key] = binding
+			end
+		end
+
+		const inner = table.clone(scope)
+		inner[name] = {
+			kind = "def",
+			name = name,
+			expr = items[3],
+			scope = outer,
+			recursive = countIn(name, items[3], false) > 0,
+		}
+
+		return compile(items[4], inner, b)
+	end
+
 	if isSym(items[1], "define") then
 		error "a definition can only be a top-level form"
 	end
@@ -719,18 +755,163 @@ const function asDefinition(
 	return name, items[3]
 end
 
+-- Rewrites every call of the local recursive function `f` so that it passes the variables `caps` it captures first. Those names are parameters of the function, so it is closed and can be built with recursion.luau like a top-level function.
+-- A use of `f` that is not a call is an error: a local function can only be called.
+local function passCaptures(
+	e: Expr,
+	f: string,
+	caps: { string }
+): Expr
+	if e.kind == "num" then
+		return e
+	elseif e.kind == "sym" then
+		if e.name == f then
+			error(`{f} is a local function and can only be called`)
+		end
+
+		return e
+	end
+
+	const items = e.items :: { Expr }
+	const out: { Expr } = {}
+
+	if isSym(items[1], f) then
+		table.insert(out, items[1])
+
+		for _, name in caps do
+			table.insert(out, Reader.sym(name))
+		end
+
+		for i = 2, #items do
+			table.insert(out, passCaptures(items[i], f, caps))
+		end
+	else
+		for _, item in items do
+			table.insert(out, passCaptures(item, f, caps))
+		end
+	end
+
+	return Reader.list(out)
+end
+
+-- Rewrites `(letrec f (lambda (params) body) expression)` into `(local-define f (lambda (captures... params) body') expression')`, where the captures are the names bound by enclosing lambdas that the function's body uses free. The calls of f pass those captures first.
+-- `enclosing` is the list of names bound by the lambdas around `e`.
+local function lowerLocal(
+	e: Expr,
+	enclosing: { string }
+): Expr
+	if e.kind ~= "list" then
+		return e
+	end
+
+	const items = e.items :: { Expr }
+
+	if isSym(items[1], "letrec") then
+		if #items ~= 4 or items[2].kind ~= "sym" then
+			error "a letrec is (letrec name (lambda (params) body) expression)"
+		end
+
+		const f = items[2].name :: string
+		const lambda = lambdaParts(items[3])
+
+		if not lambda then
+			error(`letrec {f} needs a function of at least one parameter`)
+		end
+
+		const caps: { string } = {}
+
+		for _, name in enclosing do
+			if name ~= f and not contains(caps, name) and countFree(name, lambda.names, lambda.body, false) > 0 then
+				table.insert(caps, name)
+			end
+		end
+
+		table.sort(caps)
+
+		const params: { Expr } = {}
+
+		for _, name in caps do
+			table.insert(params, Reader.sym(name))
+		end
+
+		for _, name in lambda.names do
+			table.insert(params, Reader.sym(name))
+		end
+
+		const wrapped = Reader.list({
+			Reader.sym("lambda"),
+			Reader.list(params),
+			passCaptures(lambda.body, f, caps),
+		})
+
+		return Reader.list({
+			Reader.sym("local-define"),
+			items[2],
+			lowerLocal(wrapped, enclosing),
+			lowerLocal(passCaptures(items[4], f, caps), enclosing),
+		})
+	end
+
+	if lambdaParts(e) then
+		const lambda = lambdaParts(e) :: Lambda
+		const inner = table.clone(enclosing)
+
+		for _, name in lambda.names do
+			table.insert(inner, name)
+		end
+
+		return Reader.list({
+			items[1],
+			items[2],
+			lowerLocal(lambda.body, inner),
+		})
+	end
+
+	const out: { Expr } = {}
+
+	for _, item in items do
+		table.insert(out, lowerLocal(item, enclosing))
+	end
+
+	return Reader.list(out)
+end
+
+-- A top-level form with its local recursive functions lowered.
+local function lowerForm(
+	form: Expr
+): Expr
+	if form.kind == "list" then
+		const items = form.items :: { Expr }
+
+		if isSym(items[1], "define") and #items == 3 then
+			return Reader.list({
+				items[1],
+				items[2],
+				lowerLocal(items[3], {}),
+			})
+		end
+	end
+
+	return lowerLocal(form, {})
+end
+
 -- The port that the whole program evaluates to, built into `b`. The forms are definitions, followed by the one expression whose value it is.
 const function program(
 	forms: { Expr },
 	b: Builder
 ): Port
 	const scope: Scope = {}
+	const lowered: { Expr } = {}
 
-	for i, form in forms do
+	for _, form in forms do
+		table.insert(lowered, lowerForm(form))
+	end
+
+	for i, form in lowered do
 		const name, expr = asDefinition(form)
 
 		if name and expr then
-			if i == #forms then
+			if i == #lowered then
 				error(`the program ends in the definition of {name}, not in a value`)
 			end
 
@@ -748,7 +929,7 @@ const function program(
 				recursive = recursive,
 			}
 		else
-			if i ~= #forms then
+			if i ~= #lowered then
 				error "only the last form of a program may be an expression"
 			end
 
