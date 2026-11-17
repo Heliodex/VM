@@ -28,14 +28,12 @@
 --   -- S.readNet(net) is 6
 
 const B = require "./builder"
-const Bo = require "./booleans"
 const H = require "./harness"
 const L = require "./lambda"
-const Li = require "./lists"
 const Rec = require "./recursion"
 const Reader = require "./reader"
-const S = require "./scott"
 const Types = require "./types"
+const V = require "./values"
 
 type Builder = B.Builder
 type Net = Types.Net
@@ -62,26 +60,10 @@ type Scope = {
 	[string]: Binding,
 }
 -- The names that are always in scope, each built fresh wherever it is used.
+-- The builtins are values, built afresh wherever they are used.
 const BUILTINS: {
 	[string]: (Builder) -> Port,
-} = {
-	["+"] = S.addition,
-	["*"] = S.multiplication,
-	succ = S.successor,
-	["-"] = S.subtraction,
-	["="] = S.equal,
-	["eq?"] = S.equal,
-	["<"] = S.less,
-	["<="] = S.lessEqual,
-	["zero?"] = S.isZero,
-	["true"] = Bo.truth,
-	["false"] = Bo.falsity,
-	["nil"] = Li.nilValue,
-	cons = Li.cons,
-	isNil = Li.isNil,
-	head = Li.head,
-	tail = Li.tail,
-}
+} = V.builtins
 -- Words with a meaning of their own, which a name may not be bound to.
 const KEYWORDS: {
 	[string]: boolean,
@@ -385,7 +367,7 @@ local function compileRoutedIf(
 	const yes = branch(items[3])
 	const no = branch(items[4])
 
-	return L.app(b, L.app(b, L.app(b, condition, yes), no), code)
+	return V.ifValue(b, condition, yes, no, code)
 end
 
 -- Whether `e` depends on nothing that is only known when the net is built: every name it uses is a builtin, a definition, or one of its own inner lambdas' parameters. A closed argument can be copied by compiling it again, because it does not depend on the net around it.
@@ -566,53 +548,22 @@ local function specialiseCall(
 	return fn
 end
 
--- Symbols are numbers: each name is given the next id the first time it is quoted, and the id is a Scott numeral. So `eq?` on symbols is numeral equality, and a quoted symbol reads back as its id, which symbolName turns back into the name.
--- The ids are shared by every program in this session, so a name keeps its id.
--- Nothing stops a symbol from being used as a number, since the language is untyped: (= 'a 1) is just a comparison of ids.
-local symbolIds: {
-	[string]: number,
-} = {}
-local symbolNames: {
-	[number]: string,
-} = {}
-
-const function symbolId(
-	name: string
-): number
-	local id = symbolIds[name]
-
-	if id == nil then
-		id = #symbolNames + 1
-		symbolIds[name] = id
-		symbolNames[id] = name
-	end
-
-	return id
-end
-
--- The name of a symbol id, or nil if no symbol has that id.
-const function symbolName(
-	id: number
-): string?
-	return symbolNames[id]
-end
-
--- The value of a quoted expression: a symbol is its id, a number is itself, and a list is the cons cells of its items, ending in nil.
+-- The value of a quoted expression: a symbol is a symbol value, a number is a number, and a list is the pairs of its items, ending in nil.
 local function quoted(
 	e: Expr,
 	b: Builder
 ): Port
 	if e.kind == "num" then
-		return S.numeral(b, e.value :: number)
+		return V.numberValue(b, e.value :: number)
 	elseif e.kind == "sym" then
-		return S.numeral(b, symbolId(e.name :: string))
+		return V.symbolValue(b, V.symbolId(e.name :: string))
 	end
 
-	local value = Li.nilValue(b)
+	local value = V.nilValue(b)
 	const items = e.items :: { Expr }
 
 	for i = #items, 1, -1 do
-		value = L.app(b, L.app(b, Li.cons(b), quoted(items[i], b)), value)
+		value = V.consValue(b, quoted(items[i], b), value)
 	end
 
 	return value
@@ -625,7 +576,7 @@ compile = function(
 	b: Builder
 ): Port
 	if e.kind == "num" then
-		return S.numeral(b, e.value :: number)
+		return V.numberValue(b, e.value :: number)
 	elseif e.kind == "sym" then
 		const name = e.name :: string
 		const binding = scope[name]
@@ -690,7 +641,7 @@ compile = function(
 		const yes = compile(items[3], scope, b)
 		const no = compile(items[4], scope, b)
 
-		return L.app(b, L.app(b, condition, yes), no)
+		return V.ifValue(b, condition, yes, no)
 	end
 
 	if isSym(items[1], "local-define") then
@@ -1033,6 +984,6 @@ end
 return {
 	evaluate = evaluate,
 	build = build,
-	symbolId = symbolId,
-	symbolName = symbolName,
+	symbolId = V.symbolId,
+	symbolName = V.symbolName,
 }

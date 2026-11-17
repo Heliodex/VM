@@ -18,6 +18,7 @@ const H = require "./harness"
 const L = require "./lambda"
 const Li = require "./lists"
 const Reader = require "./reader"
+const V = require "./values"
 const S = require "./scott"
 const Rules = require "./rules"
 const Types = require "./types"
@@ -34,6 +35,50 @@ local function numeralOf(
 	const _, got = S.readNet(net)
 
 	return got
+end
+
+-- How long a program may take to reduce, with the value read back.
+const PROGRAM_BUDGET = 400000
+
+-- Whether a program's value is the number n.
+local function numberIs(
+	value: V.Value?,
+	n: number
+): boolean
+	return value ~= nil and value.kind == "number" and value.value == n
+end
+
+-- Whether a program's value is the symbol called `name`.
+local function symbolIs(
+	value: V.Value?,
+	name: string
+): boolean
+	return value ~= nil and value.kind == "symbol" and value.name == name
+end
+
+-- The numbers of a program's value, if it is a list of numbers, from its start.
+local function listOfProgram(
+	src: string
+): { number }?
+	local _, value = V.read(Compile.build(src), PROGRAM_BUDGET)
+	const values: { number } = {}
+
+	while value ~= nil and value.kind == "pair" do
+		const head = value.car
+
+		if head == nil or head.kind ~= "number" or head.value == nil then
+			return nil
+		end
+
+		table.insert(values, head.value)
+		value = value.cdr
+	end
+
+	if value == nil or value.kind ~= "nil" then
+		return nil
+	end
+
+	return values
 end
 
 -- The normal form of the Scott numeral n, which is cut-free and so can be encoded.
@@ -562,8 +607,8 @@ for _, values in {
 end
 
 -- A list made by a program, and one whose elements are computed.
-report(sameList(Li.readback(Compile.build("(cons 1 (cons 2 nil))")), { 1, 2 }), "a list made by a program reads back whole")
-report(sameList(Li.readback(Compile.build("(define inc (lambda (n) (+ n 10))) (cons (inc 1) (cons (inc 2) nil))")), { 11, 12 }), "a list of computed numbers reads back whole")
+report(sameList(listOfProgram("(cons 1 (cons 2 nil))"), { 1, 2 }), "a list made by a program reads back whole")
+report(sameList(listOfProgram("(define inc (lambda (n) (+ n 10))) (cons (inc 1) (cons (inc 2) nil))"), { 11, 12 }), "a list of computed numbers reads back whole")
 
 -- A number is not a list, so it does not read back as one.
 report(Li.readback(function(
@@ -639,17 +684,17 @@ for _, case in {
 		want = 9,
 	},
 } do
-	const result, built = Compile.evaluate(case.src, ARITH_BUDGET * 4)
-	report(result.outcome == "reduced" and numeralOf(built) == case.want, `{case.src}  is {case.want}  ({H.describe(result)})`)
+	const result, value = V.read(Compile.build(case.src), PROGRAM_BUDGET)
+	report(numberIs(value, case.want), `{case.src}  is {case.want}  ({H.describe(result)})`)
 end
 
--- Symbols: a quoted name is its id, which compares by eq?, and a quoted list reads back as its cons cells.
+-- Symbols: a quoted name reads back as that symbol, eq? compares symbols by name, and a quoted list reads back as its cons cells.
 for _, name in {
 	"a",
 	"b",
 } do
-	const result, built = Compile.evaluate("'" .. name, ARITH_BUDGET)
-	report(result.outcome == "reduced" and numeralOf(built) == Compile.symbolId(name), `'{name} is its symbol id  ({H.describe(result)})`)
+	const result, value = V.read(Compile.build("'" .. name), PROGRAM_BUDGET)
+	report(symbolIs(value, name), `'{name} reads back as that symbol  ({H.describe(result)})`)
 end
 
 for _, case in {
@@ -661,20 +706,110 @@ for _, case in {
 		src = "(if (eq? 'a 'b) 1 2)",
 		want = 2,
 	},
-	{
-		src = "(head '(a b) 0)",
-		want = Compile.symbolId("a"),
-	},
 } do
-	const result, built = Compile.evaluate(case.src, ARITH_BUDGET)
-	report(result.outcome == "reduced" and numeralOf(built) == case.want, `{case.src}  is {case.want}  ({H.describe(result)})`)
+	const result, value = V.read(Compile.build(case.src), PROGRAM_BUDGET)
+	report(numberIs(value, case.want), `{case.src}  is {case.want}  ({H.describe(result)})`)
 end
 
-report(sameList(Li.readback(Compile.build("'(1 2)")), { 1, 2 }), "a quoted list of numbers reads back whole")
-report(sameList(Li.readback(Compile.build("'()")), {}), "the empty quoted list is the empty list")
+do
+	const result, value = V.read(Compile.build("(car '(a b))"), PROGRAM_BUDGET)
+	report(symbolIs(value, "a"), `(car '(a b)) is the symbol a  ({H.describe(result)})`)
+end
+
+report(sameList(listOfProgram("'(1 2)"), { 1, 2 }), "a quoted list of numbers reads back whole")
+report(sameList(listOfProgram("'()"), {}), "the empty quoted list is the empty list")
 report(not pcall(function()
 	Compile.evaluate("(define quote 1) 0")
 end), "quote cannot be defined")
+
+-- Tagged values: each program's value, written out, and the errors for values of the wrong kind.
+-- A value is written as Lisp would write it, so a test compares its shape as well as its numbers.
+local function render(
+	value: V.Value?
+): string
+	if value == nil then
+		return "?"
+	elseif value.kind == "number" then
+		return tostring(value.value)
+	elseif value.kind == "symbol" then
+		return value.name :: string
+	elseif value.kind == "boolean" then
+		return if value.truth then "#t" else "#f"
+	elseif value.kind == "nil" then
+		return "()"
+	elseif value.kind == "error" then
+		return "#error"
+	end
+
+	-- a pair: a list if its tail is a list, otherwise a dotted pair
+	const parts: { string } = { render(value.car) }
+	local rest = value.cdr
+
+	while rest ~= nil and rest.kind == "pair" do
+		table.insert(parts, render(rest.car))
+		rest = rest.cdr
+	end
+
+	if rest ~= nil and rest.kind == "nil" then
+		return `({table.concat(parts, " ")})`
+	end
+
+	return `({table.concat(parts, " ")} . {render(rest)})`
+end
+
+for _, case in {
+	{
+		src = "'(1 (2 3))",
+		want = "(1 (2 3))",
+	},
+	{
+		src = "(cons 1 2)",
+		want = "(1 . 2)",
+	},
+	{
+		src = "(cdr '(1))",
+		want = "()",
+	},
+	{
+		src = "'()",
+		want = "()",
+	},
+	{
+		src = "(< 1 2)",
+		want = "#t",
+	},
+	{
+		src = "(eq? 'a 'b)",
+		want = "#f",
+	},
+	{
+		src = "(number? 'a)",
+		want = "#f",
+	},
+	{
+		src = "(null? '())",
+		want = "#t",
+	},
+	{
+		src = "(+ 'a 1)",
+		want = "#error",
+	},
+	{
+		src = "(succ 'a)",
+		want = "#error",
+	},
+	{
+		src = "(car '())",
+		want = "#error",
+	},
+	{
+		src = "(if 5 1 2)",
+		want = "#error",
+	},
+} do
+	const result, value = V.read(Compile.build(case.src), PROGRAM_BUDGET)
+	report(result.outcome == "reduced" and render(value) == case.want, `{case.src}  is {case.want}  (is {render(value)})`)
+end
 
 -- Reader ----------------------------------------------------------------------
 -- Each source reads back as the expressions it should, comments and spacing aside.
@@ -758,29 +893,29 @@ for _, case in {
 		want = 2,
 	},
 	{
-		src = "(if (isNil (tail (cons 1 nil) nil)) 5 6)",
+		src = "(if (null? (cdr (cons 1 nil))) 5 6)",
 		want = 5,
 	},
 	-- The recursive call sits in the else branch, so these terminate only if the branch that is not chosen is never unfolded.
 	{
-		src = "(define length (lambda (l) (if (isNil l) 0 (succ (length (tail l nil)))))) (length nil)",
+		src = "(define length (lambda (l) (if (null? l) 0 (succ (length (cdr l)))))) (length nil)",
 		want = 0,
 	},
 	{
-		src = "(define length (lambda (l) (if (isNil l) 0 (succ (length (tail l nil)))))) (length (cons 1 (cons 2 nil)))",
+		src = "(define length (lambda (l) (if (null? l) 0 (succ (length (cdr l)))))) (length (cons 1 (cons 2 nil)))",
 		want = 2,
 	},
 	{
-		src = "(define length (lambda (l) (if (isNil l) 0 (succ (length (tail l nil)))))) (length (cons 1 (cons 2 (cons 3 nil))))",
+		src = "(define length (lambda (l) (if (null? l) 0 (succ (length (cdr l)))))) (length (cons 1 (cons 2 (cons 3 nil))))",
 		want = 3,
 	},
 	-- A copied list, used two different ways: this was wrong with Church numerals.
 	{
-		src = "((lambda (x) (+ (head x 0) (head (tail x 0) 0))) (cons 2 (cons 3 nil)))",
+		src = "((lambda (x) (+ (car x) (car (cdr x)))) (cons 2 (cons 3 nil)))",
 		want = 5,
 	},
 	{
-		src = "(define sum (lambda (l) (if (isNil l) 0 (+ (head l 0) (sum (tail l 0)))))) (sum (cons 1 (cons 2 (cons 3 nil))))",
+		src = "(define sum (lambda (l) (if (null? l) 0 (+ (car l) (sum (cdr l)))))) (sum (cons 1 (cons 2 (cons 3 nil))))",
 		want = 6,
 	},
 	{
@@ -789,36 +924,36 @@ for _, case in {
 	},
 	-- A recursive function given a function argument is specialised on it, so the function is never copied at run time.
 	{
-		src = "(define rep (lambda (k l) (if (isNil l) 0 (+ (k (head l 0)) (rep k (tail l nil)))))) (rep (lambda (n) (+ n 10)) (cons 1 (cons 2 nil)))",
+		src = "(define rep (lambda (k l) (if (null? l) 0 (+ (k (car l)) (rep k (cdr l)))))) (rep (lambda (n) (+ n 10)) (cons 1 (cons 2 nil)))",
 		want = 23,
 	},
 	{
-		src = "(define rep (lambda (k l) (if (isNil l) 0 (+ (k (head l 0)) (rep k (tail l nil)))))) (rep (lambda (n) (+ n n)) (cons 1 (cons 2 nil)))",
+		src = "(define rep (lambda (k l) (if (null? l) 0 (+ (k (car l)) (rep k (cdr l)))))) (rep (lambda (n) (+ n n)) (cons 1 (cons 2 nil)))",
 		want = 6,
 	},
 	{
-		src = "(define inc (lambda (n) (+ n 10))) (define rep (lambda (k l) (if (isNil l) 0 (+ (k (head l 0)) (rep k (tail l nil)))))) (rep inc (cons 1 (cons 2 nil)))",
+		src = "(define inc (lambda (n) (+ n 10))) (define rep (lambda (k l) (if (null? l) 0 (+ (k (car l)) (rep k (cdr l)))))) (rep inc (cons 1 (cons 2 nil)))",
 		want = 23,
 	},
 	{
-		src = "(define count (lambda (f l) (if (isNil l) 0 (+ (f (head l 0)) (count f (tail l nil)))))) (count (lambda (n) (* n 2)) (cons 1 (cons 2 (cons 3 nil))))",
+		src = "(define count (lambda (f l) (if (null? l) 0 (+ (f (car l)) (count f (cdr l)))))) (count (lambda (n) (* n 2)) (cons 1 (cons 2 (cons 3 nil))))",
 		want = 12,
 	},
 	{
-		src = "(define rep (lambda (k l) (if (isNil l) 0 (+ (k (head l 0)) (rep k (tail l nil)))))) ((lambda (x) (rep (lambda (n) (+ n x)) (cons 1 (cons 2 nil)))) 5)",
+		src = "(define rep (lambda (k l) (if (null? l) 0 (+ (k (car l)) (rep k (cdr l)))))) ((lambda (x) (rep (lambda (n) (+ n x)) (cons 1 (cons 2 nil)))) 5)",
 		want = 13,
 	},
 	-- A local recursive function may use the variables of the function it is in, which are passed to it.
 	{
-		src = "(define scale (lambda (n l) (if (isNil l) 0 (+ (letrec tot (lambda (m) (if (isNil m) 0 (+ (* n (head m 0)) (tot (tail m nil))))) (tot l)) (scale n (tail l nil)))))) (scale 2 (cons 1 (cons 2 nil)))",
+		src = "(define scale (lambda (n l) (if (null? l) 0 (+ (letrec tot (lambda (m) (if (null? m) 0 (+ (* n (car m)) (tot (cdr m))))) (tot l)) (scale n (cdr l)))))) (scale 2 (cons 1 (cons 2 nil)))",
 		want = 10,
 	},
 	{
-		src = "((lambda (k) (letrec sumk (lambda (l) (if (isNil l) 0 (+ (k (head l 0)) (sumk (tail l nil))))) (sumk (cons 1 (cons 2 nil))))) (lambda (x) (+ x 10)))",
+		src = "((lambda (k) (letrec sumk (lambda (l) (if (null? l) 0 (+ (k (car l)) (sumk (cdr l))))) (sumk (cons 1 (cons 2 nil))))) (lambda (x) (+ x 10)))",
 		want = 23,
 	},
 	{
-		src = "(define g (lambda (a b l) (if (isNil l) 0 (+ (letrec h (lambda (m) (if (isNil m) 0 (+ (+ a b) (h (tail m nil))))) (h l)) (g a b (tail l nil)))))) (g 1 2 (cons 0 nil))",
+		src = "(define g (lambda (a b l) (if (null? l) 0 (+ (letrec h (lambda (m) (if (null? m) 0 (+ (+ a b) (h (cdr m))))) (h l)) (g a b (cdr l)))))) (g 1 2 (cons 0 nil))",
 		want = 3,
 	},
 	-- A closed closure containing addition, used twice: this was wrong before closed arguments were substituted.
@@ -835,8 +970,8 @@ for _, case in {
 		want = 21,
 	},
 } do
-	const result, built = Compile.evaluate(case.src, ARITH_BUDGET)
-	report(result.outcome == "reduced" and numeralOf(built) == case.want, `{case.src}  is {case.want}  ({H.describe(result)})`)
+	const result, value = V.read(Compile.build(case.src), PROGRAM_BUDGET)
+	report(numberIs(value, case.want), `{case.src}  is {case.want}  ({H.describe(result)})`)
 end
 
 -- Programs that should not compile are rejected with an error.
@@ -848,15 +983,15 @@ for _, src in {
 	"(if true 1)",
 	"(define + 1) 0",
 	-- a function that depends on a variable of an enclosing lambda cannot be passed to a call
-	"(define g (lambda (l) (if (isNil l) 0 (+ ((lambda (f) (+ (f 1) (f 2))) (lambda (n) (+ n (head l 0)))) (g (tail l nil)))))) (g (cons 5 nil))",
+	"(define g (lambda (l) (if (null? l) 0 (+ ((lambda (f) (+ (f 1) (f 2))) (lambda (n) (+ n (car l)))) (g (cdr l)))))) (g (cons 5 nil))",
 	-- a recursive call must pass its function arguments on unchanged
-	"(define rep (lambda (k l) (if (isNil l) 0 (+ (k (head l 0)) (rep (lambda (n) (succ n)) (tail l nil)))))) (rep (lambda (n) (+ n 10)) (cons 1 (cons 2 nil)))",
+	"(define rep (lambda (k l) (if (null? l) 0 (+ (k (car l)) (rep (lambda (n) (succ n)) (cdr l)))))) (rep (lambda (n) (+ n 10)) (cons 1 (cons 2 nil)))",
 	-- a local function can only be called
-	"(define g (lambda (n l) (if (isNil l) 0 (letrec h (lambda (m) (if (isNil m) 0 h)) (h l))))) (g 1 nil)",
+	"(define g (lambda (n l) (if (null? l) 0 (letrec h (lambda (m) (if (null? m) 0 h)) (h l))))) (g 1 nil)",
 	-- a local function cannot call the function it is defined in
-	"(define g (lambda (n l) (if (isNil l) 0 (+ (letrec h (lambda (m) (if (isNil m) 0 (g n m))) (h l)) (g n (tail l nil)))))) (g 1 (cons 1 nil))",
+	"(define g (lambda (n l) (if (null? l) 0 (+ (letrec h (lambda (m) (if (null? m) 0 (g n m))) (h l)) (g n (cdr l)))))) (g 1 (cons 1 nil))",
 	-- a recursive function given a function argument is not a value on its own
-	"(define rep (lambda (k l) (if (isNil l) 0 (+ (k (head l 0)) (rep k (tail l nil)))))) (rep (lambda (n) (+ n 10)) rep)",
+	"(define rep (lambda (k l) (if (null? l) 0 (+ (k (car l)) (rep k (cdr l)))))) (rep (lambda (n) (+ n 10)) rep)",
 } do
 	report(not pcall(function()
 		Compile.evaluate(src)
