@@ -19,6 +19,7 @@ const L = require "./lambda"
 const Li = require "./lists"
 const Net = require "./net"
 const N = require "./numerals"
+const Reader = require "./reader"
 const Rec = require "./recursion"
 const Rules = require "./rules"
 const Types = require "./types"
@@ -425,6 +426,40 @@ for _, elements in {
 		const taken = steps(net)
 		report(taken < ARITH_BUDGET and N.readback(net) == case.want, `{case.name} of {#elements} elements is {case.want}  ({taken} steps)`)
 end end
+
+-- Reader ----------------------------------------------------------------------
+-- Each source reads back as the expressions it should, comments and spacing aside.
+for index, case in {
+	{
+		src = "(+ 1 2)",
+		want = "(+ 1 2)",
+	},
+	{
+		src = "  ( lambda (x) x )\n; a comment (with brackets)\n 7",
+		want = "(lambda (x) x) 7",
+	},
+	{
+		src = "",
+		want = "",
+	},
+} do
+	const forms = Reader.read(case.src)
+	const shown = {}
+
+	for _, form in forms do
+		table.insert(shown, Reader.show(form))
+	end
+
+	report(table.concat(shown, " ") == case.want, `source {index} reads as {case.want == "" and "nothing" or case.want}`)
+end
+
+-- Unbalanced brackets are errors, not silently accepted.
+for _, src in {
+	"(+ 1",
+	")",
+} do
+	report(not pcall(Reader.read, src), `source {src} is rejected`)
+end
 
 -- Known limitations ----------------------------------------------------------
 -- These nets should loop, but they stop with no active pair left and no cycle seen while stepping. The harness reports them as `reduced`, the same as a real normal form, and nothing in the final net separates them from a value (the identity is also a net with a loop in it).
