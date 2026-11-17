@@ -26,7 +26,8 @@ type Net = Types.Net
 type Cell = Types.Cell
 type Symbol = Types.Symbol
 -- How a reduction ended.
--- `reduced` reached a normal form, `exhausted` used its whole budget, and `cycled` was caught returning to a state it had already been in.
+-- `reduced` means no active pair is left. That is a normal form only if the net is a value: a stuck net, such as the one `(λx.x x)(λx.x x)` leaves, also has no active pair, and nothing in the final net tells it apart from a value, so it is reported as `reduced` too (see the known limitations in validate.luau).
+-- `exhausted` used its whole budget, and `cycled` was caught returning to a state it had already been in during stepping.
 export type Outcome =
 	| "reduced"
 	| "exhausted"
