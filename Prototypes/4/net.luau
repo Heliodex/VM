@@ -199,6 +199,13 @@ const function wellFormed(
 	return true
 end
 
+-- How many cells are still alive. Every cell ever made keeps its slot in Tag, and a released one is on Free until it is reused, so this is a subtraction rather than a scan.
+const function liveCount(
+	net: Net
+): number
+	return #net.Tag - #net.Free
+end
+
 -- The cells that are still alive (release() keeps Tag around for slot reuse).
 const function liveCells(
 	net: Net
@@ -241,4 +248,5 @@ return {
 	move = move,
 	wellFormed = wellFormed,
 	liveCells = liveCells,
+	liveCount = liveCount,
 }

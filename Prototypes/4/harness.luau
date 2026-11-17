@@ -161,7 +161,7 @@ local function detectCycle(
 	} = {}
 	local tracked = 0
 	local steps = 0
-	local cells = #Net.liveCells(net)
+	local cells = Net.liveCount(net)
 	local peak = cells
 
 	while true do
@@ -207,7 +207,7 @@ local function detectCycle(
 		end
 
 		steps += 1
-		cells = #Net.liveCells(net)
+		cells = Net.liveCount(net)
 		peak = math.max(peak, cells)
 	end
 end
@@ -222,7 +222,7 @@ const function reduce(
 	const limit = budget or DEFAULT_BUDGET
 	const start = snapshot(net)
 	local steps = 0
-	local cells = #Net.liveCells(net)
+	local cells = Net.liveCount(net)
 	local peak = cells
 
 	while steps < limit do
@@ -236,7 +236,7 @@ const function reduce(
 		end
 
 		steps += 1
-		cells = #Net.liveCells(net)
+		cells = Net.liveCount(net)
 		peak = math.max(peak, cells)
 	end
 
