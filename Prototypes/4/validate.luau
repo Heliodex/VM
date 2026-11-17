@@ -596,6 +596,27 @@ limitation("omega, (λx.x x)(λx.x x)", Cases.build(function(
 	omega(b)
 end))
 
+-- A program whose value is wrong today. The value it gives is recorded, so a change either way is noticed.
+-- Copying a list that contains numerals goes wrong when its copies are used differently: the fan that copies it is δ, and numerals of two or more are built with δ, so the copy sees δ meeting δ (Lafont's Lemma 3). Both copies being used the same way (head and head) comes out right, which is why this is easy to miss.
+const function wrongValue(
+	label: string,
+	src: string,
+	want: number,
+	got: number
+)
+	const result, built = Compile.evaluate(src, ARITH_BUDGET)
+	const value = N.readback(built)
+
+	if value == got then
+		print(`KNOWN  {label}  (gives {got}, should be {want}; {H.describe(result)})`)
+	else
+		report(false, `{label} now gives {value}, not {got}; if it is right now, move it to the checks  ({H.describe(result)})`)
+	end
+end
+
+wrongValue("two different uses of a copied list", "((lambda (x) (+ (head x 0) (head (tail x 0) 0))) (cons 2 (cons 3 nil)))", 5, 1)
+wrongValue("a recursive sum over a list used three ways", "(define sum (lambda (l) (if (isNil l) 0 (+ (head l 0) (sum (tail l 0)))))) (sum (cons 1 (cons 2 (cons 3 nil))))", 6, 1)
+
 if failures > 0 then
 	error(`{failures} of {total} checks failed`)
 end
