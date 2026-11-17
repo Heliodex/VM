@@ -12,6 +12,7 @@ const B = require "./builder"
 const Canon = require "./canon"
 const Cases = require "./cases"
 const Codes = require "./codes"
+const Compile = require "./compile"
 const F = require "./fix"
 const G = require "./gadgets"
 const H = require "./harness"
@@ -459,6 +460,83 @@ for _, src in {
 	")",
 } do
 	report(not pcall(Reader.read, src), `source {src} is rejected`)
+end
+
+-- Programs --------------------------------------------------------------------
+-- Source text compiles and reduces to the value it should. A program is checked by reading its value back, so a stuck net does not pass.
+for _, case in {
+	{
+		src = "3",
+		want = 3,
+	},
+	{
+		src = "(+ 2 3)",
+		want = 5,
+	},
+	{
+		src = "(* 2 3)",
+		want = 6,
+	},
+	{
+		src = "((lambda (x) 5) 9)",
+		want = 5,
+	},
+	{
+		src = "((lambda (x) (+ x x)) 4)",
+		want = 8,
+	},
+	{
+		src = "((lambda (f) (+ (f 1) (f 2))) (lambda (n) (+ n 10)))",
+		want = 23,
+	},
+	{
+		src = "(if true 1 2)",
+		want = 1,
+	},
+	{
+		src = "(if false 1 2)",
+		want = 2,
+	},
+	{
+		src = "(define double (lambda (n) (+ n n))) (double 3)",
+		want = 6,
+	},
+	{
+		src = "(define inc (lambda (x) (succ x))) (define twice (lambda (f) (lambda (x) (f (f x))))) ((twice inc) 0)",
+		want = 2,
+	},
+	{
+		src = "(if (isNil (tail (cons 1 nil) nil)) 5 6)",
+		want = 5,
+	},
+	-- The recursive call sits in the else branch, so these terminate only if the branch that is not chosen is never unfolded.
+	{
+		src = "(define length (lambda (l) (if (isNil l) 0 (succ (length (tail l nil)))))) (length nil)",
+		want = 0,
+	},
+	{
+		src = "(define length (lambda (l) (if (isNil l) 0 (succ (length (tail l nil)))))) (length (cons 1 (cons 2 nil)))",
+		want = 2,
+	},
+	{
+		src = "(define length (lambda (l) (if (isNil l) 0 (succ (length (tail l nil)))))) (length (cons 1 (cons 2 (cons 3 nil))))",
+		want = 3,
+	},
+} do
+	const result, built = Compile.evaluate(case.src, ARITH_BUDGET)
+	report(result.outcome == "reduced" and N.readback(built) == case.want, `{case.src}  is {case.want}  ({H.describe(result)})`)
+end
+
+-- Programs that should not compile are rejected with an error.
+for _, src in {
+	"(f 1)",
+	"(define x 1)",
+	"(define x (+ x 1)) 0",
+	"(lambda (x) x) (define y 2)",
+	"(if true 1)",
+	"(define + 1) 0",
+} do
+	report(not pcall(Compile.evaluate, src), `rejects {src}`)
 end
 
 -- Known limitations ----------------------------------------------------------
