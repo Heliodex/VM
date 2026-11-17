@@ -507,6 +507,71 @@ do
 	report(got == 4, `a numeral copied in two and added to itself is 4  ({H.describe(result)})`)
 end
 
+-- Whole lists: a list reads back as the Lua table of its numbers, from the start.
+local function listBuilder(
+	values: { number }
+): (Builder) -> Port
+	return function(
+		b: Builder
+	): Port
+		local list = Li.nilValue(b)
+
+		for i = #values, 1, -1 do
+			list = L.app(b, L.app(b, Li.cons(b), S.numeral(b, values[i])), list)
+		end
+
+		return list
+	end
+end
+
+local function sameList(
+	got: { number }?,
+	want: { number }
+): boolean
+	if got == nil or #got ~= #want then
+		return false
+	end
+
+	for i, value in want do
+		if got[i] ~= value then
+			return false
+		end
+	end
+
+	return true
+end
+
+for _, values in {
+	{},
+	{
+		4,
+	},
+	{
+		2,
+		3,
+	},
+	{
+		1,
+		2,
+		3,
+		4,
+	},
+} do
+	const got = Li.readback(listBuilder(values))
+	report(sameList(got, values), `the list of {#values} numbers reads back as itself`)
+end
+
+-- A list made by a program, and one whose elements are computed.
+report(sameList(Li.readback(Compile.build("(cons 1 (cons 2 nil))")), { 1, 2 }), "a list made by a program reads back whole")
+report(sameList(Li.readback(Compile.build("(define inc (lambda (n) (+ n 10))) (cons (inc 1) (cons (inc 2) nil))")), { 11, 12 }), "a list of computed numbers reads back whole")
+
+-- A number is not a list, so it does not read back as one.
+report(Li.readback(function(
+	b: Builder
+): Port
+	return S.numeral(b, 3)
+end) == nil, "a number does not read back as a list")
+
 -- Reader ----------------------------------------------------------------------
 -- Each source reads back as the expressions it should, comments and spacing aside.
 for index, case in {

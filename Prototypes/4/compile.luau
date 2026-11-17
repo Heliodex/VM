@@ -952,6 +952,18 @@ const function evaluate(
 	return H.reduce(net, budget or BUDGET), net
 end
 
+-- The program as a value to build into a net, so that it can be read back with any readback.
+const function build(
+	source: string
+): (Builder) -> Port
+	return function(
+		b: Builder
+	): Port
+		return program(Reader.read(source), b)
+	end
+end
+
 return {
 	evaluate = evaluate,
+	build = build,
 }

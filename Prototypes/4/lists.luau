@@ -189,7 +189,57 @@ const function sum(
 	return Rec.tie(b, Rec.fold(S.zero, S.addition))
 end
 
+-- The value of element i (counting from 0) of the list that `build` makes: the head of its i-th tail, or zero past the end, which readback never asks for.
+local function elementOf(
+	build: (Builder) -> Port,
+	i: number
+): (Builder) -> Port
+	return function(
+		b: Builder
+	): Port
+		local rest = build(b)
+
+		for _ = 1, i do
+			rest = L.app(b, L.app(b, tail(b), rest), nilValue(b))
+		end
+
+		return L.app(b, L.app(b, head(b), rest), S.zero(b))
+	end
+end
+
+-- The whole list that `build` makes, as a Lua table of the numbers in it, from the start. The length is read first, then each element, so the cost is quadratic in the length.
+-- It is nil if the value is not a list of numerals: either its length does not read back, or an element does not.
+const function readback(
+	build: (Builder) -> Port,
+	budget: number?
+): { number }?
+	const _, count = S.readback(function(
+		b: Builder
+	): Port
+		return L.app(b, length(b), build(b))
+	end, budget)
+
+	if count == nil then
+		return nil
+	end
+
+	const values: { number } = {}
+
+	for i = 0, count - 1 do
+		const _, value = S.readback(elementOf(build, i), budget)
+
+		if value == nil then
+			return nil
+		end
+
+		table.insert(values, value)
+	end
+
+	return values
+end
+
 return {
+	readback = readback,
 	length = length,
 	sum = sum,
 	nilValue = nilValue,
