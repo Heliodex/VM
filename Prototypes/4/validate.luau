@@ -614,6 +614,27 @@ for _, case in {
 		src = "((lambda (x) (+ x (+ x x))) 3)",
 		want = 9,
 	},
+	-- A recursive function given a function argument is specialised on it, so the function is never copied at run time.
+	{
+		src = "(define rep (lambda (k l) (if (isNil l) 0 (+ (k (head l 0)) (rep k (tail l nil)))))) (rep (lambda (n) (+ n 10)) (cons 1 (cons 2 nil)))",
+		want = 23,
+	},
+	{
+		src = "(define rep (lambda (k l) (if (isNil l) 0 (+ (k (head l 0)) (rep k (tail l nil)))))) (rep (lambda (n) (+ n n)) (cons 1 (cons 2 nil)))",
+		want = 6,
+	},
+	{
+		src = "(define inc (lambda (n) (+ n 10))) (define rep (lambda (k l) (if (isNil l) 0 (+ (k (head l 0)) (rep k (tail l nil)))))) (rep inc (cons 1 (cons 2 nil)))",
+		want = 23,
+	},
+	{
+		src = "(define count (lambda (f l) (if (isNil l) 0 (+ (f (head l 0)) (count f (tail l nil)))))) (count (lambda (n) (* n 2)) (cons 1 (cons 2 (cons 3 nil))))",
+		want = 12,
+	},
+	{
+		src = "(define rep (lambda (k l) (if (isNil l) 0 (+ (k (head l 0)) (rep k (tail l nil)))))) ((lambda (x) (rep (lambda (n) (+ n x)) (cons 1 (cons 2 nil)))) 5)",
+		want = 13,
+	},
 	-- A closed closure containing addition, used twice: this was wrong before closed arguments were substituted.
 	{
 		src = "((lambda (f) (+ (f 1) (f 2))) (lambda (n) (+ n 10)))",
@@ -640,6 +661,12 @@ for _, src in {
 	"(lambda (x) x) (define y 2)",
 	"(if true 1)",
 	"(define + 1) 0",
+	-- a function that depends on a variable of an enclosing lambda cannot be passed to a call
+	"(define g (lambda (l) (if (isNil l) 0 (+ ((lambda (f) (+ (f 1) (f 2))) (lambda (n) (+ n (head l 0)))) (g (tail l nil)))))) (g (cons 5 nil))",
+	-- a recursive call must pass its function arguments on unchanged
+	"(define rep (lambda (k l) (if (isNil l) 0 (+ (k (head l 0)) (rep (lambda (n) (succ n)) (tail l nil)))))) (rep (lambda (n) (+ n 10)) (cons 1 (cons 2 nil)))",
+	-- a recursive function given a function argument is not a value on its own
+	"(define rep (lambda (k l) (if (isNil l) 0 (+ (k (head l 0)) (rep k (tail l nil)))))) (rep (lambda (n) (+ n 10)) rep)",
 } do
 	report(not pcall(function()
 		Compile.evaluate(src)

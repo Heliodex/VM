@@ -51,6 +51,9 @@ type Binding = {
 	expr: Expr?,
 	scope: Scope?,
 	recursive: boolean?,
+	-- for a self binding of a specialised function: which parameters were fixed to function arguments (by position), and the parameter names
+	dropped: { [number]: boolean }?,
+	params: { string }?,
 }
 type Scope = {
 	[string]: Binding,
@@ -264,7 +267,49 @@ local function takeCopy(
 	return p
 end
 
-local compileRecursive: (Binding, Builder) -> Port
+
+-- The function over the parameters that are not fixed to function arguments, with the code of the function itself as its first argument. A use of the name inside stands for a recall of that code, and drops the arguments that were fixed.
+-- A parameter in `dropped` is bound by the scope to the function argument that replaces it, so the body builds that argument where it is used.
+local function compileFunction(
+	name: string,
+	params: { string },
+	body: Expr,
+	scope: Scope,
+	dropped: {
+		[number]: boolean,
+	},
+	own: Builder
+): Port
+	const remaining: { string } = {}
+
+	for i, param in params do
+		if not dropped[i] then
+			table.insert(remaining, param)
+		end
+	end
+
+	if #remaining == 0 then
+		error(`{name} needs a parameter that is not a function argument`)
+	end
+
+	return L.lam(
+		own, function(
+			code: Port
+		): Port
+			const copies = L.share(own, code, countFree(name, remaining, body, true))
+			const inner = table.clone(scope)
+			inner[name] = {
+				kind = "self",
+				name = name,
+				pool = copies,
+				dropped = dropped,
+				params = params,
+			}
+
+			return bindParams(remaining, 1, body, inner, own)
+		end
+	)
+end
 
 -- A top-level definition, built where it is used. A recursive one is tied through recursion.luau, which builds its code once into the net being built.
 local function useDefinition(
@@ -272,40 +317,16 @@ local function useDefinition(
 	b: Builder
 ): Port
 	if binding.recursive then
+		const lambda = lambdaParts(binding.expr :: Expr) :: Lambda
+
 		return Rec.tie(b, function(
 			own: Builder
 		): Port
-			return compileRecursive(binding, own)
+			return compileFunction(binding.name, lambda.names, lambda.body, binding.scope :: Scope, {}, own)
 		end)
 	end
 
 	return compile(binding.expr :: Expr, binding.scope :: Scope, b)
-end
-
--- R = λcode. λparams. body, where a use of the defined name in the body stands for a recall of the code. The code gets one copy for each such use.
-compileRecursive = function(
-	binding: Binding,
-	own: Builder
-): Port
-	const lambda = lambdaParts(binding.expr :: Expr) :: Lambda
-	const names, body = lambda.names, lambda.body
-	const name = binding.name
-
-	return L.lam(
-		own, function(
-			code: Port
-		): Port
-			const copies = L.share(own, code, countFree(name, names, body, true))
-			const scope = table.clone(binding.scope :: Scope)
-			scope[name] = {
-				kind = "self",
-				name = name,
-				pool = copies,
-			}
-
-			return bindParams(names, 1, body, scope, own)
-		end
-	)
 end
 
 -- The name of the function being defined, if the scope is inside its body.
@@ -343,6 +364,8 @@ local function compileRoutedIf(
 					kind = "self",
 					name = selfName,
 					pool = L.share(b, k, countIn(selfName, e, true)),
+					dropped = scope[selfName].dropped,
+					params = scope[selfName].params,
 				}
 
 				return compile(e, inner, b)
@@ -455,6 +478,84 @@ local function inlineCall(
 	return compile(lambda.body, inner, b)
 end
 
+-- Whether `e` is a function: a lambda, or a name for a definition of one, or for a recursive definition.
+local function isFunctionExpr(
+	e: Expr,
+	scope: Scope
+): boolean
+	if lambdaParts(e) then
+		return true
+	end
+
+	if e.kind == "sym" then
+		const binding = scope[e.name :: string]
+
+		return binding ~= nil and binding.kind == "def" and (binding.recursive == true or (binding.expr ~= nil and lambdaParts(binding.expr :: Expr) ~= nil))
+	end
+
+	return false
+end
+
+-- A call of a recursive definition with some function arguments. Each function argument is fixed into the function, so the function is built once for these arguments and nothing is copied at run time. The other arguments are passed as usual.
+-- A function argument must not depend on a variable of an enclosing lambda, because it could not then be built again at each use. Returns nil if no argument is a function, so the call is compiled as usual.
+local function specialiseCall(
+	binding: Binding,
+	args: { Expr },
+	scope: Scope,
+	b: Builder
+): Port?
+	const lambda = lambdaParts(binding.expr :: Expr) :: Lambda
+	const dropped: {
+		[number]: boolean,
+	} = {}
+	const fixed = table.clone(binding.scope :: Scope)
+	local any = false
+
+	for i, arg in args do
+		if isFunctionExpr(arg, scope) then
+			if not isClosedIn(arg, scope, {}) then
+				error(`a function passed to {binding.name} must not depend on a variable of an enclosing lambda`)
+			end
+
+			if i > #lambda.names then
+				error(`{binding.name} is given more arguments than it takes`)
+			end
+
+			dropped[i] = true
+			any = true
+			fixed[lambda.names[i]] = {
+				kind = "def",
+				name = lambda.names[i],
+				expr = arg,
+				scope = scope,
+				recursive = false,
+			}
+		end
+	end
+
+	if not any then
+		return nil
+	end
+
+	if #args ~= #lambda.names then
+		error(`{binding.name} takes {#lambda.names} arguments, and one of them is a function, so it must be given all of them`)
+	end
+
+	local fn = Rec.tie(b, function(
+		own: Builder
+	): Port
+		return compileFunction(binding.name, lambda.names, lambda.body, fixed, dropped, own)
+	end)
+
+	for i, arg in args do
+		if not dropped[i] then
+			fn = L.app(b, fn, compile(arg, scope, b))
+		end
+	end
+
+	return fn
+end
+
 -- The port that the expression `e` evaluates to, built into `b`.
 compile = function(
 	e: Expr,
@@ -470,6 +571,10 @@ compile = function(
 		if binding then
 			if binding.kind == "def" then
 				return useDefinition(binding, b)
+			end
+
+			if binding.dropped and next(binding.dropped) then
+				error(`{name} is only used by calling it with the same function arguments`)
 			end
 
 			return takeCopy(binding, b)
@@ -522,10 +627,60 @@ compile = function(
 		error "a definition can only be a top-level form"
 	end
 
+	const head = items[1]
+	const args: { Expr } = {}
+
+	for i = 2, #items do
+		table.insert(args, items[i])
+	end
+
+	if head.kind == "sym" then
+		const binding = scope[head.name :: string]
+
+		-- a call of the specialised function being defined: the fixed arguments are dropped, and were checked to be passed on unchanged
+		if binding and binding.kind == "self" and binding.dropped and next(binding.dropped) then
+			const params = binding.params :: { string }
+			const runtime: { Expr } = {}
+
+			for i, arg in args do
+				if binding.dropped[i] then
+					if arg.kind ~= "sym" or arg.name ~= params[i] then
+						error(`a recursive call of {binding.name} must pass its function arguments on unchanged`)
+					end
+				else
+					table.insert(runtime, arg)
+				end
+			end
+
+			local fn = takeCopy(binding, b)
+
+			for _, arg in runtime do
+				fn = L.app(b, fn, compile(arg, scope, b))
+			end
+
+			return fn
+		end
+
+		if binding and binding.kind == "def" and binding.recursive then
+			const specialised = specialiseCall(binding, args, scope, b)
+
+			if specialised then
+				return specialised
+			end
+		end
+	end
+
 	const inlined = inlineCall(items, scope, b)
 
 	if inlined then
 		return inlined
+	end
+
+	-- A function that depends on a variable of an enclosing lambda is not built again at each use, so a call that would share it at run time is refused.
+	for _, arg in args do
+		if isFunctionExpr(arg, scope) and not isClosedIn(arg, scope, {}) then
+			error "a function that depends on a variable of an enclosing lambda can only be applied directly, not passed to a call"
+		end
 	end
 
 	local fn = compile(items[1], scope, b)
