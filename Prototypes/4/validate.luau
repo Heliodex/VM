@@ -643,6 +643,39 @@ for _, case in {
 	report(result.outcome == "reduced" and numeralOf(built) == case.want, `{case.src}  is {case.want}  ({H.describe(result)})`)
 end
 
+-- Symbols: a quoted name is its id, which compares by eq?, and a quoted list reads back as its cons cells.
+for _, name in {
+	"a",
+	"b",
+} do
+	const result, built = Compile.evaluate("'" .. name, ARITH_BUDGET)
+	report(result.outcome == "reduced" and numeralOf(built) == Compile.symbolId(name), `'{name} is its symbol id  ({H.describe(result)})`)
+end
+
+for _, case in {
+	{
+		src = "(if (eq? 'a 'a) 1 2)",
+		want = 1,
+	},
+	{
+		src = "(if (eq? 'a 'b) 1 2)",
+		want = 2,
+	},
+	{
+		src = "(head '(a b) 0)",
+		want = Compile.symbolId("a"),
+	},
+} do
+	const result, built = Compile.evaluate(case.src, ARITH_BUDGET)
+	report(result.outcome == "reduced" and numeralOf(built) == case.want, `{case.src}  is {case.want}  ({H.describe(result)})`)
+end
+
+report(sameList(Li.readback(Compile.build("'(1 2)")), { 1, 2 }), "a quoted list of numbers reads back whole")
+report(sameList(Li.readback(Compile.build("'()")), {}), "the empty quoted list is the empty list")
+report(not pcall(function()
+	Compile.evaluate("(define quote 1) 0")
+end), "quote cannot be defined")
+
 -- Reader ----------------------------------------------------------------------
 -- Each source reads back as the expressions it should, comments and spacing aside.
 for index, case in {
@@ -657,6 +690,10 @@ for index, case in {
 	{
 		src = "",
 		want = "",
+	},
+	{
+		src = "'(a 'b)",
+		want = "(quote (a (quote b)))",
 	},
 } do
 	const forms = Reader.read(case.src)

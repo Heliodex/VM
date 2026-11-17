@@ -2,7 +2,7 @@
 -- READING PROGRAMS
 --
 -- Turns source text into expressions, which compile.luau then turns into a net.
--- The syntax is S-expressions: a natural number, a symbol, or a parenthesised list of expressions. A `;` starts a comment that runs to the end of its line.
+-- The syntax is S-expressions: a natural number, a symbol, or a parenthesised list of expressions. A `'` before an expression quotes it, so 'x is (quote x). A `;` starts a comment that runs to the end of its line.
 --
 --   const Reader = require "./reader"
 --
@@ -71,14 +71,14 @@ const function tokenize(
 		if c == ";" then
 			const newline = string.find(src, "\n", pos, true)
 			pos = if newline then (newline :: number) + 1 else #src + 1
-		elseif c == "(" or c == ")" then
+		elseif c == "(" or c == ")" or c == "'" then
 			table.insert(tokens, {
 				text = c,
 				at = pos,
 			})
 			pos += 1
 		else
-			const first, last = string.find(src, "^[^%s();]+", pos)
+			const first, last = string.find(src, "^[^%s();']+", pos)
 			table.insert(tokens, {
 				text = string.sub(src, first :: number, last :: number),
 				at = pos,
@@ -103,6 +103,16 @@ local function parseAt(
 
 	if t.text == ")" then
 		error(`unexpected ) at byte {t.at}`)
+	end
+
+	-- 'x is (quote x), and the quoted form may itself be a list
+	if t.text == "'" then
+		const quoted, after = parseAt(tokens, i + 1)
+
+		return list({
+			sym("quote"),
+			quoted,
+		}), after
 	end
 
 	if t.text == "(" then

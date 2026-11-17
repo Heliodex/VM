@@ -70,6 +70,7 @@ const BUILTINS: {
 	succ = S.successor,
 	["-"] = S.subtraction,
 	["="] = S.equal,
+	["eq?"] = S.equal,
 	["<"] = S.less,
 	["<="] = S.lessEqual,
 	["zero?"] = S.isZero,
@@ -88,6 +89,7 @@ const KEYWORDS: {
 	lambda = true,
 	["if"] = true,
 	define = true,
+	quote = true,
 }
 
 const function isSym(
@@ -564,6 +566,58 @@ local function specialiseCall(
 	return fn
 end
 
+-- Symbols are numbers: each name is given the next id the first time it is quoted, and the id is a Scott numeral. So `eq?` on symbols is numeral equality, and a quoted symbol reads back as its id, which symbolName turns back into the name.
+-- The ids are shared by every program in this session, so a name keeps its id.
+-- Nothing stops a symbol from being used as a number, since the language is untyped: (= 'a 1) is just a comparison of ids.
+local symbolIds: {
+	[string]: number,
+} = {}
+local symbolNames: {
+	[number]: string,
+} = {}
+
+const function symbolId(
+	name: string
+): number
+	local id = symbolIds[name]
+
+	if id == nil then
+		id = #symbolNames + 1
+		symbolIds[name] = id
+		symbolNames[id] = name
+	end
+
+	return id
+end
+
+-- The name of a symbol id, or nil if no symbol has that id.
+const function symbolName(
+	id: number
+): string?
+	return symbolNames[id]
+end
+
+-- The value of a quoted expression: a symbol is its id, a number is itself, and a list is the cons cells of its items, ending in nil.
+local function quoted(
+	e: Expr,
+	b: Builder
+): Port
+	if e.kind == "num" then
+		return S.numeral(b, e.value :: number)
+	elseif e.kind == "sym" then
+		return S.numeral(b, symbolId(e.name :: string))
+	end
+
+	local value = Li.nilValue(b)
+	const items = e.items :: { Expr }
+
+	for i = #items, 1, -1 do
+		value = L.app(b, L.app(b, Li.cons(b), quoted(items[i], b)), value)
+	end
+
+	return value
+end
+
 -- The port that the expression `e` evaluates to, built into `b`.
 compile = function(
 	e: Expr,
@@ -601,6 +655,14 @@ compile = function(
 
 	if #items == 0 then
 		error "an empty list is not an expression"
+	end
+
+	if isSym(items[1], "quote") then
+		if #items ~= 2 then
+			error "a quote is (quote expression)"
+		end
+
+		return quoted(items[2], b)
 	end
 
 	if isSym(items[1], "lambda") then
@@ -971,4 +1033,6 @@ end
 return {
 	evaluate = evaluate,
 	build = build,
+	symbolId = symbolId,
+	symbolName = symbolName,
 }
