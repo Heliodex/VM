@@ -250,6 +250,124 @@ const function multiplication(
 	return Rec.tie(b, multiplicationDefine)
 end
 
+-- R = λc.λm.λn. n (λc'. m) (λp.λc''. c'' (m - 1) p) c. Truncated subtraction: m - 0 = m, and m - (p+1) = (m - 1) - p, with 1 taken as the predecessor. The numeral to subtract is the scrutinee, so m is the one that is copied.
+local function subtractionDefine(
+	b: Builder
+): Port
+	return L.lam(
+		b, function(
+			c: Port
+		): Port
+			return L.lam(
+				b, function(
+					m: Port
+				): Port
+					return L.lam(
+						b, function(
+							n: Port
+						): Port
+							const ms = L.share(b, m, 2)
+							const zeroCase = L.lam(
+								b, function(
+									_c1: Port
+								): Port
+									return ms[1]
+								end
+							)
+							const succCase = L.lam(
+								b, function(
+									p: Port
+								): Port
+									return L.lam(
+										b, function(
+											c2: Port
+										): Port
+											const smaller = L.app(b, predecessor(b), ms[2])
+
+											return L.app(b, L.app(b, Rec.recall(b, c2), smaller), p)
+										end
+									)
+								end
+							)
+
+							return L.app(b, L.app(b, L.app(b, n, zeroCase), succCase), c)
+						end
+					)
+				end
+			)
+		end
+	)
+end
+
+-- Truncated subtraction, built into b: m - n, which is 0 when n is larger.
+const function subtraction(
+	b: Builder
+): Port
+	return Rec.tie(b, subtractionDefine)
+end
+
+-- λm.λn. zero? (m - n): m is at most n.
+const function lessEqual(
+	b: Builder
+): Port
+	return L.lam(
+		b, function(
+			m: Port
+		): Port
+			return L.lam(
+				b, function(
+					n: Port
+				): Port
+					return L.app(b, isZero(b), L.app(b, L.app(b, subtraction(b), m), n))
+				end
+			)
+		end
+	)
+end
+
+-- λm.λn. m ≤ n and n ≤ m, written as (m ≤ n) (n ≤ m) false, so that each of the two tests is used once.
+const function equal(
+	b: Builder
+): Port
+	return L.lam(
+		b, function(
+			m: Port
+		): Port
+			return L.lam(
+				b, function(
+					n: Port
+				): Port
+					const ms = L.share(b, m, 2)
+					const ns = L.share(b, n, 2)
+					const first = L.app(b, L.app(b, lessEqual(b), ms[1]), ns[1])
+					const second = L.app(b, L.app(b, lessEqual(b), ns[2]), ms[2])
+
+					return L.app(b, L.app(b, first, second), Bo.falsity(b))
+				end
+			)
+		end
+	)
+end
+
+-- λm.λn. m < n, which is (m + 1) ≤ n.
+const function less(
+	b: Builder
+): Port
+	return L.lam(
+		b, function(
+			m: Port
+		): Port
+			return L.lam(
+				b, function(
+					n: Port
+				): Port
+					return L.app(b, L.app(b, lessEqual(b), L.app(b, successor(b), m)), n)
+				end
+			)
+		end
+	)
+end
+
 -- R = λc.λm.λf.λx. m (λc'. x) (λp.λc''. f (c'' p f x)) c. Applied to a Scott numeral m, this gives the Church numeral with the same value.
 local function toChurchDefine(
 	b: Builder
@@ -449,6 +567,10 @@ return {
 	numeral = numeral,
 	predecessor = predecessor,
 	isZero = isZero,
+	subtraction = subtraction,
+	lessEqual = lessEqual,
+	less = less,
+	equal = equal,
 	addition = addition,
 	multiplication = multiplication,
 	toChurch = toChurch,

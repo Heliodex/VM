@@ -572,6 +572,77 @@ report(Li.readback(function(
 	return S.numeral(b, 3)
 end) == nil, "a number does not read back as a list")
 
+-- Subtraction and comparison, as programs: each result is a number or a branch taken.
+for _, case in {
+	{
+		src = "(- 5 2)",
+		want = 3,
+	},
+	{
+		src = "(- 2 5)",
+		want = 0,
+	},
+	{
+		src = "(- 3 3)",
+		want = 0,
+	},
+	{
+		src = "(- 7 0)",
+		want = 7,
+	},
+	{
+		src = "(- (+ 2 3) (* 2 2))",
+		want = 1,
+	},
+	{
+		src = "(if (= 3 3) 1 2)",
+		want = 1,
+	},
+	{
+		src = "(if (= 3 4) 1 2)",
+		want = 2,
+	},
+	{
+		src = "(if (= 0 0) 1 2)",
+		want = 1,
+	},
+	{
+		src = "(if (= 2 0) 1 2)",
+		want = 2,
+	},
+	{
+		src = "(if (< 2 3) 1 2)",
+		want = 1,
+	},
+	{
+		src = "(if (< 3 3) 1 2)",
+		want = 2,
+	},
+	{
+		src = "(if (<= 3 3) 1 2)",
+		want = 1,
+	},
+	{
+		src = "(if (<= 4 3) 1 2)",
+		want = 2,
+	},
+	{
+		src = "(if (zero? 0) 1 2)",
+		want = 1,
+	},
+	{
+		src = "(if (zero? 3) 1 2)",
+		want = 2,
+	},
+	{
+		src = "(if (= (+ 1 2) (- 6 3)) 9 8)",
+		want = 9,
+	},
+} do
+	const result, built = Compile.evaluate(case.src, ARITH_BUDGET * 4)
+	report(result.outcome == "reduced" and numeralOf(built) == case.want, `{case.src}  is {case.want}  ({H.describe(result)})`)
+end
+
 -- Reader ----------------------------------------------------------------------
 -- Each source reads back as the expressions it should, comments and spacing aside.
 for index, case in {
