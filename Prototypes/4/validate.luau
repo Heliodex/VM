@@ -53,13 +53,7 @@ for _, test in Cases.tests do
 	const limit = test.budget or H.DEFAULT_BUDGET
 	const net = Cases.build(test.start)
 	const result = H.reduce(net, limit)
-	const finished = result.outcome == "reduced"
-	const ok =
-		if test.expect then
-			finished and Net.wellFormed(net) and Canon.isomorphic(net, Cases.build(test.expect))
-		else
-			not finished and Net.wellFormed(net)
-	report(ok, `{test.name}  ({H.describe(result)})`)
+	report(Cases.verdict(test, net, result), `{test.name}  ({H.describe(result)})`)
 end
 
 -- Each numeral reduces to itself and reads back as the number it was built from.

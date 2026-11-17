@@ -4,8 +4,11 @@
 -- Each test builds a net, says what it should reduce to, and gives the step budget it is allowed.
 
 local B = require "./builder"
+local Canon = require "./canon"
 local G = require "./gadgets"
+local H = require "./harness"
 local L = require "./lambda"
+local Net = require "./net"
 local Types = require "./types"
 
 type Builder = B.Builder
@@ -81,13 +84,16 @@ local function paired(
 		tail(b, right, image(i) - 1)
 end end
 
+-- A test has exactly one of two expectations.
+-- `expect` builds the normal form, which the reduction must reach and which must match up to renaming.
+-- `diverges` names the outcome the reduction must end in instead, so a test that should loop cannot pass by stopping some other way.
 type Test = {
 	read name: string,
 	read start: Build,
 	read expect: Build?,
+	read diverges: H.Outcome?,
 	read budget: number?,
 }
--- nil means the reduction is expected not to finish
 const tests: { Test } = {
 	{
 		name = "epsilon-epsilon annihilates to nothing",
@@ -389,7 +395,7 @@ const tests: { Test } = {
 			b:wire(d.aux2, g.aux1)
 			b:wire(g.aux2, e2.principal)
 		end,
-		expect = nil, -- does not terminate
+		diverges = "cycled",
 		budget = 200,
 	},
 	{
@@ -497,7 +503,26 @@ const tests: { Test } = {
 	},
 }
 
+-- Whether a test's reduction met its expectation: a normal form that matches `expect`, or the outcome `diverges` names, with a well-formed net either way.
+-- A test with neither expectation fails, so a case cannot pass by saying nothing.
+const function verdict(
+	test: Test,
+	net: Net,
+	report: H.Report
+): boolean
+	if not Net.wellFormed(net) then
+		return false
+	end
+
+	if test.expect then
+		return report.outcome == "reduced" and Canon.isomorphic(net, build(test.expect))
+	end
+
+	return test.diverges ~= nil and report.outcome == test.diverges
+end
+
 return {
 	build = build,
 	tests = tests,
+	verdict = verdict,
 }
