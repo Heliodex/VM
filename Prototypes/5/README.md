@@ -5,8 +5,10 @@ A strict, sequential interpreter for a small functional language with native dat
 | File | What it holds |
 | --- | --- |
 | `vm.luau` | The machine, the printer, and the builders for expressions. |
-| `examples.luau` | 31 programs, each with a fuel budget and its expected outcome. |
-| `run.luau` | Runs every example and reports pass or fail. |
+| `reader.luau` | The reader: text syntax to expressions. The syntax is described at the top of the file. |
+| `examples.luau` | 31 programs built with the builders, each with a fuel budget and its expected outcome. |
+| `text.luau` | 32 of the same programs in the text syntax, plus 8 sources the reader must reject. |
+| `run.luau` | Runs every example and reject, and reports pass or fail. |
 
 ## Running
 
@@ -14,11 +16,11 @@ Run from this directory.
 
 | What | Command |
 | --- | --- |
-| The examples | `luau run.luau` |
-| The analyser | `luau-analyze vm.luau examples.luau run.luau` |
-| The formatter | `luau-format vm.luau examples.luau run.luau` |
+| The checks | `luau run.luau` |
+| The analyser | `luau-analyze vm.luau reader.luau examples.luau text.luau run.luau` |
+| The formatter | `luau-format vm.luau reader.luau examples.luau text.luau run.luau` |
 
-The runner exits with status 1 if any example fails.
+The runner exits with status 1 if any check fails.
 
 ## The language
 
