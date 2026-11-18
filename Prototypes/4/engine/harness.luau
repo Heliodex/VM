@@ -215,12 +215,14 @@ end
 -- Reduce to a normal form, or to whatever the budget allows.
 -- The net is mutated in place, so pass a net you do not need again.
 -- A net that reaches its normal form within the budget is reduced by plain stepping, which is cheap. Only a net that uses up the budget is then reduced again from its start, with cycle detection, to tell a cycle from a long run.
+-- With `plain`, a net that uses up the budget is reported as `exhausted` straight away, with no second pass. That is what a user's program wants: the cycle pass fingerprints the net at every step, so a long run costs far more than the budget it was given.
 const function reduce(
 	net: Net,
-	budget: number?
+	budget: number?,
+	plain: boolean?
 ): Report
 	const limit = budget or DEFAULT_BUDGET
-	const start = snapshot(net)
+	const start = if plain then nil else snapshot(net)
 	local steps = 0
 	local cells = Net.liveCount(net)
 	local peak = cells
@@ -238,6 +240,15 @@ const function reduce(
 		steps += 1
 		cells = Net.liveCount(net)
 		peak = math.max(peak, cells)
+	end
+
+	if start == nil then
+		return {
+			outcome = "exhausted",
+			steps = steps,
+			cells = cells,
+			peakCells = peak,
+		}
 	end
 
 	restore(net.Tag, start.Tag)

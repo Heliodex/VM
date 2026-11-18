@@ -475,7 +475,8 @@ end
 -- The value is reduced first, on a copy, so that its root is the principal port of its normal form. The original net is not changed.
 const function observeChurch(
 	original: Net,
-	budget: number?
+	budget: number?,
+	plain: boolean?
 ): (H.Report, Net?)
 	const net: Net = {
 		Tag = table.clone(original.Tag),
@@ -483,7 +484,7 @@ const function observeChurch(
 		Active = table.clone(original.Active),
 		Free = table.clone(original.Free),
 	}
-	const valueReport = H.reduce(net, budget or BUDGET)
+	const valueReport = H.reduce(net, budget or BUDGET, plain)
 
 	if valueReport.outcome ~= "reduced" then
 		return valueReport, nil
@@ -497,7 +498,7 @@ const function observeChurch(
 
 	const b = B.from(net)
 	L.app(b, toChurch(b), root)
-	const report = H.reduce(net, budget or BUDGET)
+	const report = H.reduce(net, budget or BUDGET, plain)
 
 	if report.outcome ~= "reduced" then
 		return report, nil
@@ -528,9 +529,10 @@ end
 -- A value is read by its observation, and a numeral is the one whose observation is the same, as in numerals of Church encoding. So a value that is not a numeral can only read back as one if it observes the same way.
 const function readNet(
 	original: Net,
-	budget: number?
+	budget: number?,
+	plain: boolean?
 ): (H.Report, number?)
-	const report, seen = observeChurch(original, budget)
+	const report, seen = observeChurch(original, budget, plain)
 
 	if not seen then
 		return report, nil
@@ -562,12 +564,13 @@ end
 -- The number that the Scott value built by `build` stands for, or nil if it stands for no numeral.
 const function readback(
 	build: (Builder) -> Port,
-	budget: number?
+	budget: number?,
+	plain: boolean?
 ): (H.Report, number?)
 	const b = B.new()
 	build(b)
 
-	return readNet(b:finish(), budget)
+	return readNet(b:finish(), budget, plain)
 end
 
 return {

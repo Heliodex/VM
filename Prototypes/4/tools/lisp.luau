@@ -40,7 +40,7 @@ local function run(
 ): number
 	local errors = 0
 
-	for _, result in Session.evaluate(session, source, BUDGET) do
+	for _, result in Session.evaluate(session, source, BUDGET, true) do
 		if result.kind == "defined" then
 			if showDefinitions then
 				print(`;; defined {result.name}`)

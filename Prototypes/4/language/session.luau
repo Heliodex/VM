@@ -99,11 +99,12 @@ local function errorResult(
 	}
 end
 
--- Evaluates each form of `source` in order, in the session, and returns one result for each. `budget` is the number of steps each expression may take.
+-- Evaluates each form of `source` in order, in the session, and returns one result for each. `budget` is the number of steps each expression may take. `plain` says the budget is only a limit: a form that uses it up is reported as not finishing, without the cycle check that tests use (see harness.luau).
 const function evaluate(
 	session: Session,
 	source: string,
-	budget: number
+	budget: number,
+	plain: boolean?
 ): { Result }
 	const results: { Result } = {}
 	const readOk, forms = pcall(Reader.read, source)
@@ -125,7 +126,7 @@ const function evaluate(
 			end
 		else
 			const expression = Compile.expression(session.compile, form)
-			const ok, report, value = pcall(V.read, expression, budget)
+			const ok, report, value = pcall(V.read, expression, budget, plain)
 
 			if ok then
 				table.insert(results, valueResult(value, (report :: H.Report).outcome, (report :: H.Report).steps))

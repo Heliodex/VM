@@ -644,9 +644,11 @@ end
 
 -- Reads a value back, as a Lua table. The reduction of the value is reported, and the value is nil if the net is not a value of the language.
 -- The kind is read first, as the number of the case the value takes; then the payload is read as its own encoding.
+-- `plain` is passed to the reduction, as in harness.reduce. A part that does not finish is reported with its own report, so the caller sees why the value is missing.
 local function read(
 	build: (Builder) -> Port,
-	budget: number?
+	budget: number?,
+	plain: boolean?
 ): (H.Report, Value?)
 	const report, kind = S.readback(function(
 		b: Builder
@@ -667,21 +669,25 @@ local function read(
 		end
 
 		return dispatch(b, v, bodies, 0, errorBody)
-	end, budget)
+	end, budget, plain)
 
 	if kind == nil then
 		return report, nil
 	end
 
 	if kind == NUMBER then
-		const _, n = S.readback(fieldOf(build, NUMBER, 1), budget)
+		const payload, n = S.readback(fieldOf(build, NUMBER, 1), budget, plain)
 
-		return report, if n == nil then nil else { kind = "number", value = n }
+		if n == nil then
+			return payload, nil
+		end
+
+		return report, { kind = "number", value = n }
 	elseif kind == SYMBOL then
-		const _, id = S.readback(fieldOf(build, SYMBOL, 1), budget)
+		const payload, id = S.readback(fieldOf(build, SYMBOL, 1), budget, plain)
 
 		if id == nil then
-			return report, nil
+			return payload, nil
 		end
 
 		const name = symbolName(id)
@@ -692,11 +698,16 @@ local function read(
 
 		return report, { kind = "symbol", name = name }
 	elseif kind == PAIR then
-		const _, car = read(fieldOf(build, PAIR, 1), budget)
-		const _2, cdr = read(fieldOf(build, PAIR, 2), budget)
+		const carReport, car = read(fieldOf(build, PAIR, 1), budget, plain)
 
-		if car == nil or cdr == nil then
-			return report, nil
+		if car == nil then
+			return carReport, nil
+		end
+
+		const cdrReport, cdr = read(fieldOf(build, PAIR, 2), budget, plain)
+
+		if cdr == nil then
+			return cdrReport, nil
 		end
 
 		return report, { kind = "pair", car = car, cdr = cdr }
@@ -706,7 +717,12 @@ local function read(
 		const b = B.new()
 		fieldOf(build, BOOLEAN, 1)(b)
 		const net = b:finish()
-		H.reduce(net, budget)
+		const payload = H.reduce(net, budget, plain)
+
+		if payload.outcome ~= "reduced" then
+			return payload, nil
+		end
+
 		const truth = Bo.readback(net)
 
 		return report, if truth == nil then nil else { kind = "boolean", truth = truth }
