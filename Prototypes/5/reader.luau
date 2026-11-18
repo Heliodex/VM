@@ -4,19 +4,20 @@
 -- Turns the text of a program into an Expr, which vm.luau then runs. The syntax is s-expressions, with ; starting a comment that runs to the end of the line.
 --
 --   42                 an integer, negative ones too
---   ()                 nil
+--   ~                  nil
 --   x                  a variable
 --   (lam x body)       a function of x; (lam (x y) body) is the same as (lam x (lam y body))
 --   (f a b)            application, curried: (f a b) is ((f a) b)
---   (cell h t)         a pair
+--   [a b]              a pair
 --   (list a b c)       a proper list of a, b and c
 --   (head e), (tail e)
 --   (if c t e)         evaluates t if c is nonzero, otherwise e
 --   (pin e), (force e)
 --   (fix f)            the fixed point of f, where f is (lam rec (lam ...)) and rec is the function itself
---   (add a b), (sub a b), (mul a b), (lt a b), (eq a b), (isnil a)
+--   (+ a b), (- a b), (* a b), (< a b), (= a b), (? a)
+--                      add, subtract, multiply, less-than, equal, and whether a is nil (1 or 0)
 --
--- The words above are reserved and cannot be used as variables. Errors are raised as strings that begin with the line number.
+-- The words and operators above are reserved and cannot be used as variables. Errors are raised as strings that begin with the line number.
 --
 -- Reader.parse(source) reads exactly one expression and raises an error if there is anything after it.
 
@@ -27,20 +28,21 @@ type Token = {
 	line: number,
 }
 
--- An expression as written, before it is compiled. Lists keep their line for error messages.
+-- An expression as written, before it is compiled. Groups keep their line for error messages.
 type Node =
 	| { kind: "int", value: number, line: number }
 	| { kind: "sym", name: string, line: number }
 	| { kind: "list", items: { Node }, line: number }
+	| { kind: "pair", items: { Node }, line: number }
 
--- The arity of each form. Forms with an arity of nil take any number of arguments, at least one for lam.
-const PRIMITIVES: { [string]: number } = {
-	add = 2,
-	sub = 2,
-	mul = 2,
-	lt = 2,
-	eq = 2,
-	isnil = 1,
+-- The primitives, by the symbol that writes them, with the primitive each one builds and its arity.
+const PRIMITIVES: { [string]: { op: string, arity: number } } = {
+	["+"] = { op = "add", arity = 2 },
+	["-"] = { op = "sub", arity = 2 },
+	["*"] = { op = "mul", arity = 2 },
+	["<"] = { op = "lt", arity = 2 },
+	["="] = { op = "eq", arity = 2 },
+	["?"] = { op = "isnil", arity = 1 },
 }
 
 const UNARY_FORMS: { [string]: number } = {
@@ -54,8 +56,8 @@ const UNARY_FORMS: { [string]: number } = {
 const function reserved(name: string): boolean
 	return name == "lam"
 		or name == "if"
-		or name == "cell"
 		or name == "list"
+		or name == "~"
 		or PRIMITIVES[name] ~= nil
 		or UNARY_FORMS[name] ~= nil
 end
@@ -85,11 +87,11 @@ const function tokenize(
 		elseif c == ";" then
 			-- A comment runs to the end of the line, and the newline is left for the loop above.
 			i = string.find(source, "\n", i, true) or (#source + 1)
-		elseif c == "(" or c == ")" then
+		elseif c == "(" or c == ")" or c == "[" or c == "]" then
 			table.insert(tokens, { text = c, line = line })
 			i += 1
 		else
-			const text: string = string.match(source, "^[^%s();]+", i) :: string
+			const text: string = string.match(source, "^[^%s()%[%];]+", i) :: string
 			table.insert(tokens, { text = text, line = line })
 			i += #text
 		end
@@ -98,8 +100,35 @@ const function tokenize(
 	return tokens
 end
 
+-- Reads the items of a group up to its closing token, and returns them with the position after the closing token.
+local readNode: (tokens: { Token }, pos: number) -> (Node, number)
+
+local function readItems(
+	tokens: { Token },
+	pos: number,
+	opener: Token,
+	closer: string
+): ({ Node }, number)
+	local items: { Node } = {}
+	local p = pos
+
+	while true do
+		if p > #tokens then
+			fail(opener.line, `{opener.text} is never closed`)
+		end
+
+		if tokens[p].text == closer then
+			return items, p + 1
+		end
+
+		local node: Node
+		node, p = readNode(tokens, p)
+		table.insert(items, node)
+	end
+end
+
 -- Reads one node starting at position pos, and returns it with the position after it.
-local function readNode(
+readNode = function(
 	tokens: { Token },
 	pos: number
 ): (Node, number)
@@ -109,27 +138,18 @@ local function readNode(
 
 	const token = tokens[pos]
 
-	if token.text == ")" then
-		fail(token.line, "unexpected )")
+	if token.text == ")" or token.text == "]" then
+		fail(token.line, `unexpected {token.text}`)
 	end
 
 	if token.text == "(" then
-		local items: { Node } = {}
-		local p = pos + 1
+		const items, after = readItems(tokens, pos + 1, token, ")")
+		return { kind = "list", items = items, line = token.line }, after
+	end
 
-		while true do
-			if p > #tokens then
-				fail(token.line, "( is never closed")
-			end
-
-			if tokens[p].text == ")" then
-				return { kind = "list", items = items, line = token.line }, p + 1
-			end
-
-			local node: Node
-			node, p = readNode(tokens, p)
-			table.insert(items, node)
-		end
+	if token.text == "[" then
+		const items, after = readItems(tokens, pos + 1, token, "]")
+		return { kind = "pair", items = items, line = token.line }, after
 	end
 
 	const digits = string.match(token.text, "^%-?%d+$")
@@ -199,11 +219,6 @@ local function compileForm(
 		return M.ite(compile(items[2]), compile(items[3]), compile(items[4]))
 	end
 
-	if name == "cell" then
-		arity(2)
-		return M.cell(compile(items[2]), compile(items[3]))
-	end
-
 	if name == "list" then
 		local elements: { M.Expr } = {}
 		for i = 2, #items do
@@ -213,11 +228,13 @@ local function compileForm(
 	end
 
 	if PRIMITIVES[name] ~= nil then
-		arity(PRIMITIVES[name])
-		if name == "isnil" then
-			return M.prim(name, compile(items[2]))
+		const primitive = PRIMITIVES[name]
+		arity(primitive.arity)
+
+		if primitive.arity == 1 then
+			return M.prim(primitive.op, compile(items[2]))
 		end
-		return M.prim(name, compile(items[2]), compile(items[3]))
+		return M.prim(primitive.op, compile(items[2]), compile(items[3]))
 	end
 
 	if UNARY_FORMS[name] ~= nil then
@@ -257,16 +274,26 @@ compile = function(
 	end
 
 	if node.kind == "sym" then
+		if node.name == "~" then
+			return M.nilv()
+		end
 		if reserved(node.name) then
-			fail(node.line, node.name .. " is a reserved word and cannot be used as a variable")
+			fail(node.line, `{node.name} is a reserved word and cannot be used as a variable`)
 		end
 		return M.var(node.name)
 	end
 
 	const items = node.items
 
+	if node.kind == "pair" then
+		if #items ~= 2 then
+			fail(node.line, `a pair takes exactly two items, but was given {#items}`)
+		end
+		return M.cell(compile(items[1]), compile(items[2]))
+	end
+
 	if #items == 0 then
-		return M.nilv()
+		fail(node.line, "() is not an expression, and nil is written ~")
 	end
 
 	const head = items[1]
