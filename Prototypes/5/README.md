@@ -15,6 +15,7 @@ A strict, sequential interpreter for a small functional language with native dat
 | `run.luau` | Runs every example and reject, and reports pass or fail. |
 | `self_run.luau` | Runs every example through the self-interpreter and checks it gives the same result. |
 | `self_data_run.luau` | Runs every example through the closure-free interpreter, and shows the two probes where it differs. |
+| `env_run.luau` | The environment experiment: a linked list against a skew binary random-access list, in the self-interpreter. |
 
 ## Running
 
@@ -25,6 +26,7 @@ Run from this directory.
 | The checks | `luau run.luau` |
 | The self-interpreter checks | `luau self_run.luau` |
 | The closure-free checks and probes | `luau self_data_run.luau` |
+| The environment experiment | `luau env_run.luau` |
 | The analyser | `luau-analyze interpreter/*.luau examples/*.luau self/*.luau run.luau self_run.luau self_data_run.luau` |
 | The formatter | `luau-format interpreter/*.luau examples/*.luau self/*.luau run.luau self_run.luau self_data_run.luau` |
 
@@ -73,3 +75,27 @@ The interpreter reuses the host's closures and pins. An object `lam` becomes a n
 - It is not sound. A cell that has the shape of a function is applied as one, and `head` reads a function as an ordinary pair. `self_data_run.luau` shows both: applying the forged function `[1 [[0 [7 ~]] ~]]` gives 7 where the machine gives an error, and `head` of a function gives 1 where the machine gives an error.
 
 **Conclusion:** the object language needs closures as a value kind. Making them data is cheap, but a data function cannot be told apart from a pair, and `kind` reports a data function as a cell, so it cannot tell them apart either. A native closure cannot be forged from object data, which is the only way to keep the machine's errors for function misuse. Closures stay. If functions are ever to be data, the language needs a function tag that object programs cannot construct, and that is a new primitive, which is no cheaper than keeping closures.
+
+## The environment representation
+
+`env_run.luau` compares two ways of keeping the self-interpreter's environment. The reference machine is unchanged, since this only affects how the self-interpreter stores bindings.
+
+- **Linked list:** `[value rest]`. Adding a binding is one step. Reading index `n` walks `n` tails.
+- **Skew binary random-access list:** a list of complete trees of sizes 1, 3, 7, and so on. Reading index `n` is logarithmic, but adding a binding takes more steps.
+
+Both agree with the direct machine on all 72 programs. On a program nested to depth `d` that reads each binding once:
+
+| depth | list steps | skew steps | skew / list |
+| ---: | ---: | ---: | ---: |
+| 4 | 2,225 | 2,859 | 1.28 |
+| 8 | 5,201 | 6,510 | 1.25 |
+| 16 | 12,977 | 14,501 | 1.12 |
+| 32 | 35,825 | 31,836 | 0.89 |
+| 64 | 110,705 | 69,187 | 0.62 |
+
+The skew list only wins once a program has between 16 and 32 bindings in scope. The examples nest at most about three, so the linked list is the right choice for the spec. Leaving the environment as a list also means a Nock-style `/` (see below) would not help: it would only pay off with a balanced environment, which the examples don't need.
+
+## Addresses instead of head and tail
+
+Nock's `/` reaches a value by its position in a binary tree, which could replace `head` and `tail`. With list environments, the address of index `n` is `2^(n+2) - 2`, which passes the exact-integer limit of 2^53 at about 50 bindings. So addresses only make sense with a balanced environment, and the experiment above shows that is not worth it at the depths the examples use. `head` and `tail` stay.
+
