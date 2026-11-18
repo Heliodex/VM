@@ -10,7 +10,7 @@ const VM = require "./vm"
 
 local failures = 0
 
-for _, ex in ipairs(Examples) do
+for _, ex in Examples do
 	const result = VM.run(ex.program, ex.fuel)
 	local got: string
 	local pass: boolean
