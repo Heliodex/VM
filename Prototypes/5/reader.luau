@@ -5,7 +5,7 @@
 --
 --   42                 an integer, negative ones too
 --   ~                  nil
---   x                  a variable
+--   x                  a variable, which must be bound by a lam around it
 --   (lam x body)       a function of x; (lam (x y) body) is the same as (lam x (lam y body))
 --   (f a b)            application, curried: (f a b) is ((f a) b)
 --   [a b]              a pair
@@ -20,6 +20,8 @@
 -- The words and operators above are reserved and cannot be used as variables. Errors are raised as strings that begin with the line number.
 --
 -- Reader.parse(source) reads exactly one expression and raises an error if there is anything after it.
+--
+-- The reader turns each variable into its index, so the machine never sees a name. A name that is not bound is an error here.
 
 const M = require "./vm"
 
@@ -161,12 +163,28 @@ readNode = function(
 	return { kind = "sym", name = token.text, line = token.line }, pos + 1
 end
 
--- Compiles a node to an expression. Forms are recognised by their first word.
-local compile: (Node) -> M.Expr
+-- The index of a name in the scope: 0 for the innermost binder, counting outwards. The scope lists the names innermost first.
+const function resolve(
+	name: string,
+	scope: { string },
+	line: number
+): number
+	for i = 1, #scope do
+		if scope[i] == name then
+			return i - 1
+		end
+	end
+
+	return fail(line, `{name} is not bound`)
+end
+
+-- Compiles a node to an expression, given the names of the binders around it, innermost first. Forms are recognised by their first word.
+local compile: (Node, { string }) -> M.Expr
 
 local function compileForm(
 	name: string,
-	node: { kind: "list", items: { Node }, line: number }
+	node: { kind: "list", items: { Node }, line: number },
+	scope: { string }
 ): M.Expr
 	const items = node.items
 	const args = #items - 1
@@ -206,9 +224,15 @@ local function compileForm(
 			fail(node.line, "lam needs at least one parameter")
 		end
 
-		local body = compile(items[#items])
-		for i = #names, 1, -1 do
-			body = M.lam(names[i], body)
+		-- The last parameter is the innermost binder, so it goes at the front of the scope last.
+		local inner = table.clone(scope)
+		for i = 1, #names do
+			table.insert(inner, 1, names[i])
+		end
+
+		local body = compile(items[#items], inner)
+		for _ = 1, #names do
+			body = M.lam(body)
 		end
 
 		return body
@@ -216,13 +240,13 @@ local function compileForm(
 
 	if name == "if" then
 		arity(3)
-		return M.ite(compile(items[2]), compile(items[3]), compile(items[4]))
+		return M.ite(compile(items[2], scope), compile(items[3], scope), compile(items[4], scope))
 	end
 
 	if name == "list" then
 		local elements: { M.Expr } = {}
 		for i = 2, #items do
-			table.insert(elements, compile(items[i]))
+			table.insert(elements, compile(items[i], scope))
 		end
 		return M.list(elements)
 	end
@@ -232,14 +256,14 @@ local function compileForm(
 		arity(primitive.arity)
 
 		if primitive.arity == 1 then
-			return M.prim(primitive.op, compile(items[2]))
+			return M.prim(primitive.op, compile(items[2], scope))
 		end
-		return M.prim(primitive.op, compile(items[2]), compile(items[3]))
+		return M.prim(primitive.op, compile(items[2], scope), compile(items[3], scope))
 	end
 
 	if UNARY_FORMS[name] ~= nil then
 		arity(1)
-		const inner = compile(items[2])
+		const inner = compile(items[2], scope)
 
 		if name == "head" then
 			return M.head(inner)
@@ -259,15 +283,16 @@ local function compileForm(
 		fail(node.line, "a call needs at least one argument")
 	end
 
-	local e = compile(items[1])
+	local e = compile(items[1], scope)
 	for i = 2, #items do
-		e = M.app(e, compile(items[i]))
+		e = M.app(e, compile(items[i], scope))
 	end
 	return e
 end
 
 compile = function(
-	node: Node
+	node: Node,
+	scope: { string }
 ): M.Expr
 	if node.kind == "int" then
 		return M.int(node.value)
@@ -280,7 +305,7 @@ compile = function(
 		if reserved(node.name) then
 			fail(node.line, `{node.name} is a reserved word and cannot be used as a variable`)
 		end
-		return M.var(node.name)
+		return M.var(resolve(node.name, scope, node.line))
 	end
 
 	const items = node.items
@@ -289,7 +314,7 @@ compile = function(
 		if #items ~= 2 then
 			fail(node.line, `a pair takes exactly two items, but was given {#items}`)
 		end
-		return M.cell(compile(items[1]), compile(items[2]))
+		return M.cell(compile(items[1], scope), compile(items[2], scope))
 	end
 
 	if #items == 0 then
@@ -299,10 +324,10 @@ compile = function(
 	const head = items[1]
 
 	if head.kind == "sym" and reserved(head.name) then
-		return compileForm(head.name, node)
+		return compileForm(head.name, node, scope)
 	end
 
-	return compileForm("", node)
+	return compileForm("", node, scope)
 end
 
 const function parse(
@@ -320,7 +345,7 @@ const function parse(
 		fail(tokens[after].line, "there is more text after the expression")
 	end
 
-	return compile(node)
+	return compile(node, {})
 end
 
 return {
