@@ -1,7 +1,7 @@
 --!strict
 -- THE PROGRAMS
 --
--- Programs of the kind the language is meant for, written in the text syntax with let for local names. They are longer than the examples, and each one checks a step of real work: an accumulator, building a list, sorting, scanning a list of character codes, deep equality with kind, evaluating a tree, and gcd.
+-- Programs of the kind the language is meant for, written in the text syntax with letrec for recursive functions. They are longer than the examples, and each one checks a step of real work: an accumulator, building a list, sorting, scanning a list of character codes, deep equality with kind, evaluating a tree, and gcd.
 --
 -- Text has no string type, so a word is a list of character codes, and a space is 32.
 
@@ -37,7 +37,7 @@ const examples: { Example } = {
 	value(
 		"sum with an accumulator",
 		[==[
-(let sum (fix (lam rec (lam acc (lam l (if (? l) acc (rec (+ acc (head l)) (tail l)))))))
+(letrec sum (lam (acc l) (if (? l) acc (sum (+ acc (head l)) (tail l))))
   (sum 0 (list 1 2 3 4 5)))
 ]==],
 		"15"
@@ -47,7 +47,7 @@ const examples: { Example } = {
 	value(
 		"reverse a list",
 		[==[
-(let rev (fix (lam rec (lam acc (lam l (if (? l) acc (rec [(head l) acc] (tail l)))))))
+(letrec rev (lam (acc l) (if (? l) acc (rev [(head l) acc] (tail l))))
   (rev ~ (list 1 2 3)))
 ]==],
 		"(3 2 1)"
@@ -56,7 +56,7 @@ const examples: { Example } = {
 	value(
 		"append two lists",
 		[==[
-(let append (fix (lam rec (lam a (lam b (if (? a) b [(head a) ((rec (tail a)) b)])))))
+(letrec append (lam (a b) (if (? a) b [(head a) (append (tail a) b)]))
   (append (list 1 2) (list 3 4)))
 ]==],
 		"(1 2 3 4)"
@@ -65,8 +65,8 @@ const examples: { Example } = {
 	value(
 		"insertion sort",
 		[==[
-(let insert (fix (lam rec (lam x (lam l (if (? l) [x ~] (if (< x (head l)) [x l] [(head l) ((rec x) (tail l))]))))))
-  (let isort (fix (lam rec (lam l (if (? l) ~ ((insert (head l)) (rec (tail l)))))))
+(letrec insert (lam (x l) (if (? l) [x ~] (if (< x (head l)) [x l] [(head l) (insert x (tail l))])))
+  (letrec isort (lam l (if (? l) ~ (insert (head l) (isort (tail l)))))
     (isort (list 3 1 2 5 4))))
 ]==],
 		"(1 2 3 4 5)"
@@ -75,11 +75,11 @@ const examples: { Example } = {
 	value(
 		"count words in character codes",
 		[==[
-(let words (fix (lam rec (lam l (lam inw (lam n
+(letrec words (lam (l inw n)
      (if (? l) n
        (if (= (head l) 32)
-           (rec (tail l) 0 n)
-           (rec (tail l) 1 (+ n (- 1 inw))))))))))
+           (words (tail l) 0 n)
+           (words (tail l) 1 (+ n (- 1 inw))))))
   (words (list 104 105 32 116 104 101 114 101 32 32 121 111 117) 0 0))
 ]==],
 		"3"
@@ -88,12 +88,12 @@ const examples: { Example } = {
 	value(
 		"deep equality, equal lists",
 		[==[
-(let deq (fix (lam rec (lam (a b)
+(letrec deq (lam (a b)
      (if (= (kind a) (kind b))
          (if (= (kind a) 2)
-             (if ((rec (head a)) (head b)) ((rec (tail a)) (tail b)) 0)
+             (if (deq (head a) (head b)) (deq (tail a) (tail b)) 0)
              (if (= (kind a) 0) (= a b) (= (kind a) 1)))
-         0))))
+         0))
   (deq (list 1 (list 2 [3 ~]) 4) (list 1 (list 2 [3 ~]) 4)))
 ]==],
 		"1"
@@ -102,12 +102,12 @@ const examples: { Example } = {
 	value(
 		"deep equality, lists that differ",
 		[==[
-(let deq (fix (lam rec (lam (a b)
+(letrec deq (lam (a b)
      (if (= (kind a) (kind b))
          (if (= (kind a) 2)
-             (if ((rec (head a)) (head b)) ((rec (tail a)) (tail b)) 0)
+             (if (deq (head a) (head b)) (deq (tail a) (tail b)) 0)
              (if (= (kind a) 0) (= a b) (= (kind a) 1)))
-         0))))
+         0))
   (deq (list 1 (list 2 3)) (list 1 (list 2 4))))
 ]==],
 		"0"
@@ -117,10 +117,10 @@ const examples: { Example } = {
 	value(
 		"evaluate an expression tree",
 		[==[
-(let ev (fix (lam rec (lam t
+(letrec ev (lam t
      (if (= (head t) 0) (head (tail t))
-     (if (= (head t) 1) (+ (rec (head (tail t))) (rec (tail (tail t))))
-         (* (rec (head (tail t))) (rec (tail (tail t)))))))))
+     (if (= (head t) 1) (+ (ev (head (tail t))) (ev (tail (tail t))))
+         (* (ev (head (tail t))) (ev (tail (tail t)))))))
   (ev [2 [[1 [[0 [3 ~]] [0 [4 ~]]]] [0 [2 ~]]]]))
 ]==],
 		"14"
@@ -129,8 +129,8 @@ const examples: { Example } = {
 	value(
 		"gcd by subtraction",
 		[==[
-(let gcd (fix (lam rec (lam a (lam b
-     (if (= a b) a (if (< a b) ((rec a) (- b a)) ((rec (- a b)) b)))))))
+(letrec gcd (lam (a b)
+     (if (= a b) a (if (< a b) (gcd a (- b a)) (gcd (- a b) b))))
   (gcd 48 18))
 ]==],
 		"6"

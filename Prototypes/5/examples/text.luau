@@ -124,6 +124,8 @@ const rejects: { string } = {
 	"[1]",
 	"nope",
 	"(lam x y)",
+	"(letrec f 1 (f 1))",
+	"(letrec f (add 1 2) 1)",
 }
 
 return {

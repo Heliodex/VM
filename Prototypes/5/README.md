@@ -9,8 +9,8 @@ A strict, sequential interpreter for a small functional language with native dat
 | `interpreter/vm.luau` | The machine, the printer, and the builders for expressions. |
 | `interpreter/reader.luau` | The reader: text syntax to expressions. The syntax is described at the top of the file. |
 | `examples/examples.luau` | 36 programs built with the builders, each with a fuel budget and its expected outcome. |
-| `examples/text.luau` | 36 of the same programs in the text syntax, plus 13 sources the reader must reject. |
-| `examples/programs.luau` | 9 longer programs in the text syntax, using `let`: an accumulator, reverse, append, insertion sort, word counting, deep equality, a tree evaluator and gcd. |
+| `examples/text.luau` | 36 of the same programs in the text syntax, plus 15 sources the reader must reject. |
+| `examples/programs.luau` | 9 longer programs in the text syntax, using `letrec`: an accumulator, reverse, append, insertion sort, word counting, deep equality, a tree evaluator and gcd. |
 | `self/self.luau` | The self-interpreter: an interpreter for the language, written in the language, with the quoting that feeds it. Functions are host closures. |
 | `self/self_data.luau` | The closure-free self-interpreter, where a function is a cell. See the closure question below. |
 | `run.luau` | Runs every example and reject, and reports pass or fail. |
@@ -38,7 +38,8 @@ The runners exit with status 1 if any check fails.
 - **Values:** integers, `nil`, cells, closures and pins. Lists are nested cells ending in `nil`.
 - **Expressions:** `int`, `nilv`, `var` (by index), `lam` (no name), `app` (curried), `cell`, `head`, `tail`, `ite` (only the branch taken is evaluated), `pin`, `force`, and `prim` on integers (`add`, `sub`, `mul`, `lt`, `eq`) or `kind`, which gives the kind of any value: 0 integer, 1 nil, 2 cell, 3 function, 4 pin. `(? x)` in the text syntax is shorthand for `(= (kind x) 1)`.
 - **Recursion:** `M.fix` is the strict fixed-point combinator. A recursive function is `app(fix, lam(lam(...)))`, and the outer binder, index 1 inside the inner body, refers to the function itself.
-- **Local names:** `(let x e body)` binds `x` in `body` only, as sugar for applying a `lam`. It is not recursive; recursion goes through `fix`.
+- **Local names:** `(let x e body)` binds `x` in `body` only, as sugar for applying a `lam`. It is not recursive.
+- **Recursive functions:** `(letrec f (lam ...) body)` binds `f` to a function that can call itself. It is sugar for `let` with `fix`, so it costs nothing at run time: the programs in `examples/programs.luau` take the same number of steps with it as with `fix` written out.
 - **Pins:** a pin is a suspended expression. Creating one does not run it. Forcing it runs it once, and later forces return the same value.
 
 ## Fuel and outcomes
