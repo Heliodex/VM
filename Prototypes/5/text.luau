@@ -84,18 +84,18 @@ const examples: { Example } = {
 	value("a closure keeps its scope", "((lam x (lam _ x)) 4 9)", "4"),
 
 	-- Pins
-	value("a pin is not run when made", "((lam p 5) (pin " .. OMEGA .. "))", "5", 1000),
-	value("a branch that forces an unrun pin is not taken", "(if 0 (force (pin " .. OMEGA .. ")) 5)", "5", 1000),
+	value("a pin is not run when made", `((lam p 5) (pin {OMEGA}))`, "5", 1000),
+	value("a branch that forces an unrun pin is not taken", `(if 0 (force (pin {OMEGA})) 5)`, "5", 1000),
 	value("a forced pin gives its value twice", "((lam p (cell (force p) (force p))) (pin (add 1 2)))", "(3 . 3)"),
 
 	-- Recursion through fix
-	value("length of a list", "(" .. LENGTH .. " (list 1 2 3))", "3"),
-	value("length of nil", "(" .. LENGTH .. " ())", "0"),
-	value("sum of a list", "(" .. SUM .. " (list 1 2 3))", "6"),
-	value("factorial of 5", "(" .. FACTORIAL .. " 5)", "120"),
-	value("fibonacci of 15", "(" .. FIBONACCI .. " 15)", "610"),
-	value("map doubles each element", "(" .. DOUBLE .. " (list 1 2 3))", "(2 4 6)"),
-	value("a long loop, with no host recursion", "(" .. SUM .. " (" .. RANGE .. " 10000))", "50005000", 5000000),
+	value("length of a list", `({LENGTH} (list 1 2 3))`, "3"),
+	value("length of nil", `({LENGTH} ())`, "0"),
+	value("sum of a list", `({SUM} (list 1 2 3))`, "6"),
+	value("factorial of 5", `({FACTORIAL} 5)`, "120"),
+	value("fibonacci of 15", `({FIBONACCI} 15)`, "610"),
+	value("map doubles each element", `({DOUBLE} (list 1 2 3))`, "(2 4 6)"),
+	value("a long loop, with no host recursion", `({SUM} ({RANGE} 10000))`, "50005000", 5000000),
 
 	-- Running out of fuel and errors
 	failure("omega runs out of fuel", OMEGA, "out_of_fuel", 10000),

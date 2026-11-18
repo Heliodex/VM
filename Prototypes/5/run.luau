@@ -32,7 +32,7 @@ const function report(
 		got = VM.show(result.value)
 		pass = ex.outcome == "value" and got == ex.expect
 	elseif result.status == "error" then
-		got = "error: " .. tostring(result.message)
+		got = `error: {tostring(result.message)}`
 		pass = ex.outcome == "error"
 	else
 		got = "out of fuel"
