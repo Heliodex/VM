@@ -59,15 +59,22 @@ const function prim(
 	return M.prim(name, a, b)
 end
 
+-- Whether x is nil: its kind is 1.
+const function isnil(
+	x: M.Expr
+): M.Expr
+	return prim("eq", prim("kind", x), I(1))
+end
+
 -- λx. x x, and the omega term that applies it to itself. It never finishes.
 const selfApply = M.lam(M.app(V(0), V(0)))
 const omega = M.app(selfApply, selfApply)
 -- length, sum, factorial, fibonacci, map and range, each written with M.fix.
-const length = M.app(M.fix, M.lam(M.lam( M.ite(prim("isnil", V(0)), I(0), prim("add", I(1), M.app(V(1), M.tail(V(0))))))))
-const sumList = M.app(M.fix, M.lam(M.lam( M.ite(prim("isnil", V(0)), I(0), prim("add", M.head(V(0)), M.app(V(1), M.tail(V(0))))))))
+const length = M.app(M.fix, M.lam(M.lam( M.ite(isnil(V(0)), I(0), prim("add", I(1), M.app(V(1), M.tail(V(0))))))))
+const sumList = M.app(M.fix, M.lam(M.lam( M.ite(isnil(V(0)), I(0), prim("add", M.head(V(0)), M.app(V(1), M.tail(V(0))))))))
 const factorial = M.app(M.fix, M.lam(M.lam( M.ite(prim("eq", V(0), I(0)), I(1), prim("mul", V(0), M.app(V(1), prim("sub", V(0), I(1))))))))
 const fibonacci = M.app(M.fix, M.lam(M.lam( M.ite(prim("lt", V(0), I(2)), V(0), prim("add", M.app(V(1), prim("sub", V(0), I(1))), M.app(V(1), prim("sub", V(0), I(2))))))))
-const double = M.app(M.fix, M.lam(M.lam( M.ite(prim("isnil", V(0)), NIL, M.cell(prim("mul", M.head(V(0)), I(2)), M.app(V(1), M.tail(V(0))))))))
+const double = M.app(M.fix, M.lam(M.lam( M.ite(isnil(V(0)), NIL, M.cell(prim("mul", M.head(V(0)), I(2)), M.app(V(1), M.tail(V(0))))))))
 -- range(n) is the list (n n-1 ... 1)
 const range = M.app(M.fix, M.lam(M.lam( M.ite(prim("eq", V(0), I(0)), NIL, M.cell(V(0), M.app(V(1), prim("sub", V(0), I(1))))))))
 const examples: { Example } = {
@@ -75,8 +82,13 @@ const examples: { Example } = {
 	value("a constant", I(42), "42"),
 	value("addition", prim("add", I(2), I(3)), "5"),
 	value("subtraction can go negative", prim("sub", I(2), I(3)), "-1"),
-	value("isnil on nil", prim("isnil", NIL), "1"),
-	value("isnil on a cell", prim("isnil", M.cell(I(1), NIL)), "0"),
+	value("isnil on nil", isnil(NIL), "1"),
+	value("isnil on a cell", isnil(M.cell(I(1), NIL)), "0"),
+	value("kind of an integer", prim("kind", I(7)), "0"),
+	value("kind of nil", prim("kind", NIL), "1"),
+	value("kind of a cell", prim("kind", M.cell(I(1), NIL)), "2"),
+	value("kind of a function", prim("kind", M.lam(V(0))), "3"),
+	value("kind of a pin", prim("kind", M.pin(I(1))), "4"),
 	value("less-than", prim("lt", I(2), I(3)), "1"),
 	-- Conditionals evaluate only the branch taken
 	value("only the taken branch runs", M.ite(I(1), I(7), M.head(I(3))), "7"),

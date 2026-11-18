@@ -14,8 +14,10 @@
 --   (if c t e)         evaluates t if c is nonzero, otherwise e
 --   (pin e), (force e)
 --   (fix f)            the fixed point of f, where f is (lam rec (lam ...)) and rec is the function itself
---   (+ a b), (- a b), (* a b), (< a b), (= a b), (? a)
---                      add, subtract, multiply, less-than, equal, and whether a is nil (1 or 0)
+--   (+ a b), (- a b), (* a b), (< a b), (= a b)
+--                      add, subtract, multiply, less-than, equal
+--   (kind a)           the kind of a: 0 integer, 1 nil, 2 cell, 3 function, 4 pin
+--   (? a)              shorthand for (= (kind a) 1), whether a is nil
 --
 -- The words and operators above are reserved and cannot be used as variables. Errors are raised as strings that begin with the line number.
 --
@@ -44,7 +46,12 @@ const PRIMITIVES: { [string]: { op: string, arity: number } } = {
 	["*"] = { op = "mul", arity = 2 },
 	["<"] = { op = "lt", arity = 2 },
 	["="] = { op = "eq", arity = 2 },
-	["?"] = { op = "isnil", arity = 1 },
+}
+
+-- Forms that are primitives: kind is one, and ? is a shorthand built from it.
+const KIND_FORMS: { [string]: number } = {
+	kind = 1,
+	["?"] = 1,
 }
 
 const UNARY_FORMS: { [string]: number } = {
@@ -61,6 +68,7 @@ const function reserved(name: string): boolean
 		or name == "list"
 		or name == "~"
 		or PRIMITIVES[name] ~= nil
+		or KIND_FORMS[name] ~= nil
 		or UNARY_FORMS[name] ~= nil
 end
 
@@ -249,6 +257,16 @@ local function compileForm(
 			table.insert(elements, compile(items[i], scope))
 		end
 		return M.list(elements)
+	end
+
+	if name == "kind" then
+		arity(1)
+		return M.prim("kind", compile(items[2], scope))
+	end
+
+	if name == "?" then
+		arity(1)
+		return M.prim("eq", M.prim("kind", compile(items[2], scope)), M.int(1))
 	end
 
 	if PRIMITIVES[name] ~= nil then

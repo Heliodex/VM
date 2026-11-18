@@ -41,7 +41,7 @@ const BRANCH: { [number]: string } = {
 	[13] = `(* {ev(A)} {ev(B)})`,
 	[14] = `(< {ev(A)} {ev(B)})`,
 	[15] = `(= {ev(A)} {ev(B)})`,
-	[16] = `(? {ev(A)})`,
+	[16] = `(kind {ev(A)})`,
 }
 
 -- A chain of ifs on the tag, checking 0 first and falling through to 16.

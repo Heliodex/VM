@@ -175,16 +175,35 @@ const function binary(
 	return f(integer(a, name), integer(b, name))
 end
 
+-- The kind of a value: 0 integer, 1 nil, 2 cell, 3 function, 4 pin.
+const function kindOf(
+	v: Value
+): number
+	if type(v) == "number" then
+		return 0
+	end
+
+	if v == NIL then
+		return 1
+	end
+
+	if v.kind == "cell" then
+		return 2
+	end
+
+	if v.kind == "closure" then
+		return 3
+	end
+
+	return 4
+end
+
 const function unary(
 	name: string,
 	v: Value
 ): number
-	if name == "isnil" then
-		return
-			if v == NIL then
-				1
-			else
-				0
+	if name == "kind" then
+		return kindOf(v)
 	end
 
 	return fail("unknown operation " .. name)
@@ -587,7 +606,7 @@ function M.force(
 	}
 end
 
--- A primitive on integers: add, sub, mul, lt, eq. The unary primitive isnil takes no b.
+-- A primitive on integers: add, sub, mul, lt, eq. The unary primitive kind takes no b, and works on any value.
 function M.prim(
 	name: string,
 	a: Expr,

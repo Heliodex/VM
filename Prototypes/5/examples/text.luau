@@ -65,6 +65,11 @@ const examples: { Example } = {
 	value("subtraction can go negative", "(- 2 3)", "-1"),
 	value("isnil on nil", "(? ~)", "1"),
 	value("isnil on a pair", "(? [1 ~])", "0"),
+	value("kind of an integer", "(kind 7)", "0"),
+	value("kind of nil", "(kind ~)", "1"),
+	value("kind of a pair", "(kind [1 ~])", "2"),
+	value("kind of a function", "(kind (lam x x))", "3"),
+	value("kind of a pin", "(kind (pin 1))", "4"),
 	value("less-than", "(< 2 3)", "1"),
 	value("comments are ignored", "; the answer\n(+ 40 2) ; trailing", "42"),
 

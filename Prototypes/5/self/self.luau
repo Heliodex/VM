@@ -10,7 +10,7 @@
 --   6 head, args (e)                7 tail, args (e)         8 force, args (e)
 --   9 if, args (c t e)             10 apply, args (f arg)
 --   11 +, args (a b)               12 -, args (a b)         13 *, args (a b)
---   14 <, args (a b)               15 =, args (a b)         16 ?, args (a)
+--   14 <, args (a b)               15 =, args (a b)         16 kind, args (a)
 --
 -- The interpreter does not build its own closures and pins. A quoted lam becomes a native lam, and a quoted pin becomes a native pin, so the machine's own errors and laziness apply to the object program. The only thing it has to work out is the environment, which is a list of values, indexed by tails.
 --
@@ -49,7 +49,7 @@ const BRANCH: { [number]: string } = {
 	[13] = `(* {ev(A)} {ev(B)})`,
 	[14] = `(< {ev(A)} {ev(B)})`,
 	[15] = `(= {ev(A)} {ev(B)})`,
-	[16] = `(? {ev(A)})`,
+	[16] = `(kind {ev(A)})`,
 }
 
 -- A chain of ifs on the tag, checking 0 first and falling through to 16.
@@ -66,7 +66,7 @@ const PRIMITIVE_TAGS: { [string]: number } = {
 	mul = 13,
 	lt = 14,
 	eq = 15,
-	isnil = 16,
+	kind = 16,
 }
 
 -- Builds an expression that evaluates to the quoted form of e.
