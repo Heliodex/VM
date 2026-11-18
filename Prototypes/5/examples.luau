@@ -9,7 +9,7 @@ const M = require "./vm"
 
 type Example = {
 	name: string,
-	program: any,
+	program: M.Expr,
 	fuel: number,
 	outcome: string,
 	expect: string?,
@@ -18,7 +18,7 @@ const FUEL = 1e6
 
 const function value(
 	name: string,
-	program: any,
+	program: M.Expr,
 	expect: string,
 	fuel: number?
 ): Example
@@ -33,7 +33,7 @@ end
 
 const function failure(
 	name: string,
-	program: any,
+	program: M.Expr,
 	outcome: string,
 	fuel: number?
 ): Example
@@ -52,16 +52,16 @@ const NIL = M.nilv()
 
 const function prim(
 	name: string,
-	a: any,
-	b: any?
-): any
+	a: M.Expr,
+	b: M.Expr?
+): M.Expr
 	return M.prim(name, a, b)
 end
 
 -- λx. x x, and the omega term that applies it to itself. It never finishes.
 const function selfApply(
 	name: string
-): any
+): M.Expr
 	return M.lam(name, M.app(V(name), V(name)))
 end
 
