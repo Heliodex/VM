@@ -4,6 +4,7 @@
 -- Each example is a program, a fuel budget, and what it should do. outcome is "value" (with expect set to the printed result), "error" or "out_of_fuel". run.luau checks every one. Results are written as they print, so (1 2 3) is a list and (1 . 2) is an improper pair.
 --
 -- Recursive functions use M.fix, so no example needs a special form for recursion.
+-- Variables are indices: V(0) is the innermost binder, V(1) the one outside it.
 
 const M = require "./vm"
 
@@ -59,21 +60,16 @@ const function prim(
 end
 
 -- λx. x x, and the omega term that applies it to itself. It never finishes.
-const function selfApply(
-	name: string
-): M.Expr
-	return M.lam(name, M.app(V(name), V(name)))
-end
-
-const omega = M.app(selfApply "x", selfApply "x")
+const selfApply = M.lam(M.app(V(0), V(0)))
+const omega = M.app(selfApply, selfApply)
 -- length, sum, factorial, fibonacci, map and range, each written with M.fix.
-const length = M.app(M.fix, M.lam("rec", M.lam("l", M.ite(prim("isnil", V "l"), I(0), prim("add", I(1), M.app(V "rec", M.tail(V "l")))))))
-const sumList = M.app(M.fix, M.lam("rec", M.lam("l", M.ite(prim("isnil", V "l"), I(0), prim("add", M.head(V "l"), M.app(V "rec", M.tail(V "l")))))))
-const factorial = M.app(M.fix, M.lam("rec", M.lam("n", M.ite(prim("eq", V "n", I(0)), I(1), prim("mul", V "n", M.app(V "rec", prim("sub", V "n", I(1))))))))
-const fibonacci = M.app(M.fix, M.lam("rec", M.lam("n", M.ite(prim("lt", V "n", I(2)), V "n", prim("add", M.app(V "rec", prim("sub", V "n", I(1))), M.app(V "rec", prim("sub", V "n", I(2))))))))
-const double = M.app(M.fix, M.lam("rec", M.lam("l", M.ite(prim("isnil", V "l"), NIL, M.cell(prim("mul", M.head(V "l"), I(2)), M.app(V "rec", M.tail(V "l")))))))
+const length = M.app(M.fix, M.lam(M.lam( M.ite(prim("isnil", V(0)), I(0), prim("add", I(1), M.app(V(1), M.tail(V(0))))))))
+const sumList = M.app(M.fix, M.lam(M.lam( M.ite(prim("isnil", V(0)), I(0), prim("add", M.head(V(0)), M.app(V(1), M.tail(V(0))))))))
+const factorial = M.app(M.fix, M.lam(M.lam( M.ite(prim("eq", V(0), I(0)), I(1), prim("mul", V(0), M.app(V(1), prim("sub", V(0), I(1))))))))
+const fibonacci = M.app(M.fix, M.lam(M.lam( M.ite(prim("lt", V(0), I(2)), V(0), prim("add", M.app(V(1), prim("sub", V(0), I(1))), M.app(V(1), prim("sub", V(0), I(2))))))))
+const double = M.app(M.fix, M.lam(M.lam( M.ite(prim("isnil", V(0)), NIL, M.cell(prim("mul", M.head(V(0)), I(2)), M.app(V(1), M.tail(V(0))))))))
 -- range(n) is the list (n n-1 ... 1)
-const range = M.app(M.fix, M.lam("rec", M.lam("n", M.ite(prim("eq", V "n", I(0)), NIL, M.cell(V "n", M.app(V "rec", prim("sub", V "n", I(1))))))))
+const range = M.app(M.fix, M.lam(M.lam( M.ite(prim("eq", V(0), I(0)), NIL, M.cell(V(0), M.app(V(1), prim("sub", V(0), I(1))))))))
 const examples: { Example } = {
 	-- Values and primitives
 	value("a constant", I(42), "42"),
@@ -107,13 +103,13 @@ const examples: { Example } = {
 		}, "((1) (2 3))"
 	),
 	-- Closures and scope
-	value("application", M.app(M.lam("x", prim("add", V "x", V "x")), I(21)), "42"),
-	value("lexical scope", M.app(M.app(M.lam("x", M.lam("y", prim("sub", V "x", V "y"))), I(10)), I(3)), "7"),
-	value("a closure keeps its scope", M.app(M.app(M.lam("x", M.lam("_", V "x")), I(4)), I(9)), "4"),
+	value("application", M.app(M.lam(prim("add", V(0), V(0))), I(21)), "42"),
+	value("lexical scope", M.app(M.app(M.lam(M.lam(prim("sub", V(1), V(0)))), I(10)), I(3)), "7"),
+	value("a closure keeps its scope", M.app(M.app(M.lam(M.lam(V(1))), I(4)), I(9)), "4"),
 	-- Pins: suspended, forced on demand, evaluated at most once
-	value("a pin is not run when made", M.app(M.lam("p", I(5)), M.pin(omega)), "5", 1000),
+	value("a pin is not run when made", M.app(M.lam(I(5)), M.pin(omega)), "5", 1000),
 	value("a branch that forces an unrun pin is not taken", M.ite(I(0), M.force(M.pin(omega)), I(5)), "5", 1000),
-	value("a forced pin gives its value twice", M.app(M.lam("p", M.cell(M.force(V "p"), M.force(V "p"))), M.pin(prim("add", I(1), I(2)))), "(3 . 3)"),
+	value("a forced pin gives its value twice", M.app(M.lam(M.cell(M.force(V(0)), M.force(V(0)))), M.pin(prim("add", I(1), I(2)))), "(3 . 3)"),
 	-- Recursion through the fixed-point combinator
 	value(
 		"length of a list", M.app(
@@ -157,7 +153,7 @@ const examples: { Example } = {
 	),
 	failure("head of an integer is an error", M.head(I(3)), "error"),
 	failure("applying an integer is an error", M.app(I(1), I(2)), "error"),
-	failure("an unbound variable is an error", V "nope", "error"),
+	failure("a variable with no binder is an error", V(0), "error"),
 	failure("forcing an integer is an error", M.force(I(3)), "error"),
 }
 

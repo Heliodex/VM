@@ -102,7 +102,6 @@ const examples: { Example } = {
 	failure("adding a list is an error", "(+ [1 ~] 1)", "error"),
 	failure("head of an integer is an error", "(head 3)", "error"),
 	failure("applying an integer is an error", "(3 2)", "error"),
-	failure("an unbound variable is an error", "nope", "error"),
 	failure("forcing an integer is an error", "(force 3)", "error"),
 }
 
@@ -118,6 +117,8 @@ const rejects: { string } = {
 	"()",
 	"[1 2 3]",
 	"[1]",
+	"nope",
+	"(lam x y)",
 }
 
 return {
