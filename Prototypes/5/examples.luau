@@ -16,7 +16,7 @@ type Example = {
 }
 const FUEL = 1e6
 
-local function value(
+const function value(
 	name: string,
 	program: any,
 	expect: string,
@@ -31,7 +31,7 @@ local function value(
 	}
 end
 
-local function failure(
+const function failure(
 	name: string,
 	program: any,
 	outcome: string,
@@ -50,7 +50,7 @@ const I = M.int
 const V = M.var
 const NIL = M.nilv()
 
-local function prim(
+const function prim(
 	name: string,
 	a: any,
 	b: any?
@@ -59,7 +59,7 @@ local function prim(
 end
 
 -- λx. x x, and the omega term that applies it to itself. It never finishes.
-local function selfApply(
+const function selfApply(
 	name: string
 ): any
 	return M.lam(name, M.app(V(name), V(name)))

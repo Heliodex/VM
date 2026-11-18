@@ -24,7 +24,7 @@ const NIL = {
 	kind = "nil",
 }
 
-local function fail(
+const function fail(
 	message: string
 ): never
 	error(
@@ -34,7 +34,7 @@ local function fail(
 	)
 end
 
-local function lookup(
+const function lookup(
 	env: any,
 	name: string
 ): any
@@ -94,7 +94,7 @@ const BINARY: {
 	end,
 }
 
-local function integer(
+const function integer(
 	v: any,
 	name: string
 ): number
@@ -105,7 +105,7 @@ local function integer(
 	return v
 end
 
-local function binary(
+const function binary(
 	name: string,
 	a: any,
 	b: any
@@ -119,7 +119,7 @@ local function binary(
 	return f(integer(a, name), integer(b, name))
 end
 
-local function unary(
+const function unary(
 	name: string,
 	v: any
 ): number
@@ -138,7 +138,7 @@ end
 --   status "value" with the value,
 --   status "error" with a message (a type error, an unbound name, and so on),
 --   status "out_of_fuel".
-local function run(
+const function run(
 	program: Expr,
 	fuel: number
 ): Outcome
@@ -146,14 +146,14 @@ local function run(
 	local depth = 0
 	local steps = 0
 
-	local function push(
+	const function push(
 		frame: any
 	)
 		depth += 1
 		stack[depth] = frame
 	end
 
-	local function loop(): Outcome
+	const function loop(): Outcome
 		local expr: any = program
 		local env: any = nil
 		local value: any = nil
@@ -378,7 +378,7 @@ local function run(
 end
 
 -- Prints a value the way the examples write expected results: integers as numbers, lists as (1 2 3), improper pairs as (1 . 2).
-local function show(
+const function show(
 	v: any
 ): string
 	if type(v) == "number" then
