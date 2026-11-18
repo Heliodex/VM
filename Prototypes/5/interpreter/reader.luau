@@ -12,6 +12,7 @@
 --   (list a b c)       a proper list of a, b and c
 --   (head e), (tail e)
 --   (if c t e)         evaluates t if c is nonzero, otherwise e
+--   (let x e body)     binds x to e in body. It is sugar for ((lam x body) e), so x is not in scope in e
 --   (pin e), (force e)
 --   (fix f)            the fixed point of f, where f is (lam rec (lam ...)) and rec is the function itself
 --   (+ a b), (- a b), (* a b), (< a b), (= a b)
@@ -65,6 +66,7 @@ const UNARY_FORMS: { [string]: number } = {
 const function reserved(name: string): boolean
 	return name == "lam"
 		or name == "if"
+		or name == "let"
 		or name == "list"
 		or name == "~"
 		or PRIMITIVES[name] ~= nil
@@ -249,6 +251,22 @@ local function compileForm(
 	if name == "if" then
 		arity(3)
 		return M.ite(compile(items[2], scope), compile(items[3], scope), compile(items[4], scope))
+	end
+
+	if name == "let" then
+		arity(3)
+		const binder = items[2]
+
+		if binder.kind ~= "sym" then
+			fail(binder.line, "let binds a name")
+		end
+
+		-- The value is compiled in the current scope, and the body with the name added.
+		const value = compile(items[3], scope)
+		const inner = table.clone(scope)
+		table.insert(inner, 1, (binder :: { kind: "sym", name: string, line: number }).name)
+
+		return M.app(M.lam(compile(items[4], inner)), value)
 	end
 
 	if name == "list" then
