@@ -29,8 +29,9 @@ export type Expr =
 
 export type QuoteExpr = { op: "quote", value: number }
 export type NilExpr = { op: "nil" }
-export type VarExpr = { op: "var", name: string }
-export type LamExpr = { op: "lam", param: string, body: Expr }
+-- index counts the binders between the variable and its binder, so 0 is the innermost.
+export type VarExpr = { op: "var", index: number }
+export type LamExpr = { op: "lam", body: Expr }
 export type PinExpr = { op: "pin", e: Expr }
 export type CellExpr = { op: "cell", head: Expr, tail: Expr }
 export type HeadExpr = { op: "head", e: Expr }
@@ -45,13 +46,13 @@ export type PrimExpr = { op: "prim", name: string, a: Expr, b: Expr? }
 
 export type Nil = { kind: "nil" }
 export type Cell = { kind: "cell", head: Value, tail: Value }
-export type Closure = { kind: "closure", param: string, body: Expr, env: Binding? }
+export type Closure = { kind: "closure", body: Expr, env: Binding? }
 -- result is set once the pin has been forced. busy is set while it is being forced, so a pin that forces itself is caught.
 export type Pin = { kind: "pin", expr: Expr, env: Binding?, busy: boolean, result: Value? }
 export type Value = number | Nil | Cell | Closure | Pin
 
 -- A linked list of variable bindings, innermost first.
-export type Binding = { name: string, value: Value, rest: Binding? }
+export type Binding = { value: Value, rest: Binding? }
 
 -- OUTCOMES
 
@@ -89,19 +90,21 @@ end
 
 const function lookup(
 	env: Binding?,
-	name: string
+	index: number
 ): Value
 	local e = env
+	local i = index
 
 	while e do
-		if e.name == name then
+		if i == 0 then
 			return e.value
 		end
 
+		i -= 1
 		e = e.rest
 	end
 
-	return fail("unbound variable " .. name)
+	return fail("no variable at index " .. index)
 end
 
 const BINARY: {
@@ -228,12 +231,11 @@ const function run(
 					value = NIL
 					returning = true
 				elseif expr.op == "var" then
-					value = lookup(env, expr.name)
+					value = lookup(env, expr.index)
 					returning = true
 				elseif expr.op == "lam" then
 					value = {
 						kind = "closure",
-						param = expr.param,
 						body = expr.body,
 						env = env,
 					}
@@ -358,7 +360,6 @@ const function run(
 
 					expr = fn.body
 					env = {
-						name = fn.param,
 						value = value,
 						rest = fn.env,
 					}
@@ -484,22 +485,22 @@ function M.nilv(): Expr
 	}
 end
 
+-- A variable, by its index: 0 is the innermost binder, 1 the one outside it, and so on.
 function M.var(
-	name: string
+	index: number
 ): Expr
 	return {
 		op = "var",
-		name = name,
+		index = index,
 	}
 end
 
+-- A function of one parameter. The parameter is not named: variables refer to it by index.
 function M.lam(
-	param: string,
 	body: Expr
 ): Expr
 	return {
 		op = "lam",
-		param = param,
 		body = body,
 	}
 end
@@ -614,8 +615,9 @@ function M.list(
 end
 
 -- The fixed-point combinator for a strict language, Z = λf. (λx. f (λv. x x v)) (λx. f (λv. x x v)).
--- Recursive functions are written as M.app(M.fix, M.lam("rec", M.lam(...))), where rec stands for the function itself.
-const inner = M.lam("x", M.app(M.var "f", M.lam("v", M.app(M.var "x", M.var "x", M.var "v"))))
-M.fix = M.lam("f", M.app(inner, inner))
+-- Recursive functions are written as M.app(M.fix, M.lam(M.lam(...))). The outer lambda binds the function itself, so inside the body of the inner one it is index 1.
+-- The indices below are counted from each variable's own binder: inside λx, f is 1; inside λv, x is 1 and v is 0.
+const inner = M.lam(M.app(M.var(1), M.lam(M.app(M.var(1), M.var(1), M.var(0)))))
+M.fix = M.lam(M.app(inner, inner))
 
 return M
