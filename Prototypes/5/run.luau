@@ -5,8 +5,8 @@
 --
 --   luau run.luau      (from Prototypes/5)
 
-const VM = require "./vm"
 const Examples = require "./examples"
+const VM = require "./vm"
 
 local failures = 0
 
@@ -30,9 +30,15 @@ for _, ex in ipairs(Examples) do
 		print(string.format("PASS  %s  -> %s  (%d steps)", ex.name, got, result.steps))
 	else
 		failures += 1
-		print(string.format("FAIL  %s  -> %s  (%d steps), expected %s", ex.name, got, result.steps, if ex.outcome == "value" then tostring(ex.expect) else ex.outcome))
-	end
-end
+		print(
+			string.format(
+				"FAIL  %s  -> %s  (%d steps), expected %s", ex.name, got, result.steps, if ex.outcome == "value" then
+					tostring(ex.expect)
+				else
+					ex.outcome
+			)
+		)
+end end
 
 print(string.format("%d of %d examples passed", #Examples - failures, #Examples))
 
