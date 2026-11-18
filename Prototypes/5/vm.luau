@@ -9,18 +9,71 @@
 --
 -- Numbers are Luau numbers, so integers are exact only up to 2^53.
 --
--- Expressions are plain tables with an op field. The builders at the bottom of this file are the only intended way to make them.
+-- Expressions, values, frames and outcomes are each a union of tables tagged by one field (op, kind, k and status). The builders at the bottom of this file are the only intended way to make expressions.
 
-type Expr = {
-	[string]: any,
-}
-type Outcome = {
-	status: string,
-	value: any?,
-	message: string?,
-	steps: number,
-}
-const NIL = {
+-- EXPRESSIONS
+
+export type Expr =
+	| QuoteExpr
+	| NilExpr
+	| VarExpr
+	| LamExpr
+	| PinExpr
+	| CellExpr
+	| HeadExpr
+	| TailExpr
+	| ForceExpr
+	| IfExpr
+	| ApplyExpr
+	| PrimExpr
+
+export type QuoteExpr = { op: "quote", value: number }
+export type NilExpr = { op: "nil" }
+export type VarExpr = { op: "var", name: string }
+export type LamExpr = { op: "lam", param: string, body: Expr }
+export type PinExpr = { op: "pin", e: Expr }
+export type CellExpr = { op: "cell", head: Expr, tail: Expr }
+export type HeadExpr = { op: "head", e: Expr }
+export type TailExpr = { op: "tail", e: Expr }
+export type ForceExpr = { op: "force", e: Expr }
+export type IfExpr = { op: "if", c: Expr, t: Expr, e: Expr }
+export type ApplyExpr = { op: "apply", f: Expr, arg: Expr }
+-- b is absent for the unary primitive isnil
+export type PrimExpr = { op: "prim", name: string, a: Expr, b: Expr? }
+
+-- VALUES
+
+export type Nil = { kind: "nil" }
+export type Cell = { kind: "cell", head: Value, tail: Value }
+export type Closure = { kind: "closure", param: string, body: Expr, env: Binding? }
+-- result is set once the pin has been forced. busy is set while it is being forced, so a pin that forces itself is caught.
+export type Pin = { kind: "pin", expr: Expr, env: Binding?, busy: boolean, result: Value? }
+export type Value = number | Nil | Cell | Closure | Pin
+
+-- A linked list of variable bindings, innermost first.
+export type Binding = { name: string, value: Value, rest: Binding? }
+
+-- OUTCOMES
+
+export type Outcome =
+	| { status: "value", value: Value, steps: number }
+	| { status: "error", message: string, steps: number }
+	| { status: "out_of_fuel", steps: number }
+
+-- The pending work of the machine. Each frame says what to do with the next value.
+type Frame =
+	| { k: "cell", expr: Expr, env: Binding? }
+	| { k: "cellhead", head: Value }
+	| { k: "head" | "tail" | "force" }
+	| { k: "if", t: Expr, e: Expr, env: Binding? }
+	| { k: "apply", arg: Expr, env: Binding? }
+	| { k: "argument", fn: Value }
+	| { k: "update", pin: Pin }
+	| { k: "binary", name: string, b: Expr, env: Binding? }
+	| { k: "second", name: string, first: Value }
+	| { k: "unary", name: string }
+
+const NIL: Nil = {
 	kind = "nil",
 }
 
@@ -35,9 +88,9 @@ const function fail(
 end
 
 const function lookup(
-	env: any,
+	env: Binding?,
 	name: string
-): any
+): Value
 	local e = env
 
 	while e do
@@ -95,11 +148,11 @@ const BINARY: {
 }
 
 const function integer(
-	v: any,
+	v: Value,
 	name: string
 ): number
 	if type(v) ~= "number" then
-		fail(name .. " needs integers")
+		return fail(name .. " needs integers")
 	end
 
 	return v
@@ -107,13 +160,13 @@ end
 
 const function binary(
 	name: string,
-	a: any,
-	b: any
+	a: Value,
+	b: Value
 ): number
 	const f = BINARY[name]
 
 	if not f then
-		fail("unknown operation " .. name)
+		return fail("unknown operation " .. name)
 	end
 
 	return f(integer(a, name), integer(b, name))
@@ -121,7 +174,7 @@ end
 
 const function unary(
 	name: string,
-	v: any
+	v: Value
 ): number
 	if name == "isnil" then
 		return
@@ -134,29 +187,26 @@ const function unary(
 	return fail("unknown operation " .. name)
 end
 
--- Runs a program with a budget of steps. The result is always one of:
---   status "value" with the value,
---   status "error" with a message (a type error, an unbound name, and so on),
---   status "out_of_fuel".
+-- Runs a program with a budget of steps. The result is always one of the outcomes above.
 const function run(
 	program: Expr,
 	fuel: number
 ): Outcome
-	local stack: { any } = {}
+	local stack: { Frame } = {}
 	local depth = 0
 	local steps = 0
 
 	const function push(
-		frame: any
+		frame: Frame
 	)
 		depth += 1
 		stack[depth] = frame
 	end
 
 	const function loop(): Outcome
-		local expr: any = program
-		local env: any = nil
-		local value: any = nil
+		local expr: Expr = program
+		local env: Binding? = nil
+		local value: Value = NIL
 		local returning = false
 
 		while true do
@@ -171,18 +221,16 @@ const function run(
 
 			if not returning then
 				-- Evaluate expr in env. Either finish with a value, or push a frame and move to a subexpression.
-				const op = expr.op
-
-				if op == "quote" then
+				if expr.op == "quote" then
 					value = expr.value
 					returning = true
-				elseif op == "nil" then
+				elseif expr.op == "nil" then
 					value = NIL
 					returning = true
-				elseif op == "var" then
+				elseif expr.op == "var" then
 					value = lookup(env, expr.name)
 					returning = true
-				elseif op == "lam" then
+				elseif expr.op == "lam" then
 					value = {
 						kind = "closure",
 						param = expr.param,
@@ -190,28 +238,27 @@ const function run(
 						env = env,
 					}
 					returning = true
-				elseif op == "pin" then
+				elseif expr.op == "pin" then
 					value = {
 						kind = "pin",
 						expr = expr.e,
 						env = env,
-						forced = false,
 						busy = false,
 					}
 					returning = true
-				elseif op == "cell" then
+				elseif expr.op == "cell" then
 					push {
 						k = "cell",
 						expr = expr.tail,
 						env = env,
 					}
 					expr = expr.head
-				elseif op == "head" or op == "tail" or op == "force" then
+				elseif expr.op == "head" or expr.op == "tail" or expr.op == "force" then
 					push {
-						k = op,
+						k = expr.op,
 					}
 					expr = expr.e
-				elseif op == "if" then
+				elseif expr.op == "if" then
 					push {
 						k = "if",
 						t = expr.t,
@@ -219,14 +266,15 @@ const function run(
 						env = env,
 					}
 					expr = expr.c
-				elseif op == "apply" then
+				elseif expr.op == "apply" then
 					push {
 						k = "apply",
 						arg = expr.arg,
 						env = env,
 					}
 					expr = expr.f
-				elseif op == "prim" then
+				else
+					-- The only expression left is a primitive.
 					if expr.b == nil then
 						push {
 							k = "unary",
@@ -242,8 +290,6 @@ const function run(
 					end
 
 					expr = expr.a
-				else
-					fail("unknown expression " .. tostring(op))
 				end
 			else
 				-- Hand value to the innermost frame.
@@ -258,9 +304,8 @@ const function run(
 				const frame = stack[depth]
 				stack[depth] = nil
 				depth -= 1
-				const k = frame.k
 
-				if k == "cell" then
+				if frame.k == "cell" then
 					push {
 						k = "cellhead",
 						head = value,
@@ -268,25 +313,25 @@ const function run(
 					expr = frame.expr
 					env = frame.env
 					returning = false
-				elseif k == "cellhead" then
+				elseif frame.k == "cellhead" then
 					value = {
 						kind = "cell",
 						head = frame.head,
 						tail = value,
 					}
-				elseif k == "head" or k == "tail" then
+				elseif frame.k == "head" or frame.k == "tail" then
 					if type(value) ~= "table" or value.kind ~= "cell" then
-						fail(k .. " of a non-cell")
+						return fail(frame.k .. " of a non-cell")
 					end
 
 					value =
-						if k == "head" then
+						if frame.k == "head" then
 							value.head
 						else
 							value.tail
-				elseif k == "if" then
+				elseif frame.k == "if" then
 					if type(value) ~= "number" then
-						fail "if needs an integer condition"
+						return fail "if needs an integer condition"
 					end
 
 					expr =
@@ -296,7 +341,7 @@ const function run(
 							frame.e
 					env = frame.env
 					returning = false
-				elseif k == "apply" then
+				elseif frame.k == "apply" then
 					push {
 						k = "argument",
 						fn = value,
@@ -304,11 +349,11 @@ const function run(
 					expr = frame.arg
 					env = frame.env
 					returning = false
-				elseif k == "argument" then
+				elseif frame.k == "argument" then
 					const fn = frame.fn
 
 					if type(fn) ~= "table" or fn.kind ~= "closure" then
-						fail "applying a non-function"
+						return fail "applying a non-function"
 					end
 
 					expr = fn.body
@@ -318,32 +363,34 @@ const function run(
 						rest = fn.env,
 					}
 					returning = false
-				elseif k == "force" then
+				elseif frame.k == "force" then
 					if type(value) ~= "table" or value.kind ~= "pin" then
-						fail "forcing a non-pin"
+						return fail "forcing a non-pin"
 					end
 
-					if value.forced then
-						value = value.value
+					const result = value.result
+
+					if result then
+						value = result
 					else
 						if value.busy then
-							fail "a pin forced itself"
+							return fail "a pin forced itself"
 						end
 
-						value.busy = true
+						const pin: Pin = value
+						pin.busy = true
 						push {
 							k = "update",
-							pin = value,
+							pin = pin,
 						}
-						expr = value.expr
-						env = value.env
+						expr = pin.expr
+						env = pin.env
 						returning = false
 					end
-				elseif k == "update" then
-					frame.pin.value = value
-					frame.pin.forced = true
+				elseif frame.k == "update" then
+					frame.pin.result = value
 					frame.pin.busy = false
-				elseif k == "binary" then
+				elseif frame.k == "binary" then
 					push {
 						k = "second",
 						name = frame.name,
@@ -352,14 +399,17 @@ const function run(
 					expr = frame.b
 					env = frame.env
 					returning = false
-				elseif k == "second" then
+				elseif frame.k == "second" then
 					value = binary(frame.name, frame.first, value)
-				elseif k == "unary" then
-					value = unary(frame.name, value)
 				else
-					fail("unknown continuation " .. tostring(k))
-	end end end end
+					-- The only frame left is unary.
+					value = unary(frame.name, value)
+				end
+			end
+		end
+	end
 
+	-- fail raises a table with a vmError field. Anything else is a bug in the machine, so it is passed on unchanged.
 	const ok, result: any = pcall(loop)
 
 	if ok then
@@ -379,14 +429,10 @@ end
 
 -- Prints a value the way the examples write expected results: integers as numbers, lists as (1 2 3), improper pairs as (1 . 2).
 const function show(
-	v: any
+	v: Value
 ): string
 	if type(v) == "number" then
 		return tostring(v)
-	end
-
-	if type(v) ~= "table" then
-		return "?"
 	end
 
 	if v == NIL then
@@ -401,27 +447,24 @@ const function show(
 		return "<pin>"
 	end
 
-	if v.kind == "cell" then
-		local parts: { string } = {}
-		local cur = v
+	local parts: { string } = {}
+	local cur: Value = v
 
-		while type(cur) == "table" and cur.kind == "cell" do
-			table.insert(parts, show(cur.head))
-			cur = cur.tail
-		end
-
-		if cur ~= NIL then
-			table.insert(parts, ".")
-			table.insert(parts, show(cur))
-		end
-
-		return "(" .. table.concat(parts, " ") .. ")"
+	while type(cur) == "table" and cur.kind == "cell" do
+		table.insert(parts, show(cur.head))
+		cur = cur.tail
 	end
 
-	return "?"
+	if cur ~= NIL then
+		table.insert(parts, ".")
+		table.insert(parts, show(cur))
+	end
+
+	return "(" .. table.concat(parts, " ") .. ")"
 end
 
 -- BUILDERS
+
 local M = {}
 M.run = run
 M.show = show
