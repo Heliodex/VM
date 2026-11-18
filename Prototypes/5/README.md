@@ -7,7 +7,7 @@ A strict, sequential interpreter for a small functional language with native dat
 | `vm.luau` | The machine, the printer, and the builders for expressions. |
 | `reader.luau` | The reader: text syntax to expressions. The syntax is described at the top of the file. |
 | `examples.luau` | 31 programs built with the builders, each with a fuel budget and its expected outcome. |
-| `text.luau` | 32 of the same programs in the text syntax, plus 8 sources the reader must reject. |
+| `text.luau` | 32 of the same programs in the text syntax, plus 11 sources the reader must reject. |
 | `run.luau` | Runs every example and reject, and reports pass or fail. |
 
 ## Running
@@ -25,8 +25,8 @@ The runner exits with status 1 if any check fails.
 ## The language
 
 - **Values:** integers, `nil`, cells, closures and pins. Lists are nested cells ending in `nil`.
-- **Expressions:** `int`, `nilv`, `var`, `lam`, `app` (curried), `cell`, `head`, `tail`, `ite` (only the branch taken is evaluated), `pin`, `force`, and `prim` on integers (`add`, `sub`, `mul`, `lt`, `eq`) or `isnil`.
-- **Recursion:** `M.fix` is the strict fixed-point combinator. A recursive function is `app(fix, lam("rec", lam(...)))`, and `rec` refers to the function itself.
+- **Expressions:** `int`, `nilv`, `var` (by index), `lam` (no name), `app` (curried), `cell`, `head`, `tail`, `ite` (only the branch taken is evaluated), `pin`, `force`, and `prim` on integers (`add`, `sub`, `mul`, `lt`, `eq`) or `isnil`.
+- **Recursion:** `M.fix` is the strict fixed-point combinator. A recursive function is `app(fix, lam(lam(...)))`, and the outer binder, index 1 inside the inner body, refers to the function itself.
 - **Pins:** a pin is a suspended expression. Creating one does not run it. Forcing it runs it once, and later forces return the same value.
 
 ## Fuel and outcomes
@@ -44,5 +44,6 @@ Out of fuel is a result, not a hang, so a diverging program can be tested like a
 - **No host recursion.** Pending work sits on an explicit stack. The 10,000-element loop in the examples runs in one Luau call frame.
 - **Numbers are Luau numbers,** so integers are exact only up to 2^53.
 - **Pins are memoised,** but the examples cannot see the difference except through step counts.
+- **Variables are de Bruijn indices.** The machine never sees a name: `var 0` is the innermost binder, `var 1` the one outside it. The reader turns names into indices and rejects a name that is not bound, so the machine has no unbound-name errors from programs read from text. Names exist only in the reader and the surface syntax. The language has no symbol type, so a self-interpreter could not compare names anyway.
 - **Expressions are built by Lua functions,** not parsed from text. Surface syntax is a later decision.
 - **The printer is recursive** on nested data, which is fine for a reference but would need care for very deep structures.
