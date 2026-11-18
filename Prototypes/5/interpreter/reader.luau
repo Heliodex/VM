@@ -13,6 +13,8 @@
 --   (head e), (tail e)
 --   (if c t e)         evaluates t if c is nonzero, otherwise e
 --   (let x e body)     binds x to e in body. It is sugar for ((lam x body) e), so x is not in scope in e
+--   (letrec f (lam ...) body)
+--                      binds f to a recursive function, whose definition can call f. It is sugar for let, with fix
 --   (pin e), (force e)
 --   (fix f)            the fixed point of f, where f is (lam rec (lam ...)) and rec is the function itself
 --   (+ a b), (- a b), (* a b), (< a b), (= a b)
@@ -67,6 +69,7 @@ const function reserved(name: string): boolean
 	return name == "lam"
 		or name == "if"
 		or name == "let"
+		or name == "letrec"
 		or name == "list"
 		or name == "~"
 		or PRIMITIVES[name] ~= nil
@@ -267,6 +270,29 @@ local function compileForm(
 		table.insert(inner, 1, (binder :: { kind: "sym", name: string, line: number }).name)
 
 		return M.app(M.lam(compile(items[4], inner)), value)
+	end
+
+	if name == "letrec" then
+		arity(3)
+		const binder = items[2]
+		const definition = items[3]
+
+		if binder.kind ~= "sym" then
+			fail(binder.line, "letrec binds a name")
+		end
+
+		if definition.kind ~= "list" or #definition.items == 0 or definition.items[1].kind ~= "sym" or (definition.items[1] :: { kind: "sym", name: string, line: number, })
+			.name ~= "lam" then
+			fail(definition.line, "letrec binds a lam, so the function can call itself")
+		end
+
+		-- The name is in scope in the definition and in the body. The definition is wrapped in fix, whose outer lambda binds the name to the function itself.
+		const name_ = (binder :: { kind: "sym", name: string, line: number }).name
+		const inner = table.clone(scope)
+		table.insert(inner, 1, name_)
+
+		const recursive = M.app(M.fix, M.lam(compile(definition, inner)))
+		return M.app(M.lam(compile(items[4], inner)), recursive)
 	end
 
 	if name == "list" then
