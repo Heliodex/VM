@@ -6,7 +6,7 @@
 -- Recursive functions use M.fix, so no example needs a special form for recursion.
 -- Variables are indices: V(0) is the innermost binder, V(1) the one outside it.
 
-const M = require "./vm"
+const M = require "../interpreter/vm"
 
 type Example = {
 	name: string,

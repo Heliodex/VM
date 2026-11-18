@@ -16,8 +16,8 @@
 --
 -- A program that is not well formed is not checked, since the language has no type test beyond isnil.
 
-const M = require "./vm"
-const Reader = require "./reader"
+const M = require "../interpreter/vm"
+const Reader = require "../interpreter/reader"
 
 -- The value at an index in the environment.
 const LOOKUP = "(fix (lam find (lam n (lam e (if (= n 0) (head e) ((find (- n 1)) (tail e)))))))"

@@ -5,8 +5,8 @@
 --
 -- rejects are sources that must not read. run.luau checks that each one raises an error.
 
-const Reader = require "./reader"
-const VM = require "./vm"
+const Reader = require "../interpreter/reader"
+const VM = require "../interpreter/vm"
 
 type Example = {
 	name: string,

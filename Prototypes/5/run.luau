@@ -5,10 +5,10 @@
 --
 --   luau run.luau      (from Prototypes/5)
 
-const Examples = require "./examples"
-const Reader = require "./reader"
-const Text = require "./text"
-const VM = require "./vm"
+const Examples = require "./examples/examples"
+const Reader = require "./interpreter/reader"
+const Text = require "./examples/text"
+const VM = require "./interpreter/vm"
 
 local failures = 0
 local total = 0

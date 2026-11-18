@@ -7,10 +7,10 @@
 --
 --   luau self_run.luau      (from Prototypes/5)
 
-const Examples = require "./examples"
-const Self = require "./self"
-const Text = require "./text"
-const VM = require "./vm"
+const Examples = require "./examples/examples"
+const Self = require "./self/self"
+const Text = require "./examples/text"
+const VM = require "./interpreter/vm"
 
 const FUEL_FACTOR = 50
 
