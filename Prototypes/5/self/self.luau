@@ -19,8 +19,16 @@
 const M = require "../interpreter/vm"
 const Reader = require "../interpreter/reader"
 
--- The value at an index in the environment.
-const LOOKUP = "(fix (lam find (lam n (lam e (if (= n 0) (head e) ((find (- n 1)) (tail e)))))))"
+-- The environment representations. An environment is a lookup, which takes an index and an environment, and an extend, which takes a value and an environment and returns the new environment. Both are text, so an interpreter can be built with either.
+
+-- A linked list of values, indexed by tails.
+const LOOKUP_LIST = "(fix (lam find (lam n (lam e (if (= n 0) (head e) ((find (- n 1)) (tail e)))))))"
+const EXTEND_LIST = "(lam (x env) [x env])"
+
+-- A skew binary random-access list (Okasaki). Its entries are [size tree], and a tree is [size [value [left right]]], with leaves whose children are nil. The entries are ordered newest first, and two adjacent trees of the same size merge into one. An index is found by skipping whole entries, then descending one tree.
+const LOOKUP_TREE = "(fix (lam tl (lam t (lam i ((lam (x l r) (if (= i 0) x (if (< (- i 1) (head l)) ((tl l) (- i 1)) ((tl r) (- (- i 1) (head l)))))) (head (tail t)) (head (tail (tail t))) (tail (tail (tail t))))))))"
+const LOOKUP_SKEW = `(fix (lam look (lam i (lam env ((lam (e rest) (if (< i (head e)) (({LOOKUP_TREE} (tail e)) i) ((look (- i (head e))) rest))) (head env) (tail env))))))`
+const EXTEND_SKEW = "(lam (x env) (if (? env) [[1 [1 [x [~ ~]]]] ~] ((lam (e1 rest1) (if (? rest1) [[1 [1 [x [~ ~]]]] env] ((lam (e2 rest2) (if (= (head e1) (head e2)) [[(+ (* 2 (head e1)) 1) [(+ (* 2 (head e1)) 1) [x [(tail e1) (tail e2)]]]] rest2] [[1 [1 [x [~ ~]]]] env])) (head rest1) (tail rest1)))) (head env) (tail env))))"
 
 -- Evaluates the subexpression sub in the current environment.
 local function ev(sub: string): string
@@ -31,34 +39,42 @@ const A = "(head args)"
 const B = "(head (tail args))"
 const C = "(head (tail (tail args)))"
 
--- What each tag does, as the text of its branch. The branch for tag k is BRANCH[k].
-const BRANCH: { [number]: string } = {
-	[0] = A, -- a quoted value is stored as it is
-	[1] = "~",
-	[2] = `(({LOOKUP} {A}) env)`,
-	[3] = `(lam v ((rec {A}) [v env]))`,
-	[4] = `(pin {ev(A)})`,
-	[5] = `[{ev(A)} {ev(B)}]`,
-	[6] = `(head {ev(A)})`,
-	[7] = `(tail {ev(A)})`,
-	[8] = `(force {ev(A)})`,
-	[9] = `(if {ev(A)} {ev(B)} {ev(C)})`,
-	[10] = `({ev(A)} {ev(B)})`,
-	[11] = `(+ {ev(A)} {ev(B)})`,
-	[12] = `(- {ev(A)} {ev(B)})`,
-	[13] = `(* {ev(A)} {ev(B)})`,
-	[14] = `(< {ev(A)} {ev(B)})`,
-	[15] = `(= {ev(A)} {ev(B)})`,
-	[16] = `(kind {ev(A)})`,
-}
+-- The interpreter for an environment with the given lookup and extend.
+const function build(
+	lookup: string,
+	extend: string
+): string
+	-- What each tag does, as the text of its branch. The branch for tag k is BRANCH[k].
+	const BRANCH: { [number]: string } = {
+		[0] = A, -- a quoted value is stored as it is
+		[1] = "~",
+		[2] = `(({lookup} {A}) env)`,
+		[3] = `(lam v ((rec {A}) ({extend} v env)))`,
+		[4] = `(pin {ev(A)})`,
+		[5] = `[{ev(A)} {ev(B)}]`,
+		[6] = `(head {ev(A)})`,
+		[7] = `(tail {ev(A)})`,
+		[8] = `(force {ev(A)})`,
+		[9] = `(if {ev(A)} {ev(B)} {ev(C)})`,
+		[10] = `({ev(A)} {ev(B)})`,
+		[11] = `(+ {ev(A)} {ev(B)})`,
+		[12] = `(- {ev(A)} {ev(B)})`,
+		[13] = `(* {ev(A)} {ev(B)})`,
+		[14] = `(< {ev(A)} {ev(B)})`,
+		[15] = `(= {ev(A)} {ev(B)})`,
+		[16] = `(kind {ev(A)})`,
+	}
 
--- A chain of ifs on the tag, checking 0 first and falling through to 16.
-local chain = BRANCH[16]
-for tag = 15, 0, -1 do
-	chain = `(if (= tag {tag}) {BRANCH[tag]} {chain})`
+	-- A chain of ifs on the tag, checking 0 first and falling through to 16.
+	local chain = BRANCH[16]
+	for tag = 15, 0, -1 do
+		chain = `(if (= tag {tag}) {BRANCH[tag]} {chain})`
+	end
+
+	return `(fix (lam rec (lam node (lam env ((lam (tag args) {chain}) (head node) (tail node))))))`
 end
 
-const EVAL = `(fix (lam rec (lam node (lam env ((lam (tag args) {chain}) (head node) (tail node))))))`
+const EVAL = build(LOOKUP_LIST, EXTEND_LIST)
 
 const PRIMITIVE_TAGS: { [string]: number } = {
 	add = 11,
@@ -109,15 +125,29 @@ local function quote(e: M.Expr): M.Expr
 	return node(tag, M.list({ quote(e.a), quote(e.b) }))
 end
 
--- The expression that runs a program through the self-interpreter, with an empty environment.
+-- The expression that runs a program through an interpreter, with an empty environment.
+const function interpretWith(
+	evaluator: string,
+	program: M.Expr
+): M.Expr
+	return M.app(Reader.parse(evaluator), quote(program), M.nilv())
+end
+
+-- The same, with the list representation.
 const function interpret(
 	program: M.Expr
 ): M.Expr
-	return M.app(Reader.parse(EVAL), quote(program), M.nilv())
+	return interpretWith(EVAL, program)
 end
 
 return {
 	interpret = interpret,
+	interpretWith = interpretWith,
+	build = build,
 	quote = quote,
 	EVAL = EVAL,
+	LOOKUP_LIST = LOOKUP_LIST,
+	EXTEND_LIST = EXTEND_LIST,
+	LOOKUP_SKEW = LOOKUP_SKEW,
+	EXTEND_SKEW = EXTEND_SKEW,
 }
