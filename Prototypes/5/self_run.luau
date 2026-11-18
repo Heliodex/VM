@@ -10,6 +10,7 @@
 const Examples = require "./examples/examples"
 const Self = require "./self/self"
 const Text = require "./examples/text"
+const Programs = require "./examples/programs"
 const VM = require "./interpreter/vm"
 
 const FUEL_FACTOR = 50
@@ -58,6 +59,10 @@ for _, ex in Examples do
 end
 
 for _, ex in Text.examples do
+	check(ex)
+end
+
+for _, ex in Programs.examples do
 	check(ex)
 end
 

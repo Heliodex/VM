@@ -8,8 +8,9 @@ A strict, sequential interpreter for a small functional language with native dat
 | --- | --- |
 | `interpreter/vm.luau` | The machine, the printer, and the builders for expressions. |
 | `interpreter/reader.luau` | The reader: text syntax to expressions. The syntax is described at the top of the file. |
-| `examples/examples.luau` | 31 programs built with the builders, each with a fuel budget and its expected outcome. |
-| `examples/text.luau` | 31 of the same programs in the text syntax, plus 13 sources the reader must reject. |
+| `examples/examples.luau` | 36 programs built with the builders, each with a fuel budget and its expected outcome. |
+| `examples/text.luau` | 36 of the same programs in the text syntax, plus 13 sources the reader must reject. |
+| `examples/programs.luau` | 9 longer programs in the text syntax, using `let`: an accumulator, reverse, append, insertion sort, word counting, deep equality, a tree evaluator and gcd. |
 | `self/self.luau` | The self-interpreter: an interpreter for the language, written in the language, with the quoting that feeds it. Functions are host closures. |
 | `self/self_data.luau` | The closure-free self-interpreter, where a function is a cell. See the closure question below. |
 | `run.luau` | Runs every example and reject, and reports pass or fail. |
@@ -37,6 +38,7 @@ The runners exit with status 1 if any check fails.
 - **Values:** integers, `nil`, cells, closures and pins. Lists are nested cells ending in `nil`.
 - **Expressions:** `int`, `nilv`, `var` (by index), `lam` (no name), `app` (curried), `cell`, `head`, `tail`, `ite` (only the branch taken is evaluated), `pin`, `force`, and `prim` on integers (`add`, `sub`, `mul`, `lt`, `eq`) or `kind`, which gives the kind of any value: 0 integer, 1 nil, 2 cell, 3 function, 4 pin. `(? x)` in the text syntax is shorthand for `(= (kind x) 1)`.
 - **Recursion:** `M.fix` is the strict fixed-point combinator. A recursive function is `app(fix, lam(lam(...)))`, and the outer binder, index 1 inside the inner body, refers to the function itself.
+- **Local names:** `(let x e body)` binds `x` in `body` only, as sugar for applying a `lam`. It is not recursive; recursion goes through `fix`.
 - **Pins:** a pin is a suspended expression. Creating one does not run it. Forcing it runs it once, and later forces return the same value.
 
 ## Fuel and outcomes
@@ -64,13 +66,13 @@ Out of fuel is a result, not a hang, so a diverging program can be tested like a
 
 The interpreter reuses the host's closures and pins. An object `lam` becomes a native `lam`, and an object `pin` becomes a native `pin`. So the machine's own errors and laziness apply to the object program, and the interpreter only has to work out the environment.
 
-`self_run.luau` checks all 62 programs through the interpreter. The interpreted runs take about 60 to 100 times the steps of the direct runs, so the check takes around 9 seconds.
+`self_run.luau` checks all 81 programs (the builder examples, the text examples and the longer programs) through the interpreter. The interpreted runs take about 60 to 100 times the steps of the direct runs, so the check takes around 9 seconds.
 
 ## The closure question
 
 `self/self_data.luau` is the same interpreter with no object-level closures. A function is the cell `[1 [body env]]`, and `EVAL` applies it itself.
 
-- It agrees with the direct machine on all 62 programs.
+- It agrees with the direct machine on all 72 examples (the builder and text sets).
 - It costs about 5 to 6 percent more steps than the host-closure version, and its `EVAL` is about 6 percent larger.
 - It is not sound. A cell that has the shape of a function is applied as one, and `head` reads a function as an ordinary pair. `self_data_run.luau` shows both: applying the forged function `[1 [[0 [7 ~]] ~]]` gives 7 where the machine gives an error, and `head` of a function gives 1 where the machine gives an error.
 

@@ -6,6 +6,7 @@
 --   luau run.luau      (from Prototypes/5)
 
 const Examples = require "./examples/examples"
+const Programs = require "./examples/programs"
 const Reader = require "./interpreter/reader"
 const Text = require "./examples/text"
 const VM = require "./interpreter/vm"
@@ -59,6 +60,10 @@ for _, ex in Examples do
 end
 
 for _, ex in Text.examples do
+	report(ex)
+end
+
+for _, ex in Programs.examples do
 	report(ex)
 end
 
