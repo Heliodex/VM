@@ -170,7 +170,13 @@ readNode = function(
 	const digits = string.match(token.text, "^%-?%d+$")
 
 	if digits then
-		return { kind = "int", value = tonumber(digits) :: number, line = token.line }, pos + 1
+		const value = tonumber(digits) :: number
+
+		if value > M.MAX_INTEGER or value < -M.MAX_INTEGER then
+			fail(token.line, `integer {digits} is out of range`)
+		end
+
+		return { kind = "int", value = value, line = token.line }, pos + 1
 	end
 
 	return { kind = "sym", name = token.text, line = token.line }, pos + 1

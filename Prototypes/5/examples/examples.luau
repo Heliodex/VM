@@ -82,6 +82,7 @@ const examples: { Example } = {
 	value("a constant", I(42), "42"),
 	value("addition", prim("add", I(2), I(3)), "5"),
 	value("subtraction can go negative", prim("sub", I(2), I(3)), "-1"),
+	value("the largest integer", I(9007199254740991), "9007199254740991"),
 	value("nil test on nil", isnil(NIL), "1"),
 	value("nil test on a cell", isnil(M.cell(I(1), NIL)), "0"),
 	value("kind of an integer", prim("kind", I(7)), "0"),
@@ -167,6 +168,9 @@ const examples: { Example } = {
 	failure("applying an integer is an error", M.app(I(1), I(2)), "error"),
 	failure("a variable with no binder is an error", V(0), "error"),
 	failure("forcing an integer is an error", M.force(I(3)), "error"),
+	failure("addition past the largest integer is an error", prim("add", I(9007199254740991), I(1)), "error"),
+	failure("multiplication past the largest integer is an error", prim("mul", I(9007199254740991), I(2)), "error"),
+	failure("subtraction past the smallest integer is an error", prim("sub", I(-9007199254740991), I(2)), "error"),
 }
 
 return examples

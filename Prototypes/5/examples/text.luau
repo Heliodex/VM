@@ -63,6 +63,7 @@ const examples: { Example } = {
 	value("a constant", "42", "42"),
 	value("addition", "(+ 2 3)", "5"),
 	value("subtraction can go negative", "(- 2 3)", "-1"),
+	value("the largest integer", "9007199254740991", "9007199254740991"),
 	value("nil test on nil", "(? ~)", "1"),
 	value("nil test on a pair", "(? [1 ~])", "0"),
 	value("kind of an integer", "(kind 7)", "0"),
@@ -108,6 +109,8 @@ const examples: { Example } = {
 	failure("head of an integer is an error", "(head 3)", "error"),
 	failure("applying an integer is an error", "(3 2)", "error"),
 	failure("forcing an integer is an error", "(force 3)", "error"),
+	failure("addition past the largest integer is an error", "(+ 9007199254740991 1)", "error"),
+	failure("subtraction past the smallest integer is an error", "(- -9007199254740991 2)", "error"),
 }
 
 const rejects: { string } = {
@@ -126,6 +129,9 @@ const rejects: { string } = {
 	"(lam x y)",
 	"(letrec f 1 (f 1))",
 	"(letrec f (add 1 2) 1)",
+	"9007199254740992",
+	"-9007199254740992",
+	"99999999999999999999",
 }
 
 return {

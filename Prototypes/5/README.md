@@ -8,8 +8,8 @@ A strict, sequential interpreter for a small functional language with native dat
 | --- | --- |
 | `interpreter/vm.luau` | The machine, the printer, and the builders for expressions. |
 | `interpreter/reader.luau` | The reader: text syntax to expressions. The syntax is described at the top of the file. |
-| `examples/examples.luau` | 36 programs built with the builders, each with a fuel budget and its expected outcome. |
-| `examples/text.luau` | 36 of the same programs in the text syntax, plus 15 sources the reader must reject. |
+| `examples/examples.luau` | 40 programs built with the builders, each with a fuel budget and its expected outcome. |
+| `examples/text.luau` | 39 programs in the text syntax, plus 18 sources the reader must reject. |
 | `examples/programs.luau` | 9 longer programs in the text syntax, using `letrec`: an accumulator, reverse, append, insertion sort, word counting, deep equality, a tree evaluator and gcd. |
 | `self/self.luau` | The self-interpreter: an interpreter for the language, written in the language, with the quoting that feeds it. Functions are host closures. |
 | `self/self_data.luau` | The closure-free self-interpreter, where a function is a cell. See the closure question below. |
@@ -55,7 +55,7 @@ Out of fuel is a result, not a hang, so a diverging program can be tested like a
 ## Decisions and limits
 
 - **No host recursion.** Pending work sits on an explicit stack. The 10,000-element loop in the examples runs in one Luau call frame.
-- **Numbers are Luau numbers,** so integers are exact only up to 2^53.
+- **Integers are exact from -(2^53 - 1) to 2^53 - 1.** A result outside that range is an error (`add result is out of range`), and so is a literal outside it, which the reader rejects. The bound is 2^53 - 1, not 2^53, because a result at 2^53 may already have rounded.
 - **Pins are memoised,** but the examples cannot see the difference except through step counts.
 - **Variables are de Bruijn indices.** The machine never sees a name: `var 0` is the innermost binder, `var 1` the one outside it. The reader turns names into indices and rejects a name that is not bound, so the machine has no unbound-name errors from programs read from text. Names exist only in the reader and the surface syntax. The language has no symbol type, so a self-interpreter could not compare names anyway.
 - **Expressions can be built two ways:** by the Lua builders in `vm.luau`, or read from the text syntax by `reader.luau`. Both give the same `Expr`, and the examples use each.
@@ -67,13 +67,13 @@ Out of fuel is a result, not a hang, so a diverging program can be tested like a
 
 The interpreter reuses the host's closures and pins. An object `lam` becomes a native `lam`, and an object `pin` becomes a native `pin`. So the machine's own errors and laziness apply to the object program, and the interpreter only has to work out the environment.
 
-`self_run.luau` checks all 81 programs (the builder examples, the text examples and the longer programs) through the interpreter. The interpreted runs take about 60 to 100 times the steps of the direct runs, so the check takes around 9 seconds.
+`self_run.luau` checks all 88 programs (the builder examples, the text examples and the longer programs) through the interpreter. The interpreted runs take about 60 to 100 times the steps of the direct runs, so the check takes around 9 seconds.
 
 ## The closure question
 
 `self/self_data.luau` is the same interpreter with no object-level closures. A function is the cell `[1 [body env]]`, and `EVAL` applies it itself.
 
-- It agrees with the direct machine on all 72 examples (the builder and text sets).
+- It agrees with the direct machine on 77 of the 79 examples (the builder and text sets), with the two known differences below.
 - It costs about 5 to 6 percent more steps than the host-closure version, and its `EVAL` is about 6 percent larger.
 - It is not sound. A cell that has the shape of a function is applied as one, and `head` reads a function as an ordinary pair. `self_data_run.luau` shows both: applying the forged function `[1 [[0 [7 ~]] ~]]` gives 7 where the machine gives an error, and `head` of a function gives 1 where the machine gives an error.
 
@@ -86,7 +86,7 @@ The interpreter reuses the host's closures and pins. An object `lam` becomes a n
 - **Linked list:** `[value rest]`. Adding a binding is one step. Reading index `n` walks `n` tails.
 - **Skew binary random-access list:** a list of complete trees of sizes 1, 3, 7, and so on. Reading index `n` is logarithmic, but adding a binding takes more steps.
 
-Both agree with the direct machine on all 72 programs. On a program nested to depth `d` that reads each binding once:
+Both agree with the direct machine on all 79 programs. On a program nested to depth `d` that reads each binding once:
 
 | depth | list steps | skew steps | skew / list |
 | ---: | ---: | ---: | ---: |

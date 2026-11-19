@@ -7,7 +7,7 @@
 --
 -- The machine keeps its pending work on an explicit stack, so the depth of the Luau call stack does not grow with the program. Each step costs one unit of fuel, and a run that uses up its fuel reports "out_of_fuel" rather than hanging.
 --
--- Numbers are Luau numbers, so integers are exact only up to 2^53.
+-- Integers are Luau numbers. They are exact from -MAX_INTEGER to MAX_INTEGER, and a result or a literal outside that range is an error.
 --
 -- Expressions, values, frames and outcomes are each a union of tables tagged by one field (op, kind, k and status). The builders at the bottom of this file are the only intended way to make expressions.
 
@@ -77,6 +77,9 @@ type Frame =
 const NIL: Nil = {
 	kind = "nil",
 }
+
+-- The largest magnitude an integer may have: 2^53 - 1. Below 2^53 every integer is exact as a double, so a result at or past 2^53 may already have rounded (2^53 - 1 plus 1 gives 2^53 exactly), and it is an error rather than a wrong answer.
+const MAX_INTEGER = 9007199254740991
 
 const function fail(
 	message: string
@@ -172,7 +175,13 @@ const function binary(
 		return fail("unknown operation " .. name)
 	end
 
-	return f(integer(a, name), integer(b, name))
+	const result = f(integer(a, name), integer(b, name))
+
+	if result > MAX_INTEGER or result < -MAX_INTEGER then
+		return fail(name .. " result is out of range")
+	end
+
+	return result
 end
 
 -- The kind of a value: 0 integer, 1 nil, 2 cell, 3 function, 4 pin.
@@ -488,10 +497,15 @@ end
 local M = {}
 M.run = run
 M.show = show
+M.MAX_INTEGER = MAX_INTEGER
 
 function M.int(
 	n: number
 ): Expr
+	if n > MAX_INTEGER or n < -MAX_INTEGER then
+		error(string.format("integer %s is out of range", tostring(n)), 0)
+	end
+
 	return {
 		op = "quote",
 		value = n,
