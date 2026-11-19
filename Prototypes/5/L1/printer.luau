@@ -10,16 +10,7 @@
 --   Printer.print(e): string      raises an error for a variable that is not bound
 
 const VM = require "../interpreter/vm"
-
-const SYMBOLS: { [string]: string } = {
-	add = "+",
-	sub = "-",
-	mul = "*",
-	lt = "<",
-	eq = "=",
-	div = "div",
-	mod = "mod",
-}
+const Primitives = require "../interpreter/primitives"
 
 const function binderName(
 	depth: number
@@ -97,7 +88,7 @@ printAt = function(
 			return `(kind {printAt(e.a, depth)})`
 		end
 
-		return `({SYMBOLS[e.name]} {printAt(e.a, depth)} {printAt((e.b :: VM.Expr), depth)})`
+		return `({Primitives.BY_TAG[Primitives.TAG[e.name]].symbol} {printAt(e.a, depth)} {printAt((e.b :: VM.Expr), depth)})`
 	end
 
 	error("unknown expression", 0)

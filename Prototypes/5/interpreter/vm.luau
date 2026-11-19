@@ -75,6 +75,7 @@ type Frame =
 	| { k: "kind" }
 
 -- The frame for kind, which has no fields, so one table serves every use.
+const Primitives = require "./primitives"
 const KIND_FRAME = ({
 	k = "kind",
 } :: Frame)
@@ -115,100 +116,14 @@ const function lookup(
 	return fail("no variable at index " .. index)
 end
 
--- The remainder of a divided by b, taking the sign of b, so that a = b * div + mod. Only for integers in range.
-const function floored_mod(
-	a: number,
-	b: number
-): number
-	-- math.fmod is exact on doubles, and its result takes the sign of a. It is shifted by b when the signs differ.
-	local r = math.fmod(a, b)
-
-	if r ~= 0 and (r < 0) ~= (b < 0) then
-		r += b
-	end
-
-	return r
-end
-
-const BINARY: {
-	[string]: (number, number) -> number,
-} = {
-	add = function(
-		a,
-		b
-	)
-		return a + b
-	end,
-	sub = function(
-		a,
-		b
-	)
-		return a - b
-	end,
-	mul = function(
-		a,
-		b
-	)
-		return a * b
-	end,
-	div = function(
-		a,
-		b
-	)
-		if b == 0 then
-			return fail "div by zero"
-		end
-
-		-- Floored, and exact. math.fmod leaves a - fmod(a, b) as the truncated quotient times b, which has magnitude at most |a|, so it is exact on doubles. Adding b to the remainder could push a - r past 2^53 and round, so the floor is taken as a correction to the truncated quotient instead.
-		local r = math.fmod(a, b)
-		local q = (a - r) / b
-
-		if r ~= 0 and (r < 0) ~= (b < 0) then
-			q -= 1
-		end
-
-		return q
-	end,
-	mod = function(
-		a,
-		b
-	)
-		if b == 0 then
-			return fail "mod by zero"
-		end
-
-		return floored_mod(a, b)
-	end,
-	lt = function(
-		a,
-		b
-	)
-		return
-			if a < b then
-				1
-			else
-				0
-	end,
-	eq = function(
-		a,
-		b
-	)
-		return
-			if a == b then
-				1
-			else
-				0
-	end,
-}
-
 const function binary(
 	name: string,
 	a: Value,
 	b: Value
 ): number
-	const f = BINARY[name]
+	const row = Primitives.BY_TAG[Primitives.TAG[name]]
 
-	if not f then
+	if row == nil or row.operation == nil then
 		return fail("unknown operation " .. name)
 	end
 
@@ -216,18 +131,25 @@ const function binary(
 		return fail(name .. " needs integers")
 	end
 
-	const result = f(a, b)
+	const operation = row.operation :: (number, number) -> (number?, string?)
+	const result, message = operation(a, b)
 
-	if result > MAX_INTEGER or result < -MAX_INTEGER then
+	if message ~= nil then
+		return fail(message)
+	end
+
+	const value = result :: number
+
+	if value > MAX_INTEGER or value < -MAX_INTEGER then
 		return fail(name .. " result is out of range")
 	end
 
 	-- Zero is written as 0, not -0, so that it prints the same way whatever produced it.
-	if result == 0 then
+	if value == 0 then
 		return 0
 	end
 
-	return result
+	return value
 end
 
 -- The kind of a value: 0 integer, 1 nil, 2 cell, 3 function, 4 pin.
@@ -655,19 +577,23 @@ function M.force(
 	}
 end
 
--- A primitive on integers: add, sub, mul, div, mod, lt, eq. div and mod are floored, and dividing by zero is an error. The unary primitive kind takes no b, and works on any value.
+-- A primitive, by its name, from the table in primitives.luau. The binary ones are the integer operations: div and mod are floored, and dividing by zero is an error. The unary primitive kind takes no b, and works on any value.
 -- The name and the number of arguments are checked here, so a bad primitive fails when it is built, not when the machine reaches it.
 function M.prim(
 	name: string,
 	a: Expr,
 	b: Expr?
 ): Expr
-	if name == "kind" then
-		if b ~= nil then
-			error("kind takes one argument, but was given two", 0)
-		end
-	elseif BINARY[name] == nil then
+	const tag = Primitives.TAG[name]
+
+	if tag == nil then
 		error(string.format("unknown primitive %s", name), 0)
+	end
+
+	if Primitives.BY_TAG[tag].arity == 1 then
+		if b ~= nil then
+			error(string.format("%s takes one argument, but was given two", name), 0)
+		end
 	elseif b == nil then
 		error(string.format("%s takes two arguments, but was given one", name), 0)
 	end

@@ -35,6 +35,7 @@
 -- The reader turns each variable into its index, so the machine never sees a name. A name that is not bound is an error here.
 
 const M = require "../interpreter/vm"
+const Primitives = require "../interpreter/primitives"
 
 type Token = {
 	text: string,
@@ -51,16 +52,8 @@ type Node =
 	| { kind: "list", items: { Node }, line: number }
 	| { kind: "pair", items: { Node }, line: number }
 
--- The primitives, by the symbol that writes them, with the primitive each one builds and its arity.
-const PRIMITIVES: { [string]: { op: string, arity: number } } = {
-	["+"] = { op = "add", arity = 2 },
-	["-"] = { op = "sub", arity = 2 },
-	["*"] = { op = "mul", arity = 2 },
-	["<"] = { op = "lt", arity = 2 },
-	["="] = { op = "eq", arity = 2 },
-	["div"] = { op = "div", arity = 2 },
-	["mod"] = { op = "mod", arity = 2 },
-}
+-- The primitives, by the symbol that writes them, from the table in interpreter/primitives.luau.
+const PRIMITIVES = Primitives.BY_SYMBOL
 
 -- Forms that are primitives: kind is one, and ? is a shorthand built from it.
 const KIND_FORMS: { [string]: number } = {
@@ -516,9 +509,9 @@ local function compileForm(
 		arity(primitive.arity)
 
 		if primitive.arity == 1 then
-			return M.prim(primitive.op, compile(items[2], scope))
+			return M.prim(primitive.name, compile(items[2], scope))
 		end
-		return M.prim(primitive.op, compile(items[2], scope), compile(items[3], scope))
+		return M.prim(primitive.name, compile(items[2], scope), compile(items[3], scope))
 	end
 
 	if UNARY_FORMS[name] ~= nil then

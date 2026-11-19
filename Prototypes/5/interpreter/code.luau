@@ -18,29 +18,7 @@
 -- Both are recursive on the depth of the program, not on the length of a list, since a list is a chain of tails walked one step at a time.
 
 const M = require "./vm"
-
--- The primitives, by their tag, with the arity of each.
-const PRIMITIVE_TAGS: { [string]: number } = {
-	add = 11,
-	sub = 12,
-	mul = 13,
-	div = 14,
-	mod = 15,
-	lt = 16,
-	eq = 17,
-	kind = 18,
-}
-
-const PRIMITIVE_NAMES: { [number]: string } = {
-	[11] = "add",
-	[12] = "sub",
-	[13] = "mul",
-	[14] = "div",
-	[15] = "mod",
-	[16] = "lt",
-	[17] = "eq",
-	[18] = "kind",
-}
+const Primitives = require "./primitives"
 
 const function cell(
 	head: M.Value,
@@ -103,7 +81,7 @@ toValue = function(
 		return node(10, { toValue(e.f), toValue(e.arg) })
 	end
 
-	const tag = PRIMITIVE_TAGS[e.name]
+	const tag = Primitives.TAG[e.name]
 
 	if e.b == nil then
 		return node(tag, { toValue(e.a) })
@@ -203,7 +181,7 @@ fromValue = function(
 		return M.prim("kind", fromValue(items(parts, 1)[1]))
 	end
 
-	const name = PRIMITIVE_NAMES[n]
+	const name = Primitives.BY_TAG[n].name
 	const pair = items(parts, 2)
 	return M.prim(name, fromValue(pair[1]), fromValue(pair[2]))
 end
