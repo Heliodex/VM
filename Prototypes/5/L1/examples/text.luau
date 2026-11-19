@@ -48,15 +48,15 @@ const function failure(
 	}
 end
 
-const OMEGA = "((lam x (x x)) (lam x (x x)))"
+const OMEGA = "((fn x (x x)) (fn x (x x)))"
 
 -- The recursive functions of examples.luau, each written with fix.
-const LENGTH = "(fix (lam rec (lam l (if (? l) 0 (+ 1 (rec (tail l)))))))"
-const SUM = "(fix (lam rec (lam l (if (? l) 0 (+ (head l) (rec (tail l)))))))"
-const FACTORIAL = "(fix (lam rec (lam n (if (= n 0) 1 (* n (rec (- n 1)))))))"
-const FIBONACCI = "(fix (lam rec (lam n (if (< n 2) n (+ (rec (- n 1)) (rec (- n 2)))))))"
-const DOUBLE = "(fix (lam rec (lam l (if (? l) ~ [(* (head l) 2) (rec (tail l))]))))"
-const RANGE = "(fix (lam rec (lam n (if (= n 0) ~ [n (rec (- n 1))]))))"
+const LENGTH = "(fix (fn rec (fn l (if (? l) 0 (+ 1 (rec (tail l)))))))"
+const SUM = "(fix (fn rec (fn l (if (? l) 0 (+ (head l) (rec (tail l)))))))"
+const FACTORIAL = "(fix (fn rec (fn n (if (= n 0) 1 (* n (rec (- n 1)))))))"
+const FIBONACCI = "(fix (fn rec (fn n (if (< n 2) n (+ (rec (- n 1)) (rec (- n 2)))))))"
+const DOUBLE = "(fix (fn rec (fn l (if (? l) ~ [(* (head l) 2) (rec (tail l))]))))"
+const RANGE = "(fix (fn rec (fn n (if (= n 0) ~ [n (rec (- n 1))]))))"
 
 const examples: { Example } = {
 	-- Values and primitives
@@ -77,7 +77,7 @@ const examples: { Example } = {
 	value("kind of an integer", "(kind 7)", "0"),
 	value("kind of nil", "(kind ~)", "1"),
 	value("kind of a pair", "(kind [1 ~])", "2"),
-	value("kind of a function", "(kind (lam x x))", "3"),
+	value("kind of a function", "(kind (fn x x))", "3"),
 	value("kind of a pin", "(kind (pin 1))", "4"),
 	value("less-than", "(< 2 3)", "1"),
 	value("comments are ignored", "; the answer\n(+ 40 2) ; trailing", "42"),
@@ -93,14 +93,14 @@ const examples: { Example } = {
 	value("nested lists", "(list (list 1) (list 2 3))", "((1) (2 3))"),
 
 	-- Closures and scope
-	value("application", "((lam x (+ x x)) 21)", "42"),
-	value("lexical scope", "((lam (x y) (- x y)) 10 3)", "7"),
-	value("a closure keeps its scope", "((lam x (lam _ x)) 4 9)", "4"),
+	value("application", "((fn x (+ x x)) 21)", "42"),
+	value("lexical scope", "((fn (x y) (- x y)) 10 3)", "7"),
+	value("a closure keeps its scope", "((fn x (fn _ x)) 4 9)", "4"),
 
 	-- Pins
-	value("a pin is not run when made", `((lam p 5) (pin {OMEGA}))`, "5", 1000),
+	value("a pin is not run when made", `((fn p 5) (pin {OMEGA}))`, "5", 1000),
 	value("a branch that forces an unrun pin is not taken", `(if 0 (force (pin {OMEGA})) 5)`, "5", 1000),
-	value("a forced pin gives its value twice", "((lam p [(force p) (force p)]) (pin (+ 1 2)))", "(3 . 3)"),
+	value("a forced pin gives its value twice", "((fn p [(force p) (force p)]) (pin (+ 1 2)))", "(3 . 3)"),
 
 	-- Recursion through fix
 	value("length of a list", `({LENGTH} (list 1 2 3))`, "3"),
@@ -121,9 +121,9 @@ const examples: { Example } = {
 	failure("remainder by zero is an error", "(mod 1 0)", "error"),
 	failure("addition past the largest integer is an error", "(+ 9007199254740991 1)", "error"),
 	failure("subtraction past the smallest integer is an error", "(- -9007199254740991 2)", "error"),
-	value("mutual recursion: even of 6", "(mutual ((ev (lam k (if (= k 0) 1 (od (- k 1))))) (od (lam k (if (= k 0) 0 (ev (- k 1)))))) (ev 6))", "1"),
-	value("mutual recursion: odd of 7", "(mutual ((ev (lam k (if (= k 0) 1 (od (- k 1))))) (od (lam k (if (= k 0) 0 (ev (- k 1)))))) (od 7))", "1"),
-	value("mutual recursion: three functions in a ring", "(mutual ((a (lam k (if (= k 0) 0 (b (- k 1))))) (b (lam k (if (= k 0) 1 (c (- k 1))))) (c (lam k (if (= k 0) 2 (a (- k 1)))))) (a 7))", "1"),
+	value("mutual recursion: even of 6", "(mutual ((ev (fn k (if (= k 0) 1 (od (- k 1))))) (od (fn k (if (= k 0) 0 (ev (- k 1)))))) (ev 6))", "1"),
+	value("mutual recursion: odd of 7", "(mutual ((ev (fn k (if (= k 0) 1 (od (- k 1))))) (od (fn k (if (= k 0) 0 (ev (- k 1)))))) (od 7))", "1"),
+	value("mutual recursion: three functions in a ring", "(mutual ((a (fn k (if (= k 0) 0 (b (- k 1))))) (b (fn k (if (= k 0) 1 (c (- k 1))))) (c (fn k (if (= k 0) 2 (a (- k 1)))))) (a 7))", "1"),
 	value("a bracket of three is a pair with a pair as its tail", "[1 2 3]", "(1 2 . 3)"),
 	value("a bracket of four ending in nil is a list", "[1 2 3 ~]", "(1 2 3)"),
 	value("a bracket of three can hold brackets", "[[1 2] 3 ~]", "((1 . 2) 3)"),
@@ -135,7 +135,7 @@ const examples: { Example } = {
 	value("a string can hold a semicolon and parentheses", '"a;(b)"', "(97 59 40 98 41)"),
 	value(
 		"a recursive function over a string",
-		'(letrec len (lam s (if (? s) 0 (+ 1 (len (tail s))))) (len "hello"))',
+		'(letrec len (fn s (if (? s) 0 (+ 1 (len (tail s))))) (len "hello"))',
 		"5"
 	),
 	failure("raise stops the run with an error", "(raise 7)", "error"),
@@ -151,19 +151,19 @@ const rejects: { string } = {
 	"\"a\nb\"",
 	"(mutual () 1)",
 	"(mutual ((f 1)) f)",
-	"(mutual ((f (lam x x) extra)) f)",
-	"(mutual ((f (lam x (g x)))) 1)",
+	"(mutual ((f (fn x x) extra)) f)",
+	"(mutual ((f (fn x (g x)))) 1)",
 	"(+ 1)",
-	"(lam + +)",
+	"(fn + +)",
 	"(foo)",
 	"(+",
 	")",
 	"1 2",
-	"(lam (x (y)) x)",
+	"(fn (x (y)) x)",
 	"()",
 	"[1]",
 	"nope",
-	"(lam x y)",
+	"(fn x y)",
 	"(letrec f 1 (f 1))",
 	"(letrec f (add 1 2) 1)",
 	"9007199254740992",

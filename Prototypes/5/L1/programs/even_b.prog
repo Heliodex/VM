@@ -2,13 +2,13 @@ Whether a string has an even number of b's, with a and b the only bytes allowed.
 The probe is mutual recursion over a string, with a failure carried as a value through the walk.
 ---
 ---
-(lam s
-  (mutual ((even (lam l
+(fn s
+  (mutual ((even (fn l
               (if (? l) [0 1]
                   (let c (head l)
                     (if (= c 97) (even (tail l))
                         (if (= c 98) (odd (tail l)) [1 "bad character"]))))))
-           (odd (lam l
+           (odd (fn l
               (if (? l) [0 0]
                   (let c (head l)
                     (if (= c 97) (odd (tail l))

@@ -2,8 +2,8 @@ Whether an integer is in a list of integers. The input is the pair [x xs]; the o
 ---
 
 ---
-(lam p
-  (letrec c (lam l
+(fn p
+  (letrec c (fn l
         (if (? l) 0 (if (= (head l) (head p)) 1 (c (tail l)))))
     (c (tail p))))
 ---

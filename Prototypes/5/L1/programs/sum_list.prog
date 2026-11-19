@@ -2,7 +2,7 @@ Adds up a list of integers, with a recursive function defined by letrec.
 The input is a list, and a number is not a list, so an integer input is an error.
 ---
 ---
-(lam xs (letrec sum (lam l (if (? l) 0 (+ (head l) (sum (tail l))))) (sum xs)))
+(fn xs (letrec sum (fn l (if (? l) 0 (+ (head l) (sum (tail l))))) (sum xs)))
 ---
 ~ => 0 fuel 1000
 [5 ~] => 5 fuel 1000

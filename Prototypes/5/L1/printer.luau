@@ -3,7 +3,7 @@
 --
 -- Writes an expression as text in the reader's syntax, so that reading the text gives back the same expression. It is the reverse of reader.luau, for programs that exist only as expressions, and for showing a program in the form it is written in.
 --
--- The machine has no names, so the printer invents them. The binder of a lam is named by its depth: the first lam, the outermost, is v0, and a lam inside it is v1, and so on. A variable with index i, under d binders, refers to the binder at depth d - 1 - i, and so is printed with that binder's name. A variable that points past the outermost binder is not bound by anything, so it cannot be printed, and printing it is an error.
+-- The machine has no names, so the printer invents them. The binder of a fn is named by its depth: the first fn, the outermost, is v0, and a lam inside it is v1, and so on. A variable with index i, under d binders, refers to the binder at depth d - 1 - i, and so is printed with that binder's name. A variable that points past the outermost binder is not bound by anything, so it cannot be printed, and printing it is an error.
 --
 -- A chain of applications is printed flat, (f a b), which the reader reads as ((f a) b), so the expression is the same.
 --
@@ -47,7 +47,7 @@ printAt = function(
 
 		return binderName(binder)
 	elseif e.op == "lam" then
-		return `(lam {binderName(depth)} {printAt(e.body, depth + 1)})`
+		return `(fn {binderName(depth)} {printAt(e.body, depth + 1)})`
 	elseif e.op == "pin" then
 		return `(pin {printAt(e.e, depth)})`
 	elseif e.op == "cell" then
@@ -105,7 +105,7 @@ printAt = function(
 	error("unknown expression", 0)
 end
 
--- Prints a whole program. Its outermost binders are the ones the reader gives to a lam, from depth 0.
+-- Prints a whole program. Its outermost binders are the ones the reader gives to a fn, from depth 0.
 const function print(
 	e: VM.Expr
 ): string

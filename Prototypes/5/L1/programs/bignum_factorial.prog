@@ -2,13 +2,13 @@ The factorial of n, as a list of decimal digits, least significant first. Each d
 The probe is the integer limit: 25! is far past 2^53, and this program computes it exactly, since no single integer ever gets near the limit.
 ---
 ---
-(lam n
-  (letrec mul (lam d (lam m (lam c
+(fn n
+  (letrec mul (fn d (fn m (fn c
       (if (? d)
           (if (= c 0) ~ [(mod c 10) (mul ~ m (div c 10))])
           (let t (+ (* (head d) m) c)
             [(mod t 10) (mul (tail d) m (div t 10))])))))
-    (letrec fact (lam k
+    (letrec fact (fn k
         (if (= k 0)
             [1 ~]
             (mul (fact (- k 1)) k 0)))

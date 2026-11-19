@@ -3,8 +3,8 @@ A word is a run of characters that are not spaces (code 32).
 The probe is text processing: a string is a list of bytes, and the program walks it with a state that says whether it is inside a word.
 ---
 ---
-(lam s
-  (letrec go (lam l (lam inword (lam count
+(fn s
+  (letrec go (fn l (fn inword (fn count
       (if (? l)
           count
           (let c (head l)

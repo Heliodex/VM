@@ -75,12 +75,12 @@ print(string.format("%d of %d programs agree with the direct machine, and %d kno
 -- A forged function: the cell [1 [[0 [7 ~]] ~]] is a function whose body is the quoted constant 7. The reference machine has no such function, so applying it is an error.
 const FORGED_APPLY = "([1 [[0 [7 ~]] ~]] 5)"
 -- Taking the head of a function: the reference machine rejects it, the closure-free one reads the tag.
-const FUNCTION_HEAD = "(head (lam x x))"
+const FUNCTION_HEAD = "(head (fn x x))"
 
 const probes = {
 	{ name = "applying a forged function", source = FORGED_APPLY },
 	{ name = "head of a function", source = FUNCTION_HEAD },
-	{ name = "kind of a function", source = "(kind (lam x x))" },
+	{ name = "kind of a function", source = "(kind (fn x x))" },
 }
 
 print("")

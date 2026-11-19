@@ -2,14 +2,14 @@ A Caesar cipher: each letter moves three places on, wrapping from z to a and Z t
 The probe is string in, string out: the input and the output are both strings, and the output is built one byte at a time with a cell per byte.
 ---
 ---
-(lam s
-  (let shift (lam c
+(fn s
+  (let shift (fn c
       (if (< c 65) c
           (if (< 90 c)
               (if (< c 97) c
                   (if (< 122 c) c (+ 97 (mod (+ (- c 97) 3) 26))))
               (+ 65 (mod (+ (- c 65) 3) 26)))))
-    (letrec go (lam l
+    (letrec go (fn l
         (if (? l) ~ [(shift (head l)) (go (tail l))]))
       (go s))))
 ---

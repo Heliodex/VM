@@ -3,7 +3,7 @@ Multiplies an integer by six: double of triple. Both imports are paths from the 
 triple = lib/triple.prog
 double = double.prog
 ---
-(lam x (double (triple x)))
+(fn x (double (triple x)))
 ---
 1 => 6 fuel 10000
 -2 => -12 fuel 10000

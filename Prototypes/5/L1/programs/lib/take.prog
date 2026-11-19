@@ -2,8 +2,8 @@ The first n items of a list. The input is the pair [n xs]. If n is more than the
 ---
 
 ---
-(lam p
-  (letrec t (lam n (lam l
+(fn p
+  (letrec t (fn n (fn l
         (if (if (< n 1) 1 (? l)) ~ [(head l) ((t (- n 1)) (tail l))])))
     ((t (head p)) (tail p))))
 ---

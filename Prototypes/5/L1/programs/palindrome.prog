@@ -2,10 +2,10 @@ Whether a string is a palindrome, which the program decides by reversing it and 
 The probe is two lists walked together: the comparison stops as soon as one runs out, and checks both are empty together.
 ---
 ---
-(lam s
-  (letrec rev (lam l (lam acc
+(fn s
+  (letrec rev (fn l (fn acc
         (if (? l) acc ((rev (tail l)) [(head l) acc]))))
-    (letrec same (lam a (lam b
+    (letrec same (fn a (fn b
           (if (? a) (? b)
               (if (? b) 0
                   (if (= (head a) (head b)) ((same (tail a)) (tail b)) 0)))))

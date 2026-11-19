@@ -2,7 +2,7 @@ Doubles an integer. A helper that other programs import, so it has tests of its 
 ---
 
 ---
-(lam x (+ x x))
+(fn x (+ x x))
 ---
 0 => 0 fuel 1000
 21 => 42 fuel 1000

@@ -2,8 +2,8 @@ The list of whole numbers from 0 up to, but not including, n. The input is n; ra
 ---
 
 ---
-(lam n
-  (letrec up (lam i (if (= i n) ~ [i (up (+ i 1))]))
+(fn n
+  (letrec up (fn i (if (= i n) ~ [i (up (+ i 1))]))
     (up 0)))
 ---
 0 => ~ fuel 100000

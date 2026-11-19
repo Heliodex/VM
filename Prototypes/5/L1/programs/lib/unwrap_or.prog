@@ -2,7 +2,7 @@ The value of a result, or a default. A result is [0 value] or [1 message], as th
 ---
 
 ---
-(lam p (if (= (head (head p)) 0) (tail (head p)) (tail p)))
+(fn p (if (= (head (head p)) 0) (tail (head p)) (tail p)))
 ---
 [[0 5] 9] => 5 fuel 100000
 [[1 "bad"] 9] => 9 fuel 100000

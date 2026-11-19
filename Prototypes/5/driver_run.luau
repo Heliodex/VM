@@ -45,7 +45,7 @@ const function valueOf(
 end
 
 -- A counter. The state is a number, and each step adds the input to it and outputs the state before.
-const COUNTER = "(lam p (let s (head p) (let i (tail p) [(+ s i) s])))"
+const COUNTER = "(fn p (let s (head p) (let i (tail p) [(+ s i) s])))"
 
 do
 	const session = Driver.session(Reader.parse(COUNTER), valueOf("0"), { valueOf("1"), valueOf("2"), valueOf("3") }, FUEL)
@@ -64,7 +64,7 @@ end
 -- A state that is a list: each step puts the input on the front, and outputs the list as it was.
 do
 	const session = Driver.session(
-		Reader.parse("(lam p [[(tail p) (head p)] (head p)])"),
+		Reader.parse("(fn p [[(tail p) (head p)] (head p)])"),
 		valueOf("~"),
 		{ valueOf("1"), valueOf("2"), valueOf("3") },
 		FUEL
@@ -89,13 +89,13 @@ end
 
 -- Each way a step can end a session. The session reports the status, and the input it failed on.
 const FAILURES: { { name: string, step: string, status: string, failedAt: number, message: string? } } = {
-	{ name = "a step that errors", step = "(lam p (head 5))", status = "error", failedAt = 1, message = "head of a non-cell" },
-	{ name = "a step that gives a number, not a pair", step = "(lam p 7)", status = "error", failedAt = 1, message = "a step must give a pair [state output]" },
-	{ name = "a step whose state is a function", step = "(lam p [(lam y y) ~])", status = "not_data", failedAt = 1, message = nil },
-	{ name = "a step whose output is a function", step = "(lam p [~ (lam y y)])", status = "not_data", failedAt = 1, message = nil },
+	{ name = "a step that errors", step = "(fn p (head 5))", status = "error", failedAt = 1, message = "head of a non-cell" },
+	{ name = "a step that gives a number, not a pair", step = "(fn p 7)", status = "error", failedAt = 1, message = "a step must give a pair [state output]" },
+	{ name = "a step whose state is a function", step = "(fn p [(fn y y) ~])", status = "not_data", failedAt = 1, message = nil },
+	{ name = "a step whose output is a function", step = "(fn p [~ (fn y y)])", status = "not_data", failedAt = 1, message = nil },
 	{
 		name = "a step that runs out of fuel",
-		step = "(lam p [(tail p) ((fix (lam f (lam n (f n)))) 0)])",
+		step = "(fn p [(tail p) ((fix (fn f (fn n (f n)))) 0)])",
 		status = "out_of_fuel",
 		failedAt = 1,
 		message = nil,
@@ -114,7 +114,7 @@ end
 -- The session keeps what it had before the failure: the state after the last step that gave a value.
 do
 	const session = Driver.session(
-		Reader.parse("(lam p (if (= (tail p) 3) (head 5) (let s (head p) (let i (tail p) [(+ s i) s]))))"),
+		Reader.parse("(fn p (if (= (tail p) 3) (head 5) (let s (head p) (let i (tail p) [(+ s i) s]))))"),
 		valueOf("0"),
 		{ valueOf("1"), valueOf("2"), valueOf("3") },
 		FUEL

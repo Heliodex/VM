@@ -1,7 +1,7 @@
 Returns a function. A function is not data, so the run is not_data, whatever the input.
 ---
 ---
-(lam x (lam y y))
+(fn x (fn y y))
 ---
 1 => not_data fuel 1000
 ~ => not_data fuel 1000

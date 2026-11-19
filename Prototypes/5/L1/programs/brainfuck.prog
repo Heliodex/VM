@@ -2,24 +2,24 @@ A Brainfuck interpreter for the instructions + - > < . [ and ]. The input is the
 The tape is a zipper: the cells to the left, the current cell, and the cells to the right, with cells that were never touched read as 0. The code is a zipper too, so a bracket is found by walking along it, with no indexing. A [ that is never closed is an error.
 ---
 ---
-(lam prog
+(fn prog
   (letrec advance
-    (lam z
+    (fn z
       (let cl
         (head z)
         (let c
           (head (tail z))
           (let cr (tail (tail z)) [[c cl] [(if (? cr) ~ (head cr)) (if (? cr) ~ (tail cr))]]))))
     (letrec retreat
-      (lam z
+      (fn z
         (let cl
           (head z)
           (let c (head (tail z)) (let cr (tail (tail z)) [(tail cl) [(head cl) [c cr]]]))))
       (letrec rev
-        (lam l (lam acc (if (? l) acc ((rev (tail l)) [(head l) acc]))))
+        (fn l (fn acc (if (? l) acc ((rev (tail l)) [(head l) acc]))))
         (letrec skipF
-          (lam d
-            (lam z
+          (fn d
+            (fn z
               (let c
                 (head (tail z))
                 (if (? c)
@@ -30,8 +30,8 @@ The tape is a zipper: the cells to the left, the current cell, and the cells to 
                       (if (= d 0) z ((skipF (- d 1)) (advance z)))
                       ((skipF d) (advance z))))))))
           (letrec skipB
-            (lam d
-              (lam z
+            (fn d
+              (fn z
                 (let c
                   (head (tail z))
                   (if (= c 93)
@@ -40,9 +40,9 @@ The tape is a zipper: the cells to the left, the current cell, and the cells to 
                       (if (= d 0) z ((skipB (- d 1)) (retreat z)))
                       ((skipB d) (retreat z)))))))
             (letrec run
-              (lam z
-                (lam t
-                  (lam out
+              (fn z
+                (fn t
+                  (fn out
                     (let c
                       (head (tail z))
                       (if (? c)

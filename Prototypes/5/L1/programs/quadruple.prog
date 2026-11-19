@@ -2,7 +2,7 @@ Multiplies an integer by four, by doubling it twice. The first import is the dou
 ---
 double = double.prog
 ---
-(lam x (double (double x)))
+(fn x (double (double x)))
 ---
 0 => 0 fuel 10000
 3 => 12 fuel 10000

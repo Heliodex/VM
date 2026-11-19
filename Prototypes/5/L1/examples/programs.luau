@@ -37,7 +37,7 @@ const examples: { Example } = {
 	value(
 		"sum with an accumulator",
 		[==[
-(letrec sum (lam (acc l) (if (? l) acc (sum (+ acc (head l)) (tail l))))
+(letrec sum (fn (acc l) (if (? l) acc (sum (+ acc (head l)) (tail l))))
   (sum 0 (list 1 2 3 4 5)))
 ]==],
 		"15"
@@ -47,7 +47,7 @@ const examples: { Example } = {
 	value(
 		"reverse a list",
 		[==[
-(letrec rev (lam (acc l) (if (? l) acc (rev [(head l) acc] (tail l))))
+(letrec rev (fn (acc l) (if (? l) acc (rev [(head l) acc] (tail l))))
   (rev ~ (list 1 2 3)))
 ]==],
 		"(3 2 1)"
@@ -56,7 +56,7 @@ const examples: { Example } = {
 	value(
 		"append two lists",
 		[==[
-(letrec append (lam (a b) (if (? a) b [(head a) (append (tail a) b)]))
+(letrec append (fn (a b) (if (? a) b [(head a) (append (tail a) b)]))
   (append (list 1 2) (list 3 4)))
 ]==],
 		"(1 2 3 4)"
@@ -65,8 +65,8 @@ const examples: { Example } = {
 	value(
 		"insertion sort",
 		[==[
-(letrec insert (lam (x l) (if (? l) [x ~] (if (< x (head l)) [x l] [(head l) (insert x (tail l))])))
-  (letrec isort (lam l (if (? l) ~ (insert (head l) (isort (tail l)))))
+(letrec insert (fn (x l) (if (? l) [x ~] (if (< x (head l)) [x l] [(head l) (insert x (tail l))])))
+  (letrec isort (fn l (if (? l) ~ (insert (head l) (isort (tail l)))))
     (isort (list 3 1 2 5 4))))
 ]==],
 		"(1 2 3 4 5)"
@@ -75,7 +75,7 @@ const examples: { Example } = {
 	value(
 		"count words in character codes",
 		[==[
-(letrec words (lam (l inw n)
+(letrec words (fn (l inw n)
      (if (? l) n
        (if (= (head l) 32)
            (words (tail l) 0 n)
@@ -88,7 +88,7 @@ const examples: { Example } = {
 	value(
 		"deep equality, equal lists",
 		[==[
-(letrec deq (lam (a b)
+(letrec deq (fn (a b)
      (if (= (kind a) (kind b))
          (if (= (kind a) 2)
              (if (deq (head a) (head b)) (deq (tail a) (tail b)) 0)
@@ -102,7 +102,7 @@ const examples: { Example } = {
 	value(
 		"deep equality, lists that differ",
 		[==[
-(letrec deq (lam (a b)
+(letrec deq (fn (a b)
      (if (= (kind a) (kind b))
          (if (= (kind a) 2)
              (if (deq (head a) (head b)) (deq (tail a) (tail b)) 0)
@@ -117,7 +117,7 @@ const examples: { Example } = {
 	value(
 		"evaluate an expression tree",
 		[==[
-(letrec ev (lam t
+(letrec ev (fn t
      (if (= (head t) 0) (head (tail t))
      (if (= (head t) 1) (+ (ev (head (tail t))) (ev (tail (tail t))))
          (* (ev (head (tail t))) (ev (tail (tail t)))))))
@@ -129,7 +129,7 @@ const examples: { Example } = {
 	value(
 		"gcd by subtraction",
 		[==[
-(letrec gcd (lam (a b)
+(letrec gcd (fn (a b)
      (if (= a b) a (if (< a b) (gcd a (- b a)) (gcd (- a b) b))))
   (gcd 48 18))
 ]==],

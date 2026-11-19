@@ -24,13 +24,13 @@ const Code = require "../../interpreter/code"
 -- The environment representations. An environment is a lookup, which takes an index and an environment, and an extend, which takes a value and an environment and returns the new environment. Both are text, so an interpreter can be built with either.
 
 -- A linked list of values, indexed by tails.
-const LOOKUP_LIST = "(fix (lam find (lam n (lam e (if (= n 0) (head e) ((find (- n 1)) (tail e)))))))"
-const EXTEND_LIST = "(lam (x env) [x env])"
+const LOOKUP_LIST = "(fix (fn find (fn n (fn e (if (= n 0) (head e) ((find (- n 1)) (tail e)))))))"
+const EXTEND_LIST = "(fn (x env) [x env])"
 
 -- A skew binary random-access list (Okasaki). Its entries are [size tree], and a tree is [size [value [left right]]], with leaves whose children are nil. The entries are ordered newest first, and two adjacent trees of the same size merge into one. An index is found by skipping whole entries, then descending one tree.
-const LOOKUP_TREE = "(fix (lam tl (lam t (lam i ((lam (x l r) (if (= i 0) x (if (< (- i 1) (head l)) ((tl l) (- i 1)) ((tl r) (- (- i 1) (head l)))))) (head (tail t)) (head (tail (tail t))) (tail (tail (tail t))))))))"
-const LOOKUP_SKEW = `(fix (lam look (lam i (lam env ((lam (e rest) (if (< i (head e)) (({LOOKUP_TREE} (tail e)) i) ((look (- i (head e))) rest))) (head env) (tail env))))))`
-const EXTEND_SKEW = "(lam (x env) (if (? env) [[1 [1 [x [~ ~]]]] ~] ((lam (e1 rest1) (if (? rest1) [[1 [1 [x [~ ~]]]] env] ((lam (e2 rest2) (if (= (head e1) (head e2)) [[(+ (* 2 (head e1)) 1) [(+ (* 2 (head e1)) 1) [x [(tail e1) (tail e2)]]]] rest2] [[1 [1 [x [~ ~]]]] env])) (head rest1) (tail rest1)))) (head env) (tail env))))"
+const LOOKUP_TREE = "(fix (fn tl (fn t (fn i ((fn (x l r) (if (= i 0) x (if (< (- i 1) (head l)) ((tl l) (- i 1)) ((tl r) (- (- i 1) (head l)))))) (head (tail t)) (head (tail (tail t))) (tail (tail (tail t))))))))"
+const LOOKUP_SKEW = `(fix (fn look (fn i (fn env ((fn (e rest) (if (< i (head e)) (({LOOKUP_TREE} (tail e)) i) ((look (- i (head e))) rest))) (head env) (tail env))))))`
+const EXTEND_SKEW = "(fn (x env) (if (? env) [[1 [1 [x [~ ~]]]] ~] ((fn (e1 rest1) (if (? rest1) [[1 [1 [x [~ ~]]]] env] ((fn (e2 rest2) (if (= (head e1) (head e2)) [[(+ (* 2 (head e1)) 1) [(+ (* 2 (head e1)) 1) [x [(tail e1) (tail e2)]]]] rest2] [[1 [1 [x [~ ~]]]] env])) (head rest1) (tail rest1)))) (head env) (tail env))))"
 
 -- Evaluates the subexpression sub in the current environment.
 const function ev(sub: string): string
@@ -51,7 +51,7 @@ const function build(
 		[0] = A, -- a quoted value is stored as it is
 		[1] = "~",
 		[2] = `(({lookup} {A}) env)`,
-		[3] = `(lam v ((rec {A}) ({extend} v env)))`,
+		[3] = `(fn v ((rec {A}) ({extend} v env)))`,
 		[4] = `(pin {ev(A)})`,
 		[5] = `[{ev(A)} {ev(B)}]`,
 		[6] = `(head {ev(A)})`,
@@ -76,7 +76,7 @@ const function build(
 		chain = `(if (= tag {tag}) {BRANCH[tag]} {chain})`
 	end
 
-	return `(fix (lam rec (lam node (lam env ((lam (tag args) {chain}) (head node) (tail node))))))`
+	return `(fix (fn rec (fn node (fn env ((fn (tag args) {chain}) (head node) (tail node))))))`
 end
 
 const EVAL = build(LOOKUP_LIST, EXTEND_LIST)

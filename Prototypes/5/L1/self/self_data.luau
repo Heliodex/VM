@@ -12,7 +12,7 @@ const M = require "../../interpreter/vm"
 const Reader = require "../reader"
 
 -- The value at an index in the environment.
-const LOOKUP = "(fix (lam find (lam n (lam e (if (= n 0) (head e) ((find (- n 1)) (tail e)))))))"
+const LOOKUP = "(fix (fn find (fn n (fn e (if (= n 0) (head e) ((find (- n 1)) (tail e)))))))"
 
 -- Evaluates the subexpression sub in the current environment.
 local function ev(sub: string): string
@@ -35,7 +35,7 @@ const BRANCH: { [number]: string } = {
 	[7] = `(tail {ev(A)})`,
 	[8] = `(force {ev(A)})`,
 	[9] = `(if {ev(A)} {ev(B)} {ev(C)})`,
-	[10] = `((lam (f a) (if (= (head f) 1) ((rec (head (tail f))) [a (tail (tail f))]) (head ~))) {ev(A)} {ev(B)})`,
+	[10] = `((fn (f a) (if (= (head f) 1) ((rec (head (tail f))) [a (tail (tail f))]) (head ~))) {ev(A)} {ev(B)})`,
 	[11] = `(+ {ev(A)} {ev(B)})`,
 	[12] = `(- {ev(A)} {ev(B)})`,
 	[13] = `(* {ev(A)} {ev(B)})`,
@@ -53,7 +53,7 @@ for tag = 18, 0, -1 do
 	chain = `(if (= tag {tag}) {BRANCH[tag]} {chain})`
 end
 
-const EVAL_DATA = `(fix (lam rec (lam node (lam env ((lam (tag args) {chain}) (head node) (tail node))))))`
+const EVAL_DATA = `(fix (fn rec (fn node (fn env ((fn (tag args) {chain}) (head node) (tail node))))))`
 
 -- The expression that runs a program through the closure-free interpreter, with an empty environment.
 const function interpret(

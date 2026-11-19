@@ -2,8 +2,8 @@ Sorts a list of integers, by insertion. It uses insert from lib/insert.prog, whi
 ---
 insert = lib/insert.prog
 ---
-(lam xs
-  (letrec s (lam l (if (? l) ~ (insert [(head l) (s (tail l))])))
+(fn xs
+  (letrec s (fn l (if (? l) ~ (insert [(head l) (s (tail l))])))
     (s xs)))
 ---
 ~ => ~ fuel 100000

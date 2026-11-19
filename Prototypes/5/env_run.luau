@@ -66,7 +66,7 @@ const function nested(d: number): string
 		body = `(+ {body} x{k})`
 	end
 	for k = d - 1, 0, -1 do
-		body = `(lam x{k} {body})`
+		body = `(fn x{k} {body})`
 	end
 	local args = {}
 	for k = 1, d do

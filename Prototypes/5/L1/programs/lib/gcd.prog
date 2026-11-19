@@ -2,8 +2,8 @@ The greatest common divisor of two whole numbers, by Euclid's method. The input 
 ---
 
 ---
-(lam p
-  (letrec g (lam a (lam b (if (= b 0) a ((g b) (mod a b)))))
+(fn p
+  (letrec g (fn a (fn b (if (= b 0) a ((g b) (mod a b)))))
     ((g (head p)) (tail p))))
 ---
 [12 18] => 6 fuel 100000

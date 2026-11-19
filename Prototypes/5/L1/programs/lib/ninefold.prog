@@ -2,7 +2,7 @@ Multiplies an integer by nine, by tripling it twice. The import is a path from t
 ---
 triple = lib/triple.prog
 ---
-(lam x (triple (triple x)))
+(fn x (triple (triple x)))
 ---
 1 => 9 fuel 10000
 -3 => -27 fuel 10000

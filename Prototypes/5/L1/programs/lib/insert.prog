@@ -2,8 +2,8 @@ Puts an integer into a sorted list, before the first item that is larger. The in
 ---
 
 ---
-(lam p
-  (letrec ins (lam l
+(fn p
+  (letrec ins (fn l
         (if (? l) [(head p) ~]
             (if (< (head p) (head l)) [(head p) l] [(head l) (ins (tail l))])))
     (ins (tail p))))

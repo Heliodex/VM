@@ -2,8 +2,8 @@ Applies the first item of its input to the second. The tests pass functions as i
 ---
 triple = lib/triple.prog
 ---
-(lam p ((head p) (tail p)))
+(fn p ((head p) (tail p)))
 ---
 [triple 4] => 12 fuel 100000
-[(lam x (+ x 1)) 4] => 5 fuel 100000
-[(lam x (head x)) 4] => error fuel 100000
+[(fn x (+ x 1)) 4] => 5 fuel 100000
+[(fn x (head x)) 4] => error fuel 100000

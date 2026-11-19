@@ -2,8 +2,8 @@ Joins two lists. The input is the pair [xs ys]; the output is xs followed by ys.
 ---
 
 ---
-(lam p
-  (letrec app (lam l (if (? l) (tail p) [(head l) (app (tail l))]))
+(fn p
+  (letrec app (fn l (if (? l) (tail p) [(head l) (app (tail l))]))
     (app (head p))))
 ---
 [~ ~] => ~ fuel 100000

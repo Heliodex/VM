@@ -2,8 +2,8 @@ Whether two data values are the same, all the way down. The input is the pair [a
 ---
 
 ---
-(lam p
-  (letrec eq (lam a (lam b
+(fn p
+  (letrec eq (fn a (fn b
         (if (= (kind a) (kind b))
             (if (= (kind a) 2)
                 (if ((eq (head a)) (head b)) ((eq (tail a)) (tail b)) 0)

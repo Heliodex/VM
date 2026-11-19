@@ -2,8 +2,8 @@ The number of items in a list. The input is a list; the output is its length. ni
 ---
 
 ---
-(lam xs
-  (letrec go (lam l (lam n (if (? l) n ((go (tail l)) (+ n 1)))))
+(fn xs
+  (letrec go (fn l (fn n (if (? l) n ((go (tail l)) (+ n 1)))))
     ((go xs) 0)))
 ---
 ~ => 0 fuel 100000

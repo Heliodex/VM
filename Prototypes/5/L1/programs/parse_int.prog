@@ -2,8 +2,8 @@ Parses a decimal integer from a string: an optional minus sign, then one or more
 The probe is errors as values. A minus sign alone, and an empty string, are both failures. The tests check the message as part of the output.
 ---
 ---
-(lam s
-  (letrec digits (lam l (lam acc
+(fn s
+  (letrec digits (fn l (fn acc
         (if (? l) [0 acc]
             (let c (head l)
               (if (< c 48) [1 "not a number"]

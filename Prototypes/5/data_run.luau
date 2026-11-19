@@ -116,9 +116,9 @@ end
 
 -- Writing a function or a pin is an error, and so is writing a cell that holds one.
 const NO_FORM: { { source: string, what: string } } = {
-	{ source = "(lam x x)", what = "a function" },
+	{ source = "(fn x x)", what = "a function" },
 	{ source = "(pin 1)", what = "a pin" },
-	{ source = "[1 (lam x x)]", what = "a function" },
+	{ source = "[1 (fn x x)]", what = "a function" },
 	{ source = "[(pin 1) ~]", what = "a pin" },
 }
 

@@ -1,8 +1,8 @@
-Adds one to its input. The simplest program in the format: one lam, and a test for each kind of input it takes.
+Adds one to its input. The simplest program in the format: one fn, and a test for each kind of input it takes.
 A nil input is an error, because addition needs integers.
 ---
 ---
-(lam x (+ x 1))
+(fn x (+ x 1))
 ---
 0 => 1 fuel 1000
 41 => 42 fuel 1000

@@ -5,8 +5,8 @@
 --
 --   42                 an integer, negative ones too
 --   ~                  nil
---   x                  a variable, which must be bound by a lam around it
---   (lam x body)       a function of x; (lam (x y) body) is the same as (lam x (lam y body))
+--   x                  a variable, which must be bound by a fn around it
+--   (fn x body)       a function of x; (fn (x y) body) is the same as (fn x (fn y body))
 --   (f a b)            application, curried: (f a b) is ((f a) b)
 --   [a b]              a pair
 --   [a b c]            the same as [a [b c]]: the last item is the tail, so a list ends in ~, as [1 2 ~]
@@ -14,13 +14,13 @@
 --   (list a b c)       a proper list of a, b and c
 --   (head e), (tail e)
 --   (if c t e)         evaluates t if c is nonzero, otherwise e
---   (let x e body)     binds x to e in body. It is sugar for ((lam x body) e), so x is not in scope in e
---   (letrec f (lam ...) body)
+--   (let x e body)     binds x to e in body. It is sugar for ((fn x body) e), so x is not in scope in e
+--   (letrec f (fn ...) body)
 --                      binds f to a recursive function, whose definition can call f. It is sugar for let, with fix
---   (mutual ((f (lam ...)) (g (lam ...))) body)
+--   (mutual ((f (fn ...)) (g (fn ...))) body)
 --                      binds f and g to functions that can call each other, and each other's names. It is sugar for one fixed point that takes a member and an argument
 --   (pin e), (force e)
---   (fix f)            the fixed point of f, where f is (lam rec (lam ...)) and rec is the function itself
+--   (fix f)            the fixed point of f, where f is (fn rec (fn ...)) and rec is the function itself
 --   (+ a b), (- a b), (* a b), (< a b), (= a b)
 --                      add, subtract, multiply, less-than, equal
 --   (div a b), (mod a b)
@@ -78,7 +78,7 @@ const UNARY_FORMS: { [string]: number } = {
 }
 
 const function reserved(name: string): boolean
-	return name == "lam"
+	return name == "fn"
 		or name == "if"
 		or name == "let"
 		or name == "letrec"
@@ -291,14 +291,14 @@ const function listNode(
 	return { kind = "list", items = items, line = line }
 end
 
--- The function that calls member index of the group g with one argument: (lam " y" ((g index) " y")). The names begin with a space, which no source name can contain, so they cannot clash with the program's names.
+-- The function that calls member index of the group g with one argument: (fn " y" ((g index) " y")). The names begin with a space, which no source name can contain, so they cannot clash with the program's names.
 const function member(
 	g: string,
 	index: number,
 	line: number
 ): Node
 	const call = listNode({ listNode({ symNode(g, line), intNode(index, line) }, line), symNode(" y", line) }, line)
-	return listNode({ symNode("lam", line), symNode(" y", line), call }, line)
+	return listNode({ symNode("fn", line), symNode(" y", line), call }, line)
 end
 
 -- The nodes for a mutual group. Every member shares one fixed point, dispatch, which takes a tag and then an argument. Member i has tag i - 1, and its body is run inside lets that bind each group name to a call through dispatch. The body is run with the names bound to calls through the fixed point. The result is the same as writing each function out with its names in scope, but no name is bound to a function that is not in the group.
@@ -329,12 +329,12 @@ const function mutualNode(
 	end
 
 	const dispatch = listNode({
-		symNode("lam", line),
+		symNode("fn", line),
 		symNode(" self", line),
 		listNode({
-			symNode("lam", line),
+			symNode("fn", line),
 			symNode(" tag", line),
-			listNode({ symNode("lam", line), symNode(" x", line), chain }, line),
+			listNode({ symNode("fn", line), symNode(" x", line), chain }, line),
 		}, line),
 	}, line)
 
@@ -366,9 +366,9 @@ local function compileForm(
 		end
 	end
 
-	if name == "lam" then
+	if name == "fn" then
 		if args < 2 then
-			fail(node.line, "lam needs a parameter and a body")
+			fail(node.line, "fn needs a parameter and a body")
 		end
 
 		-- The body is the last item. The parameters are the items between, either names or lists of names.
@@ -383,16 +383,16 @@ local function compileForm(
 					if inner.kind == "sym" then
 						table.insert(names, inner.name)
 					else
-						fail(inner.line, "a lam parameter must be a name")
+						fail(inner.line, "a fn parameter must be a name")
 					end
 				end
 			else
-				fail(param.line, "a lam parameter must be a name")
+				fail(param.line, "a fn parameter must be a name")
 			end
 		end
 
 		if #names == 0 then
-			fail(node.line, "lam needs at least one parameter")
+			fail(node.line, "fn needs at least one parameter")
 		end
 
 		-- The last parameter is the innermost binder, so it goes at the front of the scope last.
@@ -440,8 +440,8 @@ local function compileForm(
 		end
 
 		if definition.kind ~= "list" or #definition.items == 0 or definition.items[1].kind ~= "sym" or (definition.items[1] :: { kind: "sym", name: string, line: number, })
-			.name ~= "lam" then
-			fail(definition.line, "letrec binds a lam, so the function can call itself")
+			.name ~= "fn" then
+			fail(definition.line, "letrec binds a fn, so the function can call itself")
 		end
 
 		-- The name is in scope in the definition and in the body. The definition is wrapped in fix, whose outer lambda binds the name to the function itself.
@@ -458,13 +458,13 @@ local function compileForm(
 		const bindings = items[2]
 
 		if bindings.kind ~= "list" then
-			fail(bindings.line, "mutual binds a list of (name lam) pairs")
+			fail(bindings.line, "mutual binds a list of (name fn) pairs")
 		end
 
 		const bindingList = (bindings :: ListNode).items
 
 		if #bindingList == 0 then
-			fail(bindings.line, "mutual binds a list of (name lam) pairs")
+			fail(bindings.line, "mutual binds a list of (name fn) pairs")
 		end
 
 		local names: { string } = {}
@@ -472,19 +472,19 @@ local function compileForm(
 
 		for _, binding in bindingList do
 			if binding.kind ~= "list" then
-				fail(binding.line, "each mutual binding is (name lam)")
+				fail(binding.line, "each mutual binding is (name fn)")
 			end
 
 			const parts = (binding :: ListNode).items
 
 			if #parts ~= 2 or parts[1].kind ~= "sym" then
-				fail(binding.line, "each mutual binding is (name lam)")
+				fail(binding.line, "each mutual binding is (name fn)")
 			end
 
 			const def = parts[2]
 
-			if def.kind ~= "list" or #def.items < 2 or def.items[1].kind ~= "sym" or (def.items[1] :: SymNode).name ~= "lam" then
-				fail(def.line, "mutual binds lams, so the functions can call each other")
+			if def.kind ~= "list" or #def.items < 2 or def.items[1].kind ~= "sym" or (def.items[1] :: SymNode).name ~= "fn" then
+				fail(def.line, "mutual binds fns, so the functions can call each other")
 			end
 
 			table.insert(names, (parts[1] :: SymNode).name)

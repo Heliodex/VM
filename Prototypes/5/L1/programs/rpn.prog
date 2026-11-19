@@ -3,8 +3,8 @@ A token is a pair: [0 n] is the number n, and [1 op] is an operator, 0 add, 1 su
 The probe is a stack machine written as a function over a list. The empty input is an error, because there is no top of stack to give.
 ---
 ---
-(lam toks
-  (letrec run (lam ts (lam st
+(fn toks
+  (letrec run (fn ts (fn st
       (if (? ts)
           (head st)
           (let t (head ts)

@@ -2,8 +2,8 @@ The number of Collatz steps for n to reach 1: halve an even number, and take thr
 The probe is a loop with a numeric exit condition, and an input that never meets it.
 ---
 ---
-(lam n
-  (letrec steps (lam k (lam acc
+(fn n
+  (letrec steps (fn k (fn acc
         (if (= k 1) acc
             (if (= (mod k 2) 0)
                 ((steps (div k 2)) (+ acc 1))

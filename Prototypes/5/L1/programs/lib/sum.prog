@@ -2,8 +2,8 @@ The sum of a list of integers. The sum of nil is 0.
 ---
 
 ---
-(lam xs
-  (letrec s (lam l (if (? l) 0 (+ (head l) (s (tail l)))))
+(fn xs
+  (letrec s (fn l (if (? l) 0 (+ (head l) (s (tail l)))))
     (s xs)))
 ---
 ~ => 0 fuel 100000

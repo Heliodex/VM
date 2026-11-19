@@ -2,14 +2,14 @@ The first n primes, from a sieve over an infinite stream. Each stream is [head t
 The probe is laziness: pins inside a structure, forced by the lifecycle's output check, and a recursive filter that is built into each pin.
 ---
 ---
-(lam n
-  (letrec from (lam k [k (pin (from (+ k 1)))])
-    (letrec filter (lam p (lam s
+(fn n
+  (letrec from (fn k [k (pin (from (+ k 1)))])
+    (letrec filter (fn p (fn s
         (if (= (mod (head s) p) 0)
             ((filter p) (force (tail s)))
             [(head s) (pin ((filter p) (force (tail s))))])))
-      (letrec sieve (lam s [(head s) (pin (sieve ((filter (head s)) (force (tail s)))))])
-        (letrec take (lam k (lam s
+      (letrec sieve (fn s [(head s) (pin (sieve ((filter (head s)) (force (tail s)))))])
+        (letrec take (fn k (fn s
             (if (= k 0)
                 ~
                 [(head s) ((take (- k 1)) (force (tail s)))])))

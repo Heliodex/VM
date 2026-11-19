@@ -2,8 +2,8 @@ Reverses a list. The input is a list; the output is the same items in the opposi
 ---
 
 ---
-(lam xs
-  (letrec rev (lam l (lam acc (if (? l) acc ((rev (tail l)) [(head l) acc]))))
+(fn xs
+  (letrec rev (fn l (fn acc (if (? l) acc ((rev (tail l)) [(head l) acc]))))
     ((rev xs) ~)))
 ---
 ~ => ~ fuel 100000

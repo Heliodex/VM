@@ -2,7 +2,7 @@ The absolute value of an integer.
 ---
 
 ---
-(lam x (if (< x 0) (- 0 x) x))
+(fn x (if (< x 0) (- 0 x) x))
 ---
 -7 => 7 fuel 100000
 0 => 0 fuel 100000

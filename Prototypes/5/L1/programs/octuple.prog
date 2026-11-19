@@ -3,7 +3,7 @@ Multiplies an integer by eight: double of quadruple. It imports two programs, an
 double = double.prog
 quad = quadruple.prog
 ---
-(lam x (double (quad x)))
+(fn x (double (quad x)))
 ---
 1 => 8 fuel 10000
 10 => 80 fuel 10000

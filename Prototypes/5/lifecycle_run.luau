@@ -64,28 +64,28 @@ const function valueOf(
 end
 
 const CASES: { Case } = {
-	{ name = "identity", program = "(lam x x)", input = "[1 [2 ~]]", status = "value", output = "cons 1 cons 2 nil" },
-	{ name = "add one", program = "(lam x (+ x 1))", input = "41", status = "value", output = "42" },
+	{ name = "identity", program = "(fn x x)", input = "[1 [2 ~]]", status = "value", output = "cons 1 cons 2 nil" },
+	{ name = "add one", program = "(fn x (+ x 1))", input = "41", status = "value", output = "42" },
 	{
 		name = "sum a list",
-		program = "(lam xs (letrec sum (lam l (if (? l) 0 (+ (head l) (sum (tail l))))) (sum xs)))",
+		program = "(fn xs (letrec sum (fn l (if (? l) 0 (+ (head l) (sum (tail l))))) (sum xs)))",
 		input = "(list 1 2 3 4 5 6 7 8 9 10)",
 		status = "value",
 		output = "55",
 	},
-	{ name = "a pin in a cell is forced", program = "(lam x [1 (pin (+ x 1))])", input = "5", status = "value", output = "cons 1 6" },
-	{ name = "a pin of a pin is forced", program = "(lam x (pin (pin 7)))", input = "0", status = "value", output = "7" },
-	{ name = "a function is not data", program = "(lam x (lam y y))", input = "1", status = "not_data", output = nil },
-	{ name = "a function inside a cell is not data", program = "(lam x [1 (lam y y)])", input = "0", status = "not_data", output = nil },
-	{ name = "a pin that errors is an error", program = "(lam x [1 (pin (head 5))])", input = "0", status = "error", output = nil },
+	{ name = "a pin in a cell is forced", program = "(fn x [1 (pin (+ x 1))])", input = "5", status = "value", output = "cons 1 6" },
+	{ name = "a pin of a pin is forced", program = "(fn x (pin (pin 7)))", input = "0", status = "value", output = "7" },
+	{ name = "a function is not data", program = "(fn x (fn y y))", input = "1", status = "not_data", output = nil },
+	{ name = "a function inside a cell is not data", program = "(fn x [1 (fn y y)])", input = "0", status = "not_data", output = nil },
+	{ name = "a pin that errors is an error", program = "(fn x [1 (pin (head 5))])", input = "0", status = "error", output = nil },
 	{
 		name = "a pin that diverges runs out of fuel",
-		program = "(lam x [1 (pin ((fix (lam f (lam n (f n)))) 0))])",
+		program = "(fn x [1 (pin ((fix (fn f (fn n (f n)))) 0))])",
 		input = "0",
 		status = "out_of_fuel",
 		output = nil,
 	},
-	{ name = "a program that loops runs out of fuel", program = "(lam x ((fix (lam f (lam n (f n)))) x))", input = "0", status = "out_of_fuel", output = nil },
+	{ name = "a program that loops runs out of fuel", program = "(fn x ((fix (fn f (fn n (f n)))) x))", input = "0", status = "out_of_fuel", output = nil },
 	{ name = "a program that is not a function is an error", program = "7", input = "0", status = "error", output = nil },
 }
 
@@ -127,7 +127,7 @@ end
 
 -- A long output, so the output check and the writer walk a long list, and the bytes decode back to it.
 do
-	const program = "(lam n (letrec up (lam i (if (= i 0) ~ [i (up (- i 1))])) (up n)))"
+	const program = "(fn n (letrec up (fn i (if (= i 0) ~ [i (up (- i 1))])) (up n)))"
 	const result = Lifecycle.runBytes(Binary.encodeProgram(Reader.parse(program)), Binary.encodeValue(valueOf("1000")), 10000000)
 
 	if result.status == "value" then
@@ -151,7 +151,7 @@ do
 end
 
 do
-	const result = Lifecycle.runBytes(Binary.encodeProgram(Reader.parse("(lam x x)")), "\1\4", FUEL)
+	const result = Lifecycle.runBytes(Binary.encodeProgram(Reader.parse("(fn x x)")), "\1\4", FUEL)
 	check("bad input bytes are an error", result.status == "error" and result.steps == 0, result.status)
 end
 

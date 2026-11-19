@@ -4,7 +4,7 @@ A strict, sequential interpreter for a small functional language with native dat
 
 ## Languages
 
-The reader's language is **L1** (language 1). Its files are in `L1/`: the reader, the printer, the program-file format, the L1 programs and the L1 self-interpreter. Its tests are in `L1/examples/` and `L1/programs/`. The machine, the data and binary formats, the lifecycle and the driver are in `interpreter/`. They work on the expressions every language compiles to, so a later language can reuse them and add its own folder beside `L1/`.
+The reader's language is **L1** (language 1). Its keyword for a function is `fn`; the machine's expression for one is still called `lam`, since it is the same node the machine has always run. Its files are in `L1/`: the reader, the printer, the program-file format, the L1 programs and the L1 self-interpreter. Its tests are in `L1/examples/` and `L1/programs/`. The machine, the data and binary formats, the lifecycle and the driver are in `interpreter/`. They work on the expressions every language compiles to, so a later language can reuse them and add its own folder beside `L1/`.
 
 ## Files
 
@@ -63,10 +63,10 @@ The runners exit with status 1 if any check fails.
 - **Expressions:** `int`, `nilv`, `var` (by index), `lam` (no name), `app` (curried), `cell`, `head`, `tail`, `ite` (only the branch taken is evaluated), `pin`, `force`, and `prim` on integers (`add`, `sub`, `mul`, `div`, `mod`, `lt`, `eq`) or `kind`, which gives the kind of any value: 0 integer, 1 nil, 2 cell, 3 function, 4 pin. `(? x)` in the text syntax is shorthand for `(= (kind x) 1)`.
 - **Division is floored.** `(div a b)` rounds down, not towards zero, and `(mod a b)` takes the sign of `b`, so `a = b * q + r` with `q = (div a b)` and `r = (mod a b)`. That is the rule of Luau's `//` and `%`, so a result can be checked against the host. Dividing by zero is an error.
 - **Recursion:** `M.fix` is the strict fixed-point combinator. A recursive function is `app(fix, lam(lam(...)))`, and the outer binder, index 1 inside the inner body, refers to the function itself.
-- **Local names:** `(let x e body)` binds `x` in `body` only, as sugar for applying a `lam`. It is not recursive.
-- **Recursive functions:** `(letrec f (lam ...) body)` binds `f` to a function that can call itself. It is sugar for `let` with `fix`, so it costs nothing at run time: the programs in `L1/examples/programs.luau` take the same number of steps with it as with `fix` written out.
+- **Local names:** `(let x e body)` binds `x` in `body` only, as sugar for applying a `fn`. It is not recursive.
+- **Recursive functions:** `(letrec f (fn ...) body)` binds `f` to a function that can call itself. It is sugar for `let` with `fix`, so it costs nothing at run time: the programs in `L1/examples/programs.luau` take the same number of steps with it as with `fix` written out.
 - **Pairs:** `[a b]` is a cell. A bracket of three or more is right-nested, so `[a b c]` is `[a [b c]]`: the last item is the tail. A list ends in `~`, so `[1 2 3 ~]` is the list `(1 2 3)`, and `[1 2 3]` is the improper pair `(1 2 . 3)`. The printer writes cells in this shorthand.
-- **Mutual recursion:** `(mutual ((f (lam ...)) (g (lam ...))) body)` binds several functions that can call each other. It is sugar in the reader, with no machine change: the group shares one fixed point, and each name is a call through it.
+- **Mutual recursion:** `(mutual ((f (fn ...)) (g (fn ...))) body)` binds several functions that can call each other. It is sugar in the reader, with no machine change: the group shares one fixed point, and each name is a call through it.
 - **Errors:** there are two ways to report one. A failure that a caller should handle is a value: a program returns `[0 result]` on success and `[1 message]` on failure, and the caller checks the tag. This is how `programs/parse_int.prog` and `programs/even_b.prog` work, and the messages are then checked as ordinary output. The convention is not enforced, so a program that returns `[1 x]` as data is indistinguishable from a failure. `(raise e)` is for a run that cannot go on: it evaluates `e` and ends the run as `error`, and the message is the bytes of `e` if it is a list of integers from 0 to 255, and its printed form otherwise.
 - **Strings:** `"abc"` reads as the list of its bytes, so `"abc"` is `(97 98 99)` and `""` is nil. The escapes are `\"`, `\\`, `\n`, `\t` and `\0`. A string holds bytes, so text outside ASCII is written as its bytes. The data format has no strings. A program file's test lines use the reader's language too, so `"abc"` works there as it does in a program.
 - **Pins:** a pin is a suspended expression. Creating one does not run it. Forcing it runs it once, and later forces return the same value.
@@ -161,7 +161,7 @@ Header documentation, for people, which is not read.
 ---
 double = double.prog
 ---
-(lam x (double (+ x 1)))
+(fn x (double (+ x 1)))
 ---
 0 => 2 fuel 1000
 41 => 84 fuel 1000
@@ -170,7 +170,7 @@ double = double.prog
 
 The imports section is empty in a file that uses none. Each line is `name = file`, and it binds `name`, inside the program, to the program of that file. The file is a path from the top of the `L1/programs/` folder, so `double.prog` is at the top, `lib/triple.prog` is in `lib`, and the same path means the same file from any importing file. A path that climbs above `L1/programs/` with `..` is an error. The runner also finds program files in the folders under `L1/programs/`, and runs their tests. An imported program is closed, so it cannot use the importing file's names. An import can itself import, but a cycle is an error, and so is an import that cannot be found. Imports are looked up through a resolver, so the parser never reads files itself.
 
-The program section is read by `reader.luau`, with the imported names bound around it. There is no new program syntax. Each test line is an input, then `=>`, then an output, then `fuel` and a number of steps. Inputs and outputs are written in the reader's language, and each is evaluated to a value before the test runs, so `[1 ~]`, `(list 1 2)` and `"ab"` are all valid. The names of the file's imports are in scope for them. An input may be a function, such as `(lam x (+ x 1))`, since it is only given to the program; an output must be data, since functions cannot be compared, so a function there is refused. An output may also be one of `error`, `out_of_fuel` or `not_data`, which are the outcomes of a run. Blank lines in the test section are skipped, and a file needs at least one test.
+The program section is read by `reader.luau`, with the imported names bound around it. There is no new program syntax. Each test line is an input, then `=>`, then an output, then `fuel` and a number of steps. Inputs and outputs are written in the reader's language, and each is evaluated to a value before the test runs, so `[1 ~]`, `(list 1 2)` and `"ab"` are all valid. The names of the file's imports are in scope for them. An input may be a function, such as `(fn x (+ x 1))`, since it is only given to the program; an output must be data, since functions cannot be compared, so a function there is refused. An output may also be one of `error`, `out_of_fuel` or `not_data`, which are the outcomes of a run. Blank lines in the test section are skipped, and a file needs at least one test.
 
 Each test runs through the lifecycle, so its output is checked as data. `programs_run.luau` runs the tests in `L1/programs/`, and checks that malformed files are refused with the right reason. It uses `lute`, because this Luau build cannot read files; the file reading is `@lute/fs`.
 

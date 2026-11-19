@@ -2,9 +2,9 @@ Whether a number is even, with even and odd defined in terms of each other. The 
 The probe is mutual recursion. It was the one probe the language could not express: with letrec alone, odd is not in scope where even is defined.
 ---
 ---
-(lam n
-  (mutual ((even (lam k (if (= k 0) 1 (odd (- k 1)))))
-           (odd (lam k (if (= k 0) 0 (even (- k 1))))))
+(fn n
+  (mutual ((even (fn k (if (= k 0) 1 (odd (- k 1)))))
+           (odd (fn k (if (= k 0) 0 (even (- k 1))))))
     (even n)))
 ---
 0 => 1 fuel 10000

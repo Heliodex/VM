@@ -2,7 +2,7 @@ The smaller of two integers. The input is the pair [a b].
 ---
 
 ---
-(lam p (if (< (head p) (tail p)) (head p) (tail p)))
+(fn p (if (< (head p) (tail p)) (head p) (tail p)))
 ---
 [3 7] => 3 fuel 100000
 [7 3] => 3 fuel 100000

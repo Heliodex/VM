@@ -33,4 +33,4 @@ Each file here is a program file (see the top of `interpreter/program_file.luau`
 
 ## Functions as arguments
 
-A function can be passed in as data for a test: the input of a test may be a function, such as `(lam x (+ x 1))`, and the test's expressions can use the file's imports. So `map` is tested with an inline function, and a test could pass `triple` from the library by importing it. An output must still be data, since two functions can't be compared, so a test returns a number or a list, not a function.
+A function can be passed in as data for a test: the input of a test may be a function, such as `(fn x (+ x 1))`, and the test's expressions can use the file's imports. So `map` is tested with an inline function, and a test could pass `triple` from the library by importing it. An output must still be data, since two functions can't be compared, so a test returns a number or a list, not a function.
