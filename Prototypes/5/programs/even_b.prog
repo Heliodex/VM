@@ -1,25 +1,25 @@
-Whether a string has an even number of b's, with a and b the only bytes allowed. The two states, even and odd, are mutually recursive, and each reads the next byte and switches to the other state on a b. Any other byte is a named error.
-The probe is mutual recursion over a string, with a named error in the middle of the walk.
+Whether a string has an even number of b's, with a and b the only bytes allowed. The result is a pair: [0 1] if the count is even, [0 0] if it is odd, and [1 "bad character"] for any other byte. The two states, even and odd, are mutually recursive, and each reads the next byte and switches to the other state on a b.
+The probe is mutual recursion over a string, with a failure carried as a value through the walk.
 ---
 (lam s
   (mutual ((even (lam l
-              (if (? l) 1
+              (if (? l) [0 1]
                   (let c (head l)
                     (if (= c 97) (even (tail l))
-                        (if (= c 98) (odd (tail l)) (raise "bad character")))))))
+                        (if (= c 98) (odd (tail l)) [1 "bad character"]))))))
            (odd (lam l
-              (if (? l) 0
+              (if (? l) [0 0]
                   (let c (head l)
                     (if (= c 97) (odd (tail l))
-                        (if (= c 98) (even (tail l)) (raise "bad character"))))))))
+                        (if (= c 98) (even (tail l)) [1 "bad character"])))))))
     (even s)))
 ---
-"" => 1 fuel 200000
-"a" => 1 fuel 200000
-"b" => 0 fuel 200000
-"abba" => 1 fuel 200000
-"bab" => 1 fuel 200000
-"aabab" => 1 fuel 200000
-"bbb" => 0 fuel 200000
-"abc" => error fuel 200000
-"a b" => error fuel 200000
+"" => [0 1] fuel 200000
+"a" => [0 1] fuel 200000
+"b" => [0 0] fuel 200000
+"abba" => [0 1] fuel 200000
+"bab" => [0 1] fuel 200000
+"aabab" => [0 1] fuel 200000
+"bbb" => [0 0] fuel 200000
+"abc" => [1 "bad character"] fuel 200000
+"a b" => [1 "bad character"] fuel 200000
