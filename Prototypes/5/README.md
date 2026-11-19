@@ -14,6 +14,9 @@ A strict, sequential interpreter for a small functional language with native dat
 | `interpreter/lifecycle.luau` | Runs a program on an input, and checks the output. See "The lifecycle" below. |
 | `interpreter/printer.luau` | Writes an expression as text in the reader's syntax. See "The printer" below. |
 | `interpreter/driver.luau` | Runs a program that keeps a state between inputs. See "The driver" below. |
+| `interpreter/program_file.luau` | Reads a program file: a header, the program, and its tests. See "Program files" below. |
+| `programs/*.prog` | Program files, each with its documentation, program and tests. |
+| `programs_run.luau` | Runs every test in `programs/`, and checks that malformed files are refused. Uses `lute`. |
 | `examples/examples.luau` | 49 programs built with the builders, each with a fuel budget and its expected outcome. |
 | `examples/text.luau` | 49 programs in the text syntax, plus 18 sources the reader must reject. |
 | `examples/programs.luau` | 9 longer programs in the text syntax, using `letrec`: an accumulator, reverse, append, insertion sort, word counting, deep equality, a tree evaluator and gcd. |
@@ -44,6 +47,7 @@ Run from this directory.
 | The lifecycle checks | `luau lifecycle_run.luau` |
 | The printer checks | `luau printer_run.luau` |
 | The driver checks | `luau driver_run.luau` |
+| The program file checks | `lute run programs_run.luau` |
 | The analyser | `luau-analyze interpreter/*.luau examples/*.luau self/*.luau run.luau self_run.luau self_data_run.luau` |
 | The formatter | `luau-format interpreter/*.luau examples/*.luau self/*.luau run.luau self_run.luau self_data_run.luau` |
 
@@ -139,6 +143,24 @@ The printer's output is canonical for a given expression, so printing, reading a
 A session ends at the first step that does not give a value. It reports which input it failed on, and the state from before that step. A step that errors, runs out of fuel, returns a function, or returns something that is not a pair ends the session.
 
 `Driver.stepBytes` runs one step from bytes, with the program and the state as bytes, so a state can be stored between calls.
+
+## Program files
+
+A program file keeps a program with its documentation and its tests, in one file with three sections separated by lines that hold only `---`:
+
+```
+Header documentation, for people, which is not read.
+---
+(lam x (+ x 1))
+---
+0 => 1 fuel 1000
+41 => 42 fuel 1000
+nil => error fuel 1000
+```
+
+The program section is read by `reader.luau`, unchanged. There is no new program syntax. Each test line is an input, then `=>`, then an output, then `fuel` and a number of steps. Inputs and outputs are written in the data format. An output may also be one of `error`, `out_of_fuel` or `not_data`, which are the outcomes of a run. Blank lines in the test section are skipped, and a file needs at least one test.
+
+Each test runs through the lifecycle, so its output is checked as data. `programs_run.luau` runs the tests in `programs/`, and checks that malformed files are refused with the right reason. It uses `lute`, because this Luau build cannot read files; the file reading is `@lute/fs`.
 
 ## The self-interpreter
 
