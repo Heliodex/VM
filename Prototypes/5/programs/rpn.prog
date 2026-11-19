@@ -16,10 +16,10 @@ The probe is a stack machine written as a function over a list. The empty input 
                         (run (tail ts) [(if (= op 0) (+ a b) (if (= op 1) (- a b) (* a b))) rest]))))))))))
     (run toks ~)))
 ---
-cons cons 0 3 cons cons 0 4 cons cons 1 0 nil => 7 fuel 200000
-cons cons 0 10 cons cons 0 4 cons cons 1 1 nil => 6 fuel 200000
-cons cons 0 2 cons cons 0 3 cons cons 0 4 cons cons 1 2 cons cons 1 0 nil => 14 fuel 200000
-cons cons 0 5 cons cons 0 1 cons cons 0 2 cons cons 1 0 cons cons 0 4 cons cons 1 2 cons cons 1 0 cons cons 0 3 cons cons 1 1 nil => 14 fuel 200000
-cons cons 0 9 nil => 9 fuel 200000
-cons cons 0 1 cons cons 0 2 cons cons 0 3 cons cons 1 2 cons cons 1 1 cons cons 0 4 cons cons 1 2 nil => -20 fuel 200000
-nil => error fuel 200000
+[[0 3] [[0 4] [[1 0] ~]]] => 7 fuel 200000
+[[0 10] [[0 4] [[1 1] ~]]] => 6 fuel 200000
+[[0 2] [[0 3] [[0 4] [[1 2] [[1 0] ~]]]]] => 14 fuel 200000
+[[0 5] [[0 1] [[0 2] [[1 0] [[0 4] [[1 2] [[1 0] [[0 3] [[1 1] ~]]]]]]]]] => 14 fuel 200000
+[[0 9] ~] => 9 fuel 200000
+[[0 1] [[0 2] [[0 3] [[1 2] [[1 1] [[0 4] [[1 2] ~]]]]]]] => -20 fuel 200000
+~ => error fuel 200000

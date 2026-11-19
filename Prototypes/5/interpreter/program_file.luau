@@ -13,13 +13,16 @@
 --
 --   <input> => <output> fuel <n>
 --
--- An input and a value output are written in the data format of data.luau. An output may instead be one of the outcomes of a run, error, out_of_fuel or not_data, when the test expects that outcome. Blank lines in the test section are skipped. A file needs at least one test.
+-- The input and a value output are written in the reader's language, and each is evaluated to a value before the test runs. An input or output must give a value that is data, so it can be written down: a function is refused. An output may instead be one of the outcomes of a run, error, out_of_fuel or not_data, when the test expects that outcome. Blank lines in the test section are skipped. A file needs at least one test.
 --
 --   ProgramFile.parse(text): File      raises an error, with the line, if the file is not well formed
 
 const Data = require "./data"
 const Reader = require "./reader"
 const VM = require "./vm"
+
+-- The budget for evaluating a test's input or expected output. These are literal values, so the budget only has to be generous.
+const VALUE_FUEL = 1000000
 
 export type Test = {
 	line: number,
@@ -55,50 +58,27 @@ const function splitLines(
 	return lines
 end
 
--- The data text for a list of bytes, in the data format: cons and each byte, ending in nil. The empty list is nil.
-const function bytesText(
-	codes: { number }
-): string
-	local parts: { string } = {}
-
-	for _, code in codes do
-		table.insert(parts, "cons")
-		table.insert(parts, tostring(code))
-	end
-
-	table.insert(parts, "nil")
-	return table.concat(parts, " ")
-end
-
--- Replaces each string literal in a test's text with the data text of its bytes, so a test can write "abc" where the data format would write a list. The rest of the text is kept as it is. A string that is never closed, or has a bad escape, is an error.
-const function expandStrings(
+-- The value that a source text gives in the reader's language. It must give a value, not an error or an out of fuel, and the error for a text that does not read or run is given the line of the test. what says which part of the test it is, for the message.
+const function evalValue(
 	text: string,
-	lineNo: number
-): string
-	local out: { string } = {}
-	local i = 1
+	lineNo: number,
+	what: string
+): VM.Value
+	const ok, expr = pcall(Reader.parse, text)
 
-	while i <= #text do
-		const quote = string.find(text, '"', i, true)
-
-		if quote == nil then
-			table.insert(out, string.sub(text, i))
-			break
-		end
-
-		table.insert(out, string.sub(text, i, quote - 1))
-
-		const ok, codes, after = pcall(Reader.scanString, text, quote, lineNo)
-
-		if not ok then
-			error(`line {lineNo}: {string.gsub(tostring(codes), "^line %d+: ", "")}`, 0)
-		end
-
-		table.insert(out, bytesText(codes :: { number }))
-		i = after :: number
+	if not ok then
+		error(`line {lineNo}: the {what}: {(string.gsub(tostring(expr), "^line %d+: ", ""))}`, 0)
 	end
 
-	return table.concat(out)
+	const result = VM.run(expr :: VM.Expr, VALUE_FUEL)
+
+	if result.status == "value" then
+		return result.value
+	elseif result.status == "error" then
+		error(`line {lineNo}: the {what} raises an error: {result.message}`, 0)
+	end
+
+	error(`line {lineNo}: the {what} runs out of fuel`, 0)
 end
 
 -- Reads one test line, which is on line lineNo of the file.
@@ -127,13 +107,13 @@ const function parseTest(
 		error(`line {lineNo}: fuel must be a whole number above zero, not {fuelText}`, 0)
 	end
 
-	local input: VM.Value
-	local ok, err = pcall(function()
-		input = Data.read(expandStrings(inputText, lineNo))
-	end)
+	const input = evalValue(inputText, lineNo, "input")
 
-	if not ok then
-		error(`line {lineNo}: the input: {tostring(err)}`, 0)
+	-- An input is stored and sent with the program, so it must be data.
+	const okIn, inputErr = pcall(Data.write, input)
+
+	if not okIn then
+		error(`line {lineNo}: the input is not data: {tostring(inputErr)}`, 0)
 	end
 
 	local outcome: string
@@ -142,16 +122,15 @@ const function parseTest(
 	if outputText == "error" or outputText == "out_of_fuel" or outputText == "not_data" then
 		outcome = outputText
 	else
-		local okOut, value = pcall(function()
-			return Data.read(expandStrings(outputText, lineNo))
-		end)
+		const value = evalValue(outputText, lineNo, "output")
+		const okOut, text = pcall(Data.write, value)
 
 		if not okOut then
-			error(`line {lineNo}: the output: {tostring(value)}`, 0)
+			error(`line {lineNo}: the output is not data: {tostring(text)}`, 0)
 		end
 
 		outcome = "value"
-		output = Data.write(value)
+		output = text :: string
 	end
 
 	return {

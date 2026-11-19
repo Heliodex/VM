@@ -13,7 +13,7 @@ The probe is the integer limit: 25! is far past 2^53, and this program computes 
             (mul (fact (- k 1)) k 0)))
       (fact n))))
 ---
-0 => cons 1 nil fuel 1000000
-5 => cons 0 cons 2 cons 1 nil fuel 1000000
-20 => cons 0 cons 0 cons 0 cons 0 cons 4 cons 6 cons 6 cons 7 cons 1 cons 8 cons 0 cons 0 cons 2 cons 0 cons 9 cons 2 cons 3 cons 4 cons 2 nil fuel 1000000
-25 => cons 0 cons 0 cons 0 cons 0 cons 0 cons 0 cons 4 cons 8 cons 9 cons 5 cons 8 cons 9 cons 0 cons 3 cons 3 cons 3 cons 4 cons 0 cons 0 cons 1 cons 2 cons 1 cons 1 cons 5 cons 5 cons 1 nil fuel 1000000
+0 => [1 ~] fuel 1000000
+5 => [0 [2 [1 ~]]] fuel 1000000
+20 => [0 [0 [0 [0 [4 [6 [6 [7 [1 [8 [0 [0 [2 [0 [9 [2 [3 [4 [2 ~]]]]]]]]]]]]]]]]]]] fuel 1000000
+25 => [0 [0 [0 [0 [0 [0 [4 [8 [9 [5 [8 [9 [0 [3 [3 [3 [4 [0 [0 [1 [2 [1 [1 [5 [5 [1 ~]]]]]]]]]]]]]]]]]]]]]]]]]] fuel 1000000

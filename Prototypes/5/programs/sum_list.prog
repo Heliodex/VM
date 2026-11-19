@@ -3,7 +3,7 @@ The input is a list, and a number is not a list, so an integer input is an error
 ---
 (lam xs (letrec sum (lam l (if (? l) 0 (+ (head l) (sum (tail l))))) (sum xs)))
 ---
-nil => 0 fuel 1000
-cons 5 nil => 5 fuel 1000
-cons 1 cons 2 cons 3 nil => 6 fuel 10000
+~ => 0 fuel 1000
+[5 ~] => 5 fuel 1000
+[1 [2 [3 ~]]] => 6 fuel 10000
 0 => error fuel 1000

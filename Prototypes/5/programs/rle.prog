@@ -13,9 +13,9 @@ The probe is a function that builds a list of pairs, with a nested recursive hel
               ((run (tail l)) 1)))))
     (encode s)))
 ---
-"" => nil fuel 200000
-"a" => cons cons 1 97 nil fuel 200000
-"aaab" => cons cons 3 97 cons cons 1 98 nil fuel 200000
-"abba" => cons cons 1 97 cons cons 2 98 cons cons 1 97 nil fuel 200000
-"zzzzzzzzzz" => cons cons 10 122 nil fuel 200000
-"aabbbcccc" => cons cons 2 97 cons cons 3 98 cons cons 4 99 nil fuel 200000
+"" => ~ fuel 200000
+"a" => [[1 97] ~] fuel 200000
+"aaab" => [[3 97] [[1 98] ~]] fuel 200000
+"abba" => [[1 97] [[2 98] [[1 97] ~]]] fuel 200000
+"zzzzzzzzzz" => [[10 122] ~] fuel 200000
+"aabbbcccc" => [[2 97] [[3 98] [[4 99] ~]]] fuel 200000

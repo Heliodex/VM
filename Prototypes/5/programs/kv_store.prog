@@ -4,7 +4,7 @@ Keys here are integers, since the language has no strings.
 ---
 (lam cmds (letrec lookup (lam k (lam s (if (? s) ~ (if (= (head (head s)) k) (tail (head s)) ((lookup k) (tail s)))))) (letrec rev (lam l (lam acc (if (? l) acc ((rev (tail l)) [(head l) acc])))) (letrec run (lam cs (lam s (lam out (if (? cs) ((rev out) ~) (let c (head cs) (let op (head c) (let kv (tail c) (if (= op 0) (((run (tail cs)) [kv s]) out) (((run (tail cs)) s) [(lookup (head kv) s) out]))))))))) (run cmds ~ ~)))))
 ---
-cons cons 0 cons 1 1 cons cons 1 cons 1 nil cons cons 0 cons 1 2 cons cons 1 cons 1 nil cons cons 1 cons 2 nil nil => cons 1 cons 2 cons nil nil fuel 200000
-cons cons 1 cons 1 nil nil => cons nil nil fuel 200000
-cons cons 0 cons 2 7 cons cons 1 cons 2 nil cons cons 1 cons 1 nil nil => cons 7 cons nil nil fuel 200000
-nil => nil fuel 200000
+[[0 [1 1]] [[1 [1 ~]] [[0 [1 2]] [[1 [1 ~]] [[1 [2 ~]] ~]]]]] => [1 [2 [~ ~]]] fuel 200000
+[[1 [1 ~]] ~] => [~ ~] fuel 200000
+[[0 [2 7]] [[1 [2 ~]] [[1 [1 ~]] ~]]] => [7 [~ ~]] fuel 200000
+~ => ~ fuel 200000
