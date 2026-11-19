@@ -17,7 +17,7 @@
 --
 --   <input> => <output> fuel <n>
 --
--- The input and a value output are written in the reader's language, and each is evaluated to a value before the test runs. An input or output must give a value that is data, so it can be written down: a function is refused. An output may instead be one of the outcomes of a run, error, out_of_fuel or not_data, when the test expects that outcome. Blank lines in the test section are skipped. A file needs at least one test.
+-- The input and a value output are written in the reader's language, and each is evaluated to a value before the test runs. The names of the file's imports are in scope for them, so a test can call an imported function. An input may be a function, since it is only given to the program. An output must be data, since two functions cannot be compared, so a function there is refused. An output may instead be one of the outcomes of a run, error, out_of_fuel or not_data, when the test expects that outcome. Blank lines in the test section are skipped. A file needs at least one test.
 --
 --   ProgramFile.parse(text, resolve?, name?): File   raises an error, with the line, if the file is not well formed
 --
@@ -77,9 +77,11 @@ end
 const function evalValue(
 	text: string,
 	lineNo: number,
-	what: string
+	what: string,
+	names: { string },
+	values: { VM.Expr }
 ): VM.Value
-	const ok, expr = pcall(Reader.parse, text)
+	const ok, expr = pcall(Reader.parseWith, text, names, values)
 
 	if not ok then
 		error(`line {lineNo}: the {what}: {(string.gsub(tostring(expr), "^line %d+: ", ""))}`, 0)
@@ -99,7 +101,9 @@ end
 -- Reads one test line, which is on line lineNo of the file.
 const function parseTest(
 	text: string,
-	lineNo: number
+	lineNo: number,
+	names: { string },
+	values: { VM.Expr }
 ): Test
 	const arrow = string.find(text, " => ", 1, true)
 
@@ -122,14 +126,7 @@ const function parseTest(
 		error(`line {lineNo}: fuel must be a whole number above zero, not {fuelText}`, 0)
 	end
 
-	const input = evalValue(inputText, lineNo, "input")
-
-	-- An input is stored and sent with the program, so it must be data.
-	const okIn, inputErr = pcall(Data.write, input)
-
-	if not okIn then
-		error(`line {lineNo}: the input is not data: {tostring(inputErr)}`, 0)
-	end
+	const input = evalValue(inputText, lineNo, "input", names, values)
 
 	local outcome: string
 	local output: string? = nil
@@ -137,7 +134,7 @@ const function parseTest(
 	if outputText == "error" or outputText == "out_of_fuel" or outputText == "not_data" then
 		outcome = outputText
 	else
-		const value = evalValue(outputText, lineNo, "output")
+		const value = evalValue(outputText, lineNo, "output", names, values)
 		const okOut, written = pcall(Data.write, value)
 
 		if not okOut then
@@ -313,7 +310,7 @@ parseFile = function(
 		const line = trim(lines[i])
 
 		if line ~= "" then
-			table.insert(tests, parseTest(line, i))
+			table.insert(tests, parseTest(line, i, names, values))
 		end
 	end
 

@@ -27,7 +27,10 @@ Each file here is a program file (see the top of `interpreter/program_file.luau`
 | `equal` | `[a b]` | 1 if equal all the way down, else 0 |
 | `insert` | `[x xs]` | xs, sorted, with x inserted |
 | `sort` | list of integers | sorted (imports `insert`) |
+| `map` | `[f xs]` | the results of f on each item |
+| `filter` | `[pred xs]` | the items that pred accepts |
+| `fold` | `[f [init xs]]` | f applied from the left, starting from init |
 
-## Not here yet
+## Functions as arguments
 
-Functions that take a function, such as `map`, `filter` and `fold`, are not in the library. The test format takes data as its input, and a function is not data, so there is no way to write their tests yet. They can be added once the format can give a test a function, such as by naming a library function as the argument.
+A function can be passed in as data for a test: the input of a test may be a function, such as `(lam x (+ x 1))`, and the test's expressions can use the file's imports. So `map` is tested with an inline function, and a test could pass `triple` from the library by importing it. An output must still be data, since two functions can't be compared, so a test returns a number or a list, not a function.

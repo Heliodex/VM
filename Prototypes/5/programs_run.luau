@@ -73,11 +73,6 @@ const MALFORMED: { { name: string, text: string, reason: string } } = {
 		reason = "above zero",
 	},
 	{
-		name = "an input that is a function",
-		text = "h\n---\n---\n(lam x x)\n---\n(lam y y) => 1 fuel 10\n",
-		reason = "the input is not data",
-	},
-	{
 		name = "an input that raises an error",
 		text = "h\n---\n---\n(lam x x)\n---\n(head 5) => 1 fuel 10\n",
 		reason = "the input raises an error: head of a non-cell",

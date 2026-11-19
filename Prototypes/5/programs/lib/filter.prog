@@ -1,0 +1,15 @@
+Keeps the items of a list that a test accepts. The input is the pair [pred xs]: pred is a function of one argument that gives nonzero for an item to keep, and the output is the kept items, in order.
+---
+
+---
+(lam p
+  (letrec f (lam l
+        (if (? l) ~
+            (if ((head p) (head l))
+                [(head l) (f (tail l))]
+                (f (tail l)))))
+    (f (tail p))))
+---
+[(lam x (< x 3)) [1 5 2 4 ~]] => [1 2 ~] fuel 100000
+[(lam x (< x 3)) ~] => ~ fuel 100000
+[(lam x 0) [1 2 ~]] => ~ fuel 100000

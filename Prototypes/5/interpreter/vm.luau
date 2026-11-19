@@ -259,9 +259,11 @@ end
 local raisedText: (v: Value) -> string
 
 -- Runs a program with a budget of steps. The result is always one of the outcomes above.
+-- initialEnv is the environment the program starts in, which is empty unless given. It lets a host pass in a value that has no expression form, such as a function, as a variable.
 const function run(
 	program: Expr,
-	fuel: number
+	fuel: number,
+	initialEnv: Binding?
 ): Outcome
 	local stack: { Frame } = {}
 	local depth = 0
@@ -276,7 +278,7 @@ const function run(
 
 	const function loop(): Outcome
 		local expr: Expr = program
-		local env: Binding? = nil
+		local env: Binding? = initialEnv
 		local value: Value = NIL
 		local returning = false
 

@@ -1,0 +1,9 @@
+Applies the first item of its input to the second. The tests pass functions as input: one is imported, from the library, and one is written inline. The import is in scope for the tests as well as the program.
+---
+triple = lib/triple.prog
+---
+(lam p ((head p) (tail p)))
+---
+[triple 4] => 12 fuel 100000
+[(lam x (+ x 1)) 4] => 5 fuel 100000
+[(lam x (head x)) 4] => error fuel 100000

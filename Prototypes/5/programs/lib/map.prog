@@ -1,0 +1,11 @@
+Applies a function to every item of a list. The input is the pair [f xs]: f is a function of one argument, and the output is the list of its results. Each result is computed when its item is reached.
+---
+
+---
+(lam p
+  (letrec m (lam l (if (? l) ~ [((head p) (head l)) (m (tail l))]))
+    (m (tail p))))
+---
+[(lam x (+ x 1)) [1 2 3 ~]] => [2 3 4 ~] fuel 100000
+[(lam x x) ~] => ~ fuel 100000
+[(lam x (* x x)) [3 -4 ~]] => [9 16 ~] fuel 100000

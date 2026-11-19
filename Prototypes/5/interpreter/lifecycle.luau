@@ -13,7 +13,6 @@
 -- The outcomes are value, error, out_of_fuel, and not_data, which is a run whose output holds a function.
 
 const Binary = require "./binary"
-const Code = require "./code"
 const Reader = require "./reader"
 const VM = require "./vm"
 
@@ -40,9 +39,9 @@ const function run(
 	input: VM.Value,
 	fuel: number
 ): Result
-	const inputExpr = Code.toExpr(input)
-	const checked = VM.app(CHECK, VM.app(program, inputExpr))
-	const outcome = VM.run(checked, fuel)
+	-- The input is the variable 0, in an environment that holds it. So an input does not need an expression form, and a function can be an input.
+	const checked = VM.app(CHECK, VM.app(program, VM.var(0)))
+	const outcome = VM.run(checked, fuel, { value = input, rest = nil })
 
 	if outcome.status == "out_of_fuel" then
 		return {
