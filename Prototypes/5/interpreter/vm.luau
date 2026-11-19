@@ -68,11 +68,16 @@ type Frame =
 	| { k: "head" | "tail" | "force" }
 	| { k: "if", t: Expr, e: Expr, env: Binding? }
 	| { k: "apply", arg: Expr, env: Binding? }
-	| { k: "argument", fn: Value }
+	| { k: "argument", arg: Expr, env: Binding?, fn: Closure }
 	| { k: "update", pin: Pin }
 	| { k: "binary", name: string, b: Expr, env: Binding? }
 	| { k: "second", name: string, first: Value }
-	| { k: "unary", name: string }
+	| { k: "kind" }
+
+-- The frame for kind, which has no fields, so one table serves every use.
+const KIND_FRAME = ({
+	k = "kind",
+} :: Frame)
 
 const NIL: Nil = {
 	kind = "nil",
@@ -120,11 +125,6 @@ const function floored_mod(
 
 	if r ~= 0 and (r < 0) ~= (b < 0) then
 		r += b
-	end
-
-	-- A remainder of zero is written as 0, not -0, so it prints the same way.
-	if r == 0 then
-		return 0
 	end
 
 	return r
@@ -194,17 +194,6 @@ const BINARY: {
 	end,
 }
 
-const function integer(
-	v: Value,
-	name: string
-): number
-	if type(v) ~= "number" then
-		return fail(name .. " needs integers")
-	end
-
-	return v
-end
-
 const function binary(
 	name: string,
 	a: Value,
@@ -216,7 +205,11 @@ const function binary(
 		return fail("unknown operation " .. name)
 	end
 
-	const result = f(integer(a, name), integer(b, name))
+	if type(a) ~= "number" or type(b) ~= "number" then
+		return fail(name .. " needs integers")
+	end
+
+	const result = f(a, b)
 
 	if result > MAX_INTEGER or result < -MAX_INTEGER then
 		return fail(name .. " result is out of range")
@@ -251,17 +244,6 @@ const function kindOf(
 	end
 
 	return 4
-end
-
-const function unary(
-	name: string,
-	v: Value
-): number
-	if name == "kind" then
-		return kindOf(v)
-	end
-
-	return fail("unknown operation " .. name)
 end
 
 -- Runs a program with a budget of steps. The result is always one of the outcomes above.
@@ -352,10 +334,7 @@ const function run(
 				else
 					-- The only expression left is a primitive.
 					if expr.b == nil then
-						push {
-							k = "unary",
-							name = expr.name,
-						}
+						push(KIND_FRAME)
 					else
 						push {
 							k = "binary",
@@ -418,24 +397,24 @@ const function run(
 					env = frame.env
 					returning = false
 				elseif frame.k == "apply" then
+					if type(value) ~= "table" or value.kind ~= "closure" then
+						return fail "applying a non-function"
+					end
+
 					push {
 						k = "argument",
+						arg = frame.arg,
+						env = frame.env,
 						fn = value,
 					}
 					expr = frame.arg
 					env = frame.env
 					returning = false
 				elseif frame.k == "argument" then
-					const fn = frame.fn
-
-					if type(fn) ~= "table" or fn.kind ~= "closure" then
-						return fail "applying a non-function"
-					end
-
-					expr = fn.body
+					expr = frame.fn.body
 					env = {
 						value = value,
-						rest = fn.env,
+						rest = frame.fn.env,
 					}
 					returning = false
 				elseif frame.k == "force" then
@@ -477,8 +456,8 @@ const function run(
 				elseif frame.k == "second" then
 					value = binary(frame.name, frame.first, value)
 				else
-					-- The only frame left is unary.
-					value = unary(frame.name, value)
+					-- The only frame left is kind.
+					value = kindOf(value)
 				end
 			end
 		end
