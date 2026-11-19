@@ -159,8 +159,15 @@ const BINARY: {
 			return fail "div by zero"
 		end
 
-		-- Floored: the quotient is the exact multiple of b that leaves the remainder.
-		return (a - floored_mod(a, b)) / b
+		-- Floored, and exact. math.fmod leaves a - fmod(a, b) as the truncated quotient times b, which has magnitude at most |a|, so it is exact on doubles. Adding b to the remainder could push a - r past 2^53 and round, so the floor is taken as a correction to the truncated quotient instead.
+		local r = math.fmod(a, b)
+		local q = (a - r) / b
+
+		if r ~= 0 and (r < 0) ~= (b < 0) then
+			q -= 1
+		end
+
+		return q
 	end,
 	mod = function(
 		a,

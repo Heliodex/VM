@@ -98,6 +98,11 @@ const examples: { Example } = {
 		prim("div", I(-9007199254740991), I(2)),
 		"-4503599627370496"
 	),
+	value(
+		"division near the limit stays exact",
+		prim("div", I(9007199254740991), I(-3)),
+		"-3002399751580331"
+	),
 	value("nil test on nil", isnil(NIL), "1"),
 	value("nil test on a cell", isnil(M.cell(I(1), NIL)), "0"),
 	value("kind of an integer", prim("kind", I(7)), "0"),

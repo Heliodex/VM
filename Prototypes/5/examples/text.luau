@@ -71,6 +71,7 @@ const examples: { Example } = {
 	value("multiplication with a negative gives 0, not -0", "(* 0 -1)", "0"),
 	value("division by half-way stays exact", "(div 9007199254740991 2)", "4503599627370495"),
 	value("the smallest integer, rounded down", "(div -9007199254740991 2)", "-4503599627370496"),
+	value("division near the limit stays exact", "(div 9007199254740991 -3)", "-3002399751580331"),
 	value("nil test on nil", "(? ~)", "1"),
 	value("nil test on a pair", "(? [1 ~])", "0"),
 	value("kind of an integer", "(kind 7)", "0"),
