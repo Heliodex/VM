@@ -123,14 +123,14 @@ const function parseTest(
 		outcome = outputText
 	else
 		const value = evalValue(outputText, lineNo, "output")
-		const okOut, text = pcall(Data.write, value)
+		const okOut, written = pcall(Data.write, value)
 
 		if not okOut then
-			error(`line {lineNo}: the output is not data: {tostring(text)}`, 0)
+			error(`line {lineNo}: the output is not data: {tostring(written)}`, 0)
 		end
 
 		outcome = "value"
-		output = text :: string
+		output = written :: string
 	end
 
 	return {
