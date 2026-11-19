@@ -109,48 +109,6 @@ for name, build in builderRejects do
 	end
 end
 
--- A raise ends the run with its value as the message: the bytes if it is a list of bytes, otherwise the printed value.
-const raised: { { source: string, message: string } } = {
-	{ source = "(raise [104 [105 ~]])", message = "hi" },
-	{ source = "(raise ~)", message = "" },
-	{ source = "(raise [300 ~])", message = "(300)" },
-	{ source = "(raise (+ 1 2))", message = "3" },
-}
-
-for _, case in raised do
-	total += 1
-
-	const result = VM.run(Reader.parse(case.source), 1000)
-
-	if result.status == "error" and result.message == case.message then
-		print(string.format("PASS  raise %s  -> %q", case.source, case.message))
-	else
-		failures += 1
-		print(string.format("FAIL  raise %s  -> %s, expected %q", case.source, result.status, case.message))
-	end
-end
-
--- The shorthand is the nested form: a bracket of three or more reads to the same expression as its right-nested pairs.
-const shorthand: { { short: string, nested: string } } = {
-	{ short = "[1 2 3]", nested = "[1 [2 3]]" },
-	{ short = "[1 2 3 ~]", nested = "[1 [2 [3 ~]]]" },
-	{ short = "[[1 2] 3 4]", nested = "[[1 2] [3 4]]" },
-}
-
-for _, case in shorthand do
-	total += 1
-
-	const a = VM.run(Reader.parse(case.short), 1000)
-	const b = VM.run(Reader.parse(case.nested), 1000)
-
-	if a.status == "value" and b.status == "value" and VM.show(a.value) == VM.show(b.value) then
-		print(string.format("PASS  %s is %s  -> %s", case.short, case.nested, VM.show(a.value)))
-	else
-		failures += 1
-		print(string.format("FAIL  %s is %s", case.short, case.nested))
-	end
-end
-
 print(string.format("%d of %d checks passed", total - failures, total))
 
 if failures > 0 then

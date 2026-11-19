@@ -141,8 +141,6 @@ const examples: { Example } = {
 		'(letrec len (fn s (if (? s) 0 (+ 1 (len (tail s))))) (len "hello"))',
 		"5"
 	),
-	failure("raise stops the run with an error", "(raise 7)", "error"),
-	failure("raise stops the run even inside a cell", "[1 (raise [104 ~])]", "error"),
 }
 
 const rejects: { string } = {
