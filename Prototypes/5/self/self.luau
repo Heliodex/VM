@@ -32,7 +32,7 @@ const LOOKUP_SKEW = `(fix (lam look (lam i (lam env ((lam (e rest) (if (< i (hea
 const EXTEND_SKEW = "(lam (x env) (if (? env) [[1 [1 [x [~ ~]]]] ~] ((lam (e1 rest1) (if (? rest1) [[1 [1 [x [~ ~]]]] env] ((lam (e2 rest2) (if (= (head e1) (head e2)) [[(+ (* 2 (head e1)) 1) [(+ (* 2 (head e1)) 1) [x [(tail e1) (tail e2)]]]] rest2] [[1 [1 [x [~ ~]]]] env])) (head rest1) (tail rest1)))) (head env) (tail env))))"
 
 -- Evaluates the subexpression sub in the current environment.
-local function ev(sub: string): string
+const function ev(sub: string): string
 	return `((rec {sub}) env)`
 end
 
@@ -91,7 +91,7 @@ const PRIMITIVE_TAGS: { [string]: number } = {
 }
 
 -- Builds an expression that evaluates to the quoted form of e.
-local function quote(e: M.Expr): M.Expr
+const function quote(e: M.Expr): M.Expr
 	const function node(
 		tag: number,
 		args: M.Expr
