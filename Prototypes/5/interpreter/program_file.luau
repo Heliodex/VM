@@ -1,13 +1,17 @@
 --!strict
 -- THE PROGRAM FILE
 --
--- A program file keeps a program with its documentation and its tests. It has three sections, separated by lines that hold only ---:
+-- A program file keeps a program with its documentation, the programs it uses, and its tests. It has four sections, separated by lines that hold only ---:
 --
 --   header text, for people, which is not read
 --   ---
---   the program, in the reader's syntax, which reader.luau reads unchanged
+--   imports, one to a line: name = file
+--   ---
+--   the program, in the reader's syntax
 --   ---
 --   the tests, one to a line
+--
+-- An import binds name, inside the program, to the program of another file. The file is named as the resolver gives it, usually a file in the same folder, and it is read with the same format, so it can import in turn. The name is then a function the program can call. An imported program is closed: it cannot use the names of the file that imports it. Imports may not form a cycle, and a file may not import itself through others.
 --
 -- A test line is an input, then =>, then an output, then fuel and a number of steps:
 --
@@ -15,7 +19,9 @@
 --
 -- The input and a value output are written in the reader's language, and each is evaluated to a value before the test runs. An input or output must give a value that is data, so it can be written down: a function is refused. An output may instead be one of the outcomes of a run, error, out_of_fuel or not_data, when the test expects that outcome. Blank lines in the test section are skipped. A file needs at least one test.
 --
---   ProgramFile.parse(text): File      raises an error, with the line, if the file is not well formed
+--   ProgramFile.parse(text, resolve?, name?): File   raises an error, with the line, if the file is not well formed
+--
+-- resolve takes a file name and gives the text of that file, or nil if there is none. It is needed only when the file has imports. name is the name of this file, which is used to detect cycles.
 
 const Data = require "./data"
 const Reader = require "./reader"
@@ -23,6 +29,8 @@ const VM = require "./vm"
 
 -- The budget for evaluating a test's input or expected output. These are literal values, so the budget only has to be generous.
 const VALUE_FUEL = 1000000
+
+export type Resolve = (name: string) -> string?
 
 export type Test = {
 	line: number,
@@ -32,8 +40,15 @@ export type Test = {
 	fuel: number,
 }
 
+export type Import = {
+	line: number,
+	name: string,
+	file: string,
+}
+
 export type File = {
 	header: string,
+	imports: { Import },
 	program: VM.Expr,
 	programLine: number,
 	tests: { Test },
@@ -142,9 +157,36 @@ const function parseTest(
 	}
 end
 
--- Reads a program file.
-const function parse(
-	text: string
+-- Reads one import line, name = file, which is on line lineNo of the file. The name must be a name the reader accepts as a variable.
+const function parseImport(
+	text: string,
+	lineNo: number
+): Import
+	const name, file = string.match(text, "^(%S+)%s*=%s*(%S+)$")
+
+	if name == nil or file == nil then
+		error(`line {lineNo}: an import is name = file, but this is {text}`, 0)
+	end
+
+	if not string.match(name, "^[%a_][%w_%-]*$") or Reader.isReserved(name :: string) then
+		error(`line {lineNo}: {name} is not a name that can be bound`, 0)
+	end
+
+	return {
+		line = lineNo,
+		name = name :: string,
+		file = file :: string,
+	}
+end
+
+-- Loads the program of one file. stack holds the names of the files that are being loaded around this one, so an import of one of them is a cycle.
+local parseFile: (text: string, resolve: Resolve?, name: string?, stack: { string }) -> File
+
+parseFile = function(
+	text: string,
+	resolve: Resolve?,
+	name: string?,
+	stack: { string }
 ): File
 	const lines = splitLines(text)
 	local separators: { number } = {}
@@ -155,34 +197,89 @@ const function parse(
 		end
 	end
 
-	if #separators ~= 2 then
-		error(`a program file has three sections, separated by two lines of ---, but this one has {#separators} such lines`, 0)
+	if #separators ~= 3 then
+		error(`a program file has four sections, separated by three lines of ---, but this one has {#separators} such lines`, 0)
 	end
 
 	const first = separators[1]
 	const second = separators[2]
+	const third = separators[3]
 	const header = table.concat(lines, "\n", 1, first - 1)
-	const programText = table.concat(lines, "\n", first + 1, second - 1)
+
+	local imports: { Import } = {}
+	local seen: { [string]: boolean } = {}
+
+	for i = first + 1, second - 1 do
+		const line = trim(lines[i])
+
+		if line ~= "" then
+			const import = parseImport(line, i)
+
+			if seen[import.name] then
+				error(`line {i}: {import.name} is imported twice`, 0)
+			end
+
+			seen[import.name] = true
+			table.insert(imports, import)
+		end
+	end
+
+	-- The programs of the imports are loaded first. The chain is this file and the files around it, so a cycle is found on the way.
+	const chain = table.clone(stack)
+
+	if name ~= nil then
+		table.insert(chain, name :: string)
+	end
+
+	local names: { string } = {}
+	local values: { VM.Expr } = {}
+
+	for _, import in imports do
+		if resolve == nil then
+			error(`line {import.line}: the import {import.file} needs a folder of program files`, 0)
+		end
+
+		if table.find(chain, import.file) ~= nil then
+			error(`line {import.line}: the imports form a cycle through {import.file}`, 0)
+		end
+
+		const importText = (resolve :: Resolve)(import.file)
+
+		if importText == nil then
+			error(`line {import.line}: cannot find {import.file}`, 0)
+		end
+
+		const ok, loaded = pcall(parseFile, importText :: string, resolve, import.file, chain)
+
+		if not ok then
+			error(`line {import.line}: the import {import.file} is not well formed: {tostring(loaded)}`, 0)
+		end
+
+		table.insert(names, import.name)
+		table.insert(values, (loaded :: File).program)
+	end
+
+	const programText = table.concat(lines, "\n", second + 1, third - 1)
 
 	local program: VM.Expr
 	local ok, err = pcall(function()
-		program = Reader.parse(programText)
+		program = Reader.parseWith(programText, names, values)
 	end)
 
 	if not ok then
-		-- The reader counts lines from the start of the program section, so its line k is line first + k of the file.
+		-- The reader counts lines from the start of the program section, so its line k is line second + k of the file.
 		const readerLine, reason = string.match(tostring(err), "^line (%d+): (.*)$")
 
 		if readerLine then
-			error(`line {first + tonumber(readerLine :: string) :: number}: {reason}`, 0)
+			error(`line {second + tonumber(readerLine :: string) :: number}: {reason}`, 0)
 		end
 
-		error(`the program, which starts on line {first + 1}: {tostring(err)}`, 0)
+		error(`the program, which starts on line {second + 1}: {tostring(err)}`, 0)
 	end
 
 	local tests: { Test } = {}
 
-	for i = second + 1, #lines do
+	for i = third + 1, #lines do
 		const line = trim(lines[i])
 
 		if line ~= "" then
@@ -196,10 +293,20 @@ const function parse(
 
 	return {
 		header = header,
+		imports = imports,
 		program = program,
-		programLine = first + 1,
+		programLine = second + 1,
 		tests = tests,
 	}
+end
+
+-- Reads a program file. See the top of this file for resolve and name.
+const function parse(
+	text: string,
+	resolve: Resolve?,
+	name: string?
+): File
+	return parseFile(text, resolve, name, {})
 end
 
 return {

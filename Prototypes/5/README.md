@@ -150,19 +150,23 @@ A session ends at the first step that does not give a value. It reports which in
 
 ## Program files
 
-A program file keeps a program with its documentation and its tests, in one file with three sections separated by lines that hold only `---`:
+A program file keeps a program with its documentation, the programs it uses, and its tests, in one file with four sections separated by lines that hold only `---`: header, imports, program, tests.
 
 ```
 Header documentation, for people, which is not read.
 ---
-(lam x (+ x 1))
+double = double.prog
 ---
-0 => 1 fuel 1000
-41 => 42 fuel 1000
+(lam x (double (+ x 1)))
+---
+0 => 2 fuel 1000
+41 => 84 fuel 1000
 ~ => error fuel 1000
 ```
 
-The program section is read by `reader.luau`, unchanged. There is no new program syntax. Each test line is an input, then `=>`, then an output, then `fuel` and a number of steps. Inputs and outputs are written in the reader's language, and each is evaluated to a value before the test runs, so `[1 ~]`, `(list 1 2)` and `"ab"` are all valid. An input or output must be data: a function is refused, since it has no written form. An output may also be one of `error`, `out_of_fuel` or `not_data`, which are the outcomes of a run. Blank lines in the test section are skipped, and a file needs at least one test.
+The imports section is empty in a file that uses none. Each line is `name = file`, and it binds `name`, inside the program, to the program of that file in the same folder. An imported program is closed, so it cannot use the importing file's names. An import can itself import, but a cycle is an error, and so is an import that cannot be found. Imports are looked up through a resolver, so the parser never reads files itself.
+
+The program section is read by `reader.luau`, with the imported names bound around it. There is no new program syntax. Each test line is an input, then `=>`, then an output, then `fuel` and a number of steps. Inputs and outputs are written in the reader's language, and each is evaluated to a value before the test runs, so `[1 ~]`, `(list 1 2)` and `"ab"` are all valid. An input or output must be data: a function is refused, since it has no written form. An output may also be one of `error`, `out_of_fuel` or `not_data`, which are the outcomes of a run. Blank lines in the test section are skipped, and a file needs at least one test.
 
 Each test runs through the lifecycle, so its output is checked as data. `programs_run.luau` runs the tests in `programs/`, and checks that malformed files are refused with the right reason. It uses `lute`, because this Luau build cannot read files; the file reading is `@lute/fs`.
 

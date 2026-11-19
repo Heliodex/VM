@@ -1,6 +1,7 @@
 Whether a string is a palindrome, which the program decides by reversing it and comparing the two. The output is 1 for a palindrome and 0 otherwise. Case matters, so Aba is not one.
 The probe is two lists walked together: the comparison stops as soon as one runs out, and checks both are empty together.
 ---
+---
 (lam s
   (letrec rev (lam l (lam acc
         (if (? l) acc ((rev (tail l)) [(head l) acc]))))

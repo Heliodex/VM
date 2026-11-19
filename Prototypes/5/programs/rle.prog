@@ -1,6 +1,7 @@
 Run-length encoding of a string: each run of the same byte becomes a pair [count byte], and the pairs are the list of the runs in order.
 The probe is a function that builds a list of pairs, with a nested recursive helper that counts a run and then hands the rest back to the outer function.
 ---
+---
 (lam s
   (letrec encode (lam l
       (if (? l) ~

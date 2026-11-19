@@ -1,6 +1,7 @@
 The factorial of n, as a list of decimal digits, least significant first. Each digit is multiplied and carried, so no number is ever bigger than a digit times n.
 The probe is the integer limit: 25! is far past 2^53, and this program computes it exactly, since no single integer ever gets near the limit.
 ---
+---
 (lam n
   (letrec mul (lam d (lam m (lam c
       (if (? d)

@@ -1,6 +1,7 @@
 Whether a string has an even number of b's, with a and b the only bytes allowed. The result is a pair: [0 1] if the count is even, [0 0] if it is odd, and [1 "bad character"] for any other byte. The two states, even and odd, are mutually recursive, and each reads the next byte and switches to the other state on a b.
 The probe is mutual recursion over a string, with a failure carried as a value through the walk.
 ---
+---
 (lam s
   (mutual ((even (lam l
               (if (? l) [0 1]

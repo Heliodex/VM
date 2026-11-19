@@ -37,66 +37,114 @@ const function readFile(
 	return text
 end
 
+-- The text of a program file in programs/, or nil if there is none. Imports are looked up here.
+const function resolve(
+	name: string
+): string?
+	const ok, text = pcall(readFile, `programs/{name}`)
+
+	if ok then
+		return text :: string
+	end
+
+	return nil
+end
+
 -- Malformed files, each with a fragment of the reason it should be refused.
 const MALFORMED: { { name: string, text: string, reason: string } } = {
 	{
 		name = "a file with one separator",
 		text = "header\n---\n(lam x x)\n1 => 1 fuel 10\n",
-		reason = "three sections",
+		reason = "four sections",
 	},
 	{
 		name = "a test with no =>",
-		text = "h\n---\n(lam x x)\n---\n1 1 fuel 10\n",
+		text = "h\n---\n---\n(lam x x)\n---\n1 1 fuel 10\n",
 		reason = "needs => between",
 	},
 	{
 		name = "a test with no fuel",
-		text = "h\n---\n(lam x x)\n---\n1 => 1\n",
+		text = "h\n---\n---\n(lam x x)\n---\n1 => 1\n",
 		reason = "needs fuel",
 	},
 	{
 		name = "a test with zero fuel",
-		text = "h\n---\n(lam x x)\n---\n1 => 1 fuel 0\n",
+		text = "h\n---\n---\n(lam x x)\n---\n1 => 1 fuel 0\n",
 		reason = "above zero",
 	},
 	{
 		name = "an input that is a function",
-		text = "h\n---\n(lam x x)\n---\n(lam y y) => 1 fuel 10\n",
+		text = "h\n---\n---\n(lam x x)\n---\n(lam y y) => 1 fuel 10\n",
 		reason = "the input is not data",
 	},
 	{
 		name = "an input that raises an error",
-		text = "h\n---\n(lam x x)\n---\n(head 5) => 1 fuel 10\n",
+		text = "h\n---\n---\n(lam x x)\n---\n(head 5) => 1 fuel 10\n",
 		reason = "the input raises an error: head of a non-cell",
 	},
 	{
 		name = "an output that is a function",
-		text = "h\n---\n(lam x x)\n---\n1 => (lam y y) fuel 10\n",
+		text = "h\n---\n---\n(lam x x)\n---\n1 => (lam y y) fuel 10\n",
 		reason = "the output is not data",
 	},
 	{
 		name = "an output that does not read",
-		text = "h\n---\n(lam x x)\n---\n1 => (lam y fuel 10\n",
+		text = "h\n---\n---\n(lam x x)\n---\n1 => (lam y fuel 10\n",
 		reason = "the output: ( is never closed",
 	},
 	{
 		name = "a program with an unbound name",
-		text = "h\n---\n(lam x y)\n---\n1 => 1 fuel 10\n",
-		reason = "line 3: y is not bound",
+		text = "h\n---\n---\n(lam x y)\n---\n1 => 1 fuel 10\n",
+		reason = "line 4: y is not bound",
+	},
+	{
+		name = "an import line with no =",
+		text = "h\n---\nhelper.prog\n---\n(lam x x)\n---\n1 => 1 fuel 10\n",
+		reason = "an import is name = file",
+	},
+	{
+		name = "an import whose name is reserved",
+		text = "h\n---\nlam = helper.prog\n---\n(lam x x)\n---\n1 => 1 fuel 10\n",
+		reason = "lam is not a name that can be bound",
+	},
+	{
+		name = "an import of a file that is not there",
+		text = "h\n---\nhelper = missing.prog\n---\n(lam x x)\n---\n1 => 1 fuel 10\n",
+		reason = "cannot find missing.prog",
 	},
 	{
 		name = "a file with no tests",
-		text = "h\n---\n(lam x x)\n---\n\n",
+		text = "h\n---\n---\n(lam x x)\n---\n\n",
 		reason = "at least one test",
 	},
 }
 
 for _, case in MALFORMED do
-	const ok, err = pcall(ProgramFile.parse, case.text)
+	const ok, err = pcall(ProgramFile.parse, case.text, resolve, "malformed.prog")
 	check(
 		`refuses {case.name}`,
 		not ok and string.find(tostring(err), case.reason, 1, true) ~= nil,
 		if ok then "it parsed, but it should not" else tostring(err)
+	)
+end
+
+-- A cycle: a file that imports itself through another file. The loop is found when loop.prog is loaded, so the whole load is refused.
+do
+	const files: { [string]: string } = {
+		["loop.prog"] = "h\n---\nagain = loop.prog\n---\n(lam x x)\n---\n1 => 1 fuel 10\n",
+	}
+	const ok, err = pcall(
+		ProgramFile.parse,
+		"h\n---\nstart = loop.prog\n---\n(lam x x)\n---\n1 => 1 fuel 10\n",
+		function(name: string): string?
+			return files[name]
+		end,
+		"top.prog"
+	)
+	check(
+		"refuses an import cycle",
+		not ok and string.find(tostring(err), "form a cycle through loop.prog", 1, true) ~= nil,
+		tostring(err)
 	)
 end
 
@@ -116,7 +164,7 @@ local tests = 0
 for _, name in files do
 	const path = `programs/{name}`
 	const ok, parsed = pcall(function()
-		return ProgramFile.parse(readFile(path))
+		return ProgramFile.parse(readFile(path), resolve, name)
 	end)
 
 	if not ok then

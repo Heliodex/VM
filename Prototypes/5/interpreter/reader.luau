@@ -630,7 +630,43 @@ const function parse(
 	return compile(node, {})
 end
 
+-- Reads a program in which each names[i] is bound to values[i], an expression that is closed, so it does not refer to any of the names. The first name is the outermost binding. This is how a program file's imports are bound.
+const function parseWith(
+	source: string,
+	names: { string },
+	values: { M.Expr }
+): M.Expr
+	const tokens = tokenize(source)
+
+	if #tokens == 0 then
+		error("line 1: the program is empty", 0)
+	end
+
+	const node, after = readNode(tokens, 1)
+
+	if after <= #tokens then
+		fail(tokens[after].line, "there is more text after the expression")
+	end
+
+	-- The scope lists the names innermost first, so the last name is the innermost.
+	local scope: { string } = {}
+
+	for i = 1, #names do
+		table.insert(scope, 1, names[i])
+	end
+
+	local body = compile(node, scope)
+
+	for i = #names, 1, -1 do
+		body = M.app(M.lam(body), values[i])
+	end
+
+	return body
+end
+
 return {
 	parse = parse,
+	parseWith = parseWith,
 	scanString = scanString,
+	isReserved = reserved,
 }

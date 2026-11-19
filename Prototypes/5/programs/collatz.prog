@@ -1,6 +1,7 @@
 The number of Collatz steps for n to reach 1: halve an even number, and take three times it plus one for an odd one. Zero never reaches 1, so it loops until the fuel runs out, which is the outcome out_of_fuel.
 The probe is a loop with a numeric exit condition, and an input that never meets it.
 ---
+---
 (lam n
   (letrec steps (lam k (lam acc
         (if (= k 1) acc

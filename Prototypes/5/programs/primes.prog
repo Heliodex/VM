@@ -1,6 +1,7 @@
 The first n primes, from a sieve over an infinite stream. Each stream is [head tail], and the tail is a pin, so only the part that is asked for is ever computed.
 The probe is laziness: pins inside a structure, forced by the lifecycle's output check, and a recursive filter that is built into each pin.
 ---
+---
 (lam n
   (letrec from (lam k [k (pin (from (+ k 1)))])
     (letrec filter (lam p (lam s

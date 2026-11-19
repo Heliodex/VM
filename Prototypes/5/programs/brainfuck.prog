@@ -1,6 +1,7 @@
 A Brainfuck interpreter for the instructions + - > < . [ and ]. The input is the program as a string, and the output is the list of the cell values written by the . instruction, in order. Other characters are comments.
 The tape is a zipper: the cells to the left, the current cell, and the cells to the right, with cells that were never touched read as 0. The code is a zipper too, so a bracket is found by walking along it, with no indexing. A [ that is never closed is an error.
 ---
+---
 (lam prog
   (letrec advance
     (lam z

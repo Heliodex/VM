@@ -2,6 +2,7 @@ Counts the words in a text, given as a string literal.
 A word is a run of characters that are not spaces (code 32).
 The probe is text processing: a string is a list of bytes, and the program walks it with a state that says whether it is inside a word.
 ---
+---
 (lam s
   (letrec go (lam l (lam inword (lam count
       (if (? l)

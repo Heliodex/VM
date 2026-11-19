@@ -1,6 +1,7 @@
 Parses a decimal integer from a string: an optional minus sign, then one or more digits. The result is a pair: [0 n] for a number, or [1 message] for a failure, with a message that says what was wrong. A failure is a value, not a raise, so a caller can check it and carry on.
 The probe is errors as values. A minus sign alone, and an empty string, are both failures. The tests check the message as part of the output.
 ---
+---
 (lam s
   (letrec digits (lam l (lam acc
         (if (? l) [0 acc]
