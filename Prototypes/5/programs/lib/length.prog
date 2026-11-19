@@ -1,0 +1,12 @@
+The number of items in a list. The input is a list; the output is its length. nil has length 0.
+---
+
+---
+(lam xs
+  (letrec go (lam l (lam n (if (? l) n ((go (tail l)) (+ n 1)))))
+    ((go xs) 0)))
+---
+~ => 0 fuel 100000
+[1 2 3 ~] => 3 fuel 100000
+[5 ~] => 1 fuel 100000
+"abc" => 3 fuel 100000

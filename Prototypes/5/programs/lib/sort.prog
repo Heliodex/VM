@@ -1,0 +1,12 @@
+Sorts a list of integers, by insertion. It uses insert from lib/insert.prog, which is imported as a standard library function.
+---
+insert = lib/insert.prog
+---
+(lam xs
+  (letrec s (lam l (if (? l) ~ (insert [(head l) (s (tail l))])))
+    (s xs)))
+---
+~ => ~ fuel 100000
+[3 1 2 ~] => [1 2 3 ~] fuel 100000
+[5 5 1 ~] => [1 5 5 ~] fuel 100000
+[-1 0 -3 ~] => [-3 -1 0 ~] fuel 100000

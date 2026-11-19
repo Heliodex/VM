@@ -1,0 +1,9 @@
+The larger of two integers. The input is the pair [a b].
+---
+
+---
+(lam p (if (< (head p) (tail p)) (tail p) (head p)))
+---
+[3 7] => 7 fuel 100000
+[7 3] => 7 fuel 100000
+[-2 -5] => -2 fuel 100000

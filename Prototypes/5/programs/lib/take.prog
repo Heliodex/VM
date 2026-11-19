@@ -1,0 +1,13 @@
+The first n items of a list. The input is the pair [n xs]. If n is more than the length, the whole list is given; if n is 0 or less, the result is nil.
+---
+
+---
+(lam p
+  (letrec t (lam n (lam l
+        (if (if (< n 1) 1 (? l)) ~ [(head l) ((t (- n 1)) (tail l))])))
+    ((t (head p)) (tail p))))
+---
+[2 [1 2 3 ~]] => [1 2 ~] fuel 100000
+[0 [1 2 ~]] => ~ fuel 100000
+[5 [1 2 ~]] => [1 2 ~] fuel 100000
+[1 ~] => ~ fuel 100000
