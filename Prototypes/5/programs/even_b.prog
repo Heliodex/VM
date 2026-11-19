@@ -1,0 +1,25 @@
+Whether a string has an even number of b's, with a and b the only bytes allowed. The two states, even and odd, are mutually recursive, and each reads the next byte and switches to the other state on a b. Any other byte is a named error.
+The probe is mutual recursion over a string, with a named error in the middle of the walk.
+---
+(lam s
+  (mutual ((even (lam l
+              (if (? l) 1
+                  (let c (head l)
+                    (if (= c 97) (even (tail l))
+                        (if (= c 98) (odd (tail l)) (raise "bad character")))))))
+           (odd (lam l
+              (if (? l) 0
+                  (let c (head l)
+                    (if (= c 97) (odd (tail l))
+                        (if (= c 98) (even (tail l)) (raise "bad character"))))))))
+    (even s)))
+---
+"" => 1 fuel 200000
+"a" => 1 fuel 200000
+"b" => 0 fuel 200000
+"abba" => 1 fuel 200000
+"bab" => 1 fuel 200000
+"aabab" => 1 fuel 200000
+"bbb" => 0 fuel 200000
+"abc" => error fuel 200000
+"a b" => error fuel 200000

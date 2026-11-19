@@ -1,0 +1,21 @@
+Run-length encoding of a string: each run of the same byte becomes a pair [count byte], and the pairs are the list of the runs in order.
+The probe is a function that builds a list of pairs, with a nested recursive helper that counts a run and then hands the rest back to the outer function.
+---
+(lam s
+  (letrec encode (lam l
+      (if (? l) ~
+          (let b (head l)
+            (letrec run (lam r (lam n
+                  (if (? r) [[n b] ~]
+                      (if (= (head r) b)
+                          ((run (tail r)) (+ n 1))
+                          [[n b] (encode r)]))))
+              ((run (tail l)) 1)))))
+    (encode s)))
+---
+"" => nil fuel 200000
+"a" => cons cons 1 97 nil fuel 200000
+"aaab" => cons cons 3 97 cons cons 1 98 nil fuel 200000
+"abba" => cons cons 1 97 cons cons 2 98 cons cons 1 97 nil fuel 200000
+"zzzzzzzzzz" => cons cons 10 122 nil fuel 200000
+"aabbbcccc" => cons cons 2 97 cons cons 3 98 cons cons 4 99 nil fuel 200000
