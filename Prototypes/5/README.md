@@ -11,6 +11,7 @@ A strict, sequential interpreter for a small functional language with native dat
 | `interpreter/code.luau` | A program as data: the tag table, and the conversion between an expression and its quoted value, checked on the way back. |
 | `interpreter/data.luau` | The data format: values to text and back, for interchange. Separate from the reader. See "The data format" below. |
 | `interpreter/binary.luau` | The binary format: values and programs to bytes and back. See "The binary format" below. |
+| `interpreter/lifecycle.luau` | Runs a program on an input, and checks the output. See "The lifecycle" below. |
 | `examples/examples.luau` | 49 programs built with the builders, each with a fuel budget and its expected outcome. |
 | `examples/text.luau` | 49 programs in the text syntax, plus 18 sources the reader must reject. |
 | `examples/programs.luau` | 9 longer programs in the text syntax, using `letrec`: an accumulator, reverse, append, insertion sort, word counting, deep equality, a tree evaluator and gcd. |
@@ -22,6 +23,7 @@ A strict, sequential interpreter for a small functional language with native dat
 | `env_run.luau` | The environment experiment: a linked list against a skew binary random-access list, in the self-interpreter. |
 | `data_run.luau` | Checks the data format: written texts, rejected texts, refused functions and pins, and a round trip for every example that gives a value. |
 | `binary_run.luau` | Checks the binary format: exact bytes, refused bytes, and a round trip for every example value and program. |
+| `lifecycle_run.luau` | Checks the lifecycle: programs applied to inputs, the outcomes, and the same runs through the binary format. |
 
 ## Running
 
@@ -35,6 +37,7 @@ Run from this directory.
 | The environment experiment | `luau env_run.luau` |
 | The data format checks | `luau data_run.luau` |
 | The binary format checks | `luau binary_run.luau` |
+| The lifecycle checks | `luau lifecycle_run.luau` |
 | The analyser | `luau-analyze interpreter/*.luau examples/*.luau self/*.luau run.luau self_run.luau self_data_run.luau` |
 | The formatter | `luau-format interpreter/*.luau examples/*.luau self/*.luau run.luau self_run.luau self_data_run.luau` |
 
@@ -97,6 +100,23 @@ Functions and pins have no written form. Writing one is an error, including when
 A program is the quoted form from `interpreter/code.luau`, so the tag table is shared with the self-interpreter. Decoding a program checks its shape, so a program from outside cannot reach a form the machine does not have.
 
 The decoder is strict: it refuses an unknown header or tag, a number that is not in its shortest form, a negative zero, an integer past the limit, bytes that stop early, and bytes after the value. The writer and reader both walk cells with an explicit stack. The bytes are held in a Luau `buffer`: the writer grows it by doubling, and the reader reads it with `readu8`, which checks the bounds.
+
+## The lifecycle
+
+A program is a function. The host applies it to an input value, and the result is the output. A run is determined by the program, the input and the fuel, so it can be repeated and stored.
+
+The output must be data. The output check forces every pin inside it, and walks cells, and it is written in the language, so forcing costs fuel like any other step. A pin that never finishes therefore ends the run as `out_of_fuel`, the same as a loop, and a pin that errors ends it as `error`.
+
+The outcomes are:
+
+- `value`, with the output
+- `error`, with a message
+- `out_of_fuel`
+- `not_data`, when the output holds a function, in a cell or at the top
+
+`Lifecycle.runBytes` runs the same thing from bytes: the program and the input are decoded, and the output is encoded. A program or input that does not decode is an `error`, and the program is not run.
+
+Interactive programs are not yet supported. The intended form is a program that takes a state and an input and returns a new state and an output, with the host keeping the state between runs.
 
 ## The self-interpreter
 
