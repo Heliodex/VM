@@ -19,6 +19,7 @@
 
 const M = require "../interpreter/vm"
 const Reader = require "../interpreter/reader"
+const Code = require "../interpreter/code"
 
 -- The environment representations. An environment is a lookup, which takes an index and an environment, and an extend, which takes a value and an environment and returns the new environment. Both are text, so an interpreter can be built with either.
 
@@ -79,55 +80,9 @@ end
 
 const EVAL = build(LOOKUP_LIST, EXTEND_LIST)
 
-const PRIMITIVE_TAGS: { [string]: number } = {
-	add = 11,
-	sub = 12,
-	mul = 13,
-	lt = 14,
-	eq = 15,
-	kind = 16,
-	div = 17,
-	mod = 18,
-}
-
--- Builds an expression that evaluates to the quoted form of e.
+-- Builds an expression that evaluates to the quoted form of e. The tags are in code.luau.
 const function quote(e: M.Expr): M.Expr
-	const function node(
-		tag: number,
-		args: M.Expr
-	): M.Expr
-		return M.cell(M.int(tag), args)
-	end
-
-	if e.op == "quote" then
-		return node(0, M.list({ M.int(e.value) }))
-	elseif e.op == "nil" then
-		return node(1, M.nilv())
-	elseif e.op == "var" then
-		return node(2, M.list({ M.int(e.index) }))
-	elseif e.op == "lam" then
-		return node(3, M.list({ quote(e.body) }))
-	elseif e.op == "pin" then
-		return node(4, M.list({ quote(e.e) }))
-	elseif e.op == "cell" then
-		return node(5, M.list({ quote(e.head), quote(e.tail) }))
-	elseif e.op == "head" then
-		return node(6, M.list({ quote(e.e) }))
-	elseif e.op == "tail" then
-		return node(7, M.list({ quote(e.e) }))
-	elseif e.op == "force" then
-		return node(8, M.list({ quote(e.e) }))
-	elseif e.op == "if" then
-		return node(9, M.list({ quote(e.c), quote(e.t), quote(e.e) }))
-	elseif e.op == "apply" then
-		return node(10, M.list({ quote(e.f), quote(e.arg) }))
-	end
-
-	const tag = PRIMITIVE_TAGS[e.name]
-	if e.b == nil then
-		return node(tag, M.list({ quote(e.a) }))
-	end
-	return node(tag, M.list({ quote(e.a), quote(e.b) }))
+	return Code.toExpr(Code.toValue(e))
 end
 
 -- The expression that runs a program through an interpreter, with an empty environment.

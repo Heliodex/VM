@@ -8,6 +8,7 @@ A strict, sequential interpreter for a small functional language with native dat
 | --- | --- |
 | `interpreter/vm.luau` | The machine, the printer, and the builders for expressions. |
 | `interpreter/reader.luau` | The reader: text syntax to expressions. The syntax is described at the top of the file. |
+| `interpreter/code.luau` | A program as data: the tag table, and the conversion between an expression and its quoted value, checked on the way back. |
 | `interpreter/data.luau` | The data format: values to text and back, for interchange. Separate from the reader. See "The data format" below. |
 | `examples/examples.luau` | 49 programs built with the builders, each with a fuel budget and its expected outcome. |
 | `examples/text.luau` | 49 programs in the text syntax, plus 18 sources the reader must reject. |
@@ -84,7 +85,7 @@ Functions and pins have no written form. Writing one is an error, including when
 
 ## The self-interpreter
 
-`self/self.luau` holds an interpreter for the language, written in the language, in `EVAL`. It takes a program as data, a pair `[tag args]` for each form, and an environment, and returns the value. The tags are listed at the top of the file.
+`self/self.luau` holds an interpreter for the language, written in the language, in `EVAL`. It takes a program as data, a pair `[tag args]` for each form, and an environment, and returns the value. The tags are listed at the top of `interpreter/code.luau`, which quotes programs for it.
 
 The interpreter reuses the host's closures and pins. An object `lam` becomes a native `lam`, and an object `pin` becomes a native `pin`. So the machine's own errors and laziness apply to the object program, and the interpreter only has to work out the environment.
 
