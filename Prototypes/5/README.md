@@ -58,7 +58,7 @@ Out of fuel is a result, not a hang, so a diverging program can be tested like a
 - **Numbers are Luau numbers,** so integers are exact only up to 2^53.
 - **Pins are memoised,** but the examples cannot see the difference except through step counts.
 - **Variables are de Bruijn indices.** The machine never sees a name: `var 0` is the innermost binder, `var 1` the one outside it. The reader turns names into indices and rejects a name that is not bound, so the machine has no unbound-name errors from programs read from text. Names exist only in the reader and the surface syntax. The language has no symbol type, so a self-interpreter could not compare names anyway.
-- **Expressions are built by Lua functions,** not parsed from text. Surface syntax is a later decision.
+- **Expressions can be built two ways:** by the Lua builders in `vm.luau`, or read from the text syntax by `reader.luau`. Both give the same `Expr`, and the examples use each.
 - **The printer is recursive** on nested data, which is fine for a reference but would need care for very deep structures.
 
 ## The self-interpreter

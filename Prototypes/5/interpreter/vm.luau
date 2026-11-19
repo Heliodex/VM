@@ -39,7 +39,7 @@ export type TailExpr = { op: "tail", e: Expr }
 export type ForceExpr = { op: "force", e: Expr }
 export type IfExpr = { op: "if", c: Expr, t: Expr, e: Expr }
 export type ApplyExpr = { op: "apply", f: Expr, arg: Expr }
--- b is absent for the unary primitive isnil
+-- b is absent for the unary primitive kind
 export type PrimExpr = { op: "prim", name: string, a: Expr, b: Expr? }
 
 -- VALUES

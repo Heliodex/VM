@@ -14,7 +14,7 @@
 --
 -- The interpreter does not build its own closures and pins. A quoted lam becomes a native lam, and a quoted pin becomes a native pin, so the machine's own errors and laziness apply to the object program. The only thing it has to work out is the environment, which is a list of values, indexed by tails.
 --
--- A program that is not well formed is not checked, since the language has no type test beyond isnil.
+-- A program that is not well formed is not checked. The only type test in the language is kind, and the interpreter does not use it to check programs.
 
 const M = require "../interpreter/vm"
 const Reader = require "../interpreter/reader"
