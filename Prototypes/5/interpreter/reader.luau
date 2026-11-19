@@ -9,6 +9,7 @@
 --   (lam x body)       a function of x; (lam (x y) body) is the same as (lam x (lam y body))
 --   (f a b)            application, curried: (f a b) is ((f a) b)
 --   [a b]              a pair
+--   "abc"              a string: a list of its bytes, so "" is nil. Escapes are \" \\ \n \t and \0
 --   (list a b c)       a proper list of a, b and c
 --   (head e), (tail e)
 --   (if c t e)         evaluates t if c is nonzero, otherwise e
@@ -37,11 +38,14 @@ const M = require "./vm"
 type Token = {
 	text: string,
 	line: number,
+	-- set for a string literal, to its bytes
+	codes: { number }?,
 }
 
 -- An expression as written, before it is compiled. Groups keep their line for error messages.
 type Node =
 	| { kind: "int", value: number, line: number }
+	| { kind: "str", codes: { number }, line: number }
 	| { kind: "sym", name: string, line: number }
 	| { kind: "list", items: { Node }, line: number }
 	| { kind: "pair", items: { Node }, line: number }
@@ -92,6 +96,52 @@ const function fail(
 	return error(string.format("line %d: %s", line, message), 0)
 end
 
+-- The escapes a string literal may use, by the character after the backslash, and the byte each one is.
+const ESCAPES: { [string]: number } = {
+	['"'] = 34,
+	["\\"] = 92,
+	n = 10,
+	t = 9,
+	["0"] = 0,
+}
+
+-- Reads the string literal whose opening quote is at position start. Returns its bytes and the position after the closing quote. A string is a list of bytes, so a character above 255 cannot be written in one.
+local function scanString(
+	source: string,
+	start: number,
+	line: number
+): ({ number }, number)
+	local codes: { number } = {}
+	local j = start + 1
+
+	while true do
+		if j > #source then
+			fail(line, "a string is never closed")
+		end
+
+		const ch = string.sub(source, j, j)
+
+		if ch == '"' then
+			return codes, j + 1
+		elseif ch == "\n" then
+			fail(line, "a string cannot run over a line")
+		elseif ch == "\\" then
+			const escape = string.sub(source, j + 1, j + 1)
+			const code = ESCAPES[escape]
+
+			if code == nil then
+				fail(line, "unknown escape \\" .. escape)
+			end
+
+			table.insert(codes, code)
+			j += 2
+		else
+			table.insert(codes, string.byte(ch) :: number)
+			j += 1
+		end
+	end
+end
+
 const function tokenize(
 	source: string
 ): { Token }
@@ -113,6 +163,10 @@ const function tokenize(
 		elseif c == "(" or c == ")" or c == "[" or c == "]" then
 			table.insert(tokens, { text = c, line = line })
 			i += 1
+		elseif c == '"' then
+			const codes, after = scanString(source, i, line)
+			table.insert(tokens, { text = string.sub(source, i, after - 1), line = line, codes = codes })
+			i = after
 		else
 			const text: string = string.match(source, "^[^%s()%[%];]+", i) :: string
 			table.insert(tokens, { text = text, line = line })
@@ -163,6 +217,10 @@ readNode = function(
 
 	if token.text == ")" or token.text == "]" then
 		fail(token.line, `unexpected {token.text}`)
+	end
+
+	if token.codes then
+		return { kind = "str", codes = token.codes, line = token.line }, pos + 1
 	end
 
 	if token.text == "(" then
@@ -502,6 +560,17 @@ compile = function(
 		return M.int(node.value)
 	end
 
+	if node.kind == "str" then
+		-- A string is the list of its bytes, so the empty string is nil.
+		local elements: { M.Expr } = {}
+
+		for _, code in node.codes do
+			table.insert(elements, M.int(code))
+		end
+
+		return M.list(elements)
+	end
+
 	if node.kind == "sym" then
 		if node.name == "~" then
 			return M.nilv()
@@ -554,4 +623,5 @@ end
 
 return {
 	parse = parse,
+	scanString = scanString,
 }

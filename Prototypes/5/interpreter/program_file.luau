@@ -55,6 +55,52 @@ const function splitLines(
 	return lines
 end
 
+-- The data text for a list of bytes, in the data format: cons and each byte, ending in nil. The empty list is nil.
+const function bytesText(
+	codes: { number }
+): string
+	local parts: { string } = {}
+
+	for _, code in codes do
+		table.insert(parts, "cons")
+		table.insert(parts, tostring(code))
+	end
+
+	table.insert(parts, "nil")
+	return table.concat(parts, " ")
+end
+
+-- Replaces each string literal in a test's text with the data text of its bytes, so a test can write "abc" where the data format would write a list. The rest of the text is kept as it is. A string that is never closed, or has a bad escape, is an error.
+const function expandStrings(
+	text: string,
+	lineNo: number
+): string
+	local out: { string } = {}
+	local i = 1
+
+	while i <= #text do
+		const quote = string.find(text, '"', i, true)
+
+		if quote == nil then
+			table.insert(out, string.sub(text, i))
+			break
+		end
+
+		table.insert(out, string.sub(text, i, quote - 1))
+
+		const ok, codes, after = pcall(Reader.scanString, text, quote, lineNo)
+
+		if not ok then
+			error(`line {lineNo}: {string.gsub(tostring(codes), "^line %d+: ", "")}`, 0)
+		end
+
+		table.insert(out, bytesText(codes :: { number }))
+		i = after :: number
+	end
+
+	return table.concat(out)
+end
+
 -- Reads one test line, which is on line lineNo of the file.
 const function parseTest(
 	text: string,
@@ -83,7 +129,7 @@ const function parseTest(
 
 	local input: VM.Value
 	local ok, err = pcall(function()
-		input = Data.read(inputText)
+		input = Data.read(expandStrings(inputText, lineNo))
 	end)
 
 	if not ok then
@@ -96,7 +142,9 @@ const function parseTest(
 	if outputText == "error" or outputText == "out_of_fuel" or outputText == "not_data" then
 		outcome = outputText
 	else
-		local okOut, value = pcall(Data.read, outputText)
+		local okOut, value = pcall(function()
+			return Data.read(expandStrings(outputText, lineNo))
+		end)
 
 		if not okOut then
 			error(`line {lineNo}: the output: {tostring(value)}`, 0)

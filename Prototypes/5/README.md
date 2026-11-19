@@ -61,6 +61,9 @@ The runners exit with status 1 if any check fails.
 - **Recursion:** `M.fix` is the strict fixed-point combinator. A recursive function is `app(fix, lam(lam(...)))`, and the outer binder, index 1 inside the inner body, refers to the function itself.
 - **Local names:** `(let x e body)` binds `x` in `body` only, as sugar for applying a `lam`. It is not recursive.
 - **Recursive functions:** `(letrec f (lam ...) body)` binds `f` to a function that can call itself. It is sugar for `let` with `fix`, so it costs nothing at run time: the programs in `examples/programs.luau` take the same number of steps with it as with `fix` written out.
+- **Mutual recursion:** `(mutual ((f (lam ...)) (g (lam ...))) body)` binds several functions that can call each other. It is sugar in the reader, with no machine change: the group shares one fixed point, and each name is a call through it.
+- **Errors:** `(raise e)` evaluates `e` and ends the run as `error`. The message is the bytes of `e` if it is a list of integers from 0 to 255, and its printed form otherwise. The message is the only thing a raise carries, so programs that give their own errors can say what went wrong.
+- **Strings:** `"abc"` reads as the list of its bytes, so `"abc"` is `(97 98 99)` and `""` is nil. The escapes are `\"`, `\\`, `\n`, `\t` and `\0`. A string holds bytes, so text outside ASCII is written as its bytes. The data format has no strings; a program file's test lines may write `"abc"`, which is expanded to the data text before it is read.
 - **Pins:** a pin is a suspended expression. Creating one does not run it. Forcing it runs it once, and later forces return the same value.
 
 ## Fuel and outcomes

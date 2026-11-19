@@ -124,12 +124,26 @@ const examples: { Example } = {
 	value("mutual recursion: even of 6", "(mutual ((ev (lam k (if (= k 0) 1 (od (- k 1))))) (od (lam k (if (= k 0) 0 (ev (- k 1)))))) (ev 6))", "1"),
 	value("mutual recursion: odd of 7", "(mutual ((ev (lam k (if (= k 0) 1 (od (- k 1))))) (od (lam k (if (= k 0) 0 (ev (- k 1)))))) (od 7))", "1"),
 	value("mutual recursion: three functions in a ring", "(mutual ((a (lam k (if (= k 0) 0 (b (- k 1))))) (b (lam k (if (= k 0) 1 (c (- k 1))))) (c (lam k (if (= k 0) 2 (a (- k 1)))))) (a 7))", "1"),
+	value("a string is a list of its bytes", '"abc"', "(97 98 99)"),
+	value("the empty string is nil", '""', "()"),
+	value("an escaped quote is one byte", '"a\\"b"', "(97 34 98)"),
+	value("escapes for a newline, a tab and a zero byte", '"\\n\\t\\0"', "(10 9 0)"),
+	value("a string can be taken apart", '(head "hi")', "104"),
+	value("a string can hold a semicolon and parentheses", '"a;(b)"', "(97 59 40 98 41)"),
+	value(
+		"a recursive function over a string",
+		'(letrec len (lam s (if (? s) 0 (+ 1 (len (tail s))))) (len "hello"))',
+		"5"
+	),
 	failure("raise stops the run with an error", "(raise 7)", "error"),
 	failure("raise stops the run even inside a cell", "[1 (raise [104 ~])]", "error"),
 }
 
 const rejects: { string } = {
 	"",
+	'"abc',
+	'"a\\qb"',
+	"\"a\nb\"",
 	"(mutual () 1)",
 	"(mutual ((f 1)) f)",
 	"(mutual ((f (lam x x) extra)) f)",

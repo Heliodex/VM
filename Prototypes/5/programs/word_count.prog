@@ -1,6 +1,6 @@
-Counts the words in a text. The input is a list of character codes, since the language has no strings.
+Counts the words in a text, given as a string literal.
 A word is a run of characters that are not spaces (code 32).
-The probe is text processing: strings are lists of integers, and the program walks them with a state that says whether it is inside a word.
+The probe is text processing: a string is a list of bytes, and the program walks it with a state that says whether it is inside a word.
 ---
 (lam s
   (letrec go (lam l (lam inword (lam count
@@ -11,8 +11,8 @@ The probe is text processing: strings are lists of integers, and the program wal
               (go (tail l) (if space 0 1) (+ count (if space 0 (if inword 0 1))))))))))
     (go s 0 0)))
 ---
-nil => 0 fuel 200000
-cons 104 cons 101 cons 108 cons 108 cons 111 nil => 1 fuel 200000
-cons 104 cons 101 cons 108 cons 108 cons 111 cons 32 cons 119 cons 111 cons 114 cons 108 cons 100 nil => 2 fuel 200000
-cons 32 cons 32 cons 97 cons 32 cons 32 cons 98 cons 32 cons 99 cons 32 nil => 3 fuel 200000
-cons 111 cons 110 cons 101 cons 32 cons 116 cons 119 cons 111 cons 32 cons 116 cons 104 cons 114 cons 101 cons 101 cons 32 cons 102 cons 111 cons 117 cons 114 nil => 4 fuel 200000
+"" => 0 fuel 200000
+"hello" => 1 fuel 200000
+"hello world" => 2 fuel 200000
+"  a  b c " => 3 fuel 200000
+"one two three four" => 4 fuel 200000
