@@ -1,0 +1,25 @@
+A postfix calculator, run in one go: the input is the whole list of tokens, and the output is the top of the stack when they are used up.
+A token is a pair: [0 n] is the number n, and [1 op] is an operator, 0 add, 1 subtract, 2 multiply.
+The probe is a stack machine written as a function over a list. The empty input is an error, because there is no top of stack to give.
+---
+(lam toks
+  (letrec run (lam ts (lam st
+      (if (? ts)
+          (head st)
+          (let t (head ts)
+            (if (= (head t) 0)
+                (run (tail ts) [(tail t) st])
+                (let op (tail t)
+                  (let b (head st)
+                    (let a (head (tail st))
+                      (let rest (tail (tail st))
+                        (run (tail ts) [(if (= op 0) (+ a b) (if (= op 1) (- a b) (* a b))) rest]))))))))))
+    (run toks ~)))
+---
+cons cons 0 3 cons cons 0 4 cons cons 1 0 nil => 7 fuel 200000
+cons cons 0 10 cons cons 0 4 cons cons 1 1 nil => 6 fuel 200000
+cons cons 0 2 cons cons 0 3 cons cons 0 4 cons cons 1 2 cons cons 1 0 nil => 14 fuel 200000
+cons cons 0 5 cons cons 0 1 cons cons 0 2 cons cons 1 0 cons cons 0 4 cons cons 1 2 cons cons 1 0 cons cons 0 3 cons cons 1 1 nil => 14 fuel 200000
+cons cons 0 9 nil => 9 fuel 200000
+cons cons 0 1 cons cons 0 2 cons cons 0 3 cons cons 1 2 cons cons 1 1 cons cons 0 4 cons cons 1 2 nil => -20 fuel 200000
+nil => error fuel 200000

@@ -1,0 +1,10 @@
+A key-value store, run in one go. A command is [0 [key value]] to set a key, or [1 [key nil]] to get one. The output is the list of values from the gets, in the order they were asked for. A key that was never set gives nil.
+The probe is a lookup structure: the store is an association list, the newest pair first, and gets search from the front.
+Keys here are integers, since the language has no strings.
+---
+(lam cmds (letrec lookup (lam k (lam s (if (? s) ~ (if (= (head (head s)) k) (tail (head s)) ((lookup k) (tail s)))))) (letrec rev (lam l (lam acc (if (? l) acc ((rev (tail l)) [(head l) acc])))) (letrec run (lam cs (lam s (lam out (if (? cs) ((rev out) ~) (let c (head cs) (let op (head c) (let kv (tail c) (if (= op 0) (((run (tail cs)) [kv s]) out) (((run (tail cs)) s) [(lookup (head kv) s) out]))))))))) (run cmds ~ ~)))))
+---
+cons cons 0 cons 1 1 cons cons 1 cons 1 nil cons cons 0 cons 1 2 cons cons 1 cons 1 nil cons cons 1 cons 2 nil nil => cons 1 cons 2 cons nil nil fuel 200000
+cons cons 1 cons 1 nil nil => cons nil nil fuel 200000
+cons cons 0 cons 2 7 cons cons 1 cons 2 nil cons cons 1 cons 1 nil nil => cons 7 cons nil nil fuel 200000
+nil => nil fuel 200000

@@ -1,0 +1,20 @@
+The first n primes, from a sieve over an infinite stream. Each stream is [head tail], and the tail is a pin, so only the part that is asked for is ever computed.
+The probe is laziness: pins inside a structure, forced by the lifecycle's output check, and a recursive filter that is built into each pin.
+---
+(lam n
+  (letrec from (lam k [k (pin (from (+ k 1)))])
+    (letrec filter (lam p (lam s
+        (if (= (mod (head s) p) 0)
+            ((filter p) (force (tail s)))
+            [(head s) (pin ((filter p) (force (tail s))))])))
+      (letrec sieve (lam s [(head s) (pin (sieve ((filter (head s)) (force (tail s)))))])
+        (letrec take (lam k (lam s
+            (if (= k 0)
+                ~
+                [(head s) ((take (- k 1)) (force (tail s)))])))
+          ((take n) (sieve (from 2))))))))
+---
+0 => nil fuel 5000000
+1 => cons 2 nil fuel 5000000
+10 => cons 2 cons 3 cons 5 cons 7 cons 11 cons 13 cons 17 cons 19 cons 23 cons 29 nil fuel 5000000
+15 => cons 2 cons 3 cons 5 cons 7 cons 11 cons 13 cons 17 cons 19 cons 23 cons 29 cons 31 cons 37 cons 41 cons 43 cons 47 nil fuel 5000000
