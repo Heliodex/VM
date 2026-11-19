@@ -11,7 +11,7 @@
 --   ---
 --   the tests, one to a line
 --
--- An import binds name, inside the program, to the program of another file. The file is named as the resolver gives it, usually a file in the same folder, and it is read with the same format, so it can import in turn. The name is then a function the program can call. An imported program is closed: it cannot use the names of the file that imports it. Imports may not form a cycle, and a file may not import itself through others.
+-- An import binds name, inside the program, to the program of another file. The file is a path relative to the folder of the importing file, such as double.prog, lib/triple.prog or ../double.prog, and it is read with the same format, so it can import in turn. The name is then a function the program can call. An imported program is closed: it cannot use the names of the file that imports it. Imports may not form a cycle, and a file may not import itself through others.
 --
 -- A test line is an input, then =>, then an output, then fuel and a number of steps:
 --
@@ -179,6 +179,52 @@ const function parseImport(
 	}
 end
 
+-- The folder part of a path, with no trailing slash. A file at the top of the folder has the folder "".
+const function folderOf(
+	path: string?
+): string
+	if path == nil then
+		return ""
+	end
+
+	return string.match(path :: string, "^(.*)/[^/]*$") or ""
+end
+
+-- The path that an import names, relative to the folder of the file that imports it.
+const function joinPath(
+	folder: string,
+	file: string
+): string
+	if folder == "" then
+		return file
+	end
+
+	return folder .. "/" .. file
+end
+
+-- A path with its . and .. parts worked out, so that two paths to one file are equal. It is nil if the path climbs above the top of the folder.
+const function normalize(
+	path: string
+): string?
+	local parts: { string } = {}
+
+	for part in string.gmatch(path, "[^/]+") do
+		if part == "." then
+			-- Stays where it is.
+		elseif part == ".." then
+			if #parts == 0 then
+				return nil
+			end
+
+			table.remove(parts)
+		else
+			table.insert(parts, part)
+		end
+	end
+
+	return table.concat(parts, "/")
+end
+
 -- Loads the program of one file. stack holds the names of the files that are being loaded around this one, so an import of one of them is a cycle.
 local parseFile: (text: string, resolve: Resolve?, name: string?, stack: { string }) -> File
 
@@ -239,17 +285,24 @@ parseFile = function(
 			error(`line {import.line}: the import {import.file} needs a folder of program files`, 0)
 		end
 
-		if table.find(chain, import.file) ~= nil then
-			error(`line {import.line}: the imports form a cycle through {import.file}`, 0)
+		-- An import is a path relative to the folder of this file, and it is worked out before it is looked up.
+		const path = normalize(joinPath(folderOf(name), import.file))
+
+		if path == nil then
+			error(`line {import.line}: {import.file} is outside the programs folder`, 0)
 		end
 
-		const importText = (resolve :: Resolve)(import.file)
+		if table.find(chain, path :: string) ~= nil then
+			error(`line {import.line}: the imports form a cycle through {path}`, 0)
+		end
+
+		const importText = (resolve :: Resolve)(path :: string)
 
 		if importText == nil then
 			error(`line {import.line}: cannot find {import.file}`, 0)
 		end
 
-		const ok, loaded = pcall(parseFile, importText :: string, resolve, import.file, chain)
+		const ok, loaded = pcall(parseFile, importText :: string, resolve, path :: string, chain)
 
 		if not ok then
 			error(`line {import.line}: the import {import.file} is not well formed: {tostring(loaded)}`, 0)

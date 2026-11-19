@@ -113,6 +113,11 @@ const MALFORMED: { { name: string, text: string, reason: string } } = {
 		reason = "cannot find missing.prog",
 	},
 	{
+		name = "an import above the programs folder",
+		text = "h\n---\nx = ../../outside.prog\n---\n(lam x x)\n---\n1 => 1 fuel 10\n",
+		reason = "../../outside.prog is outside the programs folder",
+	},
+	{
 		name = "a file with no tests",
 		text = "h\n---\n---\n(lam x x)\n---\n\n",
 		reason = "at least one test",
@@ -148,14 +153,44 @@ do
 	)
 end
 
--- Every .prog file in programs/.
-local files: { string } = {}
+-- A cycle through folders: lib/a.prog and extras/b.prog import each other by paths that go up and down.
+do
+	const files: { [string]: string } = {
+		["lib/a.prog"] = "h\n---\nb = ../extras/b.prog\n---\n(lam x x)\n---\n1 => 1 fuel 10\n",
+		["extras/b.prog"] = "h\n---\na = ../lib/a.prog\n---\n(lam x x)\n---\n1 => 1 fuel 10\n",
+	}
+	const ok, err = pcall(
+		ProgramFile.parse,
+		"h\n---\na = lib/a.prog\n---\n(lam x x)\n---\n1 => 1 fuel 10\n",
+		function(name: string): string?
+			return files[name]
+		end,
+		"top.prog"
+	)
+	check(
+		"refuses a cycle through folders",
+		not ok and string.find(tostring(err), "form a cycle through lib/a.prog", 1, true) ~= nil,
+		tostring(err)
+	)
+end
 
-for _, entry in fs.listdir("programs") do
-	if entry.type == "file" and string.sub(entry.name, -5) == ".prog" then
-		table.insert(files, entry.name)
+-- Every .prog file in programs/, and in its folders, by its path from programs/. Each has its tests run, including the ones that are only imported elsewhere.
+local function listPrograms(
+	folder: string,
+	prefix: string,
+	out: { string }
+)
+	for _, entry in fs.listdir(folder) do
+		if entry.type == "dir" then
+			listPrograms(`{folder}/{entry.name}`, `{prefix}{entry.name}/`, out)
+		elseif entry.type == "file" and string.sub(entry.name, -5) == ".prog" then
+			table.insert(out, `{prefix}{entry.name}`)
+		end
 	end
 end
+
+local files: { string } = {}
+listPrograms("programs", "", files)
 
 table.sort(files)
 
