@@ -9,8 +9,9 @@
 --   3 lam, args (body)              4 pin, args (e)          5 cell, args (head tail)
 --   6 head, args (e)                7 tail, args (e)         8 force, args (e)
 --   9 if, args (c t e)             10 apply, args (f arg)
---   11 +, args (a b)               12 -, args (a b)         13 *, args (a b)
+--   11 +, args (a b)               12 -, args (a b)         13 mul, args (a b)
 --   14 <, args (a b)               15 =, args (a b)         16 kind, args (a)
+--   17 div, args (a b)             18 mod, args (a b)
 --
 -- The interpreter does not build its own closures and pins. A quoted lam becomes a native lam, and a quoted pin becomes a native pin, so the machine's own errors and laziness apply to the object program. The only thing it has to work out is the environment, which is a list of values, indexed by tails.
 --
@@ -63,11 +64,13 @@ const function build(
 		[14] = `(< {ev(A)} {ev(B)})`,
 		[15] = `(= {ev(A)} {ev(B)})`,
 		[16] = `(kind {ev(A)})`,
+		[17] = `(div {ev(A)} {ev(B)})`,
+		[18] = `(mod {ev(A)} {ev(B)})`,
 	}
 
-	-- A chain of ifs on the tag, checking 0 first and falling through to 16.
-	local chain = BRANCH[16]
-	for tag = 15, 0, -1 do
+	-- A chain of ifs on the tag, checking 0 first and falling through to the highest.
+	local chain = BRANCH[18]
+	for tag = 17, 0, -1 do
 		chain = `(if (= tag {tag}) {BRANCH[tag]} {chain})`
 	end
 
@@ -83,6 +86,8 @@ const PRIMITIVE_TAGS: { [string]: number } = {
 	lt = 14,
 	eq = 15,
 	kind = 16,
+	div = 17,
+	mod = 18,
 }
 
 -- Builds an expression that evaluates to the quoted form of e.

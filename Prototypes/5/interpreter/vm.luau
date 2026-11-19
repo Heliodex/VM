@@ -110,6 +110,26 @@ const function lookup(
 	return fail("no variable at index " .. index)
 end
 
+-- The remainder of a divided by b, taking the sign of b, so that a = b * div + mod. Only for integers in range.
+const function floored_mod(
+	a: number,
+	b: number
+): number
+	-- math.fmod is exact on doubles, and its result takes the sign of a. It is shifted by b when the signs differ.
+	local r = math.fmod(a, b)
+
+	if r ~= 0 and (r < 0) ~= (b < 0) then
+		r += b
+	end
+
+	-- A remainder of zero is written as 0, not -0, so it prints the same way.
+	if r == 0 then
+		return 0
+	end
+
+	return r
+end
+
 const BINARY: {
 	[string]: (number, number) -> number,
 } = {
@@ -130,6 +150,27 @@ const BINARY: {
 		b
 	)
 		return a * b
+	end,
+	div = function(
+		a,
+		b
+	)
+		if b == 0 then
+			return fail "div by zero"
+		end
+
+		-- Floored: the quotient is the exact multiple of b that leaves the remainder.
+		return (a - floored_mod(a, b)) / b
+	end,
+	mod = function(
+		a,
+		b
+	)
+		if b == 0 then
+			return fail "mod by zero"
+		end
+
+		return floored_mod(a, b)
 	end,
 	lt = function(
 		a,
@@ -179,6 +220,11 @@ const function binary(
 
 	if result > MAX_INTEGER or result < -MAX_INTEGER then
 		return fail(name .. " result is out of range")
+	end
+
+	-- Zero is written as 0, not -0, so that it prints the same way whatever produced it.
+	if result == 0 then
+		return 0
 	end
 
 	return result
@@ -620,7 +666,7 @@ function M.force(
 	}
 end
 
--- A primitive on integers: add, sub, mul, lt, eq. The unary primitive kind takes no b, and works on any value.
+-- A primitive on integers: add, sub, mul, div, mod, lt, eq. div and mod are floored, and dividing by zero is an error. The unary primitive kind takes no b, and works on any value.
 -- The name and the number of arguments are checked here, so a bad primitive fails when it is built, not when the machine reaches it.
 function M.prim(
 	name: string,

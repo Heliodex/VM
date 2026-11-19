@@ -19,6 +19,8 @@
 --   (fix f)            the fixed point of f, where f is (lam rec (lam ...)) and rec is the function itself
 --   (+ a b), (- a b), (* a b), (< a b), (= a b)
 --                      add, subtract, multiply, less-than, equal
+--   (div a b), (mod a b)
+--                      floored division and remainder: a = b * q + r, with r taking the sign of b
 --   (kind a)           the kind of a: 0 integer, 1 nil, 2 cell, 3 function, 4 pin
 --   (? a)              shorthand for (= (kind a) 1), whether a is nil
 --
@@ -49,6 +51,8 @@ const PRIMITIVES: { [string]: { op: string, arity: number } } = {
 	["*"] = { op = "mul", arity = 2 },
 	["<"] = { op = "lt", arity = 2 },
 	["="] = { op = "eq", arity = 2 },
+	["div"] = { op = "div", arity = 2 },
+	["mod"] = { op = "mod", arity = 2 },
 }
 
 -- Forms that are primitives: kind is one, and ? is a shorthand built from it.

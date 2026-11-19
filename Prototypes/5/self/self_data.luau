@@ -42,11 +42,13 @@ const BRANCH: { [number]: string } = {
 	[14] = `(< {ev(A)} {ev(B)})`,
 	[15] = `(= {ev(A)} {ev(B)})`,
 	[16] = `(kind {ev(A)})`,
+	[17] = `(div {ev(A)} {ev(B)})`,
+	[18] = `(mod {ev(A)} {ev(B)})`,
 }
 
--- A chain of ifs on the tag, checking 0 first and falling through to 16.
-local chain = BRANCH[16]
-for tag = 15, 0, -1 do
+-- A chain of ifs on the tag, checking 0 first and falling through to the highest.
+local chain = BRANCH[18]
+for tag = 17, 0, -1 do
 	chain = `(if (= tag {tag}) {BRANCH[tag]} {chain})`
 end
 

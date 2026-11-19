@@ -83,6 +83,21 @@ const examples: { Example } = {
 	value("addition", prim("add", I(2), I(3)), "5"),
 	value("subtraction can go negative", prim("sub", I(2), I(3)), "-1"),
 	value("the largest integer", I(9007199254740991), "9007199254740991"),
+	value("division", prim("div", I(7), I(2)), "3"),
+	value("division rounds down, not towards zero", prim("div", I(-7), I(2)), "-4"),
+	value("remainder takes the sign of the divisor", prim("mod", I(7), I(-2)), "-1"),
+	value("subtraction, then the remainder", prim("mod", I(-7), I(2)), "1"),
+	value("multiplication with a negative gives 0, not -0", prim("mul", I(0), I(-1)), "0"),
+	value(
+		"division by half-way stays exact",
+		prim("div", I(9007199254740991), I(2)),
+		"4503599627370495"
+	),
+	value(
+		"the largest integer, rounded down",
+		prim("div", I(-9007199254740991), I(2)),
+		"-4503599627370496"
+	),
 	value("nil test on nil", isnil(NIL), "1"),
 	value("nil test on a cell", isnil(M.cell(I(1), NIL)), "0"),
 	value("kind of an integer", prim("kind", I(7)), "0"),
@@ -168,6 +183,8 @@ const examples: { Example } = {
 	failure("applying an integer is an error", M.app(I(1), I(2)), "error"),
 	failure("a variable with no binder is an error", V(0), "error"),
 	failure("forcing an integer is an error", M.force(I(3)), "error"),
+	failure("division by zero is an error", prim("div", I(1), I(0)), "error"),
+	failure("remainder by zero is an error", prim("mod", I(1), I(0)), "error"),
 	failure("addition past the largest integer is an error", prim("add", I(9007199254740991), I(1)), "error"),
 	failure("multiplication past the largest integer is an error", prim("mul", I(9007199254740991), I(2)), "error"),
 	failure("subtraction past the smallest integer is an error", prim("sub", I(-9007199254740991), I(2)), "error"),
