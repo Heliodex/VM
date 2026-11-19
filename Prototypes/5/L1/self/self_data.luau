@@ -39,11 +39,11 @@ const BRANCH: { [number]: string } = {
 	[11] = `(+ {ev(A)} {ev(B)})`,
 	[12] = `(- {ev(A)} {ev(B)})`,
 	[13] = `(* {ev(A)} {ev(B)})`,
-	[14] = `(< {ev(A)} {ev(B)})`,
-	[15] = `(= {ev(A)} {ev(B)})`,
-	[16] = `(kind {ev(A)})`,
-	[17] = `(div {ev(A)} {ev(B)})`,
-	[18] = `(mod {ev(A)} {ev(B)})`,
+	[16] = `(< {ev(A)} {ev(B)})`,
+	[17] = `(= {ev(A)} {ev(B)})`,
+	[18] = `(kind {ev(A)})`,
+	[14] = `(div {ev(A)} {ev(B)})`,
+	[15] = `(mod {ev(A)} {ev(B)})`,
 }
 
 -- A chain of ifs on the tag, checking 0 first and falling through to the highest.

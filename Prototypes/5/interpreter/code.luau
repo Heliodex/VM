@@ -10,8 +10,8 @@
 --   6 head, args (e)                7 tail, args (e)         8 force, args (e)
 --   9 if, args (c t e)             10 apply, args (f arg)
 --  11 +, args (a b)               12 -, args (a b)         13 mul, args (a b)
---  14 <, args (a b)               15 =, args (a b)         16 kind, args (a)
---  17 div, args (a b)             18 mod, args (a b)
+--  14 div, args (a b)             15 mod, args (a b)
+--  16 <, args (a b)               17 =, args (a b)         18 kind, args (a)
 --
 -- toValue(e) quotes an expression. fromValue(v) reads a quoted program back, and checks it: a tag that is not known, or a list of the wrong length, is an error, so a program from outside cannot make the machine see a form it does not have. toExpr(v) gives an expression that evaluates to the data value v, which is what the self-interpreter quotes with.
 --
@@ -24,22 +24,22 @@ const PRIMITIVE_TAGS: { [string]: number } = {
 	add = 11,
 	sub = 12,
 	mul = 13,
-	lt = 14,
-	eq = 15,
-	kind = 16,
-	div = 17,
-	mod = 18,
+	div = 14,
+	mod = 15,
+	lt = 16,
+	eq = 17,
+	kind = 18,
 }
 
 const PRIMITIVE_NAMES: { [number]: string } = {
 	[11] = "add",
 	[12] = "sub",
 	[13] = "mul",
-	[14] = "lt",
-	[15] = "eq",
-	[16] = "kind",
-	[17] = "div",
-	[18] = "mod",
+	[14] = "div",
+	[15] = "mod",
+	[16] = "lt",
+	[17] = "eq",
+	[18] = "kind",
 }
 
 const function cell(
@@ -199,7 +199,7 @@ fromValue = function(
 	elseif n == 10 then
 		const pair = items(parts, 2)
 		return M.app(fromValue(pair[1]), fromValue(pair[2]))
-	elseif n == 16 then
+	elseif n == 18 then
 		return M.prim("kind", fromValue(items(parts, 1)[1]))
 	end
 
