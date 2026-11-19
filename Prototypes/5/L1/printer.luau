@@ -84,11 +84,11 @@ printAt = function(
 
 	-- The only expression left is a primitive. Kind is unary, and the rest are binary.
 	if e.op == "prim" then
-		if e.name == "kind" then
+		if e.b == nil then
 			return `(kind {printAt(e.a, depth)})`
 		end
 
-		return `({Primitives.BY_TAG[Primitives.TAG[e.name]].symbol} {printAt(e.a, depth)} {printAt((e.b :: VM.Expr), depth)})`
+		return `({Primitives.BY_TAG[e.tag].symbol} {printAt(e.a, depth)} {printAt((e.b :: VM.Expr), depth)})`
 	end
 
 	error("unknown expression", 0)

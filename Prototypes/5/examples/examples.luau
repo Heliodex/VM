@@ -7,6 +7,7 @@
 -- Variables are indices: V(0) is the innermost binder, V(1) the one outside it.
 
 const M = require "../interpreter/vm"
+const Primitives = require "../interpreter/primitives"
 
 type Example = {
 	name: string,
@@ -56,7 +57,7 @@ const function prim(
 	a: M.Expr,
 	b: M.Expr?
 ): M.Expr
-	return M.prim(name, a, b)
+	return M.prim(Primitives.TAG[name], a, b)
 end
 
 -- Whether x is nil: its kind is 1.

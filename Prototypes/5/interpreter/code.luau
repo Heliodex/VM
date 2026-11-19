@@ -81,7 +81,7 @@ toValue = function(
 		return node(10, { toValue(e.f), toValue(e.arg) })
 	end
 
-	const tag = Primitives.TAG[e.name]
+	const tag = e.tag
 
 	if e.b == nil then
 		return node(tag, { toValue(e.a) })
@@ -178,12 +178,11 @@ fromValue = function(
 		const pair = items(parts, 2)
 		return M.app(fromValue(pair[1]), fromValue(pair[2]))
 	elseif n == 18 then
-		return M.prim("kind", fromValue(items(parts, 1)[1]))
+		return M.prim(Primitives.TAG.kind, fromValue(items(parts, 1)[1]))
 	end
 
-	const name = Primitives.BY_TAG[n].name
 	const pair = items(parts, 2)
-	return M.prim(name, fromValue(pair[1]), fromValue(pair[2]))
+	return M.prim(n, fromValue(pair[1]), fromValue(pair[2]))
 end
 
 -- An expression that evaluates to the data value v. Integers and nil are literals, and a cell is a cell built at run time, so the expression is the same shape as v.

@@ -496,12 +496,12 @@ local function compileForm(
 
 	if name == "kind" then
 		arity(1)
-		return M.prim("kind", compile(items[2], scope))
+		return M.prim(Primitives.TAG.kind, compile(items[2], scope))
 	end
 
 	if name == "?" then
 		arity(1)
-		return M.prim("eq", M.prim("kind", compile(items[2], scope)), M.int(1))
+		return M.prim(Primitives.TAG.eq, M.prim(Primitives.TAG.kind, compile(items[2], scope)), M.int(1))
 	end
 
 	if PRIMITIVES[name] ~= nil then
@@ -509,9 +509,9 @@ local function compileForm(
 		arity(primitive.arity)
 
 		if primitive.arity == 1 then
-			return M.prim(primitive.name, compile(items[2], scope))
+			return M.prim(primitive.tag, compile(items[2], scope))
 		end
-		return M.prim(primitive.name, compile(items[2], scope), compile(items[3], scope))
+		return M.prim(primitive.tag, compile(items[2], scope), compile(items[3], scope))
 	end
 
 	if UNARY_FORMS[name] ~= nil then

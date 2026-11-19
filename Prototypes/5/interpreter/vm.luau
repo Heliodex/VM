@@ -39,8 +39,8 @@ export type TailExpr = { op: "tail", e: Expr }
 export type ForceExpr = { op: "force", e: Expr }
 export type IfExpr = { op: "if", c: Expr, t: Expr, e: Expr }
 export type ApplyExpr = { op: "apply", f: Expr, arg: Expr }
--- b is absent for the unary primitive kind
-export type PrimExpr = { op: "prim", name: string, a: Expr, b: Expr? }
+-- The primitive is its tag, from primitives.luau. b is absent for the unary primitive kind
+export type PrimExpr = { op: "prim", tag: number, a: Expr, b: Expr? }
 
 -- VALUES
 
@@ -70,8 +70,8 @@ type Frame =
 	| { k: "apply", arg: Expr, env: Binding? }
 	| { k: "argument", arg: Expr, env: Binding?, fn: Closure }
 	| { k: "update", pin: Pin }
-	| { k: "binary", name: string, b: Expr, env: Binding? }
-	| { k: "second", name: string, first: Value }
+	| { k: "binary", tag: number, b: Expr, env: Binding? }
+	| { k: "second", tag: number, first: Value }
 	| { k: "kind" }
 
 -- The frame for kind, which has no fields, so one table serves every use.
@@ -117,15 +117,17 @@ const function lookup(
 end
 
 const function binary(
-	name: string,
+	tag: number,
 	a: Value,
 	b: Value
 ): number
-	const row = Primitives.BY_TAG[Primitives.TAG[name]]
+	const row = Primitives.BY_TAG[tag]
 
 	if row == nil or row.operation == nil then
-		return fail("unknown operation " .. name)
+		return fail("unknown operation " .. tostring(tag))
 	end
+
+	const name = row.name
 
 	if type(a) ~= "number" or type(b) ~= "number" then
 		return fail(name .. " needs integers")
@@ -269,7 +271,7 @@ const function run(
 					else
 						push {
 							k = "binary",
-							name = expr.name,
+							tag = expr.tag,
 							b = expr.b,
 							env = env,
 						}
@@ -378,14 +380,14 @@ const function run(
 				elseif frame.k == "binary" then
 					push {
 						k = "second",
-						name = frame.name,
+						tag = frame.tag,
 						first = value,
 					}
 					expr = frame.b
 					env = frame.env
 					returning = false
 				elseif frame.k == "second" then
-					value = binary(frame.name, frame.first, value)
+					value = binary(frame.tag, frame.first, value)
 				else
 					-- The only frame left is kind.
 					value = kindOf(value)
@@ -577,30 +579,30 @@ function M.force(
 	}
 end
 
--- A primitive, by its name, from the table in primitives.luau. The binary ones are the integer operations: div and mod are floored, and dividing by zero is an error. The unary primitive kind takes no b, and works on any value.
--- The name and the number of arguments are checked here, so a bad primitive fails when it is built, not when the machine reaches it.
+-- A primitive, by its tag, from the table in primitives.luau. The binary ones are the integer operations: div and mod are floored, and dividing by zero is an error. The unary primitive kind takes no b, and works on any value.
+-- The tag and the number of arguments are checked here, so a bad primitive fails when it is built, not when the machine reaches it.
 function M.prim(
-	name: string,
+	tag: number,
 	a: Expr,
 	b: Expr?
 ): Expr
-	const tag = Primitives.TAG[name]
+	const row = Primitives.BY_TAG[tag]
 
-	if tag == nil then
-		error(string.format("unknown primitive %s", name), 0)
+	if row == nil then
+		error(string.format("unknown primitive %s", tostring(tag)), 0)
 	end
 
-	if Primitives.BY_TAG[tag].arity == 1 then
+	if row.arity == 1 then
 		if b ~= nil then
-			error(string.format("%s takes one argument, but was given two", name), 0)
+			error(string.format("%s takes one argument, but was given two", row.name), 0)
 		end
 	elseif b == nil then
-		error(string.format("%s takes two arguments, but was given one", name), 0)
+		error(string.format("%s takes two arguments, but was given one", row.name), 0)
 	end
 
 	return {
 		op = "prim",
-		name = name,
+		tag = tag,
 		a = a,
 		b = b,
 	}

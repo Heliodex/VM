@@ -10,6 +10,7 @@ const Programs = require "./L1/examples/programs"
 const Reader = require "./L1/reader"
 const Text = require "./L1/examples/text"
 const VM = require "./interpreter/vm"
+const Primitives = require "./interpreter/primitives"
 
 local failures = 0
 local total = 0
@@ -83,13 +84,13 @@ end
 -- Builders reject a bad primitive or an out-of-range integer as soon as they are called.
 const builderRejects: { [string]: () -> VM.Expr } = {
 	["a primitive that is not known"] = function()
-		return VM.prim("nope", VM.int(1), VM.int(2))
+		return VM.prim(99, VM.int(1), VM.int(2))
 	end,
 	["a binary primitive with one argument"] = function()
-		return VM.prim("add", VM.int(1))
+		return VM.prim(Primitives.TAG.add, VM.int(1))
 	end,
 	["kind with two arguments"] = function()
-		return VM.prim("kind", VM.int(1), VM.int(2))
+		return VM.prim(Primitives.TAG.kind, VM.int(1), VM.int(2))
 	end,
 	["an integer past the range"] = function()
 		return VM.int(9007199254740992)
