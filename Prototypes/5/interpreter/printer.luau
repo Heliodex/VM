@@ -51,7 +51,17 @@ printAt = function(
 	elseif e.op == "pin" then
 		return `(pin {printAt(e.e, depth)})`
 	elseif e.op == "cell" then
-		return `[{printAt(e.head, depth)} {printAt(e.tail, depth)}]`
+		-- Walk the spine of right-nested cells: every head is an item, and the tail that is not a cell is the last item.
+		local parts: { string } = {}
+		local cur: VM.Expr = e
+
+		while cur.op == "cell" do
+			table.insert(parts, printAt((cur :: VM.CellExpr).head, depth))
+			cur = (cur :: VM.CellExpr).tail
+		end
+
+		table.insert(parts, printAt(cur, depth))
+		return "[" .. table.concat(parts, " ") .. "]"
 	elseif e.op == "head" then
 		return `(head {printAt(e.e, depth)})`
 	elseif e.op == "tail" then

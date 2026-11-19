@@ -9,6 +9,7 @@
 --   (lam x body)       a function of x; (lam (x y) body) is the same as (lam x (lam y body))
 --   (f a b)            application, curried: (f a b) is ((f a) b)
 --   [a b]              a pair
+--   [a b c]            the same as [a [b c]]: the last item is the tail, so a list ends in ~, as [1 2 ~]
 --   "abc"              a string: a list of its bytes, so "" is nil. Escapes are \" \\ \n \t and \0
 --   (list a b c)       a proper list of a, b and c
 --   (head e), (tail e)
@@ -584,10 +585,18 @@ compile = function(
 	const items = node.items
 
 	if node.kind == "pair" then
-		if #items ~= 2 then
-			fail(node.line, `a pair takes exactly two items, but was given {#items}`)
+		if #items < 2 then
+			fail(node.line, `a pair takes at least two items, but was given {#items}`)
 		end
-		return M.cell(compile(items[1], scope), compile(items[2], scope))
+
+		-- The last item is the tail, and the others are heads, so [a b c] is [a [b c]].
+		local e = compile(items[#items], scope)
+
+		for i = #items - 1, 1, -1 do
+			e = M.cell(compile(items[i], scope), e)
+		end
+
+		return e
 	end
 
 	if #items == 0 then

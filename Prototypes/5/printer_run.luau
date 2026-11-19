@@ -39,6 +39,9 @@ const TEXTS: { { source: string, text: string } } = {
 	{ source = "(pin (force (head [1 ~])))", text = "(pin (force (head [1 ~])))" },
 	{ source = "(lam x (if x (kind x) (- x 3)))", text = "(lam v0 (if v0 (kind v0) (- v0 3)))" },
 	{ source = "(lam x (lam y (mod (div x y) x)))", text = "(lam v0 (lam v1 (mod (div v0 v1) v0)))" },
+	{ source = "[1 [2 [3 ~]]]", text = "[1 2 3 ~]" },
+	{ source = "[1 [2 3]]", text = "[1 2 3]" },
+	{ source = "[[1 2] 3]", text = "[[1 2] 3]" },
 	{ source = "-3", text = "-3" },
 	{ source = "~", text = "~" },
 }

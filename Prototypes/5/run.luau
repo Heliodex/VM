@@ -130,6 +130,27 @@ for _, case in raised do
 	end
 end
 
+-- The shorthand is the nested form: a bracket of three or more reads to the same expression as its right-nested pairs.
+const shorthand: { { short: string, nested: string } } = {
+	{ short = "[1 2 3]", nested = "[1 [2 3]]" },
+	{ short = "[1 2 3 ~]", nested = "[1 [2 [3 ~]]]" },
+	{ short = "[[1 2] 3 4]", nested = "[[1 2] [3 4]]" },
+}
+
+for _, case in shorthand do
+	total += 1
+
+	const a = VM.run(Reader.parse(case.short), 1000)
+	const b = VM.run(Reader.parse(case.nested), 1000)
+
+	if a.status == "value" and b.status == "value" and VM.show(a.value) == VM.show(b.value) then
+		print(string.format("PASS  %s is %s  -> %s", case.short, case.nested, VM.show(a.value)))
+	else
+		failures += 1
+		print(string.format("FAIL  %s is %s", case.short, case.nested))
+	end
+end
+
 print(string.format("%d of %d checks passed", total - failures, total))
 
 if failures > 0 then
