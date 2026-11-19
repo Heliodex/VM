@@ -1,6 +1,6 @@
-Multiplies an integer by nine, by tripling it twice. The import is named by a plain file name, so triple.prog is found in this folder, next to this file, and not in the folder of the program that imports ninefold.
+Multiplies an integer by nine, by tripling it twice. The import is a path from the top of the programs folder, so it names lib/triple.prog wherever the importing file is.
 ---
-triple = triple.prog
+triple = lib/triple.prog
 ---
 (lam x (triple (triple x)))
 ---

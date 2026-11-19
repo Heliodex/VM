@@ -1,7 +1,7 @@
-Multiplies an integer by six: double of triple. Both imports come from other folders, so their paths go up one level and then down into the folder they are in.
+Multiplies an integer by six: double of triple. Both imports are paths from the top of the programs folder, so one is in lib and the other is at the top.
 ---
-triple = ../lib/triple.prog
-double = ../double.prog
+triple = lib/triple.prog
+double = double.prog
 ---
 (lam x (double (triple x)))
 ---

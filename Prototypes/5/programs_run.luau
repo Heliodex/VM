@@ -114,8 +114,8 @@ const MALFORMED: { { name: string, text: string, reason: string } } = {
 	},
 	{
 		name = "an import above the programs folder",
-		text = "h\n---\nx = ../../outside.prog\n---\n(lam x x)\n---\n1 => 1 fuel 10\n",
-		reason = "../../outside.prog is outside the programs folder",
+		text = "h\n---\nx = ../outside.prog\n---\n(lam x x)\n---\n1 => 1 fuel 10\n",
+		reason = "../outside.prog is outside the programs folder",
 	},
 	{
 		name = "a file with no tests",
@@ -153,11 +153,11 @@ do
 	)
 end
 
--- A cycle through folders: lib/a.prog and extras/b.prog import each other by paths that go up and down.
+-- A cycle through folders: lib/a.prog and extras/b.prog import each other by paths from the top of the folder.
 do
 	const files: { [string]: string } = {
-		["lib/a.prog"] = "h\n---\nb = ../extras/b.prog\n---\n(lam x x)\n---\n1 => 1 fuel 10\n",
-		["extras/b.prog"] = "h\n---\na = ../lib/a.prog\n---\n(lam x x)\n---\n1 => 1 fuel 10\n",
+		["lib/a.prog"] = "h\n---\nb = extras/b.prog\n---\n(lam x x)\n---\n1 => 1 fuel 10\n",
+		["extras/b.prog"] = "h\n---\na = lib/a.prog\n---\n(lam x x)\n---\n1 => 1 fuel 10\n",
 	}
 	const ok, err = pcall(
 		ProgramFile.parse,
