@@ -26,7 +26,9 @@ export type Expr =
 	| IfExpr
 	| ApplyExpr
 	| PrimExpr
+	| RaiseExpr
 
+export type RaiseExpr = { op: "raise", e: Expr }
 export type QuoteExpr = { op: "quote", value: number }
 export type NilExpr = { op: "nil" }
 -- index counts the binders between the variable and its binder, so 0 is the innermost.
@@ -65,7 +67,7 @@ export type Outcome =
 type Frame =
 	| { k: "cell", expr: Expr, env: Binding? }
 	| { k: "cellhead", head: Value }
-	| { k: "head" | "tail" | "force" }
+	| { k: "head" | "tail" | "force" | "raise" }
 	| { k: "if", t: Expr, e: Expr, env: Binding? }
 	| { k: "apply", arg: Expr, env: Binding? }
 	| { k: "argument", arg: Expr, env: Binding?, fn: Closure }
@@ -253,6 +255,9 @@ const function kindOf(
 	return 4
 end
 
+-- The message of a raised value: its bytes, if it is a list of integers from 0 to 255, and otherwise its printed form. Set once show is defined, below.
+local raisedText: (v: Value) -> string
+
 -- Runs a program with a budget of steps. The result is always one of the outcomes above.
 const function run(
 	program: Expr,
@@ -318,7 +323,7 @@ const function run(
 						env = env,
 					}
 					expr = expr.head
-				elseif expr.op == "head" or expr.op == "tail" or expr.op == "force" then
+				elseif expr.op == "head" or expr.op == "tail" or expr.op == "force" or expr.op == "raise" then
 					push {
 						k = expr.op,
 					}
@@ -462,6 +467,8 @@ const function run(
 					returning = false
 				elseif frame.k == "second" then
 					value = binary(frame.name, frame.first, value)
+				elseif frame.k == "raise" then
+					return fail(raisedText(value))
 				else
 					-- The only frame left is kind.
 					value = kindOf(value)
@@ -522,6 +529,30 @@ const function show(
 	end
 
 	return "(" .. table.concat(parts, " ") .. ")"
+end
+
+raisedText = function(
+	v: Value
+): string
+	local bytes: { string } = {}
+	local cur = v
+
+	while type(cur) == "table" and cur.kind == "cell" do
+		const h = cur.head
+
+		if type(h) ~= "number" or h < 0 or h > 255 or h ~= math.floor(h) then
+			return show(v)
+		end
+
+		table.insert(bytes, string.char(h))
+		cur = cur.tail
+	end
+
+	if cur ~= NIL then
+		return show(v)
+	end
+
+	return table.concat(bytes)
 end
 
 -- BUILDERS
@@ -675,6 +706,16 @@ function M.prim(
 		name = name,
 		a = a,
 		b = b,
+	}
+end
+
+-- Stops the run with an error whose message is the value of e: its bytes if it is a list of bytes, otherwise its printed form. The value is evaluated first, so the message can be built by the program.
+function M.raise(
+	e: Expr
+): Expr
+	return {
+		op = "raise",
+		e = e,
 	}
 end
 

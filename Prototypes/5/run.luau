@@ -109,6 +109,27 @@ for name, build in builderRejects do
 	end
 end
 
+-- A raise ends the run with its value as the message: the bytes if it is a list of bytes, otherwise the printed value.
+const raised: { { source: string, message: string } } = {
+	{ source = "(raise [104 [105 ~]])", message = "hi" },
+	{ source = "(raise ~)", message = "" },
+	{ source = "(raise [300 ~])", message = "(300)" },
+	{ source = "(raise (+ 1 2))", message = "3" },
+}
+
+for _, case in raised do
+	total += 1
+
+	const result = VM.run(Reader.parse(case.source), 1000)
+
+	if result.status == "error" and result.message == case.message then
+		print(string.format("PASS  raise %s  -> %q", case.source, case.message))
+	else
+		failures += 1
+		print(string.format("FAIL  raise %s  -> %s, expected %q", case.source, result.status, case.message))
+	end
+end
+
 print(string.format("%d of %d checks passed", total - failures, total))
 
 if failures > 0 then

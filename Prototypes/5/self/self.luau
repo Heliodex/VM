@@ -67,11 +67,12 @@ const function build(
 		[16] = `(kind {ev(A)})`,
 		[17] = `(div {ev(A)} {ev(B)})`,
 		[18] = `(mod {ev(A)} {ev(B)})`,
+		[19] = `(raise {ev(A)})`,
 	}
 
 	-- A chain of ifs on the tag, checking 0 first and falling through to the highest.
-	local chain = BRANCH[18]
-	for tag = 17, 0, -1 do
+	local chain = BRANCH[19]
+	for tag = 18, 0, -1 do
 		chain = `(if (= tag {tag}) {BRANCH[tag]} {chain})`
 	end
 

@@ -67,6 +67,7 @@ const UNARY_FORMS: { [string]: number } = {
 	pin = 1,
 	force = 1,
 	fix = 1,
+	raise = 1,
 }
 
 const function reserved(name: string): boolean
@@ -345,6 +346,8 @@ local function compileForm(
 			return M.pin(inner)
 		elseif name == "force" then
 			return M.force(inner)
+		elseif name == "raise" then
+			return M.raise(inner)
 		else
 			return M.app(M.fix, inner)
 		end

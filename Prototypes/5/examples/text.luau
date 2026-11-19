@@ -121,6 +121,8 @@ const examples: { Example } = {
 	failure("remainder by zero is an error", "(mod 1 0)", "error"),
 	failure("addition past the largest integer is an error", "(+ 9007199254740991 1)", "error"),
 	failure("subtraction past the smallest integer is an error", "(- -9007199254740991 2)", "error"),
+	failure("raise stops the run with an error", "(raise 7)", "error"),
+	failure("raise stops the run even inside a cell", "[1 (raise [104 ~])]", "error"),
 }
 
 const rejects: { string } = {

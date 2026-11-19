@@ -60,6 +60,8 @@ printAt = function(
 		return `(force {printAt(e.e, depth)})`
 	elseif e.op == "if" then
 		return `(if {printAt(e.c, depth)} {printAt(e.t, depth)} {printAt(e.e, depth)})`
+	elseif e.op == "raise" then
+		return `(raise {printAt(e.e, depth)})`
 	end
 
 	if e.op == "apply" then

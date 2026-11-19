@@ -12,6 +12,7 @@
 --  11 +, args (a b)               12 -, args (a b)         13 mul, args (a b)
 --  14 <, args (a b)               15 =, args (a b)         16 kind, args (a)
 --  17 div, args (a b)             18 mod, args (a b)
+--  19 raise, args (e)
 --
 -- toValue(e) quotes an expression. fromValue(v) reads a quoted program back, and checks it: a tag that is not known, or a list of the wrong length, is an error, so a program from outside cannot make the machine see a form it does not have. toExpr(v) gives an expression that evaluates to the data value v, which is what the self-interpreter quotes with.
 --
@@ -101,6 +102,8 @@ toValue = function(
 		return node(9, { toValue(e.c), toValue(e.t), toValue(e.e) })
 	elseif e.op == "apply" then
 		return node(10, { toValue(e.f), toValue(e.arg) })
+	elseif e.op == "raise" then
+		return node(19, { toValue(e.e) })
 	end
 
 	const tag = PRIMITIVE_TAGS[e.name]
@@ -154,7 +157,7 @@ fromValue = function(
 
 	const tag = v.head
 
-	if not isInteger(tag) or (tag :: number) < 0 or (tag :: number) > 18 then
+	if not isInteger(tag) or (tag :: number) < 0 or (tag :: number) > 19 then
 		error(`a program has no form with tag {tostring(tag)}`, 0)
 	end
 
@@ -201,6 +204,8 @@ fromValue = function(
 		return M.app(fromValue(pair[1]), fromValue(pair[2]))
 	elseif n == 16 then
 		return M.prim("kind", fromValue(items(parts, 1)[1]))
+	elseif n == 19 then
+		return M.raise(fromValue(items(parts, 1)[1]))
 	end
 
 	const name = PRIMITIVE_NAMES[n]
