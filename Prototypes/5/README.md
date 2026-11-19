@@ -12,6 +12,8 @@ A strict, sequential interpreter for a small functional language with native dat
 | `interpreter/data.luau` | The data format: values to text and back, for interchange. Separate from the reader. See "The data format" below. |
 | `interpreter/binary.luau` | The binary format: values and programs to bytes and back. See "The binary format" below. |
 | `interpreter/lifecycle.luau` | Runs a program on an input, and checks the output. See "The lifecycle" below. |
+| `interpreter/printer.luau` | Writes an expression as text in the reader's syntax. See "The printer" below. |
+| `interpreter/driver.luau` | Runs a program that keeps a state between inputs. See "The driver" below. |
 | `examples/examples.luau` | 49 programs built with the builders, each with a fuel budget and its expected outcome. |
 | `examples/text.luau` | 49 programs in the text syntax, plus 18 sources the reader must reject. |
 | `examples/programs.luau` | 9 longer programs in the text syntax, using `letrec`: an accumulator, reverse, append, insertion sort, word counting, deep equality, a tree evaluator and gcd. |
@@ -24,6 +26,8 @@ A strict, sequential interpreter for a small functional language with native dat
 | `data_run.luau` | Checks the data format: written texts, rejected texts, refused functions and pins, and a round trip for every example that gives a value. |
 | `binary_run.luau` | Checks the binary format: exact bytes, refused bytes, and a round trip for every example value and program. |
 | `lifecycle_run.luau` | Checks the lifecycle: programs applied to inputs, the outcomes, and the same runs through the binary format. |
+| `printer_run.luau` | Checks the printer: the text for given programs, the refusal of an unbound variable, and a round trip for every example program. |
+| `driver_run.luau` | Checks the driver: sessions that keep a state, each way a step can end a session, and the same through bytes. |
 
 ## Running
 
@@ -38,6 +42,8 @@ Run from this directory.
 | The data format checks | `luau data_run.luau` |
 | The binary format checks | `luau binary_run.luau` |
 | The lifecycle checks | `luau lifecycle_run.luau` |
+| The printer checks | `luau printer_run.luau` |
+| The driver checks | `luau driver_run.luau` |
 | The analyser | `luau-analyze interpreter/*.luau examples/*.luau self/*.luau run.luau self_run.luau self_data_run.luau` |
 | The formatter | `luau-format interpreter/*.luau examples/*.luau self/*.luau run.luau self_run.luau self_data_run.luau` |
 
@@ -116,7 +122,23 @@ The outcomes are:
 
 `Lifecycle.runBytes` runs the same thing from bytes: the program and the input are decoded, and the output is encoded. A program or input that does not decode is an `error`, and the program is not run.
 
-Interactive programs are not yet supported. The intended form is a program that takes a state and an input and returns a new state and an output, with the host keeping the state between runs.
+Programs that keep a state between inputs are run by the driver, described below. Each step is a lifecycle run.
+
+## The printer
+
+`interpreter/printer.luau` writes an expression as text in the reader's syntax, so that reading the text gives back the same expression. The machine has no names, so the printer invents them: a `lam` is named by its depth, so the outermost is `v0`, the next `v1`, and so on. A variable with index `i` under `d` binders prints as the name of the binder at depth `d - 1 - i`. A variable with no binder around it cannot be written, so the printer refuses it.
+
+A chain of applications prints flat, `(f a b)`, which the reader reads back as `((f a) b)`.
+
+The printer's output is canonical for a given expression, so printing, reading and printing again gives the same text. `printer_run.luau` checks this for every example program.
+
+## The driver
+
+`interpreter/driver.luau` runs a program that keeps a state between inputs. The program is a step: a function of a pair `[state input]`, which gives a pair `[state' output]`. The driver carries the state from one step to the next. Each step is a lifecycle run, so its output is checked as data, and it has its own fuel.
+
+A session ends at the first step that does not give a value. It reports which input it failed on, and the state from before that step. A step that errors, runs out of fuel, returns a function, or returns something that is not a pair ends the session.
+
+`Driver.stepBytes` runs one step from bytes, with the program and the state as bytes, so a state can be stored between calls.
 
 ## The self-interpreter
 
