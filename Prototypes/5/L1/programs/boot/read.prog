@@ -1,0 +1,16 @@
+The L1 reader, written in L1: the three stages of the bootstrap run in order. The input is the source, a list of bytes, and the output is the quoted form of the program it reads, in the form code.luau uses. The Luau reader is the reference: for each source, this and the Luau reader should give the same expression, or both should refuse it.
+The stages are imported by their paths, so the whole reader is the tokenizer, the parser and the compiler.
+---
+tok = boot/tokenize.prog
+par = boot/parse.prog
+com = boot/compile.prog
+---
+(fn src (com (par (tok src))))
+---
+"42" => [0 [42 ~]] fuel 10000000
+"(fn x x)" => [3 [[2 [0 ~]] ~]] fuel 10000000
+"((fn x x) 4)" => [10 [[3 [[2 [0 ~]] ~]] [[0 [4 ~]] ~]]] fuel 10000000
+"(let x 1 x)" => [10 [[3 [[2 [0 ~]] ~]] [[0 [1 ~]] ~]]] fuel 10000000
+"(f 1" => error fuel 10000000
+"(f 1))" => error fuel 10000000
+"x" => error fuel 10000000

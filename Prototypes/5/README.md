@@ -4,6 +4,8 @@ A strict, sequential interpreter for a small functional language with native dat
 
 ## Languages
 
+The bootstrap: the L1 reader is also written in L1, in `L1/programs/boot/`. Three stages, each a program file, are joined by `read.prog`: `tokenize.prog` turns source bytes into tokens, `parse.prog` builds the syntax tree, and `compile.prog` gives the quoted form of the expression. `read.prog` takes the source as a list of bytes and gives the same quoted program that `Code.toValue` gives for the Luau reader. `boot_run.luau` checks this on every example, every reject, and the program sections of every program file that imports nothing, including the three stage sources, so the L1 reader reads its own code. Errors are raised, without line numbers, so the L1 reader agrees with the Luau reader on which sources it refuses, not on the messages.
+
 The reader's language is **L1** (language 1). Its keyword for a function is `fn`; the machine's expression for one is still called `lam`, since it is the same node the machine has always run. Its files are in `L1/`: the reader, the printer, the program-file format, the L1 programs and the L1 self-interpreter. Its tests are in `L1/examples/` and `L1/programs/`. The machine, the data and binary formats, the lifecycle and the driver are in `interpreter/`. They work on the expressions every language compiles to, so a later language can reuse them and add its own folder beside `L1/`.
 
 ## Files

@@ -11,6 +11,7 @@ const VM = require "../../interpreter/vm"
 type Example = {
 	name: string,
 	program: VM.Expr,
+	source: string,
 	fuel: number,
 	outcome: string,
 	expect: string?,
@@ -26,6 +27,7 @@ const function value(
 	return {
 		name = name,
 		program = Reader.parse(source),
+		source = source,
 		fuel = FUEL,
 		outcome = "value",
 		expect = expect,
