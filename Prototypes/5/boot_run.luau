@@ -132,7 +132,8 @@ end
 const readerFile = ProgramFile.parse(readFile("L1/programs/boot/read.prog"), resolve, "boot/read.prog")
 const stage0 = readerFile.program
 
-const function valueOf(
+-- The payload of a stage's result: [0 value] gives value, and a refusal [1 message] is an error here.
+const function okOf(
 	status: string,
 	v: VM.Value?
 ): VM.Value
@@ -140,7 +141,31 @@ const function valueOf(
 		error("a stage gave " .. status .. ", not a value", 0)
 	end
 
-	return v :: VM.Value
+	local cell = v :: VM.Cell
+
+	if cell.head ~= 0 then
+		error("a stage refused its source", 0)
+	end
+
+	return cell.tail :: VM.Value
+end
+
+-- The tag of a stage's result, 0 for a success and 1 for a refusal, or nil if the result is not a tag.
+local function tagOf(
+	status: string,
+	v: VM.Value?
+): number?
+	if status ~= "value" or v == nil then
+		return nil
+	end
+
+	local h = (v :: VM.Cell).head
+
+	if type(h) == "number" then
+		return h
+	end
+
+	return nil
 end
 
 -- The quoted stage programs, from stage 0.
@@ -149,12 +174,12 @@ const _, parSection = sectionsOf(readFile("L1/programs/boot/parse.prog"))
 const _, comSection = sectionsOf(readFile("L1/programs/boot/compile.prog"))
 const _, readSection = sectionsOf(readFile("L1/programs/boot/read.prog"))
 
-const QTOK = valueOf(readWith(stage0, tokSection, {}, {}))
-const QPAR = valueOf(readWith(stage0, parSection, {}, {}))
-const QCOM = valueOf(readWith(stage0, comSection, {}, {}))
+const QTOK = okOf(readWith(stage0, tokSection, {}, {}))
+const QPAR = okOf(readWith(stage0, parSection, {}, {}))
+const QCOM = okOf(readWith(stage0, comSection, {}, {}))
 const STAGE_NAMES = { "tok", "par", "com" }
 const STAGE_VALUES = { QTOK, QPAR, QCOM }
-const QREAD = valueOf(readWith(stage0, readSection, STAGE_NAMES, STAGE_VALUES))
+const QREAD = okOf(readWith(stage0, readSection, STAGE_NAMES, STAGE_VALUES))
 
 -- Stage 1: the reader that stage 0 compiled from its own source.
 const stage1 = Code.fromValue(QREAD)
@@ -174,10 +199,10 @@ end
 
 -- 1. The fixed point: stage 1 gives the same quoted programs as stage 0.
 local _, tokSection1 = sectionsOf(readFile("L1/programs/boot/tokenize.prog"))
-same("fixed point: tokenize", valueOf(readWith(stage1, tokSection1, {}, {})), QTOK)
-same("fixed point: parse", valueOf(readWith(stage1, parSection, {}, {})), QPAR)
-same("fixed point: compile", valueOf(readWith(stage1, comSection, {}, {})), QCOM)
-same("fixed point: read", valueOf(readWith(stage1, readSection, STAGE_NAMES, STAGE_VALUES)), QREAD)
+same("fixed point: tokenize", okOf(readWith(stage1, tokSection1, {}, {})), QTOK)
+same("fixed point: parse", okOf(readWith(stage1, parSection, {}, {})), QPAR)
+same("fixed point: compile", okOf(readWith(stage1, comSection, {}, {})), QCOM)
+same("fixed point: read", okOf(readWith(stage1, readSection, STAGE_NAMES, STAGE_VALUES)), QREAD)
 
 -- 2. Stage 1 agrees with the Luau reader on the sources. A source is read with no imports, unless it has some.
 const function quotedOf(
@@ -200,7 +225,7 @@ const function quotedOf(
 		table.insert(values, quotedOf(reader, file :: string))
 	end
 
-	return valueOf(readWith(reader, section, names, values))
+	return okOf(readWith(reader, section, names, values))
 end
 
 const function luauQuoted(
@@ -217,9 +242,10 @@ local function check(
 )
 	const refOk, ref = pcall(Reader.parse, source)
 	const status, out = readWith(stage1, source, {}, {})
+	const tag = tagOf(status, out)
 
 	if not refOk then
-		if status == "error" then
+		if tag == 1 then
 			agree += 1
 		else
 			disagree += 1
@@ -230,7 +256,7 @@ local function check(
 
 	const expected = Data.write(Code.toValue(ref :: VM.Expr))
 
-	if status == "value" and out ~= nil and Data.write(out :: VM.Value) == expected then
+	if tag == 0 and out ~= nil and Data.write((out :: VM.Cell).tail :: VM.Value) == expected then
 		agree += 1
 	else
 		disagree += 1

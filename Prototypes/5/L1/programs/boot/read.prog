@@ -1,17 +1,32 @@
-The L1 reader, written in L1: the three stages of the bootstrap run in order. The input is the source, a list of bytes, and the output is the quoted form of the program it reads, in the form code.luau uses. The Luau reader is the reference: for each source, this and the Luau reader should give the same expression, or both should refuse it.
-The stages are imported by their paths, so the whole reader is the tokenizer, the parser and the compiler.
+The L1 reader, written in L1: the three stages of the bootstrap run in order. The input is [source [names values]]: the source, a list of bytes, then the names and the quoted values of the imports the program uses. The output is [0 quoted] for a source that reads, with the quoted program in the form code.luau uses, or [1 message] for one that is refused. The Luau reader is the reference: for each source, this and the Luau reader should give the same expression, or both should refuse it.
+The stages are imported by their paths, so the whole reader is the tokenizer, the parser and the compiler. Each stage's result is passed on by bind, so a refusal from any stage is the result of the whole reader.
 ---
 tok = boot/tokenize.prog
 par = boot/parse.prog
 com = boot/compile.prog
 ---
-(fn input (let qLam (fn b [3 b ~]) (let qApp (fn (f a) [10 f a ~]) (letrec rev (fn (l acc) (if (? l) acc (rev (tail l) [(head l) acc]))) (letrec addNames (fn (ns s) (if (? ns) s (addNames (tail ns) [(head ns) s]))) (letrec wrapVals (fn (vs body) (if (? vs) body (wrapVals (tail vs) (qApp (qLam body) (head vs))))) (let src (head input) (let names (head (tail input)) (let values (tail (tail input)) (wrapVals (rev values ~) (com [(par (tok src)) (addNames names ~)])))))))))))
+(fn input
+  (let qLam (fn b [3 b ~])
+  (let qApp (fn (f a) [10 f a ~])
+  (letrec rev (fn (l acc) (if (? l) acc (rev (tail l) [(head l) acc])))
+  (letrec addNames (fn (ns s) (if (? ns) s (addNames (tail ns) [(head ns) s])))
+  (letrec wrapVals (fn (vs body) (if (? vs) body (wrapVals (tail vs) (qApp (qLam body) (head vs)))))
+  (let bind (fn (r f) (if (= (head r) 0) (f (tail r)) r))
+  (let src (head input)
+  (let names (head (tail input))
+  (let values (tail (tail input))
+    (bind (tok src)
+      (fn ts
+        (bind (par ts)
+          (fn node
+            (bind (com [node (addNames names ~)])
+              (fn q [0 (wrapVals (rev values ~) q)]))))))))))))))))
 ---
-["42" ~ ~] => [0 42 ~] fuel 10000000
-["(fn x x)" ~ ~] => [3 [2 0 ~] ~] fuel 10000000
-["((fn x x) 4)" ~ ~] => [10 [3 [2 0 ~] ~] [0 4 ~] ~] fuel 10000000
-["(let x 1 x)" ~ ~] => [10 [3 [2 0 ~] ~] [0 1 ~] ~] fuel 10000000
-["x" (list "x") (list [0 1 ~])] => [10 [3 [2 0 ~] ~] [0 1 ~] ~] fuel 10000000
-["(f 1" ~ ~] => error fuel 10000000
-["(f 1))" ~ ~] => error fuel 10000000
-["x" ~ ~] => error fuel 10000000
+["42" ~ ~] => [0 [0 42 ~]] fuel 10000000
+["(fn x x)" ~ ~] => [0 [3 [2 0 ~] ~]] fuel 10000000
+["((fn x x) 4)" ~ ~] => [0 [10 [3 [2 0 ~] ~] [0 4 ~] ~]] fuel 10000000
+["(let x 1 x)" ~ ~] => [0 [10 [3 [2 0 ~] ~] [0 1 ~] ~]] fuel 10000000
+["x" (list "x") (list [0 1 ~])] => [0 [10 [3 [2 0 ~] ~] [0 1 ~] ~]] fuel 10000000
+["(f 1" ~ ~] => [1 "a group is never closed"] fuel 10000000
+["(f 1))" ~ ~] => [1 "there is more text after the expression"] fuel 10000000
+["x" ~ ~] => [1 "name is not bound"] fuel 10000000
