@@ -3,13 +3,12 @@ The probe is two lists walked together: the comparison stops as soon as one runs
 ---
 ---
 (fn s
-  (letrec rev (fn l (fn acc
-        (if (? l) acc ((rev (tail l)) [(head l) acc]))))
-    (letrec same (fn a (fn b
-          (if (? a) (? b)
-              (if (? b) 0
-                  (if (= (head a) (head b)) ((same (tail a)) (tail b)) 0)))))
-      ((same s) ((rev s) ~)))))
+  (letrec rev
+    (fn (l acc) (if (? l) acc (rev (tail l) [(head l) acc])))
+    (letrec same
+      (fn (a b)
+        (if (? a) (? b) (if (? b) 0 (if (= (head a) (head b)) (same (tail a) (tail b)) 0))))
+      (same s (rev s ~)))))
 ---
 "" => 1 fuel 200000
 "a" => 1 fuel 200000

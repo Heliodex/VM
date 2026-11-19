@@ -4,12 +4,15 @@ The probe is text processing: a string is a list of bytes, and the program walks
 ---
 ---
 (fn s
-  (letrec go (fn l (fn inword (fn count
+  (letrec go
+    (fn (l inword count)
       (if (? l)
-          count
-          (let c (head l)
-            (let space (= c 32)
-              (go (tail l) (if space 0 1) (+ count (if space 0 (if inword 0 1))))))))))
+        count
+        (let c
+          (head l)
+          (let space
+            (= c 32)
+            (go (tail l) (if space 0 1) (+ count (if space 0 (if inword 0 1))))))))
     (go s 0 0)))
 ---
 "" => 0 fuel 200000

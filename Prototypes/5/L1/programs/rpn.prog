@@ -4,17 +4,23 @@ The probe is a stack machine written as a function over a list. The empty input 
 ---
 ---
 (fn toks
-  (letrec run (fn ts (fn st
+  (letrec run
+    (fn (ts st)
       (if (? ts)
-          (head st)
-          (let t (head ts)
-            (if (= (head t) 0)
-                (run (tail ts) [(tail t) st])
-                (let op (tail t)
-                  (let b (head st)
-                    (let a (head (tail st))
-                      (let rest (tail (tail st))
-                        (run (tail ts) [(if (= op 0) (+ a b) (if (= op 1) (- a b) (* a b))) rest]))))))))))
+        (head st)
+        (let t
+          (head ts)
+          (if (= (head t) 0)
+            (run (tail ts) [(tail t) st])
+            (let op
+              (tail t)
+              (let b
+                (head st)
+                (let a
+                  (head (tail st))
+                  (let rest
+                    (tail (tail st))
+                    (run (tail ts) [(if (= op 0) (+ a b) (if (= op 1) (- a b) (* a b))) rest])))))))))
     (run toks ~)))
 ---
 [[0 3] [[0 4] [[1 0] ~]]] => 7 fuel 200000

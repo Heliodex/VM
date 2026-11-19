@@ -3,15 +3,16 @@ The probe is a function that builds a list of pairs, with a nested recursive hel
 ---
 ---
 (fn s
-  (letrec encode (fn l
-      (if (? l) ~
-          (let b (head l)
-            (letrec run (fn r (fn n
-                  (if (? r) [[n b] ~]
-                      (if (= (head r) b)
-                          ((run (tail r)) (+ n 1))
-                          [[n b] (encode r)]))))
-              ((run (tail l)) 1)))))
+  (letrec encode
+    (fn l
+      (if (? l)
+        ~
+        (let b
+          (head l)
+          (letrec run
+            (fn (r n)
+              (if (? r) [[n b] ~] (if (= (head r) b) (run (tail r) (+ n 1)) [[n b] (encode r)])))
+            (run (tail l) 1)))))
     (encode s)))
 ---
 "" => ~ fuel 200000
