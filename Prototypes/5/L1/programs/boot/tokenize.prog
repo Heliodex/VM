@@ -1,0 +1,21 @@
+The first stage of the L1 reader, written in L1. It turns the source, a list of bytes, into a list of tokens. A token is [kind [line payload]]: kind 0 is (, 1 is ), 2 is [, 3 is ], 4 is an integer, 5 is a symbol and 6 is a string. The payload of an integer is the number, and of a symbol or a string, the list of its bytes.
+Whitespace is 32 and 9 to 13. A comment runs from ; to the end of its line. A string follows the reader's escapes, \" \\ \n \t and \0. An error is a raised message.
+The probe for the bootstrap: this is the first of four stages, and it has to agree with the Luau tokenizer on the sources of the examples.
+---
+
+---
+(fn src (letrec rev (fn (l acc) (if (? l) acc (rev (tail l) [(head l) acc]))) (letrec ws (fn c (if (= c 32) 1 (if (< c 9) 0 (if (< 13 c) 0 1)))) (letrec delim (fn c (if (ws c) 1 (if (= c 40) 1 (if (= c 41) 1 (if (= c 91) 1 (if (= c 93) 1 (= c 59))))))) (letrec skipLine (fn l (if (? l) l (if (= (head l) 10) l (skipLine (tail l))))) (letrec word (fn (l acc) (if (? l) [(rev acc ~) l] (if (delim (head l)) [(rev acc ~) l] (word (tail l) [(head l) acc])))) (letrec escape (fn e (if (= e 34) 34 (if (= e 92) 92 (if (= e 110) 10 (if (= e 116) 9 (if (= e 48) 0 (raise "unknown escape"))))))) (letrec scan (fn (l acc) (if (? l) (raise "a string is never closed") (if (= (head l) 34) [(rev acc ~) (tail l)] (if (= (head l) 10) (raise "a string cannot run over a line") (if (= (head l) 92) (if (? (tail l)) (raise "a string is never closed") (scan (tail (tail l)) [(escape (head (tail l))) acc])) (scan (tail l) [(head l) acc])))))) (letrec digit (fn c (if (< c 48) 0 (if (< 57 c) 0 1))) (letrec digits (fn l (if (? l) 1 (if (digit (head l)) (digits (tail l)) 0))) (letrec isNum (fn w (if (? w) 0 (let rest (if (= (head w) 45) (tail w) w) (if (? rest) 0 (digits rest))))) (letrec value (fn (l acc) (if (? l) acc (value (tail l) (+ (* acc 10) (- (head l) 48))))) (letrec toInt (fn w (let neg (= (head w) 45) (let v (value (if neg (tail w) w) 0) (let n (if neg (- 0 v) v) (if (< 9007199254740991 n) (raise "integer is out of range") (if (< n -9007199254740991) (raise "integer is out of range") n)))))) (letrec go (fn (l line acc) (if (? l) (rev acc ~) (let c (head l) (if (= c 10) (go (tail l) (+ line 1) acc) (if (ws c) (go (tail l) line acc) (if (= c 59) (go (skipLine l) line acc) (if (= c 40) (go (tail l) line [[0 [line ~]] acc]) (if (= c 41) (go (tail l) line [[1 [line ~]] acc]) (if (= c 91) (go (tail l) line [[2 [line ~]] acc]) (if (= c 93) (go (tail l) line [[3 [line ~]] acc]) (if (= c 34) (let r (scan (tail l) ~) (go (tail r) line [[6 [line (head r)]] acc])) (let w (word l ~) (let bytes (head w) (go (tail w) line [(if (isNum bytes) [4 [line (toInt bytes)]] [5 [line bytes]]) acc])))))))))))))) (go src 1 ~)))))))))))))))
+---
+"" => ~ fuel 100000
+"(a 1)" => (list [0 [1 ~]] [5 [1 "a"]] [4 [1 1]] [1 [1 ~]]) fuel 100000
+"; hi\n5" => (list [4 [2 5]]) fuel 100000
+"-5" => (list [4 [1 -5]]) fuel 100000
+"-" => (list [5 [1 "-"]]) fuel 100000
+"foo-bar [x]" => (list [5 [1 "foo-bar"]] [2 [1 ~]] [5 [1 "x"]] [3 [1 ~]]) fuel 100000
+"\"a\\nb\"" => (list [6 [1 "a\nb"]]) fuel 100000
+"\"a\\\"b\\\\c\\t\\0\"" => (list [6 [1 "a\"b\\c\t\0"]]) fuel 100000
+"  \n\n  x" => (list [5 [3 "x"]]) fuel 100000
+"9007199254740992" => error fuel 100000
+"\"abc" => error fuel 100000
+"\"a\nb\"" => error fuel 100000
+"\"\\q\"" => error fuel 100000
