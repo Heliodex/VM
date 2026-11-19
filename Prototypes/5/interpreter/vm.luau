@@ -529,6 +529,7 @@ end
 local M = {}
 M.run = run
 M.show = show
+M.NIL = NIL
 M.MAX_INTEGER = MAX_INTEGER
 
 function M.int(

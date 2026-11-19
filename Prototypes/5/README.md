@@ -8,6 +8,7 @@ A strict, sequential interpreter for a small functional language with native dat
 | --- | --- |
 | `interpreter/vm.luau` | The machine, the printer, and the builders for expressions. |
 | `interpreter/reader.luau` | The reader: text syntax to expressions. The syntax is described at the top of the file. |
+| `interpreter/data.luau` | The data format: values to text and back, for interchange. Separate from the reader. See "The data format" below. |
 | `examples/examples.luau` | 49 programs built with the builders, each with a fuel budget and its expected outcome. |
 | `examples/text.luau` | 49 programs in the text syntax, plus 18 sources the reader must reject. |
 | `examples/programs.luau` | 9 longer programs in the text syntax, using `letrec`: an accumulator, reverse, append, insertion sort, word counting, deep equality, a tree evaluator and gcd. |
@@ -17,6 +18,7 @@ A strict, sequential interpreter for a small functional language with native dat
 | `self_run.luau` | Runs every example through the self-interpreter and checks it gives the same result. |
 | `self_data_run.luau` | Runs every example through the closure-free interpreter, and shows the two probes where it differs. |
 | `env_run.luau` | The environment experiment: a linked list against a skew binary random-access list, in the self-interpreter. |
+| `data_run.luau` | Checks the data format: written texts, rejected texts, refused functions and pins, and a round trip for every example that gives a value. |
 
 ## Running
 
@@ -28,6 +30,7 @@ Run from this directory.
 | The self-interpreter checks | `luau self_run.luau` |
 | The closure-free checks and probes | `luau self_data_run.luau` |
 | The environment experiment | `luau env_run.luau` |
+| The data format checks | `luau data_run.luau` |
 | The analyser | `luau-analyze interpreter/*.luau examples/*.luau self/*.luau run.luau self_run.luau self_data_run.luau` |
 | The formatter | `luau-format interpreter/*.luau examples/*.luau self/*.luau run.luau self_run.luau self_data_run.luau` |
 
@@ -62,6 +65,22 @@ Out of fuel is a result, not a hang, so a diverging program can be tested like a
 - **Variables are de Bruijn indices.** The machine never sees a name: `var 0` is the innermost binder, `var 1` the one outside it. The reader turns names into indices and rejects a name that is not bound, so the machine has no unbound-name errors from programs read from text. Names exist only in the reader and the surface syntax. The language has no symbol type, so a self-interpreter could not compare names anyway.
 - **Expressions can be built two ways:** by the Lua builders in `vm.luau`, or read from the text syntax by `reader.luau`. Both give the same `Expr`, and the examples use each.
 - **The printer is recursive** on nested data, which is fine for a reference but would need care for very deep structures.
+
+## The data format
+
+`interpreter/data.luau` is a separate format for values passed into and out of programs. It is not the program syntax, and it is never evaluated. The program reader is for writing programs by hand; this format is for data, so the two can change independently.
+
+A value is a sequence of tokens separated by single spaces:
+
+- `nil`, the nil value
+- an integer in decimal, such as `0`, `-3` or `42`, within the exact range
+- `cons h t`, a cell, with head `h` and tail `t`, each a value in turn
+
+It is prefix notation, so a list is read in one pass: `(1 2 3)` is `cons 1 cons 2 cons 3 nil`. Both the writer and the reader walk cells with an explicit stack, so a long list does not nest the Luau call stack.
+
+The form is canonical. The reader accepts only the text the writer produces: no leading zeros, no `-0`, no `+`, one space between tokens and none at the ends, and nothing after the value. So each value has exactly one text, and two values are equal exactly when their texts are.
+
+Functions and pins have no written form. Writing one is an error, including when a cell holds one.
 
 ## The self-interpreter
 
