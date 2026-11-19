@@ -96,7 +96,7 @@ Functions and pins have no written form. Writing one is an error, including when
 
 A program is the quoted form from `interpreter/code.luau`, so the tag table is shared with the self-interpreter. Decoding a program checks its shape, so a program from outside cannot reach a form the machine does not have.
 
-The decoder is strict: it refuses an unknown header or tag, a number that is not in its shortest form, a negative zero, an integer past the limit, bytes that stop early, and bytes after the value. The writer and reader both walk cells with an explicit stack.
+The decoder is strict: it refuses an unknown header or tag, a number that is not in its shortest form, a negative zero, an integer past the limit, bytes that stop early, and bytes after the value. The writer and reader both walk cells with an explicit stack. The bytes are held in a Luau `buffer`: the writer grows it by doubling, and the reader reads it with `readu8`, which checks the bounds.
 
 ## The self-interpreter
 
