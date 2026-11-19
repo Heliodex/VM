@@ -80,6 +80,35 @@ for _, source in Text.rejects do
 	end
 end
 
+-- Builders reject a bad primitive or an out-of-range integer as soon as they are called.
+const builderRejects: { [string]: () -> VM.Expr } = {
+	["a primitive that is not known"] = function()
+		return VM.prim("nope", VM.int(1), VM.int(2))
+	end,
+	["a binary primitive with one argument"] = function()
+		return VM.prim("add", VM.int(1))
+	end,
+	["kind with two arguments"] = function()
+		return VM.prim("kind", VM.int(1), VM.int(2))
+	end,
+	["an integer past the range"] = function()
+		return VM.int(9007199254740992)
+	end,
+}
+
+for name, build in builderRejects do
+	total += 1
+
+	const ok, err = pcall(build)
+
+	if ok then
+		failures += 1
+		print(string.format("FAIL  builder %s  -> it built, but it should not", name))
+	else
+		print(string.format("PASS  builder %s  -> %s", name, tostring(err)))
+	end
+end
+
 print(string.format("%d of %d checks passed", total - failures, total))
 
 if failures > 0 then

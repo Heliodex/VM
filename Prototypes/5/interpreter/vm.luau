@@ -621,11 +621,22 @@ function M.force(
 end
 
 -- A primitive on integers: add, sub, mul, lt, eq. The unary primitive kind takes no b, and works on any value.
+-- The name and the number of arguments are checked here, so a bad primitive fails when it is built, not when the machine reaches it.
 function M.prim(
 	name: string,
 	a: Expr,
 	b: Expr?
 ): Expr
+	if name == "kind" then
+		if b ~= nil then
+			error("kind takes one argument, but was given two", 0)
+		end
+	elseif BINARY[name] == nil then
+		error(string.format("unknown primitive %s", name), 0)
+	elseif b == nil then
+		error(string.format("%s takes two arguments, but was given one", name), 0)
+	end
+
 	return {
 		op = "prim",
 		name = name,
