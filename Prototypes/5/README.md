@@ -10,6 +10,7 @@ A strict, sequential interpreter for a small functional language with native dat
 | `interpreter/reader.luau` | The reader: text syntax to expressions. The syntax is described at the top of the file. |
 | `interpreter/code.luau` | A program as data: the tag table, and the conversion between an expression and its quoted value, checked on the way back. |
 | `interpreter/data.luau` | The data format: values to text and back, for interchange. Separate from the reader. See "The data format" below. |
+| `interpreter/binary.luau` | The binary format: values and programs to bytes and back. See "The binary format" below. |
 | `examples/examples.luau` | 49 programs built with the builders, each with a fuel budget and its expected outcome. |
 | `examples/text.luau` | 49 programs in the text syntax, plus 18 sources the reader must reject. |
 | `examples/programs.luau` | 9 longer programs in the text syntax, using `letrec`: an accumulator, reverse, append, insertion sort, word counting, deep equality, a tree evaluator and gcd. |
@@ -20,6 +21,7 @@ A strict, sequential interpreter for a small functional language with native dat
 | `self_data_run.luau` | Runs every example through the closure-free interpreter, and shows the two probes where it differs. |
 | `env_run.luau` | The environment experiment: a linked list against a skew binary random-access list, in the self-interpreter. |
 | `data_run.luau` | Checks the data format: written texts, rejected texts, refused functions and pins, and a round trip for every example that gives a value. |
+| `binary_run.luau` | Checks the binary format: exact bytes, refused bytes, and a round trip for every example value and program. |
 
 ## Running
 
@@ -32,6 +34,7 @@ Run from this directory.
 | The closure-free checks and probes | `luau self_data_run.luau` |
 | The environment experiment | `luau env_run.luau` |
 | The data format checks | `luau data_run.luau` |
+| The binary format checks | `luau binary_run.luau` |
 | The analyser | `luau-analyze interpreter/*.luau examples/*.luau self/*.luau run.luau self_run.luau self_data_run.luau` |
 | The formatter | `luau-format interpreter/*.luau examples/*.luau self/*.luau run.luau self_run.luau self_data_run.luau` |
 
@@ -82,6 +85,18 @@ It is prefix notation, so a list is read in one pass: `(1 2 3)` is `cons 1 cons 
 The form is canonical. The reader accepts only the text the writer produces: no leading zeros, no `-0`, no `+`, one space between tokens and none at the ends, and nothing after the value. So each value has exactly one text, and two values are equal exactly when their texts are.
 
 Functions and pins have no written form. Writing one is an error, including when a cell holds one.
+
+## The binary format
+
+`interpreter/binary.luau` stores values and programs as bytes, for machines. It has three parts:
+
+- a header byte: `1` for a data value, `2` for a program
+- a prefix sequence of parts, each starting with a tag byte: `0` nil, `1` a cell (head, then tail), `2` a non-negative integer, `3` a negative integer
+- an integer's magnitude, as unsigned LEB128: 7 bits per byte, the top bit set on every byte but the last, and the last byte never zero unless it is the only one
+
+A program is the quoted form from `interpreter/code.luau`, so the tag table is shared with the self-interpreter. Decoding a program checks its shape, so a program from outside cannot reach a form the machine does not have.
+
+The decoder is strict: it refuses an unknown header or tag, a number that is not in its shortest form, a negative zero, an integer past the limit, bytes that stop early, and bytes after the value. The writer and reader both walk cells with an explicit stack.
 
 ## The self-interpreter
 
