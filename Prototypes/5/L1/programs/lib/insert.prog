@@ -3,10 +3,10 @@ Puts an integer into a sorted list, before the first item that is larger. The in
 
 ---
 (fn p
-  (letrec ins (fn l
-        (if (? l) [(head p) ~]
-            (if (< (head p) (head l)) [(head p) l] [(head l) (ins (tail l))])))
-    (ins (tail p))))
+	(letrec ins (fn l
+				(if (? l) [(head p) ~]
+						(if (< (head p) (head l)) [(head p) l] [(head l) (ins (tail l))])))
+		(ins (tail p))))
 ---
 [3 1 2 5 ~] => [1 2 3 5 ~] fuel 100000
 [0 ~] => [0 ~] fuel 100000

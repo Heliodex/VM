@@ -4,24 +4,24 @@ Keys here are integers, since the language has no strings.
 ---
 ---
 (fn cmds
-  (letrec lookup
-    (fn (k s) (if (? s) ~ (if (= (head (head s)) k) (tail (head s)) (lookup k (tail s)))))
-    (letrec rev
-      (fn (l acc) (if (? l) acc (rev (tail l) [(head l) acc])))
-      (letrec run
-        (fn (cs s out)
-          (if (? cs)
-            (rev out ~)
-            (let c
-              (head cs)
-              (let op
-                (head c)
-                (let kv
-                  (tail c)
-                  (if (= op 0)
-                    (run (tail cs) [kv s] out)
-                    (run (tail cs) s [(lookup (head kv) s) out])))))))
-        (run cmds ~ ~)))))
+	(letrec lookup
+		(fn (k s) (if (? s) ~ (if (= (head (head s)) k) (tail (head s)) (lookup k (tail s)))))
+		(letrec rev
+			(fn (l acc) (if (? l) acc (rev (tail l) [(head l) acc])))
+			(letrec run
+				(fn (cs s out)
+					(if (? cs)
+						(rev out ~)
+						(let c
+							(head cs)
+							(let op
+								(head c)
+								(let kv
+									(tail c)
+									(if (= op 0)
+										(run (tail cs) [kv s] out)
+										(run (tail cs) s [(lookup (head kv) s) out])))))))
+				(run cmds ~ ~)))))
 ---
 [[0 1 1] [1 1 ~] [0 1 2] [1 1 ~] [1 2 ~] ~] => [1 2 ~ ~] fuel 200000
 [[1 1 ~] ~] => [~ ~] fuel 200000

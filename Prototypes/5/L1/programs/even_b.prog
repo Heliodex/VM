@@ -3,17 +3,17 @@ The probe is mutual recursion over a string, with a failure carried as a value t
 ---
 ---
 (fn s
-  (mutual ((even (fn l
-              (if (? l) [0 1]
-                  (let c (head l)
-                    (if (= c 97) (even (tail l))
-                        (if (= c 98) (odd (tail l)) [1 "bad character"]))))))
-           (odd (fn l
-              (if (? l) [0 0]
-                  (let c (head l)
-                    (if (= c 97) (odd (tail l))
-                        (if (= c 98) (even (tail l)) [1 "bad character"])))))))
-    (even s)))
+	(mutual ((even (fn l
+							(if (? l) [0 1]
+									(let c (head l)
+										(if (= c 97) (even (tail l))
+												(if (= c 98) (odd (tail l)) [1 "bad character"]))))))
+					(odd (fn l
+							(if (? l) [0 0]
+									(let c (head l)
+										(if (= c 97) (odd (tail l))
+												(if (= c 98) (even (tail l)) [1 "bad character"])))))))
+		(even s)))
 ---
 "" => [0 1] fuel 200000
 "a" => [0 1] fuel 200000

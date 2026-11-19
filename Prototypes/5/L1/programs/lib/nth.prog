@@ -3,10 +3,10 @@ The item at index n of a list, counting from 0. The input is the pair [n xs]. Th
 
 ---
 (fn p
-  (letrec nth
-    (fn (n l)
-      (if (? l) [1 "index out of range"] (if (= n 0) [0 (head l)] (nth (- n 1) (tail l)))))
-    (nth (head p) (tail p))))
+	(letrec nth
+		(fn (n l)
+			(if (? l) [1 "index out of range"] (if (= n 0) [0 (head l)] (nth (- n 1) (tail l)))))
+		(nth (head p) (tail p))))
 ---
 [0 7 8 9 ~] => [0 7] fuel 100000
 [2 7 8 9 ~] => [0 9] fuel 100000

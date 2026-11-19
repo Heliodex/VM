@@ -6,81 +6,81 @@ The probe for the bootstrap: this is the first of four stages, and it has to agr
 
 ---
 (fn src
-  (let bind (fn (r f) (if (= (head r) 0) (f (tail r)) r))
-  (letrec rev
-    (fn (l acc) (if (? l) acc (rev (tail l) [(head l) acc])))
-  (letrec ws
-    (fn c (if (= c 32) 1 (if (< c 9) 0 (if (< 13 c) 0 1))))
-  (letrec delim
-    (fn c (if (ws c) 1 (if (= c 40) 1 (if (= c 41) 1 (if (= c 91) 1 (if (= c 93) 1 (= c 59)))))))
-  (letrec skipLine
-    (fn l (if (? l) l (if (= (head l) 10) l (skipLine (tail l)))))
-  (letrec word
-    (fn (l acc)
-      (if (? l) [(rev acc ~) l]
-          (if (delim (head l)) [(rev acc ~) l]
-              (word (tail l) [(head l) acc]))))
-  (letrec escape
-    (fn e
-      (if (= e 34) [0 34]
-          (if (= e 92) [0 92]
-              (if (= e 110) [0 10]
-                  (if (= e 116) [0 9]
-                      (if (= e 48) [0 0]
-                          [1 "unknown escape"]))))))
-  (letrec scan
-    (fn (l acc)
-      (if (? l) [1 "a string is never closed"]
-          (if (= (head l) 34) [0 [(rev acc ~) (tail l)]]
-              (if (= (head l) 10) [1 "a string cannot run over a line"]
-                  (if (= (head l) 92)
-                      (if (? (tail l)) [1 "a string is never closed"]
-                          (bind (escape (head (tail l)))
-                                (fn code (scan (tail (tail l)) [code acc]))))
-                      (scan (tail l) [(head l) acc]))))))
-  (letrec digit
-    (fn c (if (< c 48) 0 (if (< 57 c) 0 1)))
-  (letrec digits
-    (fn l (if (? l) 1 (if (digit (head l)) (digits (tail l)) 0)))
-  (letrec isNum
-    (fn w
-      (if (? w) 0
-          (let rest (if (= (head w) 45) (tail w) w)
-            (if (? rest) 0 (digits rest)))))
-  (letrec value
-    (fn (l acc)
-      (if (? l) acc
-          (let d (- (head l) 48)
-            (if (< (div (- 9007199254740991 d) 10) acc) -1
-                (value (tail l) (+ (* acc 10) d))))))
-  (letrec toInt
-    (fn w
-      (let neg (= (head w) 45)
-        (let v (value (if neg (tail w) w) 0)
-          (let n (if neg (- 0 v) v)
-            (if (< v 0) [1 "integer is out of range"]
-                [0 n])))))
-  (letrec go
-    (fn (l line acc)
-      (if (? l) [0 (rev acc ~)]
-          (let c (head l)
-            (if (= c 10) (go (tail l) (+ line 1) acc)
-            (if (ws c) (go (tail l) line acc)
-            (if (= c 59) (go (skipLine l) line acc)
-            (if (= c 40) (go (tail l) line [[0 line ~] acc])
-            (if (= c 41) (go (tail l) line [[1 line ~] acc])
-            (if (= c 91) (go (tail l) line [[2 line ~] acc])
-            (if (= c 93) (go (tail l) line [[3 line ~] acc])
-            (if (= c 34)
-                (bind (scan (tail l) ~)
-                      (fn r (go (tail r) line [[6 line (head r)] acc])))
-                (let w (word l ~)
-                  (let bytes (head w)
-                    (if (isNum bytes)
-                        (bind (toInt bytes)
-                              (fn n (go (tail w) line [[4 line n] acc])))
-                        (go (tail w) line [[5 line bytes] acc])))))))))))))))
-    (go src 1 ~))))))))))))))))
+	(let bind (fn (r f) (if (= (head r) 0) (f (tail r)) r))
+	(letrec rev
+		(fn (l acc) (if (? l) acc (rev (tail l) [(head l) acc])))
+	(letrec ws
+		(fn c (if (= c 32) 1 (if (< c 9) 0 (if (< 13 c) 0 1))))
+	(letrec delim
+		(fn c (if (ws c) 1 (if (= c 40) 1 (if (= c 41) 1 (if (= c 91) 1 (if (= c 93) 1 (= c 59)))))))
+	(letrec skipLine
+		(fn l (if (? l) l (if (= (head l) 10) l (skipLine (tail l)))))
+	(letrec word
+		(fn (l acc)
+			(if (? l) [(rev acc ~) l]
+					(if (delim (head l)) [(rev acc ~) l]
+							(word (tail l) [(head l) acc]))))
+	(letrec escape
+		(fn e
+			(if (= e 34) [0 34]
+					(if (= e 92) [0 92]
+							(if (= e 110) [0 10]
+									(if (= e 116) [0 9]
+											(if (= e 48) [0 0]
+													[1 "unknown escape"]))))))
+	(letrec scan
+		(fn (l acc)
+			(if (? l) [1 "a string is never closed"]
+					(if (= (head l) 34) [0 [(rev acc ~) (tail l)]]
+							(if (= (head l) 10) [1 "a string cannot run over a line"]
+									(if (= (head l) 92)
+											(if (? (tail l)) [1 "a string is never closed"]
+													(bind (escape (head (tail l)))
+																(fn code (scan (tail (tail l)) [code acc]))))
+											(scan (tail l) [(head l) acc]))))))
+	(letrec digit
+		(fn c (if (< c 48) 0 (if (< 57 c) 0 1)))
+	(letrec digits
+		(fn l (if (? l) 1 (if (digit (head l)) (digits (tail l)) 0)))
+	(letrec isNum
+		(fn w
+			(if (? w) 0
+					(let rest (if (= (head w) 45) (tail w) w)
+						(if (? rest) 0 (digits rest)))))
+	(letrec value
+		(fn (l acc)
+			(if (? l) acc
+					(let d (- (head l) 48)
+						(if (< (div (- 9007199254740991 d) 10) acc) -1
+								(value (tail l) (+ (* acc 10) d))))))
+	(letrec toInt
+		(fn w
+			(let neg (= (head w) 45)
+				(let v (value (if neg (tail w) w) 0)
+					(let n (if neg (- 0 v) v)
+						(if (< v 0) [1 "integer is out of range"]
+								[0 n])))))
+	(letrec go
+		(fn (l line acc)
+			(if (? l) [0 (rev acc ~)]
+					(let c (head l)
+						(if (= c 10) (go (tail l) (+ line 1) acc)
+						(if (ws c) (go (tail l) line acc)
+						(if (= c 59) (go (skipLine l) line acc)
+						(if (= c 40) (go (tail l) line [[0 line ~] acc])
+						(if (= c 41) (go (tail l) line [[1 line ~] acc])
+						(if (= c 91) (go (tail l) line [[2 line ~] acc])
+						(if (= c 93) (go (tail l) line [[3 line ~] acc])
+						(if (= c 34)
+								(bind (scan (tail l) ~)
+											(fn r (go (tail r) line [[6 line (head r)] acc])))
+								(let w (word l ~)
+									(let bytes (head w)
+										(if (isNum bytes)
+												(bind (toInt bytes)
+															(fn n (go (tail w) line [[4 line n] acc])))
+												(go (tail w) line [[5 line bytes] acc])))))))))))))))
+		(go src 1 ~))))))))))))))))
 ---
 "" => [0 ~] fuel 100000
 "(a 1)" => [0 (list [0 1 ~] [5 1 "a"] [4 1 1] [1 1 ~])] fuel 100000

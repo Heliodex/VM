@@ -3,12 +3,12 @@ The probe is a loop with a numeric exit condition, and an input that never meets
 ---
 ---
 (fn n
-  (letrec steps
-    (fn (k acc)
-      (if (= k 1)
-        acc
-        (if (= (mod k 2) 0) (steps (div k 2) (+ acc 1)) (steps (+ (* 3 k) 1) (+ acc 1)))))
-    (steps n 0)))
+	(letrec steps
+		(fn (k acc)
+			(if (= k 1)
+				acc
+				(if (= (mod k 2) 0) (steps (div k 2) (+ acc 1)) (steps (+ (* 3 k) 1) (+ acc 1)))))
+		(steps n 0)))
 ---
 1 => 0 fuel 100000
 2 => 1 fuel 100000

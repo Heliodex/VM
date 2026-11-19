@@ -3,8 +3,8 @@ Sorts a list of integers, by insertion. It uses insert from lib/insert.prog, whi
 insert = lib/insert.prog
 ---
 (fn xs
-  (letrec s (fn l (if (? l) ~ (insert [(head l) (s (tail l))])))
-    (s xs)))
+	(letrec s (fn l (if (? l) ~ (insert [(head l) (s (tail l))])))
+		(s xs)))
 ---
 ~ => ~ fuel 100000
 [3 1 2 ~] => [1 2 3 ~] fuel 100000

@@ -4,38 +4,38 @@ The result is [0 node] for a program that parses, and [1 message] for one that d
 
 ---
 (fn ts
-  (let bind (fn (r f) (if (= (head r) 0) (f (tail r)) r))
-  (letrec rev
-    (fn (l acc) (if (? l) acc (rev (tail l) [(head l) acc])))
-  (mutual ((readNode
-             (fn ts
-               (if (? ts) [1 "the program ends before an expression is complete"]
-                   (let t (head ts)
-                     (let k (head t)
-                       (let line (head (tail t))
-                         (let p (tail (tail t))
-                           (if (= k 0)
-                               (bind (readItems (tail ts) 1 ~)
-                                     (fn r [0 [[2 line (head r)] (tail r)]]))
-                               (if (= k 2)
-                                   (bind (readItems (tail ts) 3 ~)
-                                         (fn r [0 [[3 line (head r)] (tail r)]]))
-                                   (if (= k 1) [1 "unexpected )"]
-                                       (if (= k 3) [1 "unexpected ]"]
-                                           (if (= k 4) [0 [[0 line p] (tail ts)]]
-                                               (if (= k 5) [0 [[1 line p] (tail ts)]]
-                                                   [0 [[4 line p] (tail ts)]])))))))))))))
-           (readItems
-             (fn (ts closer acc)
-               (if (? ts) [1 "a group is never closed"]
-                   (if (= (head (head ts)) closer)
-                       [0 [(rev acc ~) (tail ts)]]
-                       (bind (readNode ts)
-                             (fn r (readItems (tail r) closer [(head r) acc]))))))))
-    (if (? ts) [1 "the program is empty"]
-        (bind (readNode ts)
-              (fn r (if (? (tail r)) [0 (head r)]
-                        [1 "there is more text after the expression"]))))))))
+	(let bind (fn (r f) (if (= (head r) 0) (f (tail r)) r))
+	(letrec rev
+		(fn (l acc) (if (? l) acc (rev (tail l) [(head l) acc])))
+	(mutual ((readNode
+						(fn ts
+							(if (? ts) [1 "the program ends before an expression is complete"]
+									(let t (head ts)
+										(let k (head t)
+											(let line (head (tail t))
+												(let p (tail (tail t))
+													(if (= k 0)
+															(bind (readItems (tail ts) 1 ~)
+																		(fn r [0 [[2 line (head r)] (tail r)]]))
+															(if (= k 2)
+																	(bind (readItems (tail ts) 3 ~)
+																				(fn r [0 [[3 line (head r)] (tail r)]]))
+																	(if (= k 1) [1 "unexpected )"]
+																			(if (= k 3) [1 "unexpected ]"]
+																					(if (= k 4) [0 [[0 line p] (tail ts)]]
+																							(if (= k 5) [0 [[1 line p] (tail ts)]]
+																									[0 [[4 line p] (tail ts)]])))))))))))))
+					(readItems
+						(fn (ts closer acc)
+							(if (? ts) [1 "a group is never closed"]
+									(if (= (head (head ts)) closer)
+											[0 [(rev acc ~) (tail ts)]]
+											(bind (readNode ts)
+														(fn r (readItems (tail r) closer [(head r) acc]))))))))
+		(if (? ts) [1 "the program is empty"]
+				(bind (readNode ts)
+							(fn r (if (? (tail r)) [0 (head r)]
+												[1 "there is more text after the expression"]))))))))
 ---
 (list [4 1 1]) => [0 [0 1 1]] fuel 100000
 (list [0 1 ~] [5 1 "a"] [1 1 ~]) => [0 [2 1 (list [1 1 "a"])]] fuel 100000

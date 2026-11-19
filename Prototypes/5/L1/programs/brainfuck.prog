@@ -3,76 +3,76 @@ The tape is a zipper: the cells to the left, the current cell, and the cells to 
 ---
 ---
 (fn prog
-  (letrec advance
-    (fn z
-      (let cl
-        (head z)
-        (let c
-          (head (tail z))
-          (let cr (tail (tail z)) [[c cl] (if (? cr) ~ (head cr)) (if (? cr) ~ (tail cr))]))))
-    (letrec retreat
-      (fn z
-        (let cl
-          (head z)
-          (let c (head (tail z)) (let cr (tail (tail z)) [(tail cl) (head cl) c cr]))))
-      (letrec rev
-        (fn (l acc) (if (? l) acc (rev (tail l) [(head l) acc])))
-        (letrec skipF
-          (fn (d z)
-            (let c
-              (head (tail z))
-              (if (? c)
-                (head 0)
-                (if (= c 91)
-                  (skipF (+ d 1) (advance z))
-                  (if (= c 93) (if (= d 0) z (skipF (- d 1) (advance z))) (skipF d (advance z)))))))
-          (letrec skipB
-            (fn (d z)
-              (let c
-                (head (tail z))
-                (if (= c 93)
-                  (skipB (+ d 1) (retreat z))
-                  (if (= c 91) (if (= d 0) z (skipB (- d 1) (retreat z))) (skipB d (retreat z))))))
-            (letrec run
-              (fn (z t out)
-                (let c
-                  (head (tail z))
-                  (if (? c)
-                    (rev out ~)
-                    (let L
-                      (head t)
-                      (let v
-                        (head (tail t))
-                        (let R
-                          (tail (tail t))
-                          (if (= c 43)
-                            (run (advance z) [L (+ v 1) R] out)
-                            (if (= c 45)
-                              (run (advance z) [L (- v 1) R] out)
-                              (if (= c 62)
-                                (run
-                                  (advance z)
-                                  [[v L] (if (? R) 0 (head R)) (if (? R) ~ (tail R))]
-                                  out)
-                                (if (= c 60)
-                                  (run
-                                    (advance z)
-                                    [(if (? L) ~ (tail L)) (if (? L) 0 (head L)) v R]
-                                    out)
-                                  (if (= c 46)
-                                    (run (advance z) t [v out])
-                                    (if (= c 91)
-                                      (if (= v 0)
-                                        (run (advance (skipF 0 (advance z))) t out)
-                                        (run (advance z) t out))
-                                      (if (= c 93)
-                                        (if (= v 0)
-                                          (run (advance z) t out)
-                                          (run (skipB 0 (retreat z)) t out))
-                                        (run (advance z) t out))))))))))))))
-              (let c0
-                (if (? prog) ~ (head prog))
-                (let cr0 (if (? prog) ~ (tail prog)) (run [~ c0 cr0] [~ 0 ~] ~))))))))))
+	(letrec advance
+		(fn z
+			(let cl
+				(head z)
+				(let c
+					(head (tail z))
+					(let cr (tail (tail z)) [[c cl] (if (? cr) ~ (head cr)) (if (? cr) ~ (tail cr))]))))
+		(letrec retreat
+			(fn z
+				(let cl
+					(head z)
+					(let c (head (tail z)) (let cr (tail (tail z)) [(tail cl) (head cl) c cr]))))
+			(letrec rev
+				(fn (l acc) (if (? l) acc (rev (tail l) [(head l) acc])))
+				(letrec skipF
+					(fn (d z)
+						(let c
+							(head (tail z))
+							(if (? c)
+								(head 0)
+								(if (= c 91)
+									(skipF (+ d 1) (advance z))
+									(if (= c 93) (if (= d 0) z (skipF (- d 1) (advance z))) (skipF d (advance z)))))))
+					(letrec skipB
+						(fn (d z)
+							(let c
+								(head (tail z))
+								(if (= c 93)
+									(skipB (+ d 1) (retreat z))
+									(if (= c 91) (if (= d 0) z (skipB (- d 1) (retreat z))) (skipB d (retreat z))))))
+						(letrec run
+							(fn (z t out)
+								(let c
+									(head (tail z))
+									(if (? c)
+										(rev out ~)
+										(let L
+											(head t)
+											(let v
+												(head (tail t))
+												(let R
+													(tail (tail t))
+													(if (= c 43)
+														(run (advance z) [L (+ v 1) R] out)
+														(if (= c 45)
+															(run (advance z) [L (- v 1) R] out)
+															(if (= c 62)
+																(run
+																	(advance z)
+																	[[v L] (if (? R) 0 (head R)) (if (? R) ~ (tail R))]
+																	out)
+																(if (= c 60)
+																	(run
+																		(advance z)
+																		[(if (? L) ~ (tail L)) (if (? L) 0 (head L)) v R]
+																		out)
+																	(if (= c 46)
+																		(run (advance z) t [v out])
+																		(if (= c 91)
+																			(if (= v 0)
+																				(run (advance (skipF 0 (advance z))) t out)
+																				(run (advance z) t out))
+																			(if (= c 93)
+																				(if (= v 0)
+																					(run (advance z) t out)
+																					(run (skipB 0 (retreat z)) t out))
+																				(run (advance z) t out))))))))))))))
+							(let c0
+								(if (? prog) ~ (head prog))
+								(let cr0 (if (? prog) ~ (tail prog)) (run [~ c0 cr0] [~ 0 ~] ~))))))))))
 ---
 "+++." => [3 ~] fuel 300000
 "++[>+<-]>." => [2 ~] fuel 300000

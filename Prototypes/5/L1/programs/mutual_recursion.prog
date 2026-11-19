@@ -3,9 +3,9 @@ The probe is mutual recursion. It was the one probe the language could not expre
 ---
 ---
 (fn n
-  (mutual ((even (fn k (if (= k 0) 1 (odd (- k 1)))))
-           (odd (fn k (if (= k 0) 0 (even (- k 1))))))
-    (even n)))
+	(mutual ((even (fn k (if (= k 0) 1 (odd (- k 1)))))
+					(odd (fn k (if (= k 0) 0 (even (- k 1))))))
+		(even n)))
 ---
 0 => 1 fuel 10000
 4 => 1 fuel 10000

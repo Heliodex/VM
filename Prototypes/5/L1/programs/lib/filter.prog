@@ -3,12 +3,12 @@ Keeps the items of a list that a test accepts. The input is the pair [pred xs]: 
 
 ---
 (fn p
-  (letrec f (fn l
-        (if (? l) ~
-            (if ((head p) (head l))
-                [(head l) (f (tail l))]
-                (f (tail l)))))
-    (f (tail p))))
+	(letrec f (fn l
+				(if (? l) ~
+						(if ((head p) (head l))
+								[(head l) (f (tail l))]
+								(f (tail l)))))
+		(f (tail p))))
 ---
 [(fn x (< x 3)) 1 5 2 4 ~] => [1 2 ~] fuel 100000
 [(fn x (< x 3)) ~] => ~ fuel 100000

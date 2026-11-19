@@ -3,12 +3,12 @@ The probe is the integer limit: 25! is far past 2^53, and this program computes 
 ---
 ---
 (fn n
-  (letrec mul
-    (fn (d m c)
-      (if (? d)
-        (if (= c 0) ~ [(mod c 10) (mul ~ m (div c 10))])
-        (let t (+ (* (head d) m) c) [(mod t 10) (mul (tail d) m (div t 10))])))
-    (letrec fact (fn k (if (= k 0) [1 ~] (mul (fact (- k 1)) k 0))) (fact n))))
+	(letrec mul
+		(fn (d m c)
+			(if (? d)
+				(if (= c 0) ~ [(mod c 10) (mul ~ m (div c 10))])
+				(let t (+ (* (head d) m) c) [(mod t 10) (mul (tail d) m (div t 10))])))
+		(letrec fact (fn k (if (= k 0) [1 ~] (mul (fact (- k 1)) k 0))) (fact n))))
 ---
 0 => [1 ~] fuel 1000000
 5 => [0 2 1 ~] fuel 1000000

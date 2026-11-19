@@ -6,21 +6,21 @@ par = boot/parse.prog
 com = boot/compile.prog
 ---
 (fn input
-  (let qLam (fn b [3 b ~])
-  (let qApp (fn (f a) [10 f a ~])
-  (letrec rev (fn (l acc) (if (? l) acc (rev (tail l) [(head l) acc])))
-  (letrec addNames (fn (ns s) (if (? ns) s (addNames (tail ns) [(head ns) s])))
-  (letrec wrapVals (fn (vs body) (if (? vs) body (wrapVals (tail vs) (qApp (qLam body) (head vs)))))
-  (let bind (fn (r f) (if (= (head r) 0) (f (tail r)) r))
-  (let src (head input)
-  (let names (head (tail input))
-  (let values (tail (tail input))
-    (bind (tok src)
-      (fn ts
-        (bind (par ts)
-          (fn node
-            (bind (com [node (addNames names ~)])
-              (fn q [0 (wrapVals (rev values ~) q)]))))))))))))))))
+	(let qLam (fn b [3 b ~])
+	(let qApp (fn (f a) [10 f a ~])
+	(letrec rev (fn (l acc) (if (? l) acc (rev (tail l) [(head l) acc])))
+	(letrec addNames (fn (ns s) (if (? ns) s (addNames (tail ns) [(head ns) s])))
+	(letrec wrapVals (fn (vs body) (if (? vs) body (wrapVals (tail vs) (qApp (qLam body) (head vs)))))
+	(let bind (fn (r f) (if (= (head r) 0) (f (tail r)) r))
+	(let src (head input)
+	(let names (head (tail input))
+	(let values (tail (tail input))
+		(bind (tok src)
+			(fn ts
+				(bind (par ts)
+					(fn node
+						(bind (com [node (addNames names ~)])
+							(fn q [0 (wrapVals (rev values ~) q)]))))))))))))))))
 ---
 ["42" ~ ~] => [0 [0 42 ~]] fuel 10000000
 ["(fn x x)" ~ ~] => [0 [3 [2 0 ~] ~]] fuel 10000000
