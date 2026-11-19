@@ -121,12 +121,19 @@ const examples: { Example } = {
 	failure("remainder by zero is an error", "(mod 1 0)", "error"),
 	failure("addition past the largest integer is an error", "(+ 9007199254740991 1)", "error"),
 	failure("subtraction past the smallest integer is an error", "(- -9007199254740991 2)", "error"),
+	value("mutual recursion: even of 6", "(mutual ((ev (lam k (if (= k 0) 1 (od (- k 1))))) (od (lam k (if (= k 0) 0 (ev (- k 1)))))) (ev 6))", "1"),
+	value("mutual recursion: odd of 7", "(mutual ((ev (lam k (if (= k 0) 1 (od (- k 1))))) (od (lam k (if (= k 0) 0 (ev (- k 1)))))) (od 7))", "1"),
+	value("mutual recursion: three functions in a ring", "(mutual ((a (lam k (if (= k 0) 0 (b (- k 1))))) (b (lam k (if (= k 0) 1 (c (- k 1))))) (c (lam k (if (= k 0) 2 (a (- k 1)))))) (a 7))", "1"),
 	failure("raise stops the run with an error", "(raise 7)", "error"),
 	failure("raise stops the run even inside a cell", "[1 (raise [104 ~])]", "error"),
 }
 
 const rejects: { string } = {
 	"",
+	"(mutual () 1)",
+	"(mutual ((f 1)) f)",
+	"(mutual ((f (lam x x) extra)) f)",
+	"(mutual ((f (lam x (g x)))) 1)",
 	"(+ 1)",
 	"(lam + +)",
 	"(foo)",

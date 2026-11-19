@@ -1,10 +1,10 @@
-Whether a number is even, with even and odd defined in terms of each other. Written the natural way, with the letrecs nested, odd is not in scope where even is defined.
-The probe is mutual recursion: the language has self-recursion through letrec, but no way to bind two functions that call each other.
+Whether a number is even, with even and odd defined in terms of each other. The mutual form binds both names at once, so each function can call the other.
+The probe is mutual recursion. It was the one probe the language could not express: with letrec alone, odd is not in scope where even is defined.
 ---
 (lam n
-  (letrec even (lam k (if (= k 0) 1 (odd (- k 1))))
-    (letrec odd (lam k (if (= k 0) 0 (even (- k 1))))
-      (even n))))
+  (mutual ((even (lam k (if (= k 0) 1 (odd (- k 1)))))
+           (odd (lam k (if (= k 0) 0 (even (- k 1))))))
+    (even n)))
 ---
 0 => 1 fuel 10000
 4 => 1 fuel 10000

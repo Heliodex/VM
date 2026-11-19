@@ -15,6 +15,8 @@
 --   (let x e body)     binds x to e in body. It is sugar for ((lam x body) e), so x is not in scope in e
 --   (letrec f (lam ...) body)
 --                      binds f to a recursive function, whose definition can call f. It is sugar for let, with fix
+--   (mutual ((f (lam ...)) (g (lam ...))) body)
+--                      binds f and g to functions that can call each other, and each other's names. It is sugar for one fixed point that takes a member and an argument
 --   (pin e), (force e)
 --   (fix f)            the fixed point of f, where f is (lam rec (lam ...)) and rec is the function itself
 --   (+ a b), (- a b), (* a b), (< a b), (= a b)
@@ -75,6 +77,7 @@ const function reserved(name: string): boolean
 		or name == "if"
 		or name == "let"
 		or name == "letrec"
+		or name == "mutual"
 		or name == "list"
 		or name == "~"
 		or PRIMITIVES[name] ~= nil
@@ -205,6 +208,91 @@ end
 -- Compiles a node to an expression, given the names of the binders around it, innermost first. Forms are recognised by their first word.
 local compile: (Node, { string }) -> M.Expr
 
+type SymNode = { kind: "sym", name: string, line: number }
+type ListNode = { kind: "list", items: { Node }, line: number }
+
+const function symNode(
+	name: string,
+	line: number
+): Node
+	return { kind = "sym", name = name, line = line }
+end
+
+const function intNode(
+	value: number,
+	line: number
+): Node
+	return { kind = "int", value = value, line = line }
+end
+
+const function listNode(
+	items: { Node },
+	line: number
+): Node
+	return { kind = "list", items = items, line = line }
+end
+
+-- The function that calls member index of the group g with one argument: (lam " y" ((g index) " y")). The names begin with a space, which no source name can contain, so they cannot clash with the program's names.
+const function member(
+	g: string,
+	index: number,
+	line: number
+): Node
+	const call = listNode({ listNode({ symNode(g, line), intNode(index, line) }, line), symNode(" y", line) }, line)
+	return listNode({ symNode("lam", line), symNode(" y", line), call }, line)
+end
+
+-- The nodes for a mutual group. Every member shares one fixed point, dispatch, which takes a tag and then an argument. Member i has tag i - 1, and its body is run inside lets that bind each group name to a call through dispatch. The body is run with the names bound to calls through the fixed point. The result is the same as writing each function out with its names in scope, but no name is bound to a function that is not in the group.
+const function mutualNode(
+	names: { string },
+	defs: { Node },
+	body: Node,
+	line: number
+): Node
+	const n = #names
+	local branches: { Node } = {}
+
+	for i = 1, n do
+		local inner: Node = listNode({ defs[i], symNode(" x", line) }, line)
+
+		for k = n, 1, -1 do
+			inner = listNode({ symNode("let", line), symNode(names[k], line), member(" self", k - 1, line), inner }, line)
+		end
+
+		branches[i] = inner
+	end
+
+	local chain: Node = branches[n]
+
+	for i = n - 1, 1, -1 do
+		const test = listNode({ symNode("=", line), symNode(" tag", line), intNode(i - 1, line) }, line)
+		chain = listNode({ symNode("if", line), test, branches[i], chain }, line)
+	end
+
+	const dispatch = listNode({
+		symNode("lam", line),
+		symNode(" self", line),
+		listNode({
+			symNode("lam", line),
+			symNode(" tag", line),
+			listNode({ symNode("lam", line), symNode(" x", line), chain }, line),
+		}, line),
+	}, line)
+
+	local inner: Node = body
+
+	for k = n, 1, -1 do
+		inner = listNode({ symNode("let", line), symNode(names[k], line), member(" group", k - 1, line), inner }, line)
+	end
+
+	return listNode({
+		symNode("let", line),
+		symNode(" group", line),
+		listNode({ symNode("fix", line), dispatch }, line),
+		inner,
+	}, line)
+end
+
 local function compileForm(
 	name: string,
 	node: { kind: "list", items: { Node }, line: number },
@@ -304,6 +392,47 @@ local function compileForm(
 
 		const recursive = M.app(M.fix, M.lam(compile(definition, inner)))
 		return M.app(M.lam(compile(items[4], inner)), recursive)
+	end
+
+	if name == "mutual" then
+		arity(2)
+		const bindings = items[2]
+
+		if bindings.kind ~= "list" then
+			fail(bindings.line, "mutual binds a list of (name lam) pairs")
+		end
+
+		const bindingList = (bindings :: ListNode).items
+
+		if #bindingList == 0 then
+			fail(bindings.line, "mutual binds a list of (name lam) pairs")
+		end
+
+		local names: { string } = {}
+		local defs: { Node } = {}
+
+		for _, binding in bindingList do
+			if binding.kind ~= "list" then
+				fail(binding.line, "each mutual binding is (name lam)")
+			end
+
+			const parts = (binding :: ListNode).items
+
+			if #parts ~= 2 or parts[1].kind ~= "sym" then
+				fail(binding.line, "each mutual binding is (name lam)")
+			end
+
+			const def = parts[2]
+
+			if def.kind ~= "list" or #def.items < 2 or def.items[1].kind ~= "sym" or (def.items[1] :: SymNode).name ~= "lam" then
+				fail(def.line, "mutual binds lams, so the functions can call each other")
+			end
+
+			table.insert(names, (parts[1] :: SymNode).name)
+			table.insert(defs, def)
+		end
+
+		return compile(mutualNode(names, defs, items[3], node.line), scope)
 	end
 
 	if name == "list" then
