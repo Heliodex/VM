@@ -7,6 +7,6 @@ Combines the items of a list from the left, starting from an initial value. The 
     (fn (acc l) (if (? l) acc (go ((head p) [acc (head l)]) (tail l))))
     (go (head (tail p)) (tail (tail p)))))
 ---
-[(fn p (+ (head p) (tail p))) [0 [1 2 3 ~]]] => 6 fuel 100000
-[(fn p (+ (head p) (tail p))) [7 ~]] => 7 fuel 100000
-[(fn p [(tail p) (head p)]) [~ [1 2 ~]]] => [2 1 ~] fuel 100000
+[(fn p (+ (head p) (tail p))) 0 1 2 3 ~] => 6 fuel 100000
+[(fn p (+ (head p) (tail p))) 7 ~] => 7 fuel 100000
+[(fn p [(tail p) (head p)]) ~ 1 2 ~] => [2 1 ~] fuel 100000

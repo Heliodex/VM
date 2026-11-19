@@ -8,7 +8,7 @@ Puts an integer into a sorted list, before the first item that is larger. The in
             (if (< (head p) (head l)) [(head p) l] [(head l) (ins (tail l))])))
     (ins (tail p))))
 ---
-[3 [1 2 5 ~]] => [1 2 3 5 ~] fuel 100000
+[3 1 2 5 ~] => [1 2 3 5 ~] fuel 100000
 [0 ~] => [0 ~] fuel 100000
-[9 [1 2 ~]] => [1 2 9 ~] fuel 100000
-[2 [2 3 ~]] => [2 2 3 ~] fuel 100000
+[9 1 2 ~] => [1 2 9 ~] fuel 100000
+[2 2 3 ~] => [2 2 3 ~] fuel 100000

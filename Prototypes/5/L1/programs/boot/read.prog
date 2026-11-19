@@ -5,13 +5,13 @@ tok = boot/tokenize.prog
 par = boot/parse.prog
 com = boot/compile.prog
 ---
-(fn input (let qLam (fn b [3 [b ~]]) (let qApp (fn (f a) [10 [f [a ~]]]) (letrec rev (fn (l acc) (if (? l) acc (rev (tail l) [(head l) acc]))) (letrec addNames (fn (ns s) (if (? ns) s (addNames (tail ns) [(head ns) s]))) (letrec wrapVals (fn (vs body) (if (? vs) body (wrapVals (tail vs) (qApp (qLam body) (head vs))))) (let src (head input) (let names (head (tail input)) (let values (tail (tail input)) (wrapVals (rev values ~) (com [(par (tok src)) (addNames names ~)])))))))))))
+(fn input (let qLam (fn b [3 b ~]) (let qApp (fn (f a) [10 f a ~]) (letrec rev (fn (l acc) (if (? l) acc (rev (tail l) [(head l) acc]))) (letrec addNames (fn (ns s) (if (? ns) s (addNames (tail ns) [(head ns) s]))) (letrec wrapVals (fn (vs body) (if (? vs) body (wrapVals (tail vs) (qApp (qLam body) (head vs))))) (let src (head input) (let names (head (tail input)) (let values (tail (tail input)) (wrapVals (rev values ~) (com [(par (tok src)) (addNames names ~)])))))))))))
 ---
-["42" [~ ~]] => [0 [42 ~]] fuel 10000000
-["(fn x x)" [~ ~]] => [3 [[2 [0 ~]] ~]] fuel 10000000
-["((fn x x) 4)" [~ ~]] => [10 [[3 [[2 [0 ~]] ~]] [[0 [4 ~]] ~]]] fuel 10000000
-["(let x 1 x)" [~ ~]] => [10 [[3 [[2 [0 ~]] ~]] [[0 [1 ~]] ~]]] fuel 10000000
-["x" [(list "x") (list [0 [1 ~]])]] => [10 [[3 [[2 [0 ~]] ~]] [[0 [1 ~]] ~]]] fuel 10000000
-["(f 1" [~ ~]] => error fuel 10000000
-["(f 1))" [~ ~]] => error fuel 10000000
-["x" [~ ~]] => error fuel 10000000
+["42" ~ ~] => [0 42 ~] fuel 10000000
+["(fn x x)" ~ ~] => [3 [2 0 ~] ~] fuel 10000000
+["((fn x x) 4)" ~ ~] => [10 [3 [2 0 ~] ~] [0 4 ~] ~] fuel 10000000
+["(let x 1 x)" ~ ~] => [10 [3 [2 0 ~] ~] [0 1 ~] ~] fuel 10000000
+["x" (list "x") (list [0 1 ~])] => [10 [3 [2 0 ~] ~] [0 1 ~] ~] fuel 10000000
+["(f 1" ~ ~] => error fuel 10000000
+["(f 1))" ~ ~] => error fuel 10000000
+["x" ~ ~] => error fuel 10000000

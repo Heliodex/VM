@@ -7,6 +7,6 @@ Whether an integer is in a list of integers. The input is the pair [x xs]; the o
         (if (? l) 0 (if (= (head l) (head p)) 1 (c (tail l)))))
     (c (tail p))))
 ---
-[2 [1 2 3 ~]] => 1 fuel 100000
-[9 [1 2 3 ~]] => 0 fuel 100000
+[2 1 2 3 ~] => 1 fuel 100000
+[9 1 2 3 ~] => 0 fuel 100000
 [1 ~] => 0 fuel 100000

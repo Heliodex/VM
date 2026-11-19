@@ -6,6 +6,6 @@ Applies a function to every item of a list. The input is the pair [f xs]: f is a
   (letrec m (fn l (if (? l) ~ [((head p) (head l)) (m (tail l))]))
     (m (tail p))))
 ---
-[(fn x (+ x 1)) [1 2 3 ~]] => [2 3 4 ~] fuel 100000
+[(fn x (+ x 1)) 1 2 3 ~] => [2 3 4 ~] fuel 100000
 [(fn x x) ~] => ~ fuel 100000
-[(fn x (* x x)) [3 -4 ~]] => [9 16 ~] fuel 100000
+[(fn x (* x x)) 3 -4 ~] => [9 16 ~] fuel 100000

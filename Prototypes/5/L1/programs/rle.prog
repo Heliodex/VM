@@ -17,7 +17,7 @@ The probe is a function that builds a list of pairs, with a nested recursive hel
 ---
 "" => ~ fuel 200000
 "a" => [[1 97] ~] fuel 200000
-"aaab" => [[3 97] [[1 98] ~]] fuel 200000
-"abba" => [[1 97] [[2 98] [[1 97] ~]]] fuel 200000
+"aaab" => [[3 97] [1 98] ~] fuel 200000
+"abba" => [[1 97] [2 98] [1 97] ~] fuel 200000
 "zzzzzzzzzz" => [[10 122] ~] fuel 200000
-"aabbbcccc" => [[2 97] [[3 98] [[4 99] ~]]] fuel 200000
+"aabbbcccc" => [[2 97] [3 98] [4 99] ~] fuel 200000
