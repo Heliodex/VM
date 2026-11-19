@@ -8,9 +8,9 @@
 --   luau self_run.luau      (from Prototypes/5)
 
 const Examples = require "./examples/examples"
-const Self = require "./self/self"
-const Text = require "./examples/text"
-const Programs = require "./examples/programs"
+const Self = require "./L1/self/self"
+const Text = require "./L1/examples/text"
+const Programs = require "./L1/examples/programs"
 const VM = require "./interpreter/vm"
 
 const FUEL_FACTOR = 50

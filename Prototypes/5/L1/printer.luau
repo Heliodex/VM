@@ -9,7 +9,7 @@
 --
 --   Printer.print(e): string      raises an error for a variable that is not bound
 
-const VM = require "./vm"
+const VM = require "../interpreter/vm"
 
 const SYMBOLS: { [string]: string } = {
 	add = "+",

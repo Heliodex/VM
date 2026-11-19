@@ -17,9 +17,9 @@
 --
 -- A program that is not well formed is not checked. The only type test in the language is kind, and the interpreter does not use it to check programs.
 
-const M = require "../interpreter/vm"
-const Reader = require "../interpreter/reader"
-const Code = require "../interpreter/code"
+const M = require "../../interpreter/vm"
+const Reader = require "../reader"
+const Code = require "../../interpreter/code"
 
 -- The environment representations. An environment is a lookup, which takes an index and an environment, and an extend, which takes a value and an environment and returns the new environment. Both are text, so an interpreter can be built with either.
 

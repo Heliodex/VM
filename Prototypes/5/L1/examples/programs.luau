@@ -5,8 +5,8 @@
 --
 -- Text has no string type, so a word is a list of character codes, and a space is 32.
 
-const Reader = require "../interpreter/reader"
-const VM = require "../interpreter/vm"
+const Reader = require "../reader"
+const VM = require "../../interpreter/vm"
 
 type Example = {
 	name: string,

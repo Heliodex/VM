@@ -13,7 +13,7 @@
 -- The outcomes are value, error, out_of_fuel, and not_data, which is a run whose output holds a function.
 
 const Binary = require "./binary"
-const Reader = require "./reader"
+const Reader = require "../L1/reader"
 const VM = require "./vm"
 
 export type Result =

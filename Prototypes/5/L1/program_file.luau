@@ -23,9 +23,9 @@
 --
 -- resolve takes a file name and gives the text of that file, or nil if there is none. It is needed only when the file has imports. name is the name of this file, which is used to detect cycles.
 
-const Data = require "./data"
+const Data = require "../interpreter/data"
 const Reader = require "./reader"
-const VM = require "./vm"
+const VM = require "../interpreter/vm"
 
 -- The budget for evaluating a test's input or expected output. These are literal values, so the budget only has to be generous.
 const VALUE_FUEL = 1000000

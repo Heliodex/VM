@@ -7,10 +7,10 @@
 
 const Binary = require "./interpreter/binary"
 const Examples = require "./examples/examples"
-const Programs = require "./examples/programs"
-const Printer = require "./interpreter/printer"
-const Reader = require "./interpreter/reader"
-const Text = require "./examples/text"
+const Programs = require "./L1/examples/programs"
+const Printer = require "./L1/printer"
+const Reader = require "./L1/reader"
+const Text = require "./L1/examples/text"
 const VM = require "./interpreter/vm"
 
 local failures = 0

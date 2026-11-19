@@ -11,9 +11,9 @@
 --   luau env_run.luau      (from Prototypes/5)
 
 const Examples = require "./examples/examples"
-const Reader = require "./interpreter/reader"
-const Self = require "./self/self"
-const Text = require "./examples/text"
+const Reader = require "./L1/reader"
+const Self = require "./L1/self/self"
+const Text = require "./L1/examples/text"
 const VM = require "./interpreter/vm"
 
 const FUEL_FACTOR = 50

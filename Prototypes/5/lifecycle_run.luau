@@ -8,7 +8,7 @@
 const Binary = require "./interpreter/binary"
 const Data = require "./interpreter/data"
 const Lifecycle = require "./interpreter/lifecycle"
-const Reader = require "./interpreter/reader"
+const Reader = require "./L1/reader"
 const VM = require "./interpreter/vm"
 
 local failures = 0

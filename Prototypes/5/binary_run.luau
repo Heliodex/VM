@@ -8,8 +8,8 @@
 const Binary = require "./interpreter/binary"
 const Data = require "./interpreter/data"
 const Examples = require "./examples/examples"
-const Programs = require "./examples/programs"
-const Text = require "./examples/text"
+const Programs = require "./L1/examples/programs"
+const Text = require "./L1/examples/text"
 const VM = require "./interpreter/vm"
 
 local failures = 0

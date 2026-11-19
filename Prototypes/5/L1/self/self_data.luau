@@ -8,8 +8,8 @@
 -- The tags are those of self.luau, with the function value as a cell in place of a native closure.
 
 const Self = require "./self"
-const M = require "../interpreter/vm"
-const Reader = require "../interpreter/reader"
+const M = require "../../interpreter/vm"
+const Reader = require "../reader"
 
 -- The value at an index in the environment.
 const LOOKUP = "(fix (lam find (lam n (lam e (if (= n 0) (head e) ((find (- n 1)) (tail e)))))))"

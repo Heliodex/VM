@@ -8,7 +8,7 @@
 const fs = require "@lute/fs"
 const Data = require "./interpreter/data"
 const Lifecycle = require "./interpreter/lifecycle"
-const ProgramFile = require "./interpreter/program_file"
+const ProgramFile = require "./L1/program_file"
 
 local failures = 0
 local total = 0
@@ -41,7 +41,7 @@ end
 const function resolve(
 	name: string
 ): string?
-	const ok, text = pcall(readFile, `programs/{name}`)
+	const ok, text = pcall(readFile, `L1/programs/{name}`)
 
 	if ok then
 		return text :: string
@@ -185,14 +185,14 @@ local function listPrograms(
 end
 
 local files: { string } = {}
-listPrograms("programs", "", files)
+listPrograms("L1/programs", "", files)
 
 table.sort(files)
 
 local tests = 0
 
 for _, name in files do
-	const path = `programs/{name}`
+	const path = `L1/programs/{name}`
 	const ok, parsed = pcall(function()
 		return ProgramFile.parse(readFile(path), resolve, name)
 	end)

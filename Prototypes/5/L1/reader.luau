@@ -34,7 +34,7 @@
 --
 -- The reader turns each variable into its index, so the machine never sees a name. A name that is not bound is an error here.
 
-const M = require "./vm"
+const M = require "../interpreter/vm"
 
 type Token = {
 	text: string,

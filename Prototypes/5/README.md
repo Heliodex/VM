@@ -2,26 +2,30 @@
 
 A strict, sequential interpreter for a small functional language with native data: integers, cells (pairs), nil, closures and pins. It is the spec for later prototypes, so any other implementation should agree with it on the examples in `examples/`.
 
+## Languages
+
+The reader's language is **L1** (language 1). Its files are in `L1/`: the reader, the printer, the program-file format, the L1 programs and the L1 self-interpreter. Its tests are in `L1/examples/` and `L1/programs/`. The machine, the data and binary formats, the lifecycle and the driver are in `interpreter/`. They work on the expressions every language compiles to, so a later language can reuse them and add its own folder beside `L1/`.
+
 ## Files
 
 | Path | What it holds |
 | --- | --- |
 | `interpreter/vm.luau` | The machine, the printer, and the builders for expressions. |
-| `interpreter/reader.luau` | The reader: text syntax to expressions. The syntax is described at the top of the file. |
+| `L1/reader.luau` | The reader: text syntax to expressions. The syntax is described at the top of the file. |
 | `interpreter/code.luau` | A program as data: the tag table, and the conversion between an expression and its quoted value, checked on the way back. |
 | `interpreter/data.luau` | The data format: values to text and back, for interchange. Separate from the reader. See "The data format" below. |
 | `interpreter/binary.luau` | The binary format: values and programs to bytes and back. See "The binary format" below. |
 | `interpreter/lifecycle.luau` | Runs a program on an input, and checks the output. See "The lifecycle" below. |
-| `interpreter/printer.luau` | Writes an expression as text in the reader's syntax. See "The printer" below. |
+| `L1/printer.luau` | Writes an expression as text in the reader's syntax. See "The printer" below. |
 | `interpreter/driver.luau` | Runs a program that keeps a state between inputs. See "The driver" below. |
-| `interpreter/program_file.luau` | Reads a program file: a header, the program, and its tests. See "Program files" below. |
-| `programs/*.prog` | Program files, each with its documentation, program and tests. |
-| `programs_run.luau` | Runs every test in `programs/`, and checks that malformed files are refused. Uses `lute`. |
+| `L1/program_file.luau` | Reads a program file: a header, the program, and its tests. See "Program files" below. |
+| `L1/programs/*.prog` | Program files, each with its documentation, program and tests. |
+| `programs_run.luau` | Runs every test in `L1/programs/`, and checks that malformed files are refused. Uses `lute`. |
 | `examples/examples.luau` | 49 programs built with the builders, each with a fuel budget and its expected outcome. |
-| `examples/text.luau` | 49 programs in the text syntax, plus 18 sources the reader must reject. |
-| `examples/programs.luau` | 9 longer programs in the text syntax, using `letrec`: an accumulator, reverse, append, insertion sort, word counting, deep equality, a tree evaluator and gcd. |
-| `self/self.luau` | The self-interpreter: an interpreter for the language, written in the language, with the quoting that feeds it. Functions are host closures. |
-| `self/self_data.luau` | The closure-free self-interpreter, where a function is a cell. See the closure question below. |
+| `L1/examples/text.luau` | 49 programs in the text syntax, plus 18 sources the reader must reject. |
+| `L1/examples/programs.luau` | 9 longer programs in the text syntax, using `letrec`: an accumulator, reverse, append, insertion sort, word counting, deep equality, a tree evaluator and gcd. |
+| `L1/self/self.luau` | The self-interpreter: an interpreter for the language, written in the language, with the quoting that feeds it. Functions are host closures. |
+| `L1/self/self_data.luau` | The closure-free self-interpreter, where a function is a cell. See the closure question below. |
 | `run.luau` | Runs every example and reject, and reports pass or fail. |
 | `self_run.luau` | Runs every example through the self-interpreter and checks it gives the same result. |
 | `self_data_run.luau` | Runs every example through the closure-free interpreter, and shows the two probes where it differs. |
@@ -60,7 +64,7 @@ The runners exit with status 1 if any check fails.
 - **Division is floored.** `(div a b)` rounds down, not towards zero, and `(mod a b)` takes the sign of `b`, so `a = b * q + r` with `q = (div a b)` and `r = (mod a b)`. That is the rule of Luau's `//` and `%`, so a result can be checked against the host. Dividing by zero is an error.
 - **Recursion:** `M.fix` is the strict fixed-point combinator. A recursive function is `app(fix, lam(lam(...)))`, and the outer binder, index 1 inside the inner body, refers to the function itself.
 - **Local names:** `(let x e body)` binds `x` in `body` only, as sugar for applying a `lam`. It is not recursive.
-- **Recursive functions:** `(letrec f (lam ...) body)` binds `f` to a function that can call itself. It is sugar for `let` with `fix`, so it costs nothing at run time: the programs in `examples/programs.luau` take the same number of steps with it as with `fix` written out.
+- **Recursive functions:** `(letrec f (lam ...) body)` binds `f` to a function that can call itself. It is sugar for `let` with `fix`, so it costs nothing at run time: the programs in `L1/examples/programs.luau` take the same number of steps with it as with `fix` written out.
 - **Pairs:** `[a b]` is a cell. A bracket of three or more is right-nested, so `[a b c]` is `[a [b c]]`: the last item is the tail. A list ends in `~`, so `[1 2 3 ~]` is the list `(1 2 3)`, and `[1 2 3]` is the improper pair `(1 2 . 3)`. The printer writes cells in this shorthand.
 - **Mutual recursion:** `(mutual ((f (lam ...)) (g (lam ...))) body)` binds several functions that can call each other. It is sugar in the reader, with no machine change: the group shares one fixed point, and each name is a call through it.
 - **Errors:** there are two ways to report one. A failure that a caller should handle is a value: a program returns `[0 result]` on success and `[1 message]` on failure, and the caller checks the tag. This is how `programs/parse_int.prog` and `programs/even_b.prog` work, and the messages are then checked as ordinary output. The convention is not enforced, so a program that returns `[1 x]` as data is indistinguishable from a failure. `(raise e)` is for a run that cannot go on: it evaluates `e` and ends the run as `error`, and the message is the bytes of `e` if it is a list of integers from 0 to 255, and its printed form otherwise.
@@ -134,7 +138,7 @@ Programs that keep a state between inputs are run by the driver, described below
 
 ## The printer
 
-`interpreter/printer.luau` writes an expression as text in the reader's syntax, so that reading the text gives back the same expression. The machine has no names, so the printer invents them: a `lam` is named by its depth, so the outermost is `v0`, the next `v1`, and so on. A variable with index `i` under `d` binders prints as the name of the binder at depth `d - 1 - i`. A variable with no binder around it cannot be written, so the printer refuses it.
+`L1/printer.luau` writes an expression as text in the reader's syntax, so that reading the text gives back the same expression. The machine has no names, so the printer invents them: a `lam` is named by its depth, so the outermost is `v0`, the next `v1`, and so on. A variable with index `i` under `d` binders prints as the name of the binder at depth `d - 1 - i`. A variable with no binder around it cannot be written, so the printer refuses it.
 
 A chain of applications prints flat, `(f a b)`, which the reader reads back as `((f a) b)`.
 
@@ -164,15 +168,15 @@ double = double.prog
 ~ => error fuel 1000
 ```
 
-The imports section is empty in a file that uses none. Each line is `name = file`, and it binds `name`, inside the program, to the program of that file. The file is a path from the top of the `programs/` folder, so `double.prog` is at the top, `lib/triple.prog` is in `lib`, and the same path means the same file from any importing file. A path that climbs above `programs/` with `..` is an error. The runner also finds program files in the folders under `programs/`, and runs their tests. An imported program is closed, so it cannot use the importing file's names. An import can itself import, but a cycle is an error, and so is an import that cannot be found. Imports are looked up through a resolver, so the parser never reads files itself.
+The imports section is empty in a file that uses none. Each line is `name = file`, and it binds `name`, inside the program, to the program of that file. The file is a path from the top of the `L1/programs/` folder, so `double.prog` is at the top, `lib/triple.prog` is in `lib`, and the same path means the same file from any importing file. A path that climbs above `L1/programs/` with `..` is an error. The runner also finds program files in the folders under `L1/programs/`, and runs their tests. An imported program is closed, so it cannot use the importing file's names. An import can itself import, but a cycle is an error, and so is an import that cannot be found. Imports are looked up through a resolver, so the parser never reads files itself.
 
 The program section is read by `reader.luau`, with the imported names bound around it. There is no new program syntax. Each test line is an input, then `=>`, then an output, then `fuel` and a number of steps. Inputs and outputs are written in the reader's language, and each is evaluated to a value before the test runs, so `[1 ~]`, `(list 1 2)` and `"ab"` are all valid. The names of the file's imports are in scope for them. An input may be a function, such as `(lam x (+ x 1))`, since it is only given to the program; an output must be data, since functions cannot be compared, so a function there is refused. An output may also be one of `error`, `out_of_fuel` or `not_data`, which are the outcomes of a run. Blank lines in the test section are skipped, and a file needs at least one test.
 
-Each test runs through the lifecycle, so its output is checked as data. `programs_run.luau` runs the tests in `programs/`, and checks that malformed files are refused with the right reason. It uses `lute`, because this Luau build cannot read files; the file reading is `@lute/fs`.
+Each test runs through the lifecycle, so its output is checked as data. `programs_run.luau` runs the tests in `L1/programs/`, and checks that malformed files are refused with the right reason. It uses `lute`, because this Luau build cannot read files; the file reading is `@lute/fs`.
 
 ## The self-interpreter
 
-`self/self.luau` holds an interpreter for the language, written in the language, in `EVAL`. It takes a program as data, a pair `[tag args]` for each form, and an environment, and returns the value. The tags are listed at the top of `interpreter/code.luau`, which quotes programs for it.
+`L1/self/self.luau` holds an interpreter for the language, written in the language, in `EVAL`. It takes a program as data, a pair `[tag args]` for each form, and an environment, and returns the value. The tags are listed at the top of `interpreter/code.luau`, which quotes programs for it.
 
 The interpreter reuses the host's closures and pins. An object `lam` becomes a native `lam`, and an object `pin` becomes a native `pin`. So the machine's own errors and laziness apply to the object program, and the interpreter only has to work out the environment.
 
@@ -180,7 +184,7 @@ The interpreter reuses the host's closures and pins. An object `lam` becomes a n
 
 ## The closure question
 
-`self/self_data.luau` is the same interpreter with no object-level closures. A function is the cell `[1 [body env]]`, and `EVAL` applies it itself.
+`L1/self/self_data.luau` is the same interpreter with no object-level closures. A function is the cell `[1 [body env]]`, and `EVAL` applies it itself.
 
 - It agrees with the direct machine on 97 of the 99 examples (the builder and text sets), with the two known differences below.
 - It costs about 5 to 6 percent more steps than the host-closure version, and its `EVAL` is about 6 percent larger.
