@@ -1,7 +1,7 @@
 --!strict
 -- RUNS THE EXAMPLES THROUGH THE SELF-INTERPRETER
 --
--- Quotes every example, runs it through self.luau, and checks that the result is the one the example expects. Prints the steps the direct run and the interpreted run each take, so the cost of interpreting can be read off.
+-- Quotes every example, runs it through self.luau, and checks that the interpreted run has the same outcome as the direct run: the same status, and for a value the same printed value. Errors are compared by status only, since the interpreter raises its own messages. The direct run must also match what the example expects. Prints the steps each run takes, so the cost of interpreting can be read off.
 --
 -- The interpreted run gets 50 times the fuel, since every step of the program costs several steps of the interpreter.
 --
@@ -18,6 +18,19 @@ const FUEL_FACTOR = 50
 local failures = 0
 local total = 0
 
+-- The outcome of a run as one string, so two runs can be compared. Errors are reduced to "error", since the messages come from different machines.
+const function describe(
+	r: VM.Outcome
+): string
+	if r.status == "value" then
+		return "value " .. VM.show(r.value)
+	elseif r.status == "error" then
+		return "error"
+	end
+
+	return "out of fuel"
+end
+
 const function check(
 	ex: {
 		name: string,
@@ -30,27 +43,17 @@ const function check(
 	const direct = VM.run(ex.program, ex.fuel)
 	const interpreted = VM.run(Self.interpret(ex.program), ex.fuel * FUEL_FACTOR)
 
-	local got: string
-	local pass: boolean
+	-- The direct run is the reference: it must match the example, and the interpreted run must match it.
+	local expected = if ex.outcome == "value" then "value " .. tostring(ex.expect) elseif ex.outcome == "error" then "error" else "out of fuel"
+	local pass = describe(direct) == expected and describe(interpreted) == describe(direct)
 
 	total += 1
 
-	if interpreted.status == "value" then
-		got = VM.show(interpreted.value)
-		pass = ex.outcome == "value" and got == ex.expect
-	elseif interpreted.status == "error" then
-		got = `error: {tostring(interpreted.message)}`
-		pass = ex.outcome == "error"
-	else
-		got = "out of fuel"
-		pass = ex.outcome == "out_of_fuel"
-	end
-
 	if pass then
-		print(string.format("PASS  %s  -> %s  (direct %d steps, interpreted %d)", ex.name, got, direct.steps, interpreted.steps))
+		print(string.format("PASS  %s  -> %s  (direct %d steps, interpreted %d)", ex.name, describe(direct), direct.steps, interpreted.steps))
 	else
 		failures += 1
-		print(string.format("FAIL  %s  -> %s  (interpreted %d steps), expected %s", ex.name, got, interpreted.steps, ex.outcome))
+		print(string.format("FAIL  %s  -> direct %s, interpreted %s (interpreted %d steps), expected %s", ex.name, describe(direct), describe(interpreted), interpreted.steps, expected))
 	end
 end
 
