@@ -33,6 +33,8 @@ expr   ::= atom
          | expr atom+            application, curried: f a b is (f a) b
          | "fn" params expr      function (section 4)
          | "let" name "=" expr "in" expr
+         | "letrec" name "=" expr "in" expr    (recursive; section 12)
+         | "mutual" "(" binding+ ")" "in" expr    (section 12)
          | "if" expr expr expr   branch on an integer: nonzero is true
          | "match" expr "{" arm+ "}"    (section 9.3)
 atom   ::= integer | string | name | "~" | list | pair | "(" expr ")"
@@ -164,7 +166,7 @@ Expressions that L1 already has stay: `quote`, `var`, `lam`, `pin`, `cell`, `ind
 - Compile to the machine's `Expr`.
 - Tests: L1 programs ported to L2, with the same expected results, run through the same program-file format. Each port must give the same result as its L1 original.
 
-## 11. Layout and binding rules
+## 12. Layout and binding rules
 
 These rules are decided for the first version.
 
@@ -184,7 +186,7 @@ describe r = match r {
 }
 ```
 
-## 12. Open questions
+## 13. Open questions
 
 Decided: prefix application only, with no infix sugar for now (3.3); tags for constructors in the machine (section 8); the results model (section 9); the dispatch expressions (section 9.4); layout and binding (section 11), with `letrec` for recursion, newlines separating arms, and indentation deferred.
 
