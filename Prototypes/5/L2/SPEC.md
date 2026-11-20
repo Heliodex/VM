@@ -34,7 +34,7 @@ expr   ::= atom
          | "fn" params expr      function (section 4)
          | "let" name "=" expr "in" expr
          | "if" expr expr expr   branch on an integer: nonzero is true
-         | "match" expr "{" arm+ "}"    (open, section 8)
+         | "match" expr "{" arm+ "}"    (section 9.3)
 atom   ::= integer | string | name | "~" | list | pair | "(" expr ")"
 list   ::= "[" expr* "]"        a proper list
 pair   ::= "(" expr "." expr ")"
@@ -110,6 +110,39 @@ The comparison and recommendation are in `L2/RESULTS.md`: a tagged sum type `Ok 
 
 Runtime errors from the machine (a wrong-kind `head`, a divide by zero) end the run as `error` with a message, as in L1.
 
+### 9.1 Sums
+
+A sum type has constructors, each with one payload. The first version has one built-in sum, `Result`:
+
+```
+Ok v      a success carrying v
+Err e     a failure carrying e
+```
+
+Constructors are tagged values (section 8), so `kind` and `match` can tell them apart. A sum is not a list or a pair, and it prints as `Ok v` or `Err e`.
+
+### 9.2 Early return
+
+`e?` evaluates `e`. If it is `Ok v`, the expression is `v`. If it is `Err e`, the whole enclosing function returns `Err e`. The reader hoists `e?` into a `let` in the same function, so it works anywhere an expression can appear. This is sound because L2 is pure: moving an evaluation earlier changes only which error is reported first, never a result. The payload types must match: a function that uses `?` on `Err e` must return `Err` with a compatible payload.
+
+### 9.3 Match
+
+`match e { pattern -> body ... }` evaluates `e`, tests the constructor of its value against each arm in order, and evaluates the body of the first arm that matches, with the pattern's variables bound.
+
+Patterns in the first version:
+
+- A constructor with a variable payload: `Ok v`, `Err e`.
+- A constructor with a wildcard payload: `Ok _`, `Err _`.
+- A wildcard: `_`, matching anything.
+
+Nested patterns are not in the first version. A nested pattern can be written as nested `match` expressions.
+
+Arms are lazy: only the body of the arm that matches is evaluated. The compiler checks that the arms cover every constructor of the scrutinee's type, or that a wildcard arm is present, and reports an error otherwise.
+
+### 9.4 The core primitive
+
+The machine gets one primitive for dispatch: test the tag of a value and, if it matches, give its payload. `match`, `?` and the constructors are built on it by the reader. A tag test is one step, with no closure per arm. The exact form of the primitive is decided with section 8, since it depends on how tags are stored.
+
 ## 10. Machine changes
 
 Changes to the machine that L2 needs, listed separately so they can be reviewed on their own:
@@ -132,4 +165,4 @@ Expressions that L1 already has stay: `quote`, `var`, `lam`, `pin`, `cell`, `ind
 2. Tagged values: in the machine, or in a layer above it (section 8)?
 3. Results: which model (section 9)?
 4. Exact tag numbers and the representation of nil and strings.
-5. Whether `match` is a core form or a library function.
+5. The exact form of the dispatch primitive (section 9.4), which depends on the tagged-value representation (section 8).
