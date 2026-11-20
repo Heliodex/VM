@@ -244,6 +244,16 @@ do
 	)
 end
 
+-- Constructors: tag byte 4, then the tag and the payload, and read back to the same value.
+do
+	const c: VM.Value = { kind = "con", tag = 2, payload = { kind = "cell", head = 1, tail = VM.NIL } } :: VM.Con
+	const bytes = Binary.encodeValue(c)
+	check("a constructor is tag byte 4, its tag, then its payload", bytes == "\1\4\2\2\1\2\1\0", "")
+	check("a constructor reads back", Data.write(Binary.decodeValue(bytes)) == "con 2 cons 1 nil", "")
+	local rejected, _ = pcall(Binary.decodeValue, "\1\4\3\1")
+	check("a negative constructor tag is refused", not rejected, "")
+end
+
 print(string.format("%d of %d checks passed (%d example values and %d example programs round-tripped)", total - failures, total, valueRoundTrips, programRoundTrips))
 
 if failures > 0 then

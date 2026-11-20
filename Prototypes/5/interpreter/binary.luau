@@ -14,6 +14,7 @@
 --   1   a cell: its head, then its tail
 --   2   an integer that is not negative, then its magnitude
 --   3   a negative integer, then its magnitude, which is at least 1
+--   4   a constructor: its tag, which is a whole number from 0 up, then its payload
 --
 -- A magnitude is an unsigned LEB128 number: 7 bits per byte, least significant group first, with the top bit set on every byte but the last. The last byte is not zero unless it is the only byte, so each number has one encoding.
 --
@@ -122,6 +123,14 @@ const function writeBody(
 			end
 		elseif cur == M.NIL then
 			putByte(w, 0)
+		elseif cur.kind == "con" then
+			putByte(w, 4)
+
+			-- The tag is written before the payload, so the payload goes on the stack first.
+			count += 1
+			pending[count] = cur.payload
+			count += 1
+			pending[count] = cur.tag
 		elseif cur.kind == "cell" then
 			putByte(w, 1)
 
@@ -217,7 +226,7 @@ const function readBody(
 	b: buffer,
 	p: number
 ): (M.Value, number)
-	local stack: { { head: M.Value? } } = {}
+	local stack: { { head: M.Value?, con: boolean } } = {}
 	local pos = p
 
 	while true do
@@ -226,7 +235,10 @@ const function readBody(
 		end
 
 		if buffer.readu8(b, pos) == 1 then
-			table.insert(stack, { head = nil })
+			table.insert(stack, { head = nil, con = false })
+			pos += 1
+		elseif buffer.readu8(b, pos) == 4 then
+			table.insert(stack, { head = nil, con = true })
 			pos += 1
 		else
 			local v: M.Value
@@ -241,16 +253,29 @@ const function readBody(
 				const top = stack[#stack]
 
 				if top.head == nil then
+					if top.con and (type(v) ~= "number" or v < 0) then
+						error("binary: a constructor tag is a whole number from 0 up", 0)
+					end
+
 					top.head = v
 					break
 				end
 
 				table.remove(stack)
-				v = {
-					kind = "cell",
-					head = top.head :: M.Value,
-					tail = v,
-				}
+
+				if top.con then
+					v = {
+						kind = "con",
+						tag = top.head :: number,
+						payload = v,
+					}
+				else
+					v = {
+						kind = "cell",
+						head = top.head :: M.Value,
+						tail = v,
+					}
+				end
 			end
 		end
 	end

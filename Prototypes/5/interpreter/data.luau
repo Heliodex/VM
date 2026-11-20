@@ -8,11 +8,14 @@
 --   nil                the nil value
 --   0, -3, 42          an integer, written in decimal, within the exact range
 --   cons h t           a cell, with head h and tail t, each a value in turn
+--   con n p            a constructor with tag n, a whole number from 0 up, and payload p
 --
 -- It is a prefix form, so the tokens of a cell follow it in order and the whole text can be read in one pass with no nesting. A list 1, 2, 3 is "cons 1 cons 2 cons 3 nil".
 --
 -- The form is canonical. The writer produces exactly one text for each value, and the reader accepts only that text: no leading zeros, no -0, no plus signs, one space between tokens and none at the ends, and nothing after the value. So reading a text and writing the value back gives the same text, and two values are equal exactly when their texts are.
 --
+-- A constructor is written con followed by its tag and its payload, and its tag is a whole number from 0 up. The text uses the tag, which is not a name: names are for the surface language.
+
 -- Functions and pins have no written form. Writing one is an error.
 --
 --   Data.write(value): string      raises an error for a function or a pin
@@ -20,7 +23,7 @@
 
 const M = require "./vm"
 
-type Stack = { { head: M.Value? } }
+type Stack = { { head: M.Value?, con: boolean } }
 
 -- Writes a value. The cells are walked with an explicit stack, so a long list does not nest the Luau call stack.
 const function write(
@@ -39,6 +42,14 @@ const function write(
 			table.insert(out, tostring(cur))
 		elseif cur == M.NIL then
 			table.insert(out, "nil")
+		elseif cur.kind == "con" then
+			table.insert(out, "con")
+
+			-- The tag is written before the payload, so the payload goes on the stack first.
+			count += 1
+			pending[count] = cur.payload
+			count += 1
+			pending[count] = cur.tag
 		elseif cur.kind == "cell" then
 			table.insert(out, "cons")
 
@@ -106,7 +117,9 @@ const function read(
 		end
 
 		if token == "cons" then
-			table.insert(stack, { head = nil })
+			table.insert(stack, { head = nil, con = false })
+		elseif token == "con" then
+			table.insert(stack, { head = nil, con = true })
 		else
 			local v = leaf(token)
 
@@ -120,18 +133,31 @@ const function read(
 				const top = stack[#stack]
 
 				if top.head == nil then
-					-- This value is the head, so the tail is still to come.
+					-- This value is the head, so the tail is still to come. A constructor's head is its tag, which is a whole number from 0 up.
+					if top.con and (type(v) ~= "number" or v < 0 or v ~= math.floor(v)) then
+						error("data: a constructor tag is a whole number from 0 up", 0)
+					end
+
 					top.head = v
 					break
 				end
 
 				-- This value is the tail, so the cell is complete. It may complete the cell around it as well.
 				table.remove(stack)
-				v = {
-					kind = "cell",
-					head = top.head :: M.Value,
-					tail = v,
-				}
+
+				if top.con then
+					v = {
+						kind = "con",
+						tag = top.head :: number,
+						payload = v,
+					}
+				else
+					v = {
+						kind = "cell",
+						head = top.head :: M.Value,
+						tail = v,
+					}
+				end
 			end
 		end
 	end

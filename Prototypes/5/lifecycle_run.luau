@@ -155,10 +155,16 @@ do
 	check("bad input bytes are an error", result.status == "error" and result.steps == 0, result.status)
 end
 
--- A constructor has no text form yet, so it is built directly, and it is not data: a program that returns one is not_data.
+-- A constructor is built directly, since the L1 text has no constructors. Its payload decides whether it is data: a plain payload is data, and a pin or a function under it is not_data.
 do
-	const constructed = Lifecycle.run(VM.lam(VM.construct(0, VM.int(1))), VM.NIL, 1000)
-	check("a constructor is not data", constructed.status == "not_data", constructed.status)
+	const plain = Lifecycle.run(VM.lam(VM.construct(0, VM.int(1))), VM.NIL, 1000)
+	check("a constructor with a plain payload is data", plain.status == "value" and Data.write(plain.value) == "con 0 1", plain.status)
+
+	const withPin = Lifecycle.run(VM.lam(VM.construct(0, VM.pin(VM.int(1)))), VM.NIL, 1000)
+	check("a pin under a constructor is not data", withPin.status == "not_data", withPin.status)
+
+	const withFunction = Lifecycle.run(VM.lam(VM.construct(0, VM.lam(VM.var(0)))), VM.NIL, 1000)
+	check("a function under a constructor is not data", withFunction.status == "not_data", withFunction.status)
 end
 
 print(string.format("%d of %d checks passed", total - failures, total))

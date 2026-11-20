@@ -28,10 +28,34 @@ export type ByteResult =
 	| { status: "out_of_fuel", steps: number }
 	| { status: "not_data", steps: number }
 
--- The output check, as a program. Its tags are 0 for data and 1 for a function or a constructor, neither of which has a text form yet.
+-- The output check, as a program. Its tags are 0 for data and 1 for a function. The check forces the pins in cells, and it gives a constructor back as it is, since a program written in L1 cannot take a constructor apart. A pin or a function left under a constructor is refused below, by a walk in Luau.
 const CHECK = Reader.parse(
-	"(fix (fn rec (fn v (if (= (@ v) 4) (rec (force v)) (if (= (@ v) 2) (let h (rec (head v)) (if (= (head h) 1) h (let t (rec (tail v)) (if (= (head t) 1) t [0 [(tail h) (tail t)]])))) (if (= (@ v) 3) [1 ~] (if (= (@ v) 5) [1 ~] [0 v])))))))"
+	"(fix (fn rec (fn v (if (= (@ v) 4) (rec (force v)) (if (= (@ v) 2) (let h (rec (head v)) (if (= (head h) 1) h (let t (rec (tail v)) (if (= (head t) 1) t [0 [(tail h) (tail t)]])))) (if (= (@ v) 3) [1 ~] [0 v]))))))"
 )
+
+-- Whether a pin or a function is left in a value. The output check forces the pins in cells, so what is left is under a constructor, whose payload the check does not enter.
+const function hasPinOrFunction(
+	v: VM.Value
+): boolean
+	local pending: { VM.Value } = { v }
+
+	while #pending > 0 do
+		const cur = table.remove(pending) :: VM.Value
+
+		if type(cur) == "table" then
+			if cur.kind == "pin" or cur.kind == "closure" then
+				return true
+			elseif cur.kind == "cell" then
+				table.insert(pending, cur.head)
+				table.insert(pending, cur.tail)
+			elseif cur.kind == "con" then
+				table.insert(pending, cur.payload)
+			end
+		end
+	end
+
+	return false
+end
 
 -- Runs the program on the input, and checks the output. The outcome is a Result.
 const function run(
@@ -61,6 +85,13 @@ const function run(
 	const tag = pair.head :: number
 
 	if tag == 1 then
+		return {
+			status = "not_data",
+			steps = outcome.steps,
+		}
+	end
+
+	if hasPinOrFunction(pair.tail) then
 		return {
 			status = "not_data",
 			steps = outcome.steps,

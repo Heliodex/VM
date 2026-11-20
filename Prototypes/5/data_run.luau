@@ -191,6 +191,19 @@ do
 	)
 end
 
+-- Constructors: written with con, a tag and a payload, and read back to the same value.
+do
+	const c: VM.Value = { kind = "con", tag = 2, payload = { kind = "cell", head = 1, tail = VM.NIL } } :: VM.Con
+	check("a constructor is written con, its tag, then its payload", Data.write(c) == "con 2 cons 1 nil", Data.write(c))
+	check("a constructor reads back", Data.write(Data.read("con 2 cons 1 nil")) == "con 2 cons 1 nil", "")
+	local rejected, _ = pcall(Data.read, "con -1 5")
+	check("a negative constructor tag is refused", not rejected, "")
+	rejected, _ = pcall(Data.read, "con cons 1 nil 5")
+	check("a constructor whose tag is a cell is refused", not rejected, "")
+	rejected, _ = pcall(Data.read, "con 1")
+	check("a constructor with no payload is refused", not rejected, "")
+end
+
 print(string.format("%d of %d checks passed (%d example values round-tripped)", total - failures, total, roundTrips))
 
 if failures > 0 then
