@@ -106,7 +106,7 @@ The cost is one extra cell per value, unless the tag lives in the machine's valu
 - A `?` operator that returns early on a failure, as in Rust.
 - Exceptions with `try`, which the machine would need to support.
 
-A memo will compare these before the design is fixed.
+The comparison and recommendation are in `L2/RESULTS.md`: a tagged sum type `Ok v | Err e` with `match`, `?` as sugar for early return, and no effects or `try` in the first version.
 
 Runtime errors from the machine (a wrong-kind `head`, a divide by zero) end the run as `error` with a message, as in L1.
 
