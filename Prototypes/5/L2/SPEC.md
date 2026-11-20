@@ -29,19 +29,22 @@ Tokens, separated by whitespace or by delimiters:
 ### 3.1 Expressions
 
 ```
-expr   ::= atom
-         | expr atom+            application, curried: f a b is (f a) b
+expr   ::= app
+         | app "?"               early return on a failure (section 9.2)
+app    ::= atom+                application, curried: f a b is (f a) b
          | "fn" params expr      function (section 4)
          | "let" name "=" expr "in" expr
          | "letrec" name "=" expr "in" expr    (recursive; section 12)
          | "mutual" "(" binding+ ")" "in" expr    (section 12)
          | "if" expr expr expr   branch on an integer: nonzero is true
-         | "match" expr "{" arm+ "}"    (section 9.3)
+         | "match" expr "{" arm+ "}"    (section 9.3; arms are multi-line, section 12)
 atom   ::= integer | string | name | "~" | list | pair | "(" expr ")"
 list   ::= "[" expr* "]"        a proper list
 pair   ::= "(" expr "." expr ")"
 params ::= name | "(" name+ ")"
 ```
+
+`?` ends an application, so `parse s?` is `(parse s)?`, and it applies to the whole call on its left. To apply `?` to an argument, wrap it in parentheses: `g (parse s)?`. `?` appears at most once at the end of an application, so `f x? y` and `e??` are syntax errors. `?` is not an atom.
 
 The grammar needs one token of lookahead: `(` starts a pair if the token after the first expression is `.`, and a group otherwise. The parser decides at the closing `)` or `.` after its first expression, so a group and a pair share one prefix. Implementations may use a small backtrack buffer.
 
@@ -133,7 +136,7 @@ Constructors are tagged values (section 8), so `kind` and `match` can tell them 
 
 ### 9.2 Early return
 
-`e?` evaluates `e`. If it is `Ok v`, the expression is `v`. If it is `Err e`, the whole enclosing function returns `Err e`. The reader hoists `e?` into a `let` in the same function, so it works anywhere an expression can appear. This is sound because L2 is pure: moving an evaluation earlier changes only which error is reported first, never a result. The payload types must match: a function that uses `?` on `Err e` must return `Err` with a compatible payload.
+`e?`, where `e` is an application, evaluates `e`. If it is `Ok v`, the expression is `v`. If it is `Err e`, the whole enclosing function returns `Err e`. The reader hoists `e?` into a `let` in the same function, so it works anywhere an expression can appear. This is sound because L2 is pure: moving an evaluation earlier changes only which error is reported first, never a result. The payload types must match: a function that uses `?` on `Err e` must return `Err` with a compatible payload.
 
 ### 9.3 Match
 
