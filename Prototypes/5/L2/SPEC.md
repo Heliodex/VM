@@ -149,7 +149,15 @@ Constructors are tagged values (section 8), so `kind` and `match` can tell them 
 
 ### 9.2 Early return
 
-`e?`, where `e` is an application, evaluates `e`. If it is `Ok v`, the expression is `v`. If it is `Err e`, the whole enclosing function returns `Err e`. The reader hoists `e?` into a `let` in the same function, so it works anywhere an expression can appear. This is sound because L2 is pure: moving an evaluation earlier changes only which error is reported first, never a result. The payload types must match: a function that uses `?` on `Err e` must return `Err` with a compatible payload.
+`e?`, where `e` is an application, evaluates `e`. If it is `Ok v`, the expression is `v`. If it is `Err e`, the whole enclosing function returns `Err e`. The desugarer hoists `e?` into a `match` around the function's body, so the early return runs only when the `?` is reached.
+
+Where a `?` may appear is limited, so that hoisting never runs an expression that would not otherwise run:
+
+- In the body of a function, and in any expression that always runs with it (a let value, an argument, a list item, a pair part, an if condition, a match scrutinee), it is allowed. Its early return leaves the enclosing function.
+- In a let or mutual body, or in an if branch or match arm, it is allowed only when that let, if or match is itself the function's result. Then the branch is a function of its own, and the early return leaves it. The names the let binds are in scope for it.
+- Anywhere else, including an if branch or match arm that is not the function's result, it is an error.
+
+This is sound because L2 is pure: moving an evaluation earlier changes only which error is reported first, never a result. The payload types must match: a function that uses `?` on `Err e` must return `Err` with a compatible payload.
 
 ### 9.3 Match
 
