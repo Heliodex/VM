@@ -164,10 +164,32 @@ Expressions that L1 already has stay: `quote`, `var`, `lam`, `pin`, `cell`, `ind
 - Compile to the machine's `Expr`.
 - Tests: L1 programs ported to L2, with the same expected results, run through the same program-file format. Each port must give the same result as its L1 original.
 
+## 11. Layout and binding rules
+
+These rules are decided for the first version.
+
+- **Newlines** are whitespace, except inside a `match` block, where a newline ends an arm.
+- **Arms** are `pattern -> body`. A body ends at the end of its line. To continue a body onto the next line, wrap it in parentheses, so the parser never needs a layout rule.
+- **Indentation** has no meaning. Indentation-based syntax is deferred, and it can be added to the lexer later without changing the grammar.
+- **`let`** is non-recursive. A recursive function is written with **`letrec`**, which is `fix` as in L1, and a group of functions that call each other is one **`mutual`** form.
+
+Example:
+
+```
+describe r = match r {
+  Ok v -> v
+  Err e -> (
+    let n = 0 in n
+  )
+}
+```
+
 ## 12. Open questions
 
-Decided: prefix application only, with no infix sugar for now (3.3); tags for constructors in the machine (section 8); the results model (section 9); the dispatch expressions (section 9.4).
+Decided: prefix application only, with no infix sugar for now (3.3); tags for constructors in the machine (section 8); the results model (section 9); the dispatch expressions (section 9.4); layout and binding (section 11), with `letrec` for recursion, newlines separating arms, and indentation deferred.
 
 1. The text syntax for constructors: how `Ok v` and `Err e` are written and printed.
+4. How a user declares their own constructors and their tags. The examples assume `Ok` and `Err` are built in, with tags 0 and 1.
+5. The meaning of `[1 2 . 3]`, a list with an improper tail.
 2. Data form for constructors, so a constructor can be an output of a program.
 3. Exact tag numbers for `Ok` and `Err`, and the representation of nil and strings.
