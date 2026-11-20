@@ -221,7 +221,6 @@ The first version has a small static type system for surface programs. Quoted an
 
 ```
 t ::= Int                 an integer
-    | Nil                 the empty list, ~
     | (t . t)             a pair
     | t -> t              a function, curried
     | Pin t               a suspended value (section 7)
@@ -230,13 +229,13 @@ t ::= Int                 an integer
     | Dyn                 a value from untyped code (13.4)
 ```
 
-A list of `t` has type `[t]`, a built-in recursive type. Its values are the pair chains of section 5, so `[t]` is `(t . [t])` or `Nil`. A list literal `[a b c]` has type `[t]` when each item has type `t`.
+A list of `t` has type `[t]`, a built-in recursive type. Its values are the pair chains of section 5, so a `[t]` value is `~` or a pair `(t . [t])`. The empty list is `~`, and it has type `[t]` for any `t`. A list literal `[a b c]` has type `[t]` when each item has type `t`. A pair and a list unify head to head and tail to tail, since a list is a pair or nil.
 
 ### 13.2 Inference
 
 The checker is unification with mutable type variables, following Algorithm W. Each variable records the nesting depth at which it was created, and a `let` or `letrec` generalises the variables created deeper than its own level. Unification has the usual occurs check.
 
-The checker runs on the desugared tree, with each node given an identifier. It reports a type error by the identifier of the node.
+The checker runs on the parser's tree, before the desugarer. It reports a type error at the source position of the node where it is found.
 
 The constructs:
 
@@ -260,7 +259,7 @@ Recursive functions (`letrec`) are checked monomorphically within their own body
 - `+ - * / %` have type `Int -> Int -> Int`.
 - `< =` have type `Int -> Int -> Int`, since the machine returns 0 or 1.
 - `@` has type `a -> Int`, the kind of any value.
-- `head` and `tail` have type `(a . b) -> a` and `(a . b) -> b`. The address form (`index`) is typed by its steps.
+- `head` and `tail` have type `[a] -> a` and `[a] -> [a]`. They take lists, so that a recursive function over a list is typed. A pair is accepted where a list is, when its second part is a list, so a pair whose parts have different types cannot be taken apart in the first version.
 - `if c t e` needs `c : Int`, and `t` and `e` must have the same type.
 - `pin e` has type `Pin t` when `e : t`, and `force` has type `Pin t -> t`.
 - `fix` has type `(a -> a) -> a`.
@@ -291,6 +290,8 @@ A quoted program, or a program decoded from binary, is untyped. Evaluating it gi
 
 So a program can run untyped code, and the types it has are kept at the boundary by a check that is part of the surface language's compiled form, not the machine.
 
+A program is run on untyped data. Its input is checked against the input type the checker inferred, when the program is run. A failed check ends the run as an error, as a machine failure does.
+
 ### 13.5.1 Tags at run time
 
 Only constructors carry a tag of their own. Every other value's kind comes from its representation, so the static types need no extra tag at run time.
@@ -298,9 +299,8 @@ Only constructors carry a tag of their own. Every other value's kind comes from 
 | Type | Kind | Extra tag | Dyn check |
 |---|---|---|---|
 | `Int` | 0, a number | none | the value is an integer in range |
-| `Nil` | 1, nil | none | the value is `~` |
 | `(a . b)` | 2, a pair | none | kind 2, then check `a` and `b` |
-| `[a]` | 2, a chain of pairs | none | kind 2 or nil, then check each item |
+| `[a]` | 1 for nil, or 2 for a pair | none | kind 1, or kind 2 then check the item and the rest of the list |
 | `a -> b` | 3, a function | none | kind 3; arity is not checked |
 | `Pin a` | 4, a pin | none | kind 4 |
 | a declared sum | 5, a constructor | the constructor's tag, from 0 up | kind 5, the tag belongs to this sum, then check the payload |
@@ -335,4 +335,4 @@ These were open, and are now settled:
 10. `Dyn` checks are inserted automatically during inference (section 13.5).
 11. Nullary constructors have payload `~`, and several fields are one pair (section 13.4).
 
-Nothing is open in the draft. The remaining work is implementation: the L2 reader, the type checker, and the constructor data form.
+Nothing is open in the draft. The remaining work is implementation: a surface form that produces untyped values, which is the source of `Dyn` (section 13.5), and a run-time error message for a failed check.
