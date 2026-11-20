@@ -10,7 +10,7 @@
 --
 -- Newlines are whitespace, except inside a match block, where a newline ends an arm body. Inside parentheses and brackets newlines are whitespace again. Items of a list are atoms, so a call inside a list needs parentheses.
 --
--- A let or letrec has no keyword between its value and its body. The value ends at the end of its line, and the body starts on the next line. A mutual group still uses in.
+-- A let or letrec has no keyword between its value and its body. The value ends at the end of its line, and the body starts on the next line. A mutual group ends at the close of its bindings, so its body needs no keyword either.
 --
 -- The surface tree is the types below. The rawfix form is never written in source: the desugarer makes it for a mutual group.
 --
@@ -62,7 +62,6 @@ const KEYWORDS: { [string]: boolean } = {
 	fn = true,
 	let = true,
 	letrec = true,
-	[ "in" ] = true,
 	[ "if" ] = true,
 	match = true,
 	mutual = true,
@@ -515,7 +514,6 @@ local function parse(
 		end
 
 		expectKind(")")
-		expectSym("in")
 		const body = parseExpr()
 		sig = saved
 		return { k = "mutual", bindings = bindings, body = body, at = at(start) }

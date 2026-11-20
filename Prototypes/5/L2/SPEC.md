@@ -37,7 +37,7 @@ app    ::= atom+                application, curried: f a b is (f a) b
          | "fn" params expr      function (section 4)
          | "let" name "=" expr newline expr
          | "letrec" name "=" expr newline expr    (recursive; section 12)
-         | "mutual" "(" binding+ ")" "in" expr    (section 12)
+         | "mutual" "(" binding+ ")" expr    (section 12)
          | "if" expr expr expr   branch on an integer: nonzero is true
          | "match" expr "{" newline arm+ "}"    (section 9.3; arms are multi-line, section 12)
 atom   ::= integer | string | name | "~" | list | pair | "(" expr ")"
@@ -75,7 +75,7 @@ Names are symbols that are not reserved (section 3.5). Names are lexically scope
 
 ### 3.5 Reserved words
 
-`fn`, `let`, `letrec`, `in`, `if`, `match`, `mutual`, `~`, `_`, and the primitives' symbols, listed in section 6. `in` is reserved because `mutual` uses it.
+`fn`, `let`, `letrec`, `if`, `match`, `mutual`, `~`, `_`, and the primitives' symbols, listed in section 6.
 
 ## 4. Functions
 
@@ -199,7 +199,7 @@ These rules are decided for the first version.
 - **Newlines** are whitespace, except inside a `match` block, where a newline ends an arm, and after the value of a `let` or `letrec`, where a newline ends the value.
 - **Arms** are `pattern -> body`. A body ends at the end of its line. To continue a body onto the next line, wrap it in parentheses, so the parser never needs a layout rule.
 - **Indentation** has no meaning. Indentation-based syntax is deferred, and it can be added to the lexer later without changing the grammar.
-- **`let`** is non-recursive, and has no keyword between its value and its body. The value ends at the end of its line, so a longer value is wrapped in parentheses, and the body starts on the next line. A `let` inside a match arm is wrapped in parentheses too, since the arm already ends at its line. A recursive function is written with **`letrec`**, which is `fix` as in L1, and a group of functions that call each other is one **`mutual`** form, which still uses `in`.
+- **`let`** is non-recursive, and has no keyword between its value and its body. The value ends at the end of its line, so a longer value is wrapped in parentheses, and the body starts on the next line. A `let` inside a match arm is wrapped in parentheses too, since the arm already ends at its line. A recursive function is written with **`letrec`**, which is `fix` as in L1, and a group of functions that call each other is one **`mutual`** form. Its body follows the close of its bindings, with no keyword between them.
 
 Example:
 

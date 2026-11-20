@@ -27,7 +27,7 @@ Our machine is an expression evaluator with explicit frames. It has no way to ca
 
 Early return can be done without machine support, for two reasons:
 
-1. L2 is pure. Evaluating an operand early or late changes only which error is reported first, never a result. So `?` can be a rewrite: `let x = e? in body` becomes `match e { Ok x -> body; Err e -> Err e }`, with no change to the machine.
+1. L2 is pure. Evaluating an operand early or late changes only which error is reported first, never a result. So `?` can be a rewrite: `let x = e?`, followed by its body, becomes `match e { Ok x -> body; Err e -> Err e }`, with no change to the machine.
 2. The rewrite only needs the `Err` to be the function's result. In an expression language, the rest of the function is the body of a `let`, so the `Err` branch can be the result without unwinding anything.
 
 Unwinding (`try`/`catch`) would need a handler frame in the machine that discards frames up to it. That is a small addition, but it adds hidden control flow, which L1 avoided on purpose, so I would leave it out.
