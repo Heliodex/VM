@@ -63,7 +63,7 @@ Application is juxtaposition: `f x y` is `(f x) y`. An atom is any single expres
 
 ### 3.3 Operators
 
-Operators are ordinary names, so `+ 1 2` is application of `+`. Infix forms `a + b` are not part of this draft; they can be added later as sugar with a fixed precedence table. **Open:** whether to add infix sugar for the primitives.
+Operators are ordinary names, so `+ 1 2` is application of `+`. Infix forms `a + b` are not part of the first version. Operators are written in prefix form only, and infix sugar with a fixed precedence table can be added later, if wanted.
 
 ### 3.3a Equality
 
