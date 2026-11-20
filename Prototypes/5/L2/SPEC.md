@@ -91,12 +91,17 @@ Primitives are the functions the machine provides. They are written as names, wi
 
 ## 8. Tagged values and the layers
 
-**Open: the design is not decided.** The idea:
+**Decided: constructors are tagged in the machine.** Integers, nil, pairs, functions and pins keep their representations, and their kind is the same as in L1 (`@` gives 0 to 4). A constructor is a new value kind, 5, with a tag and a payload. Only user sums and `Ok`/`Err` are constructors, so an integer costs nothing extra, and a constructor cannot be mistaken for a pair.
 
-- Layer 0: the machine. Raw opcodes on untagged values. As in L1, the machine keeps its own kind checks: `head` of a non-cell is an error.
-- Layer 1: the library. Every L2 value carries its tag, and each operation untags its arguments, calls the raw opcode, and retags the result. `add` on two Int values is `untag, add, tag Int`.
+The machine has three expressions for constructors:
 
-The cost is one extra cell per value, unless the tag lives in the machine's value representation. **Recommended:** put the tag in the machine's values, so the check and the operation happen in one step, and keep the raw opcodes for code that does not need the check. The surface layer then uses the tags the machine already has. Decide before implementation.
+- `construct tag e`: a constructor with the given tag, from 0 up, and the value of `e` as its payload.
+- `tagof e`: the tag of a constructor, or -1 for any other value. It never fails, so it is the test in a `match`.
+- `payload e`: the payload of a constructor. It is an error for any other value, so it is only used after a `tagof` test.
+
+A constructor is not data yet: a program that returns one is `not_data`, as a function is. A text form for printing and reading constructors is part of the L2 surface, not L1.
+
+The layer above, in the surface language, untags and retags for the library functions as before. The raw opcodes take untagged values, and the machine's own kind checks stay.
 
 ## 9. Results and errors
 
@@ -141,7 +146,7 @@ Arms are lazy: only the body of the arm that matches is evaluated. The compiler 
 
 ### 9.4 The core primitive
 
-The machine gets one primitive for dispatch: test the tag of a value and, if it matches, give its payload. `match`, `?` and the constructors are built on it by the reader. A tag test is one step, with no closure per arm. The exact form of the primitive is decided with section 8, since it depends on how tags are stored.
+The machine's dispatch is two expressions, `tagof` and `payload` (section 8). A `match` tests `tagof` against each constructor's tag, and binds `payload` in the arm that matches. `match`, `?` and the constructors are built on them by the reader. A tag test is one step, with no closure per arm.
 
 ## 10. Machine changes
 
@@ -161,8 +166,8 @@ Expressions that L1 already has stay: `quote`, `var`, `lam`, `pin`, `cell`, `ind
 
 ## 12. Open questions
 
-1. Infix sugar for primitives: yes or no?
-2. Tagged values: in the machine, or in a layer above it (section 8)?
-3. Results: which model (section 9)?
-4. Exact tag numbers and the representation of nil and strings.
-5. The exact form of the dispatch primitive (section 9.4), which depends on the tagged-value representation (section 8).
+Decided: prefix application only, with no infix sugar for now (3.3); tags for constructors in the machine (section 8); the results model (section 9); the dispatch expressions (section 9.4).
+
+1. The text syntax for constructors: how `Ok v` and `Err e` are written and printed.
+2. Data form for constructors, so a constructor can be an output of a program.
+3. Exact tag numbers for `Ok` and `Err`, and the representation of nil and strings.
