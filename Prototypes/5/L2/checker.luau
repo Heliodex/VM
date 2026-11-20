@@ -1,9 +1,9 @@
 --!strict
 -- THE L2 CHECKER
 --
--- Infers the type of a surface program (SPEC section 13), and puts a check node around each value that is used at a type it does not have. It runs on the parser's tree, before the desugarer, and returns the same tree with the check nodes in it. Each check node carries the test the desugarer compiles.
+-- Infers the type of a surface program (SPEC section 13), and gives each `check e` the test for the type its use gives it. It runs on the parser's tree, before the desugarer, and returns the same tree with the check nodes in it. Each check node carries the test the desugarer compiles.
 --
--- The types (section 13.1) are Int, pairs, lists, functions, Pin, sums and Dyn, as constructors over type variables. Unification is Algorithm W's, with levels for generalisation. Dyn is the type of a value from untyped code. Unifying Dyn with a concrete type succeeds, and the value gets a check. Unifying Dyn with a variable binds the variable to Dyn.
+-- The types (section 13.1) are Int, pairs, lists, functions, Pin, sums and Dyn, as constructors over type variables. Unification is Algorithm W's, with levels for generalisation. Dyn is the type of a value from untyped code. Dyn unifies only with Dyn and with a variable, so a value from untyped code is used at a specific type only through `check e`, which gives a Result. Unifying Dyn with a variable binds the variable to Dyn.
 --
 -- A program is run on data, so its input is checked when it is entered: the input is untyped data, and the checker gives its test in the result.
 --
@@ -228,92 +228,66 @@ local function bindVar(
 	end
 end
 
--- Binds every unbound variable in t to Dyn, since a value of Dyn can have any shape there.
-local function bindAllDyn(
-	t: Ty
-)
-	local x = prune(t)
-
-	if x.k == "var" then
-		x.ref = DYN
-	elseif x.k == "con" then
-		for _, a in x.args do
-			bindAllDyn(a)
-		end
-	end
-end
-
--- Unifies an actual type with an expected one. Returns true when a Dyn value meets a concrete type, so the value needs a check. A list and a pair unify head to head and tail to tail, since a list is a pair or nil.
-local unify: (Ty, Ty) -> boolean
+-- Unifies an actual type with an expected one. A Dyn value unifies only with Dyn and with a variable, so an untyped value is used at a specific type only through an explicit check. A list and a pair unify head to head and tail to tail, since a list is a pair or nil.
+local unify: (Ty, Ty) -> ()
 
 unify = function(
 	actual: Ty,
 	expected: Ty
-): boolean
+)
 	local a = prune(actual)
 	local b = prune(expected)
 
 	if a == b then
-		return false
+		return
 	end
 
 	if a.k == "var" then
 		bindVar(a, b)
-		return false
+		return
 	end
 
 	if b.k == "var" then
 		bindVar(b, a)
-		return false
+		return
 	end
 
-	if a.name == "Dyn" then
-		if b.name == "Dyn" then
-			return false
-		end
-
-		bindAllDyn(b)
-		return true
+	if a.name == "Dyn" and b.name == "Dyn" then
+		return
 	end
 
-	if b.name == "Dyn" then
-		return false
+	if a.name == "Dyn" or b.name == "Dyn" then
+		mismatch(a, b)
 	end
 
 	if a.name == "pair" and b.name == "list" then
-		local head = unify(a.args[1], b.args[1])
-		local tail = unify(a.args[2], b)
-		return head or tail
+		unify(a.args[1], b.args[1])
+		unify(a.args[2], b)
+		return
 	end
 
 	if a.name == "list" and b.name == "pair" then
-		local head = unify(a.args[1], b.args[1])
-		local tail = unify(a, b.args[2])
-		return head or tail
+		unify(a.args[1], b.args[1])
+		unify(a, b.args[2])
+		return
 	end
 
 	if a.name ~= b.name or #a.args ~= #b.args then
 		mismatch(a, b)
 	end
 
-	local need = false
-
 	for i, x in a.args do
-		if unify(x, b.args[i]) then
-			need = true
-		end
+		unify(x, b.args[i])
 	end
-
-	return need
 end
 
 local function unifyAt(
 	at: Pos,
 	actual: Ty,
 	expected: Ty
-): boolean
+)
 	hereAt = at
-	return unify(actual, expected)
+	unify(actual, expected)
 end
 
 local function substitute(
@@ -620,7 +594,7 @@ end
 
 -- INFERENCE
 
--- Gives e the type expected, or puts a check on it when it is an untyped value used at a concrete type.
+-- Unifies the type of node with the type expected at its position, and gives node back.
 local function use(
 	cx: Cx,
 	node: Parser.Expr,
@@ -628,12 +602,7 @@ local function use(
 	expected: Ty,
 	at: Pos
 ): Parser.Expr
-	if unifyAt(at, actual, expected) then
-		const c: CheckNode = { k = "check", e = node, test = nil, expect = "", at = at }
-		table.insert(cx.pending, { node = c, ty = expected })
-		return c
-	end
-
+	unifyAt(at, actual, expected)
 	return node
 end
 
@@ -680,8 +649,8 @@ infer = function(
 
 			if i == 1 then
 				f = use(cx, f, cur, arrow(pt, rt), node.at)
-			elseif unifyAt(node.at, cur, arrow(pt, rt)) then
-				failAt(node.at, "an untyped value is applied to more than one argument; bind it with let first")
+			else
+				unifyAt(node.at, cur, arrow(pt, rt))
 			end
 
 			args[i] = use(cx, out, aty, pt, arg.at)
@@ -839,6 +808,14 @@ infer = function(
 		end
 
 		return { k = "match", scrut = scrut, arms = arms, at = node.at }, resTy
+	elseif node.k == "check" then
+		const e = infer(cx, env, node.e, level, ret)
+
+		-- The test depends on the type the use gives the value, which is only known once inference is done, so the type is not generalised.
+		const t = fresh(-1)
+		const c: CheckNode = { k = "check", e = e, test = nil, expect = "", at = node.at }
+		table.insert(cx.pending, { node = c, ty = t })
+		return c, con("Result", { t, listOf(INT) })
 	elseif node.k == "try" then
 		const e, et = infer(cx, env, node.e, level, ret)
 		const okTy = fresh(level)

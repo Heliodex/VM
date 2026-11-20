@@ -12,5 +12,5 @@ fn t
 Leaf => 0 fuel 1000
 Node (Leaf . Leaf) => 1 fuel 1000
 Node (Leaf . (Node (Leaf . Leaf))) => 1 fuel 1000
-Node (Leaf . 5) => error fuel 1000
-~ => error fuel 1000
+Node (Leaf . 5) => Err [101 120 112 101 99 116 101 100 32 84 114 101 101] fuel 1000
+~ => Err [101 120 112 101 99 116 101 100 32 84 114 101 101] fuel 1000

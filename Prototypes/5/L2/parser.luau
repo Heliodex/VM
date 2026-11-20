@@ -81,6 +81,7 @@ const KEYWORDS: { [string]: boolean } = {
 	[ "if" ] = true,
 	match = true,
 	mutual = true,
+	check = true,
 	type = true,
 }
 
@@ -535,6 +536,13 @@ local function parse(
 		return { k = "mutual", bindings = bindings, body = body, at = at(start) }
 	end
 
+	-- check e: the value of e, tested when it is used at a type. The operand is an atom, so an application needs parentheses.
+	local function parseCheck(): Expr
+		const start = advance()
+		const e = parseAtom()
+		return { k = "check", e = e, test = nil, expect = "", at = at(start) }
+	end
+
 	parseExpr = function(): Expr
 		const t = cur()
 
@@ -549,6 +557,8 @@ local function parse(
 				return parseMatch()
 			elseif word(t) == "mutual" then
 				return parseMutual()
+			elseif word(t) == "check" then
+				return parseCheck()
 			end
 		end
 

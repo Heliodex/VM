@@ -33,6 +33,7 @@ Tokens, separated by whitespace or by delimiters:
 ```
 expr   ::= app
          | app "?"               early return on a failure (section 9.2)
+         | "check" atom          the result of an explicit check of an untyped value (section 13.5)
 app    ::= atom+                application, curried: f a b is (f a) b
          | "fn" params expr      function (section 4)
          | "let" name "=" expr newline expr
@@ -245,7 +246,7 @@ The constructs:
 - `if` needs an `Int` condition, and its branches must have the same type.
 - `match` checks each pattern against the scrutinee's sum, requires the arms to have one type, and checks coverage: the arms' constructors must be the sum's constructors, or a catch-all arm must be present. Arms after a catch-all are reported as unreachable.
 
-For `Dyn` (section 13.5), unifying `Dyn` with a concrete type succeeds, and the checker records a check node at that position in the output. Unifying `Dyn` with an unbound variable binds the variable to `Dyn`.
+`check e` has the type `Result t [Int]`, where `t` is the type its use gives the value. The check is not generalised, so its test is known when inference ends. A value of `Dyn` is used at a specific type only through `check`. Unifying `Dyn` with a concrete type is a type error, and unifying `Dyn` with an unbound variable binds the variable to `Dyn`.
 
 The output is the same tree with the check nodes inserted, and the desugarer takes that tree.
 
@@ -285,12 +286,12 @@ The result of `?` on `Result a e` is `a`, and the enclosing function must return
 
 A quoted program, or a program decoded from binary, is untyped. Evaluating it gives a value of type `Dyn`.
 
-- Inference inserts the check automatically, with no annotation, wherever a `Dyn` value meets a specific type. A `Dyn` value used where a specific type is needed passes a run-time check: an `Int` must be an integer, a pair must be a pair, and a constructor must have the declared tag. A failed check is an error, as a machine failure is. Its message is `expected` and the type, such as `expected Int`.
+- A `Dyn` value is used at a specific type only through `check e`, which is written in the program. `check e` gives `Ok e` when the value has the shape of the type its use gives it, and `Err` with the message `expected` and the type, such as `expected Int`, when it does not. An `Int` must be an integer, a pair must be a pair, and a constructor must have the declared tag. Without a check, a `Dyn` value used at `Int` is a type error, such as `expected Int, but this is Dyn`.
 - A typed value passed into untyped code is not checked, and it is still a valid value of its type.
 
-So a program can run untyped code, and the types it has are kept at the boundary by a check that is part of the surface language's compiled form, not the machine.
+So a program can run untyped code, and the types it has are kept at the boundary by an explicit check. The check is part of the surface language's compiled form, not the machine, and a failed check is a value, so it can be matched and handled like any other error.
 
-A program is run on untyped data. Its input is checked against the input type the checker inferred, when the program is run. A failed check ends the run as an error, as a machine failure does.
+A program is run on untyped data. Its input is checked against the input type the checker inferred, when the program is run. A failed input check is the run's value: the run gives `Err` with the message, and the program does not run.
 
 ### 13.5.1 Tags at run time
 
@@ -332,7 +333,7 @@ These were open, and are now settled:
 7. Constructor text syntax: a capitalised name applied by juxtaposition, and a bare name for a constructor with no payload (section 5).
 8. Constructor data form: `con TAG PAYLOAD` in the data text and tag byte 4 in the binary format (section 5).
 9. Tag numbers: a user sum's constructors are numbered from 0 in declaration order, so `Ok` is 0 and `Err` is 1 (section 13.4). nil is `~`, and strings are lists of bytes (section 5).
-10. `Dyn` checks are inserted automatically during inference (section 13.5).
+10. `Dyn` values are checked only by an explicit `check`, which gives a `Result` (section 13.5).
 11. Nullary constructors have payload `~`, and several fields are one pair (section 13.4).
 
-Nothing is open in the draft. The remaining work is implementation: a surface form that produces untyped values, which is the source of `Dyn` (section 13.5), and a run-time error message for a failed check.
+Nothing is open in the draft. The remaining work is implementation: a surface form that produces untyped values, which is the source of `Dyn` (section 13.5).

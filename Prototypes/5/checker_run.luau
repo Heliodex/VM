@@ -1,7 +1,7 @@
 --!strict
 -- CHECKS THE CHECKER ON THE CASES THAT THE PROGRAM FILES DO NOT REACH
 --
--- The untyped import: a value from untyped code has type Dyn, so a use of it at Int gets a check, and the run fails when the value is not an integer. Each run is through the desugarer and the machine, as a program is.
+-- The untyped import: a value from untyped code has type Dyn. It is used at a type only through an explicit check, which gives Ok or Err. Each run is through the desugarer and the machine, as a program is.
 --
 --   lute run checker_run.luau      (from Prototypes/5)
 
@@ -45,7 +45,7 @@ const function runDyn(
 	const input = given.value :: VM.Value
 	const parsed = Parser.parse(src)
 	const result = Checker.check(parsed, { { name = "raw", scheme = Checker.untyped() } }, "dyn.prog")
-	const expr = Desugar.wrapImports(Desugar.desugarProgram(result.expr, { "raw" }, {}), { value })
+	const expr = Desugar.wrapImports(Desugar.desugarProgram(result.expr, { "raw" }, Desugar.buildCtors({})), { value })
 	const outcome = Lifecycle.run(Desugar.boundary(expr, result.input, result.inputExpect), input, 100000)
 
 	if outcome.status == "value" then
@@ -75,11 +75,53 @@ for _, case in SHOWN do
 	check(case.name, shown == case.want, shown)
 end
 
--- An untyped value used as an Int: fine when it is one, refused when it is not.
-check("an untyped integer is used at Int", runDyn("fn x (+ raw x)", VM.int(5), VM.int(1)) == "value 6", runDyn("fn x (+ raw x)", VM.int(5), VM.int(1)))
-check("an untyped constructor is refused at Int", runDyn("fn x (+ raw x)", VM.construct(0, VM.int(5)), VM.int(1)) == "error expected Int", runDyn("fn x (+ raw x)", VM.construct(0, VM.int(5)), VM.int(1)))
-check("an input of the wrong shape is refused on entry", runDyn("fn x (+ x 1)", VM.int(0), VM.construct(0, VM.int(1))) == "error expected Int", runDyn("fn x (+ x 1)", VM.int(0), VM.construct(0, VM.int(1))))
-check("a list input is refused where an Int is needed", runDyn("fn x (+ x 1)", VM.int(0), VM.cell(VM.int(1), VM.nilv())) == "error expected Int", runDyn("fn x (+ x 1)", VM.int(0), VM.cell(VM.int(1), VM.nilv())))
+-- The text of an error value, as the L2 program writes it: Err with the bytes of the message.
+const function bytesOf(
+	s: string
+): VM.Expr
+	local v: VM.Expr = VM.nilv()
+
+	for i = #s, 1, -1 do
+		v = VM.cell(VM.int(string.byte(s, i) :: number), v)
+	end
+
+	return v
+end
+
+-- The value an expression gives, written as Data writes it.
+const function writtenOf(
+	e: VM.Expr
+): string
+	const r = VM.run(e, 1000)
+
+	if r.status ~= "value" then
+		error("the expected value does not give a value", 0)
+	end
+
+	return Data.write(r.value :: VM.Value)
+end
+
+-- Checks src, with an untyped import raw, and gives the type error, or "accepted" when it has none.
+const function typeOf(
+	src: string
+): string
+	const ok, res = pcall(Checker.check, Parser.parse(src), { { name = "raw", scheme = Checker.untyped() } }, "dyn.prog")
+	return if ok then "accepted" else tostring(res)
+end
+
+-- A value from untyped code used at Int without a check is a type error, and the message says it is untyped.
+const refusal = typeOf("fn x (+ raw x)")
+check("an untyped value is refused at Int without a check", string.find(refusal, "expected Int, but this is Dyn", 1, true) ~= nil, refusal)
+
+-- An explicit check gives Ok when the value has the type, and Err with the expected type when it does not.
+const CHECKED = "fn x\n\tmatch (check raw) {\n\t\tOk v -> (Ok (+ v x))\n\t\tErr e -> (Err e)\n\t}"
+check("an explicit check gives Ok for an integer", runDyn(CHECKED, VM.int(5), VM.int(1)) == "value " .. writtenOf(VM.construct(0, VM.int(6))), runDyn(CHECKED, VM.int(5), VM.int(1)))
+check("an explicit check gives Err for a constructor", runDyn(CHECKED, VM.construct(0, VM.int(5)), VM.int(1)) == "value " .. writtenOf(VM.construct(1, bytesOf("expected Int"))), runDyn(CHECKED, VM.construct(0, VM.int(5)), VM.int(1)))
+check("an explicit check gives Err for a list", runDyn(CHECKED, VM.cell(VM.int(1), VM.nilv()), VM.int(1)) == "value " .. writtenOf(VM.construct(1, bytesOf("expected Int"))), runDyn(CHECKED, VM.cell(VM.int(1), VM.nilv()), VM.int(1)))
+
+-- The input is checked on entry, and a wrong input gives Err as the run's value.
+check("an input of the wrong shape gives Err on entry", runDyn("fn x (+ x 1)", VM.int(0), VM.construct(0, VM.int(1))) == "value " .. writtenOf(VM.construct(1, bytesOf("expected Int"))), runDyn("fn x (+ x 1)", VM.int(0), VM.construct(0, VM.int(1))))
+check("a list input gives Err on entry where an Int is needed", runDyn("fn x (+ x 1)", VM.int(0), VM.cell(VM.int(1), VM.nilv())) == "value " .. writtenOf(VM.construct(1, bytesOf("expected Int"))), runDyn("fn x (+ x 1)", VM.int(0), VM.cell(VM.int(1), VM.nilv())))
 
 print(string.format("%d of %d checks passed", total - failures, total))
 

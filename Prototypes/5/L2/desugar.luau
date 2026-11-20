@@ -17,7 +17,7 @@
 --   Desugar.desugarExpr(expr, importNames, ctors): VM.Expr      an expression that is not checked, such as a test's
 --   Desugar.buildCtors(decls): { [string]: Ctor }
 --   Desugar.wrapImports(expr, importExprs): VM.Expr
---   Desugar.boundary(expr, test): VM.Expr                       the program, with its input checked when it is run
+--   Desugar.boundary(expr, test, expect): VM.Expr               the program, with its input checked when it is run
 
 const M = require "../interpreter/vm"
 const Primitives = require "../interpreter/primitives"
@@ -505,14 +505,14 @@ compilePred = function(
 	return M.app(M.app(M.fix, M.lam(M.lam(body))), valueOf(base, path, scope))
 end
 
--- The value e, checked: it is e when it has the test's shape. When it does not, the run fails with "expected" and the type.
+-- The value e, checked: Ok e when it has the test's shape, and Err with "expected" and the type when it does not.
 local function checkValue(
 	test: Test,
 	expect: string,
 	e: M.Expr
 ): M.Expr
-	const fail = M.prim(Primitives.TAG.raise, textValue("expected " .. expect))
-	return M.app(M.lam(M.ite(compilePred(test, "v", {}, { "v" }), M.var(0), fail)), e)
+	const body = M.ite(compilePred(test, "v", {}, { "v" }), M.construct(0, M.var(0)), M.construct(1, textValue("expected " .. expect)))
+	return M.app(M.lam(body), e)
 end
 
 -- DESUGARING
@@ -816,13 +816,13 @@ local function desugarExpr(
 	return desugar(contextify(ast), scope, ctors)
 end
 
--- The whole program as the run applies it: a function that checks its input against the test, then runs the program on it. The program is closed by then, since its imports are bound.
+-- The whole program as the run applies it: a function that runs the program on its input when the input has the test's shape, and gives Err with "expected" and the type when it does not. The program is closed by then, since its imports are bound.
 local function boundary(
 	expr: M.Expr,
 	test: Test,
 	expect: string
 ): M.Expr
-	return M.lam(M.app(expr, checkValue(test, expect, M.var(0))))
+	return M.lam(M.ite(compilePred(test, "v", {}, { "v" }), M.app(expr, M.var(0)), M.construct(1, textValue("expected " .. expect))))
 end
 
 -- Binds each import around the program. The imported programs are closed, so their expressions can be placed at the top.
