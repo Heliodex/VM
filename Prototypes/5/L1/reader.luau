@@ -6,7 +6,8 @@
 --   42                 an integer, negative ones too
 --   ~                  nil
 --   x                  a variable, which must be bound by a fn around it
---   (fn x body)       a function of x; (fn (x y) body) is the same as (fn x (fn y body))
+--   (fn x body)       a function of x; (fn (x y) body) is the same as (fn x (fn y body)).
+--                      A fn has one parameter part, a name or a list of names, so (fn x y body) is refused
 --   (f a b)            application, curried: (f a b) is ((f a) b)
 --   [a b]              a pair
 --   [a b c]            the same as [a [b c]]: the last item is the tail, so a list ends in ~, as [1 2 ~]
@@ -363,24 +364,26 @@ local function compileForm(
 			fail(node.line, "fn needs a parameter and a body")
 		end
 
-		-- The body is the last item. The parameters are the items between, either names or lists of names.
-		local names: { string } = {}
-		for i = 2, #items - 1 do
-			const param = items[i]
+		-- A fn has one parameter part and one body: (fn (x y) body) for a list of names, or (fn x body) for one name.
+		if args > 2 then
+			fail(node.line, "fn takes a list of parameters, (fn (x y) body), or one name, (fn x body)")
+		end
 
-			if param.kind == "sym" then
-				table.insert(names, param.name)
-			elseif param.kind == "list" then
-				for _, inner in param.items do
-					if inner.kind == "sym" then
-						table.insert(names, inner.name)
-					else
-						fail(inner.line, "a fn parameter must be a name")
-					end
+		local names: { string } = {}
+		const param = items[2]
+
+		if param.kind == "sym" then
+			table.insert(names, param.name)
+		elseif param.kind == "list" then
+			for _, inner in param.items do
+				if inner.kind == "sym" then
+					table.insert(names, inner.name)
+				else
+					fail(inner.line, "a fn parameter must be a name")
 				end
-			else
-				fail(param.line, "a fn parameter must be a name")
 			end
+		else
+			fail(param.line, "a fn parameter must be a name")
 		end
 
 		if #names == 0 then

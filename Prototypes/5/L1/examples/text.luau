@@ -91,6 +91,8 @@ const examples: { Example } = {
 
 	-- Pairs and lists
 	value("head and tail", "(head (tail [1 [2 ~]]))", "2"),
+	value("a fn takes a parameter list", "((fn (x y) (- x y)) 10 3)", "7"),
+	value("a fn takes one name", "((fn x (fn y (- x y))) 10 3)", "7"),
 	value("a chain of heads is one address", "(head (head [[4 5] 6]))", "4"),
 	value("a head then a tail", "(tail (head [[4 5] 6]))", "5"),
 	value("a tail then a head", "(head (tail [1 [[7 8] 9]]))", "(7 . 8)"),
@@ -149,6 +151,7 @@ const examples: { Example } = {
 
 const rejects: { string } = {
 	"",
+	"(fn x y x)",
 	'"abc',
 	"[1]",
 	"[]",
