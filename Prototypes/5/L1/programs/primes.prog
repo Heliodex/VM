@@ -7,7 +7,7 @@ The probe is laziness: pins inside a structure, forced by the lifecycle's output
 		(fn k [k (pin (from (+ k 1)))])
 		(letrec filter
 			(fn (p s)
-				(if (= (mod (head s) p) 0)
+				(if (= (% (head s) p) 0)
 					(filter p (force (tail s)))
 					[(head s) (pin (filter p (force (tail s))))]))
 			(letrec sieve

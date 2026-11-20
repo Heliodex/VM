@@ -91,10 +91,10 @@ const examples: { Example } = {
 		"deep equality, equal lists",
 		[==[
 (letrec deq (fn (a b)
-     (if (= (kind a) (kind b))
-         (if (= (kind a) 2)
+     (if (= (@ a) (@ b))
+         (if (= (@ a) 2)
              (if (deq (head a) (head b)) (deq (tail a) (tail b)) 0)
-             (if (= (kind a) 0) (= a b) (= (kind a) 1)))
+             (if (= (@ a) 0) (= a b) (= (@ a) 1)))
          0))
   (deq (list 1 (list 2 [3 ~]) 4) (list 1 (list 2 [3 ~]) 4)))
 ]==],
@@ -105,10 +105,10 @@ const examples: { Example } = {
 		"deep equality, lists that differ",
 		[==[
 (letrec deq (fn (a b)
-     (if (= (kind a) (kind b))
-         (if (= (kind a) 2)
+     (if (= (@ a) (@ b))
+         (if (= (@ a) 2)
              (if (deq (head a) (head b)) (deq (tail a) (tail b)) 0)
-             (if (= (kind a) 0) (= a b) (= (kind a) 1)))
+             (if (= (@ a) 0) (= a b) (= (@ a) 1)))
          0))
   (deq (list 1 (list 2 3)) (list 1 (list 2 4))))
 ]==],

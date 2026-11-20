@@ -24,10 +24,10 @@
 --   (fix f)            the fixed point of f, where f is (fn rec (fn ...)) and rec is the function itself
 --   (+ a b), (- a b), (* a b), (< a b), (= a b)
 --                      add, subtract, multiply, less-than, equal
---   (div a b), (mod a b)
+--   (/ a b), (% a b)
 --                      floored division and remainder: a = b * q + r, with r taking the sign of b
---   (kind a)           the kind of a: 0 integer, 1 nil, 2 cell, 3 function, 4 pin
---   (? a)              shorthand for (= (kind a) 1), whether a is nil
+--   (@ a)           the kind of a: 0 integer, 1 nil, 2 cell, 3 function, 4 pin
+--   (? a)              shorthand for (= (@ a) 1), whether a is nil
 --
 -- The words and operators above are reserved and cannot be used as variables. Errors are raised as strings that begin with the line number.
 --
@@ -56,9 +56,8 @@ type Node =
 -- The primitives, by the symbol that writes them, from the table in interpreter/primitives.luau.
 const PRIMITIVES = Primitives.BY_SYMBOL
 
--- Forms that are primitives: kind is one, and ? is a shorthand built from it.
+-- Forms that are primitives: @ (kind) is one, and ? is a shorthand built from it.
 const KIND_FORMS: { [string]: number } = {
-	kind = 1,
 	["?"] = 1,
 }
 
@@ -390,6 +389,12 @@ local function compileForm(
 			fail(node.line, "fn needs at least one parameter")
 		end
 
+		for _, name in names do
+			if reserved(name) then
+				fail(node.line, `{name} is a reserved word and cannot be used as a variable`)
+			end
+		end
+
 		-- The last parameter is the innermost binder, so it goes at the front of the scope last.
 		local inner = table.clone(scope)
 		for i = 1, #names do
@@ -497,7 +502,7 @@ local function compileForm(
 		return M.list(elements)
 	end
 
-	if name == "kind" then
+	if name == "@" then
 		arity(1)
 		return M.prim(Primitives.TAG.kind, compile(items[2], scope))
 	end

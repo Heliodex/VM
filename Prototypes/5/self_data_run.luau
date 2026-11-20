@@ -80,7 +80,7 @@ const FUNCTION_HEAD = "(head (fn x x))"
 const probes = {
 	{ name = "applying a forged function", source = FORGED_APPLY },
 	{ name = "head of a function", source = FUNCTION_HEAD },
-	{ name = "kind of a function", source = "(kind (fn x x))" },
+	{ name = "kind of a function", source = "(@ (fn x x))" },
 }
 
 print("")

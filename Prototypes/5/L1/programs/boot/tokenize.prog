@@ -51,7 +51,7 @@ The probe for the bootstrap: this is the first of four stages, and it has to agr
 		(fn (l acc)
 			(if (? l) acc
 					(let d (- (head l) 48)
-						(if (< (div (- 9007199254740991 d) 10) acc) -1
+						(if (< (/ (- 9007199254740991 d) 10) acc) -1
 								(value (tail l) (+ (* acc 10) d))))))
 	(letrec toInt
 		(fn w

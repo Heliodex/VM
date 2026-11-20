@@ -7,8 +7,8 @@ The probe is string in, string out: the input and the output are both strings, a
 			(if (< c 65) c
 					(if (< 90 c)
 							(if (< c 97) c
-									(if (< 122 c) c (+ 97 (mod (+ (- c 97) 3) 26))))
-							(+ 65 (mod (+ (- c 65) 3) 26)))))
+									(if (< 122 c) c (+ 97 (% (+ (- c 97) 3) 26))))
+							(+ 65 (% (+ (- c 65) 3) 26)))))
 		(letrec go (fn l
 				(if (? l) ~ [(shift (head l)) (go (tail l))]))
 			(go s))))

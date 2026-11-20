@@ -74,7 +74,7 @@ const ROWS: { Primitive } = {
 	{
 		tag = 14,
 		name = "div",
-		symbol = "div",
+		symbol = "/",
 		arity = 2,
 		operation = function(
 			a: number,
@@ -98,7 +98,7 @@ const ROWS: { Primitive } = {
 	{
 		tag = 15,
 		name = "mod",
-		symbol = "mod",
+		symbol = "%",
 		arity = 2,
 		operation = function(
 			a: number,
@@ -146,7 +146,7 @@ const ROWS: { Primitive } = {
 	{
 		tag = 18,
 		name = "kind",
-		symbol = "kind",
+		symbol = "@",
 		arity = 1,
 		operation = nil,
 	},

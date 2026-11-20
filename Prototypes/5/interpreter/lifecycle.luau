@@ -30,7 +30,7 @@ export type ByteResult =
 
 -- The output check, as a program. Its tags are 0 for data and 1 for a function.
 const CHECK = Reader.parse(
-	"(fix (fn rec (fn v (if (= (kind v) 4) (rec (force v)) (if (= (kind v) 2) (let h (rec (head v)) (if (= (head h) 1) h (let t (rec (tail v)) (if (= (head t) 1) t [0 [(tail h) (tail t)]])))) (if (= (kind v) 3) [1 ~] [0 v]))))))"
+	"(fix (fn rec (fn v (if (= (@ v) 4) (rec (force v)) (if (= (@ v) 2) (let h (rec (head v)) (if (= (head h) 1) h (let t (rec (tail v)) (if (= (head t) 1) t [0 [(tail h) (tail t)]])))) (if (= (@ v) 3) [1 ~] [0 v]))))))"
 )
 
 -- Runs the program on the input, and checks the output. The outcome is a Result.
