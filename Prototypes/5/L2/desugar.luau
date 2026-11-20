@@ -4,8 +4,8 @@
 -- Turns a surface tree (parser.luau) into the machine's expressions (interpreter/vm.luau). There is no type checking here: the checker is a later stage, and it will run before this one.
 --
 --   fn (x y) body         a function of x, then of y: lam, lam
---   let x = e in b        a non-recursive binding: (lam b) applied to e
---   letrec f = fn ... in b  a recursive function: fix, as in L1
+--   let x = e, then b     a non-recursive binding: (lam b) applied to e
+--   letrec f = fn ..., then b  a recursive function: fix, as in L1
 --   mutual (...) in b     a group of functions that call each other, as in L1: one fix, dispatched by a tag
 --   if c t e              ite; only the branch taken runs
 --   match e { ... }       the scrutinee is bound, and each arm tests its constructor's tag: tagof, then payload

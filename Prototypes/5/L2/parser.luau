@@ -10,6 +10,8 @@
 --
 -- Newlines are whitespace, except inside a match block, where a newline ends an arm body. Inside parentheses and brackets newlines are whitespace again. Items of a list are atoms, so a call inside a list needs parentheses.
 --
+-- A let or letrec has no keyword between its value and its body. The value ends at the end of its line, and the body starts on the next line. A mutual group still uses in.
+--
 -- The surface tree is the types below. The rawfix form is never written in source: the desugarer makes it for a mutual group.
 --
 --   Parser.parse(text): Program    raises an error, with the line and column, if the text is not a program
@@ -387,8 +389,24 @@ local function parse(
 		end
 
 		expectSym("=")
+
+		-- Inside a match arm a newline ends the arm, so a let there would have no body to read. It needs parentheses.
+		if sig then
+			fail(start, "a let in a match arm needs parentheses around it")
+		end
+
+		-- The value ends at the end of its line, so a longer value is wrapped in parentheses. The body is on the next line.
+		sig = true
 		const value = parseExpr()
-		expectSym("in")
+		sig = false
+
+		if toks[pos].kind ~= "NL" then
+			fail(toks[pos], "a let value ends at the end of its line; wrap a longer value in parentheses")
+		end
+
+		while toks[pos].kind == "NL" do
+			pos += 1
+		end
 
 		return {
 			k = "let",

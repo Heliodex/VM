@@ -3,7 +3,7 @@ Sums a list of integers. A list is a chain of pairs ending in nil, and (@ l) is 
 
 ---
 letrec total = fn l (if (= (@ l) 1) 0 (+ (head l) (total (tail l))))
-in total
+total
 ---
 ~ => 0 fuel 100000
 [1 2 3] => 6 fuel 100000

@@ -64,12 +64,12 @@ const MALFORMED: { { name: string, text: string, reason: string } } = {
 	},
 	{
 		name = "a ? in a non-tail if branch",
-		text = "h\n---\n---\nfn s (let v = (if s (Err 1)? (Ok 2)) in v)\n---\n1 => 1 fuel 10\n",
+		text = "h\n---\n---\nfn s (let v = (if s (Err 1)? (Ok 2))\nv)\n---\n1 => 1 fuel 10\n",
 		reason = "expected a value here",
 	},
 	{
 		name = "a ? in a let value that is not the function's result",
-		text = "h\n---\n---\nfn s (g (let v = s in v?))\n---\n1 => 1 fuel 10\n",
+		text = "h\n---\n---\nfn s (g (let v = s\nv?))\n---\n1 => 1 fuel 10\n",
 		reason = "? can only be used where it runs whenever its function does",
 	},
 	{
@@ -84,17 +84,27 @@ const MALFORMED: { { name: string, text: string, reason: string } } = {
 	},
 	{
 		name = "a constructor bound as a name",
-		text = "h\n---\n---\nlet Ok = 1 in Ok\n---\n1 => 1 fuel 10\n",
+		text = "h\n---\n---\nlet Ok = 1\nOk\n---\n1 => 1 fuel 10\n",
 		reason = "Ok cannot be bound by let",
 	},
 	{
 		name = "a primitive bound as a name",
-		text = "h\n---\n---\nlet + = 1 in +\n---\n1 => 1 fuel 10\n",
+		text = "h\n---\n---\nlet + = 1\n+\n---\n1 => 1 fuel 10\n",
 		reason = "is a primitive, and cannot be bound",
 	},
 	{
+		name = "a let that still has in",
+		text = "h\n---\n---\nlet x = 1 in x\n---\n1 => 1 fuel 10\n",
+		reason = "a let value ends at the end of its line",
+	},
+	{
+		name = "a let inside a match arm",
+		text = "h\n---\n---\nfn r match r {\n\tOk v -> let y = v\n\ty\n}\n---\n1 => 1 fuel 10\n",
+		reason = "needs parentheses around it",
+	},
+	{
 		name = "a letrec that does not bind a fn",
-		text = "h\n---\n---\nletrec x = 1 in x\n---\n1 => 1 fuel 10\n",
+		text = "h\n---\n---\nletrec x = 1\nx\n---\n1 => 1 fuel 10\n",
 		reason = "letrec binds a fn",
 	},
 	{
