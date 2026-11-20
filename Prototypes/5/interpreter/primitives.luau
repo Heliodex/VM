@@ -1,9 +1,9 @@
 --!strict
 -- THE PRIMITIVES
 --
--- The primitives are the operations on integers, and kind, which works on any value. Each one is written here once, in a row that gives its tag, its name, the symbol that writes it in the reader's language, its arity and, for a binary one, its operation. The machine, the reader, the printer and the quoted form in code.luau all read this table, so a primitive is added or reordered in one place.
+-- The primitives are the operations on integers, kind, which works on any value, and raise, which ends the run with a message. Each one is written here once, in a row that gives its tag, its name, the symbol that writes it in the reader's language, its arity and, for a binary one, its operation. The machine, the reader, the printer and the quoted form in code.luau all read this table, so a primitive is added or reordered in one place.
 --
--- A binary operation takes two integers and gives an integer, or nil and a message for a failure, such as dividing by zero. kind is unary, and the machine computes it, since it works on any value.
+-- A binary operation takes two integers and gives an integer, or nil and a message for a failure, such as dividing by zero. kind and raise are unary, and the machine computes them, since they work on any value: raise takes a string, a list of bytes, and fails with it.
 --
 --   Primitives.TAG.add == 11                  the tag of a primitive, by its name
 --   Primitives.BY_TAG[11].symbol == "+"       the row for a tag
@@ -147,6 +147,13 @@ const ROWS: { Primitive } = {
 		tag = 18,
 		name = "kind",
 		symbol = "@",
+		arity = 1,
+		operation = nil,
+	},
+	{
+		tag = 19,
+		name = "raise",
+		symbol = "!",
 		arity = 1,
 		operation = nil,
 	},

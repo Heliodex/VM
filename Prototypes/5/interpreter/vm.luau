@@ -82,13 +82,9 @@ type Frame =
 	| { k: "update", pin: Pin }
 	| { k: "binary", tag: number, b: Expr, env: Binding? }
 	| { k: "second", tag: number, first: Value }
-	| { k: "kind" }
+	| { k: "unary", tag: number }
 
--- The frame for kind, which has no fields, so one table serves every use.
 const Primitives = require "./primitives"
-const KIND_FRAME = ({
-	k = "kind",
-} :: Frame)
 
 const NIL: Nil = {
 	kind = "nil",
@@ -162,6 +158,31 @@ const function binary(
 	end
 
 	return value
+end
+
+-- The text a raise carries: a list of bytes. A value that is not text gives a fixed message, so the failure still says something.
+const function textOf(
+	v: Value
+): string
+	local bytes: { string } = {}
+	local cur: Value = v
+
+	while type(cur) == "table" and cur.kind == "cell" do
+		const h = cur.head
+
+		if type(h) ~= "number" or h < 0 or h > 255 or math.floor(h) ~= h then
+			return "raised with a value that is not text"
+		end
+
+		table.insert(bytes, string.char(h))
+		cur = cur.tail
+	end
+
+	if cur ~= NIL then
+		return "raised with a value that is not text"
+	end
+
+	return table.concat(bytes)
 end
 
 -- The kind of a value: 0 integer, 1 nil, 2 cell, 3 function, 4 pin.
@@ -300,7 +321,10 @@ const function run(
 				else
 					-- The only expression left is a primitive.
 					if expr.b == nil then
-						push(KIND_FRAME)
+						push({
+							k = "unary",
+							tag = expr.tag,
+						} :: Frame)
 					else
 						push {
 							k = "binary",
@@ -452,7 +476,11 @@ const function run(
 				elseif frame.k == "second" then
 					value = binary(frame.tag, frame.first, value)
 				else
-					-- The only frame left is kind.
+					-- The only frame left is a unary primitive.
+					if frame.tag == Primitives.TAG.raise then
+						fail(textOf(value))
+					end
+
 					value = kindOf(value)
 				end
 			end
