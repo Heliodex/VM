@@ -251,6 +251,24 @@ A quoted program, or a program decoded from binary, is untyped. Evaluating it gi
 
 So a program can run untyped code, and the types it has are kept at the boundary by a check that is part of the surface language's compiled form, not the machine.
 
+### 13.5.1 Tags at run time
+
+Only constructors carry a tag of their own. Every other value's kind comes from its representation, so the static types need no extra tag at run time.
+
+| Type | Kind | Extra tag | Dyn check |
+|---|---|---|---|
+| `Int` | 0, a number | none | the value is an integer in range |
+| `Nil` | 1, nil | none | the value is `~` |
+| `(a . b)` | 2, a pair | none | kind 2, then check `a` and `b` |
+| `[a]` | 2, a chain of pairs | none | kind 2 or nil, then check each item |
+| `a -> b` | 3, a function | none | kind 3; arity is not checked |
+| `Pin a` | 4, a pin | none | kind 4 |
+| a declared sum | 5, a constructor | the constructor's tag, from 0 up | kind 5, the tag belongs to this sum, then check the payload |
+
+Tags are numbered per declaration, so the same number can mean different constructors in different sums. The expected type says which tags are valid, so a `Dyn` value is only checked against the sum it is being used as.
+
+The payload check is deep: a `Dyn` value used as `Result Int Str` checks the payload as well as the tag. This keeps the guarantee, at the cost of a step per item for a long list. A value that passes a check is known to have the right shape. Its meaning comes from the static types around it, not from anything stored with it.
+
 ### 13.6 What is not checked
 
 - Machine failures (a wrong-kind `head`, a divide by zero) are not types. They end the run, as in L1.
