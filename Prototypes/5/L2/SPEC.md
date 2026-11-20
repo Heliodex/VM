@@ -18,7 +18,8 @@ Non-goals for now: a module system beyond imports, effects, a foreign-function i
 
 Tokens, separated by whitespace or by delimiters:
 
-- Integers: optional `-`, then digits. Range as in L1, from -(2^53 - 1) to 2^53 - 1.
+- Integers: a `-` immediately followed by digits is part of the integer, so `-5` is a literal. `- 5`, with a space, is the symbol `-` applied to 5. Range as in L1, from -(2^53 - 1) to 2^53 - 1.
+- A token that starts with a digit, or with `-` and a digit, must be a whole integer. So `1-2` is a lexical error. Names such as `x-1` are single symbols.
 - Strings: `"..."` with the escapes `\"`, `\\`, `\n`, `\t`, `\0`. A string is a list of bytes (see section 5).
 - Symbols (names and operators): a maximal run of characters that are not whitespace, `(`, `)`, `[`, `]`, `{`, `}`, `"`, or `;`. A symbol cannot start with a digit.
 - Comments: `;` to the end of the line.
@@ -213,6 +214,23 @@ t ::= Int                 an integer
 A list of `t` has type `[t]`, a built-in recursive type. Its values are the pair chains of section 5, so `[t]` is `(t . [t])` or `Nil`. A list literal `[a b c]` has type `[t]` when each item has type `t`.
 
 ### 13.2 Inference
+
+The checker is unification with mutable type variables, following Algorithm W. Each variable records the nesting depth at which it was created, and a `let` or `letrec` generalises the variables created deeper than its own level. Unification has the usual occurs check.
+
+The checker runs on the desugared tree, with each node given an identifier. It reports a type error by the identifier of the node.
+
+The constructs:
+
+- `fn` makes an arrow type.
+- `letrec` binds its name before checking its body, and generalises afterwards.
+- `mutual` checks its group together and generalises the group after.
+- `if` needs an `Int` condition, and its branches must have the same type.
+- `match` checks each pattern against the scrutinee's sum, requires the arms to have one type, and checks coverage: the arms' constructors must be the sum's constructors, or a catch-all arm must be present. Arms after a catch-all are reported as unreachable.
+
+For `Dyn` (section 13.5), unifying `Dyn` with a concrete type succeeds, and the checker records a check node at that position in the output. Unifying `Dyn` with an unbound variable binds the variable to `Dyn`.
+
+The output is the same tree with the check nodes inserted, and the desugarer takes that tree.
+
 
 Types are inferred with Hindley–Milner: unification, with let-polymorphism for `let` and `letrec` bindings. A function's type is generalised at its `let` or `letrec`, so `fn x x` is `a -> a` and can be used at two types.
 
