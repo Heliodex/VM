@@ -93,20 +93,22 @@ const NIL: Nil = {
 -- The largest magnitude an integer may have: 2^53 - 1. Below 2^53 every integer is exact as a double, so a result at or past 2^53 may already have rounded (2^53 - 1 plus 1 gives 2^53 exactly), and it is an error rather than a wrong answer.
 const MAX_INTEGER = 9007199254740991
 
-const function fail(
-	message: string
-): never
-	error(
-		{
-			vmError = message,
-		}, 0
-	)
+-- A failure ends the run with an error outcome. It is returned, not thrown, so the loop returns it like any other outcome.
+const function failed(
+	message: string,
+	steps: number
+): Outcome
+	return {
+		status = "error",
+		message = message,
+		steps = steps,
+	}
 end
 
 const function lookup(
 	env: Binding?,
 	index: number
-): Value
+): Value?
 	local e = env
 	local i = index
 
@@ -119,45 +121,45 @@ const function lookup(
 		e = e.rest
 	end
 
-	return fail("no variable at index " .. index)
+	return nil
 end
 
 const function binary(
 	tag: number,
 	a: Value,
 	b: Value
-): number
+): (number?, string?)
 	const row = Primitives.BY_TAG[tag]
 
 	if row == nil or row.operation == nil then
-		return fail("unknown operation " .. tostring(tag))
+		return nil, "unknown operation " .. tostring(tag)
 	end
 
 	const name = row.name
 
 	if type(a) ~= "number" or type(b) ~= "number" then
-		return fail(name .. " needs integers")
+		return nil, name .. " needs integers"
 	end
 
 	const operation = row.operation :: (number, number) -> (number?, string?)
 	const result, message = operation(a, b)
 
 	if message ~= nil then
-		return fail(message)
+		return nil, message
 	end
 
 	const value = result :: number
 
 	if value > MAX_INTEGER or value < -MAX_INTEGER then
-		return fail(name .. " result is out of range")
+		return nil, name .. " result is out of range"
 	end
 
 	-- Zero is written as 0, not -0, so that it prints the same way whatever produced it.
 	if value == 0 then
-		return 0
+		return 0, nil
 	end
 
-	return value
+	return value, nil
 end
 
 -- The text a raise carries: a list of bytes. A value that is not text gives a fixed message, so the failure still says something.
@@ -252,7 +254,13 @@ const function run(
 					value = expr.value
 					returning = true
 				elseif expr.op == "var" then
-					value = lookup(env, expr.index)
+					const found = lookup(env, expr.index)
+
+					if found == nil then
+						return failed("no variable at index " .. expr.index, steps)
+					end
+
+					value = found
 					returning = true
 				elseif expr.op == "lam" then
 					value = {
@@ -366,29 +374,29 @@ const function run(
 					}
 				elseif frame.k == "index" then
 					-- The steps of the address, low bit first. The low bit is the last step, so the steps are applied from the high end.
-					local steps: { number } = {}
+					local path: { number } = {}
 					local n = frame.n
 
 					while n > 1 do
-						table.insert(steps, n % 2)
+						table.insert(path, n % 2)
 						n = math.floor(n / 2)
 					end
 
-					for i = #steps, 1, -1 do
+					for i = #path, 1, -1 do
 						if type(value) ~= "table" or value.kind ~= "cell" then
-							local side = if steps[i] == 0 then "head" else "tail"
-							return fail(side .. " of a non-cell")
+							local side = if path[i] == 0 then "head" else "tail"
+							return failed(side .. " of a non-cell", steps)
 						end
 
 						value =
-							if steps[i] == 0 then
+							if path[i] == 0 then
 								value.head
 							else
 								value.tail
 					end
 				elseif frame.k == "if" then
 					if type(value) ~= "number" then
-						return fail "if needs an integer condition"
+						return failed("if needs an integer condition", steps)
 					end
 
 					expr =
@@ -400,7 +408,7 @@ const function run(
 					returning = false
 				elseif frame.k == "apply" then
 					if type(value) ~= "table" or value.kind ~= "closure" then
-						return fail "applying a non-function"
+						return failed("applying a non-function", steps)
 					end
 
 					push {
@@ -433,13 +441,13 @@ const function run(
 							-1
 				elseif frame.k == "payload" then
 					if type(value) ~= "table" or value.kind ~= "con" then
-						return fail "a payload of a non-constructor"
+						return failed("a payload of a non-constructor", steps)
 					end
 
 					value = value.payload
 				elseif frame.k == "force" then
 					if type(value) ~= "table" or value.kind ~= "pin" then
-						return fail "forcing a non-pin"
+						return failed("forcing a non-pin", steps)
 					end
 
 					const result = value.result
@@ -448,7 +456,7 @@ const function run(
 						value = result
 					else
 						if value.busy then
-							return fail "a pin forced itself"
+							return failed("a pin forced itself", steps)
 						end
 
 						const pin: Pin = value
@@ -474,11 +482,17 @@ const function run(
 					env = frame.env
 					returning = false
 				elseif frame.k == "second" then
-					value = binary(frame.tag, frame.first, value)
+					const result, message = binary(frame.tag, frame.first, value)
+
+					if message ~= nil then
+						return failed(message, steps)
+					end
+
+					value = result :: number
 				else
 					-- The only frame left is a unary primitive.
 					if frame.tag == Primitives.TAG.raise then
-						fail(textOf(value))
+						return failed(textOf(value), steps)
 					end
 
 					value = kindOf(value)
@@ -487,26 +501,7 @@ const function run(
 		end
 	end
 
-	-- fail raises a table with a vmError field. Anything else is a bug in the machine, so it is passed on unchanged.
-	const ok, result: unknown = pcall(loop)
-
-	if ok then
-		return result :: Outcome
-	end
-
-	if type(result) == "table" then
-		const failure = result :: { vmError: string? }
-
-		if failure.vmError ~= nil then
-			return {
-				status = "error",
-				message = failure.vmError,
-				steps = steps,
-			}
-		end
-	end
-
-	error(result, 0)
+	return loop()
 end
 
 -- Prints a value the way the examples write expected results: integers as numbers, lists as (1 2 3), improper pairs as (1 . 2).
