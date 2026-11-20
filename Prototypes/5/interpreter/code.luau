@@ -5,14 +5,25 @@
 --
 -- A program is quoted as a pair [tag args], where tag is an integer for the form and args is a proper list of its parts:
 --
---   0 quote, args (value), a value that is an integer or nil   2 var, args (index)
---   3 lam, args (body)              4 pin, args (e)          5 cell, args (head tail)
---   6 index, args (n e), an address n from 2 up, see vm.luau   8 force, args (e)
---   1 and 7 are not forms: their tags are unused
---   9 if, args (c t e)             10 apply, args (f arg)
---  11 +, args (a b)               12 -, args (a b)         13 mul, args (a b)
---  14 div, args (a b)             15 mod, args (a b)
---  16 <, args (a b)               17 =, args (a b)         18 kind, args (a)
+--   0 quote, args (value), a value that is an integer or nil
+--   1 unused
+--   2 var, args (index)
+--   3 lam, args (body)
+--   4 pin, args (e)
+--   5 cell, args (head tail)
+--   6 index, args (n e), an address n from 2 up, see vm.luau
+--   7 unused
+--   8 force, args (e)
+--   9 if, args (c t e)
+--  10 apply, args (f arg)
+--  11 add, args (a b)
+--  12 sub, args (a b)
+--  13 mul, args (a b)
+--  14 div, args (a b)
+--  15 mod, args (a b)
+--  16 lt, args (a b)
+--  17 eq, args (a b)
+--  18 kind, args (a)
 --
 -- toValue(e) quotes an expression. fromValue(v) reads a quoted program back, and checks it: a tag that is not known, or a list of the wrong length, is an error, so a program from outside cannot make the machine see a form it does not have. toExpr(v) gives an expression that evaluates to the data value v, which is what the self-interpreter quotes with.
 --
