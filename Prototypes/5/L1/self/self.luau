@@ -5,9 +5,10 @@
 --
 -- A program is quoted as a pair [tag args], where tag is an integer for the form and args is a list of its parts:
 --
---   0 quote, args (value)           1 nil, args ()           2 var, args (index)
+--   0 quote, args (value), a value that is an integer or nil   2 var, args (index)
 --   3 lam, args (body)              4 pin, args (e)          5 cell, args (head tail)
---   6 head, args (e)                7 tail, args (e)         8 force, args (e)
+--   6 index, args (n e), an address n from 2 up, see vm.luau   8 force, args (e)
+--   1 and 7 are not forms: their tags are unused
 --   9 if, args (c t e)             10 apply, args (f arg)
 --   11 +, args (a b)               12 -, args (a b)         13 mul, args (a b)
 --   14 div, args (a b)             15 mod, args (a b)
@@ -37,6 +38,9 @@ const function ev(sub: string): string
 	return `((rec {sub}) env)`
 end
 
+-- Walks an address n from 2 up through the value v: the low bit of n is the last step, so walk n v is the step for n mod 2 applied to walk (n div 2) v. A 0 is head and a 1 is tail.
+const WALK = "(fix (fn w (fn n (fn v (if (= n 1) v (let s ((w (div n 2)) v) (if (= (mod n 2) 0) (head s) (tail s))))))))"
+
 const A = "(head args)"
 const B = "(head (tail args))"
 const C = "(head (tail (tail args)))"
@@ -53,8 +57,7 @@ const function build(
 		[3] = `(fn v ((rec {A}) ({extend} v env)))`,
 		[4] = `(pin {ev(A)})`,
 		[5] = `[{ev(A)} {ev(B)}]`,
-		[6] = `(head {ev(A)})`,
-		[7] = `(tail {ev(A)})`,
+		[6] = `(({WALK} {A}) {ev(B)})`,
 		[8] = `(force {ev(A)})`,
 		[9] = `(if {ev(A)} {ev(B)} {ev(C)})`,
 		[10] = `({ev(A)} {ev(B)})`,

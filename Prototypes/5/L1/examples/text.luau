@@ -91,6 +91,10 @@ const examples: { Example } = {
 
 	-- Pairs and lists
 	value("head and tail", "(head (tail [1 [2 ~]]))", "2"),
+	value("a chain of heads is one address", "(head (head [[4 5] 6]))", "4"),
+	value("a head then a tail", "(tail (head [[4 5] 6]))", "5"),
+	value("a tail then a head", "(head (tail [1 [[7 8] 9]]))", "(7 . 8)"),
+	value("a long chain of tails", "(tail (tail (tail [1 2 3 4 ~])))", "(4)"),
 	value("a list", "(list 1 2 3)", "(1 2 3)"),
 	value("an improper pair", "[1 2]", "(1 . 2)"),
 	value("nested lists", "(list (list 1) (list 2 3))", "((1) (2 3))"),

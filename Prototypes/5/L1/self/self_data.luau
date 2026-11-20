@@ -19,6 +19,9 @@ local function ev(sub: string): string
 	return `((rec {sub}) env)`
 end
 
+-- Walks an address n from 2 up through the value v: the low bit of n is the last step, so walk n v is the step for n mod 2 applied to walk (n div 2) v. A 0 is head and a 1 is tail.
+const WALK = "(fix (fn w (fn n (fn v (if (= n 1) v (let s ((w (div n 2)) v) (if (= (mod n 2) 0) (head s) (tail s))))))))"
+
 const A = "(head args)"
 const B = "(head (tail args))"
 const C = "(head (tail (tail args)))"
@@ -30,8 +33,7 @@ const BRANCH: { [number]: string } = {
 	[3] = `[1 [{A} env]]`,
 	[4] = `(pin {ev(A)})`,
 	[5] = `[{ev(A)} {ev(B)}]`,
-	[6] = `(head {ev(A)})`,
-	[7] = `(tail {ev(A)})`,
+	[6] = `(({WALK} {A}) {ev(B)})`,
 	[8] = `(force {ev(A)})`,
 	[9] = `(if {ev(A)} {ev(B)} {ev(C)})`,
 	[10] = `((fn (f a) (if (= (head f) 1) ((rec (head (tail f))) [a (tail (tail f))]) (head ~))) {ev(A)} {ev(B)})`,

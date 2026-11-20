@@ -55,10 +55,23 @@ printAt = function(
 
 		table.insert(parts, printAt(cur, depth))
 		return "[" .. table.concat(parts, " ") .. "]"
-	elseif e.op == "head" then
-		return `(head {printAt(e.e, depth)})`
-	elseif e.op == "tail" then
-		return `(tail {printAt(e.e, depth)})`
+	elseif e.op == "index" then
+		-- The address is written as the steps that name it, innermost first, so that reading the text takes head and tail steps that the reader joins back into the same index.
+		local steps: { number } = {}
+		local n = e.n
+
+		while n > 1 do
+			table.insert(steps, n % 2)
+			n = math.floor(n / 2)
+		end
+
+		local text = printAt(e.e, depth)
+
+		for i = #steps, 1, -1 do
+			text = if steps[i] == 0 then `(head {text})` else `(tail {text})`
+		end
+
+		return text
 	elseif e.op == "force" then
 		return `(force {printAt(e.e, depth)})`
 	elseif e.op == "if" then

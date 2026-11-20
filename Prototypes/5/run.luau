@@ -95,6 +95,9 @@ const builderRejects: { [string]: () -> VM.Expr } = {
 	["an integer past the range"] = function()
 		return VM.int(9007199254740992)
 	end,
+	["an index below 2"] = function()
+		return VM.index(1, VM.int(1))
+	end,
 }
 
 for name, build in builderRejects do

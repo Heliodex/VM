@@ -5,9 +5,10 @@
 --
 -- A program is quoted as a pair [tag args], where tag is an integer for the form and args is a proper list of its parts:
 --
---   0 quote, args (value)           1 nil, args ()           2 var, args (index)
+--   0 quote, args (value), a value that is an integer or nil   2 var, args (index)
 --   3 lam, args (body)              4 pin, args (e)          5 cell, args (head tail)
---   6 head, args (e)                7 tail, args (e)         8 force, args (e)
+--   6 index, args (n e), an address n from 2 up, see vm.luau   8 force, args (e)
+--   1 and 7 are not forms: their tags are unused
 --   9 if, args (c t e)             10 apply, args (f arg)
 --  11 +, args (a b)               12 -, args (a b)         13 mul, args (a b)
 --  14 div, args (a b)             15 mod, args (a b)
@@ -67,10 +68,8 @@ toValue = function(
 		return node(4, { toValue(e.e) })
 	elseif e.op == "cell" then
 		return node(5, { toValue(e.head), toValue(e.tail) })
-	elseif e.op == "head" then
-		return node(6, { toValue(e.e) })
-	elseif e.op == "tail" then
-		return node(7, { toValue(e.e) })
+	elseif e.op == "index" then
+		return node(6, { e.n, toValue(e.e) })
 	elseif e.op == "force" then
 		return node(8, { toValue(e.e) })
 	elseif e.op == "if" then
@@ -165,9 +164,13 @@ fromValue = function(
 		const pair = items(parts, 2)
 		return M.cell(fromValue(pair[1]), fromValue(pair[2]))
 	elseif n == 6 then
-		return M.head(fromValue(items(parts, 1)[1]))
-	elseif n == 7 then
-		return M.tail(fromValue(items(parts, 1)[1]))
+		const pair = items(parts, 2)
+
+		if not isInteger(pair[1]) or (pair[1] :: number) < 2 then
+			error("an index is a whole number from 2 up", 0)
+		end
+
+		return M.index(pair[1] :: number, fromValue(pair[2]))
 	elseif n == 8 then
 		return M.force(fromValue(items(parts, 1)[1]))
 	elseif n == 9 then
@@ -178,6 +181,10 @@ fromValue = function(
 		return M.app(fromValue(pair[1]), fromValue(pair[2]))
 	elseif n == 18 then
 		return M.prim(Primitives.TAG.kind, fromValue(items(parts, 1)[1]))
+	end
+
+	if Primitives.BY_TAG[n] == nil then
+		error(`a program has no form with tag {tostring(n)}`, 0)
 	end
 
 	const pair = items(parts, 2)

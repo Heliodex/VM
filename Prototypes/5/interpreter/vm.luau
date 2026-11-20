@@ -19,8 +19,7 @@ export type Expr =
 	| LamExpr
 	| PinExpr
 	| CellExpr
-	| HeadExpr
-	| TailExpr
+	| IndexExpr
 	| ForceExpr
 	| IfExpr
 	| ApplyExpr
@@ -33,8 +32,8 @@ export type VarExpr = { op: "var", index: number }
 export type LamExpr = { op: "lam", body: Expr }
 export type PinExpr = { op: "pin", e: Expr }
 export type CellExpr = { op: "cell", head: Expr, tail: Expr }
-export type HeadExpr = { op: "head", e: Expr }
-export type TailExpr = { op: "tail", e: Expr }
+-- The part of e that an address names. n is at least 2: its binary digits after the leading 1 are the steps, from the first step to the last, with 0 for head and 1 for tail. So 2 is head, 3 is tail, 4 is head of head, and 5 is tail of head.
+export type IndexExpr = { op: "index", n: number, e: Expr }
 export type ForceExpr = { op: "force", e: Expr }
 export type IfExpr = { op: "if", c: Expr, t: Expr, e: Expr }
 export type ApplyExpr = { op: "apply", f: Expr, arg: Expr }
@@ -64,7 +63,8 @@ export type Outcome =
 type Frame =
 	| { k: "cell", expr: Expr, env: Binding? }
 	| { k: "cellhead", head: Value }
-	| { k: "head" | "tail" | "force" }
+	| { k: "force" }
+	| { k: "index", n: number }
 	| { k: "if", t: Expr, e: Expr, env: Binding? }
 	| { k: "apply", arg: Expr, env: Binding? }
 	| { k: "argument", arg: Expr, env: Binding?, fn: Closure }
@@ -240,9 +240,15 @@ const function run(
 						env = env,
 					}
 					expr = expr.head
-				elseif expr.op == "head" or expr.op == "tail" or expr.op == "force" then
+				elseif expr.op == "force" then
 					push {
-						k = expr.op,
+						k = "force",
+					}
+					expr = expr.e
+				elseif expr.op == "index" then
+					push {
+						k = "index",
+						n = expr.n,
 					}
 					expr = expr.e
 				elseif expr.op == "if" then
@@ -303,16 +309,28 @@ const function run(
 						head = frame.head,
 						tail = value,
 					}
-				elseif frame.k == "head" or frame.k == "tail" then
-					if type(value) ~= "table" or value.kind ~= "cell" then
-						return fail(frame.k .. " of a non-cell")
+				elseif frame.k == "index" then
+					-- The steps of the address, low bit first. The low bit is the last step, so the steps are applied from the high end.
+					local steps: { number } = {}
+					local n = frame.n
+
+					while n > 1 do
+						table.insert(steps, n % 2)
+						n = math.floor(n / 2)
 					end
 
-					value =
-						if frame.k == "head" then
-							value.head
-						else
-							value.tail
+					for i = #steps, 1, -1 do
+						if type(value) ~= "table" or value.kind ~= "cell" then
+							local side = if steps[i] == 0 then "head" else "tail"
+							return fail(side .. " of a non-cell")
+						end
+
+						value =
+							if steps[i] == 0 then
+								value.head
+							else
+								value.tail
+					end
 				elseif frame.k == "if" then
 					if type(value) ~= "number" then
 						return fail "if needs an integer condition"
@@ -526,22 +544,44 @@ function M.cell(
 	}
 end
 
+-- The part of e that the address n names. See IndexExpr.
+function M.index(
+	n: number,
+	e: Expr
+): Expr
+	if n < 2 or n > MAX_INTEGER or n ~= math.floor(n) then
+		error(string.format("an index is a whole number from 2 up, not %s", tostring(n)), 0)
+	end
+
+	return {
+		op = "index",
+		n = n,
+		e = e,
+	}
+end
+
+-- The head (side 0) or tail (side 1) of e. The head or tail of an index is the same index with one more step, so a chain of them is one step, as long as the address stays in range.
+local function step(
+	side: number,
+	e: Expr
+): Expr
+	if e.op == "index" and e.n < 2 ^ 50 then
+		return M.index(2 * e.n + side, e.e)
+	end
+
+	return M.index(2 + side, e)
+end
+
 function M.head(
 	e: Expr
 ): Expr
-	return {
-		op = "head",
-		e = e,
-	}
+	return step(0, e)
 end
 
 function M.tail(
 	e: Expr
 ): Expr
-	return {
-		op = "tail",
-		e = e,
-	}
+	return step(1, e)
 end
 
 -- Evaluates t if c is nonzero, otherwise e. Only the branch taken is evaluated.
