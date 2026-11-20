@@ -80,7 +80,7 @@ Every value has a kind, which `@` reports (section 6). The kinds are:
 
 A string is a list of Int values, each from 0 to 255, so `"ab"` is `[97 98]`. nil is `~`.
 
-A constructor is written by its name, applied to its payload: `Ok 5`, `Err "x"`, and `None` for a constructor with no payload. The printer writes it the same way, so the text reads back to the same value. Its data form is a tag and a payload, `(tag . payload)`, in the binary format. The text form uses the name and not the number, because `(0 . 5)` read as text is an ordinary pair.
+A constructor is written by its name, applied to its payload: `Ok 5`, `Err "x"`, and `None` for a constructor with no payload. The printer writes it the same way, so the text reads back to the same value. Its data form is a tag and a payload. In the data text it is `con TAG PAYLOAD`, as in `con 0 5`, and in the binary format it is tag byte 4 followed by the tag and the payload. The data text uses the number, since it is interchange and not surface syntax, and `(0 . 5)` would read as an ordinary pair. Only the surface printer writes names.
 
 A list `[a b c]` is the pair chain `(a . (b . (c . ~)))`. A pair `(a . b)` is one pair cell, which is not a list unless `b` is a list. A list's items are whole expressions, so a pair inside a list needs parentheses: `[1 (2 . 3)]` is the list of 1 and the pair `(2 . 3)`. A dot inside brackets is a syntax error, so `[1 2 . 3]` is refused. An improper list is written as nested pairs, `(1 . (2 . 3))`. The printer writes a list with brackets and a pair with a dot, so the two forms never print the same way.
 
@@ -290,7 +290,7 @@ These were open, and are now settled:
 5. Layout: newlines separate `match` arms, a body continues only inside parentheses, indentation is deferred, `let` is non-recursive, `letrec` and `mutual` are for recursion (section 12).
 6. A dot inside brackets is a syntax error, and nested pairs are written with parentheses (section 5).
 7. Constructor text syntax: a capitalised name applied by juxtaposition, and a bare name for a constructor with no payload (section 5).
-8. Constructor data form: `(tag . payload)` in the binary format, and the name in text (section 5).
+8. Constructor data form: `con TAG PAYLOAD` in the data text and tag byte 4 in the binary format (section 5).
 9. Tag numbers: a user sum's constructors are numbered from 0 in declaration order, so `Ok` is 0 and `Err` is 1 (section 13.4). nil is `~`, and strings are lists of bytes (section 5).
 10. `Dyn` checks are inserted automatically during inference (section 13.5).
 11. Nullary constructors have payload `~`, and several fields are one pair (section 13.4).
