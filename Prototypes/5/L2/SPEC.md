@@ -229,7 +229,12 @@ A sum is declared once, with its constructors and their payload types:
 type Result a e = Ok a | Err e
 ```
 
-Each constructor has a tag, from 0 up, by declaration order, so `Ok` is 0 and `Err` is 1. `Ok v` has type `Result a e` when `v : a`. A `match` on a sum must cover every constructor, or have a wildcard arm (section 9.3). The arms' bodies must have the same type.
+Each constructor has a tag, from 0 up, by declaration order, so `Ok` is 0 and `Err` is 1.
+
+A constructor carries exactly one payload value. Two rules follow from that:
+
+- **No payload.** A constructor declared without a type has payload `~` (nil), and is written by its name alone. For example, `type Option a = None | Some a` gives `None` payload `~` and tag 0, and `Some a` tag 1.
+- **Several fields.** A constructor with several values takes one payload that is a pair, so `Point (1 . 2)` is a constructor whose payload is the pair. A tuple type is not needed, and the machine keeps one payload per constructor. `Ok v` has type `Result a e` when `v : a`. A `match` on a sum must cover every constructor, or have a wildcard arm (section 9.3). The arms' bodies must have the same type.
 
 The result of `?` on `Result a e` is `a`, and the enclosing function must return `Result b e`, with the same `e`.
 
