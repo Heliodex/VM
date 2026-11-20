@@ -460,18 +460,22 @@ const function run(
 	end
 
 	-- fail raises a table with a vmError field. Anything else is a bug in the machine, so it is passed on unchanged.
-	const ok, result: any = pcall(loop)
+	const ok, result: unknown = pcall(loop)
 
 	if ok then
-		return result
+		return result :: Outcome
 	end
 
-	if type(result) == "table" and result.vmError then
-		return {
-			status = "error",
-			message = result.vmError,
-			steps = steps,
-		}
+	if type(result) == "table" then
+		const failure = result :: { vmError: string? }
+
+		if failure.vmError ~= nil then
+			return {
+				status = "error",
+				message = failure.vmError,
+				steps = steps,
+			}
+		end
 	end
 
 	error(result, 0)
