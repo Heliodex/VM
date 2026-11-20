@@ -1,6 +1,6 @@
 # L2: specification draft
 
-Status: draft. Sections marked **open** need a decision or research before they are final.
+Status: draft. Every question in the draft is decided; section 14 records them.
 
 L2 is the next language on the machine in `interpreter/`. It keeps what L1 learned, changes the surface syntax, and adds tagged values. The reference implementation is written in Luau. L2 is bootstrapped in L2 only after its surface is stable.
 
@@ -67,17 +67,20 @@ Names are symbols that are not reserved (section 3.5). Names are lexically scope
 
 ## 5. Values
 
-Every value has a tag. **Open (section 8):** the tag representation and the tags themselves. The draft's working set:
+Every value has a kind, which `@` reports (section 6). The kinds are:
 
-| Tag     | Meaning                                   |
-|---------|-------------------------------------------|
-| Int     | an integer in range                       |
-| Nil     | the empty list, written `~`               |
-| Pair    | a cell with a head and a tail             |
-| Fn      | a function (closure)                      |
-| Pin     | a suspended expression (see section 7)    |
+| Kind | Value                                     |
+|------|-------------------------------------------|
+| 0    | Int: an integer in range                  |
+| 1    | Nil: the empty list, written `~`          |
+| 2    | Pair: a cell with a head and a tail       |
+| 3    | Fn: a function (closure)                  |
+| 4    | Pin: a suspended expression (section 7)   |
+| 5    | Con: a constructor, a tag and a payload (section 8) |
 
-A string is a list of Int values, each from 0 to 255, so `"ab"` is `[97 98]`.
+A string is a list of Int values, each from 0 to 255, so `"ab"` is `[97 98]`. nil is `~`.
+
+A constructor is written by its name, applied to its payload: `Ok 5`, `Err "x"`, and `None` for a constructor with no payload. The printer writes it the same way, so the text reads back to the same value. Its data form is a tag and a payload, `(tag . payload)`, in the binary format. The text form uses the name and not the number, because `(0 . 5)` read as text is an ordinary pair.
 
 A list `[a b c]` is the pair chain `(a . (b . (c . ~)))`. A pair `(a . b)` is one pair cell, which is not a list unless `b` is a list. A list's items are whole expressions, so a pair inside a list needs parentheses: `[1 (2 . 3)]` is the list of 1 and the pair `(2 . 3)`. A dot inside brackets is a syntax error, so `[1 2 . 3]` is refused. An improper list is written as nested pairs, `(1 . (2 . 3))`. The printer writes a list with brackets and a pair with a dot, so the two forms never print the same way.
 
@@ -93,7 +96,7 @@ Primitives are the functions the machine provides. They are written as names, wi
 
 ## 8. Tagged values and the layers
 
-**Decided: constructors are tagged in the machine.** Integers, nil, pairs, functions and pins keep their representations, and their kind is the same as in L1 (`@` gives 0 to 4). A constructor is a new value kind, 5, with a tag and a payload. Only user sums and `Ok`/`Err` are constructors, so an integer costs nothing extra, and a constructor cannot be mistaken for a pair.
+Constructors are tagged in the machine. Integers, nil, pairs, functions and pins keep their representations, and their kinds are as in L1. A constructor is a value of kind 5, with a tag and a payload. An integer costs nothing extra, and a constructor cannot be mistaken for a pair.
 
 The machine has three expressions for constructors:
 
@@ -101,13 +104,13 @@ The machine has three expressions for constructors:
 - `tagof e`: the tag of a constructor, or -1 for any other value. It never fails, so it is the test in a `match`.
 - `payload e`: the payload of a constructor. It is an error for any other value, so it is only used after a `tagof` test.
 
-A constructor is not data yet: a program that returns one is `not_data`, as a function is. A text form for printing and reading constructors is part of the L2 surface, not L1.
+The raw opcodes and the machine's kind checks are as before. The surface language uses these expressions directly, so no untagging layer is needed.
 
-The layer above, in the surface language, untags and retags for the library functions as before. The raw opcodes take untagged values, and the machine's own kind checks stay.
+A constructor is not data until the data form in section 5 is implemented, so a program that returns one is `not_data` for now.
 
 ## 9. Results and errors
 
-**Open: research needed.** The current convention is `[0 value]` for success and `[1 message]` for failure, applied by hand. Candidates:
+**Decided** (see `L2/RESULTS.md`). The L1 convention `[0 value]` and `[1 message]`, applied by hand, becomes the built-in sum `Result`. The candidates the memo weighed were:
 
 - Tagged sum types with `match`, as in OCaml and Rust enums.
 - A `?` operator that returns early on a failure, as in Rust.
@@ -152,12 +155,13 @@ The machine's dispatch is two expressions, `tagof` and `payload` (section 8). A 
 
 ## 10. Machine changes
 
-Changes to the machine that L2 needs, listed separately so they can be reviewed on their own:
+The machine changes made for L2, each in its own commit:
 
-- Tagged values, if section 8 puts the tag in the machine.
-- Anything that the results design (section 9) needs, such as early return.
+- Nil is `quote` of nil, so there is no nil expression.
+- `head` and `tail` are one `index` expression, an address from 2 up.
+- Constructors: a value kind 5 with a tag and a payload, and the expressions `construct`, `tagof` and `payload`.
 
-Expressions that L1 already has stay: `quote`, `var`, `lam`, `pin`, `cell`, `index`, `force`, `if`, `apply`, `prim`.
+Early return needs no machine change: `?` is a rewrite (section 9.2). The expressions that L1 already has stay: `quote`, `var`, `lam`, `pin`, `cell`, `index`, `force`, `if`, `apply`, `prim`, and the three constructor expressions.
 
 ## 11. Compilation and tests
 
@@ -242,7 +246,7 @@ The result of `?` on `Result a e` is `a`, and the enclosing function must return
 
 A quoted program, or a program decoded from binary, is untyped. Evaluating it gives a value of type `Dyn`.
 
-- A `Dyn` value used where a specific type is needed must pass a run-time check: an `Int` must be an integer, a pair must be a pair, and a constructor must have the declared tag. A failed check is an error, as a machine failure is.
+- Inference inserts the check automatically, with no annotation, wherever a `Dyn` value meets a specific type. A `Dyn` value used where a specific type is needed passes a run-time check: an `Int` must be an integer, a pair must be a pair, and a constructor must have the declared tag. A failed check is an error, as a machine failure is.
 - A typed value passed into untyped code is not checked, and it is still a valid value of its type.
 
 So a program can run untyped code, and the types it has are kept at the boundary by a check that is part of the surface language's compiled form, not the machine.
@@ -257,11 +261,20 @@ So a program can run untyped code, and the types it has are kept at the boundary
 
 The L2 compiler written in L2 is checked as a surface program, so it is typed. Its output, the quoted form, is untyped, which is the same situation as any other quoted code.
 
-## 14. Open questions
+## 14. Decided questions
 
-Decided: a dot inside brackets is a syntax error, so a pair in a list is written with parentheses, `[1 (2 . 3)]`, and an improper list is nested pairs (section 5); prefix application only, with no infix sugar for now (3.3); tags for constructors in the machine (section 8); the results model (section 9); the dispatch expressions (section 9.4); layout and binding (section 11), with `letrec` for recursion, newlines separating arms, and indentation deferred.
+These were open, and are now settled:
 
-1. The text syntax for constructors: how `Ok v` and `Err e` are written and printed.
-2. Data form for constructors, so a constructor can be an output of a program.
-3. Exact tag numbers for user sums, and the representation of nil and strings.
-4. Whether `Dyn` checks should be inserted automatically, or only where a `Dyn` value is written with an explicit annotation.
+1. Prefix application only, with no infix sugar for now (3.3).
+2. Constructors are tagged in the machine (section 8).
+3. The results model is a built-in sum `Result`, with `?` and `match` (section 9).
+4. The dispatch expressions are `tagof` and `payload` (section 9.4).
+5. Layout: newlines separate `match` arms, a body continues only inside parentheses, indentation is deferred, `let` is non-recursive, `letrec` and `mutual` are for recursion (section 12).
+6. A dot inside brackets is a syntax error, and nested pairs are written with parentheses (section 5).
+7. Constructor text syntax: a capitalised name applied by juxtaposition, and a bare name for a constructor with no payload (section 5).
+8. Constructor data form: `(tag . payload)` in the binary format, and the name in text (section 5).
+9. Tag numbers: a user sum's constructors are numbered from 0 in declaration order, so `Ok` is 0 and `Err` is 1 (section 13.4). nil is `~`, and strings are lists of bytes (section 5).
+10. `Dyn` checks are inserted automatically during inference (section 13.5).
+11. Nullary constructors have payload `~`, and several fields are one pair (section 13.4).
+
+Nothing is open in the draft. The remaining work is implementation: the L2 reader, the type checker, and the constructor data form.
