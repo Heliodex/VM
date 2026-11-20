@@ -21,9 +21,11 @@
 
 const M = require "../interpreter/vm"
 
+export type TokenValue = string | number | { number } | nil
+
 export type Token = {
 	kind: string,
-	value: any,
+	value: TokenValue,
 	line: number,
 	col: number,
 	spaced: boolean,
@@ -77,7 +79,7 @@ const function tokenize(
 
 	local function push(
 		kind: string,
-		value: any,
+		value: TokenValue,
 		pos: number
 	)
 		table.insert(tokens, {

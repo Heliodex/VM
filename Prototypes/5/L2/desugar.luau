@@ -1,7 +1,7 @@
 --!strict
 -- THE L2 DESUGARER
 --
--- Turns a surface tree (parser.luau) into the machine's expressions (interpreter/vm.luau). There are no types here: the checker is a later stage, and it will run before this one.
+-- Turns a surface tree (parser.luau) into the machine's expressions (interpreter/vm.luau). There is no type checking here: the checker is a later stage, and it will run before this one.
 --
 --   fn (x y) body         a function of x, then of y: lam, lam
 --   let x = e in b        a non-recursive binding: (lam b) applied to e
@@ -15,12 +15,22 @@
 --
 --   Desugar.desugarProgram(ast, importNames, ctors): VM.Expr
 --   Desugar.buildCtors(decls): { [string]: Ctor }
---   Desugar.wrapImports(expr, importNames, importExprs): VM.Expr
+--   Desugar.wrapImports(expr, importExprs): VM.Expr
 
 const M = require "../interpreter/vm"
 const Primitives = require "../interpreter/primitives"
+const Parser = require "./parser"
+
+type Expr = Parser.Expr
+type Arm = Parser.Arm
+type Pattern = Parser.Pattern
+type Pos = Parser.Pos
+type Binding = Parser.Binding
 
 export type Ctor = { tag: number, payload: boolean, sum: string }
+
+-- A ? expression pulled out of a function body, to be bound before the body runs.
+type Hoist = { name: string, expr: Expr, at: Pos }
 
 local counter = 0
 
@@ -43,9 +53,9 @@ local function fresh(): string
 end
 
 local function fail(
-	at: { line: number, col: number }?,
+	at: Pos?,
 	msg: string
-)
+): never
 	if at ~= nil then
 		error(string.format("line %d, column %d: %s", at.line, at.col, msg), 0)
 	end
@@ -62,7 +72,7 @@ end
 -- Checks a name that is about to be bound.
 local function checkBinder(
 	name: string,
-	at: any
+	at: Pos
 )
 	if isCapital(name) then
 		fail(at, string.format("%s is a constructor, and cannot be bound", name))
@@ -79,7 +89,7 @@ end
 
 -- The constructors of the built-in sum Result, and of every type declared in the program.
 local function buildCtors(
-	decls: { any }
+	decls: { Parser.TypeDecl }
 ): { [string]: Ctor }
 	local ctors: { [string]: Ctor } = {
 		Ok = { tag = 0, payload = true, sum = "Result" },
@@ -130,10 +140,39 @@ local function withNames(
 	return out
 end
 
+-- Constructors for the surface nodes the desugarer makes itself. Each has its return type, so every literal is checked against its node kind.
+local function nameE(name: string, at: Pos): Expr
+	return { k = "name", name = name, at = at }
+end
+
+local function intE(n: number, at: Pos): Expr
+	return { k = "int", n = n, at = at }
+end
+
+local function appE(f: Expr, args: { Expr }, at: Pos): Expr
+	return { k = "app", f = f, args = args, at = at }
+end
+
+local function fnE(names: { string }, body: Expr, at: Pos): Expr
+	return { k = "fn", names = names, body = body, at = at }
+end
+
+local function letE(name: string, value: Expr, body: Expr, at: Pos): Expr
+	return { k = "let", name = name, value = value, body = body, rec = false, at = at }
+end
+
+local function ifE(c: Expr, t: Expr, e: Expr, at: Pos): Expr
+	return { k = "if", c = c, t = t, e = e, at = at }
+end
+
+local function conPat(name: string, bind: string?, at: Pos): Pattern
+	return { k = "con", name = name, bind = bind, at = at }
+end
+
 -- EARLY RETURN
 
 -- Collects the ? expressions of a body in evaluation order, and returns the body with each one replaced by a name. mode is "fn" where the value is the function's result, "eager" where the expression runs whenever the function does but is not the result, and "none" where it runs only sometimes.
-local collect: (node: any, hoists: { any }, mode: string) -> any
+local collect: (node: Expr, hoists: { Hoist }, mode: string) -> Expr
 
 local function childMode(
 	mode: string
@@ -142,66 +181,61 @@ local function childMode(
 end
 
 local function wrapHoists(
-	body: any,
-	hoists: { any }
-): any
+	body: Expr,
+	hoists: { Hoist }
+): Expr
 	for i = #hoists, 1, -1 do
 		const h = hoists[i]
 		const errName = fresh()
-
-		body = {
-			k = "match",
-			scrut = h.expr,
-			arms = {
-				{
-					pat = { k = "con", name = "Ok", bind = h.name, at = h.at },
-					body = body,
-					at = h.at,
-				},
-				{
-					pat = { k = "con", name = "Err", bind = errName, at = h.at },
-					body = {
-						k = "app",
-						f = { k = "name", name = "Err", at = h.at },
-						args = { { k = "name", name = errName, at = h.at } },
-						at = h.at,
-					},
-					at = h.at,
-				},
-			},
-			at = h.at,
-		}
+		const errBody = appE(nameE("Err", h.at), { nameE(errName, h.at) }, h.at)
+		const okArm: Arm = { pat = conPat("Ok", h.name, h.at), body = body, at = h.at }
+		const errArm: Arm = { pat = conPat("Err", errName, h.at), body = errBody, at = h.at }
+		body = { k = "match", scrut = h.expr, arms = { okArm, errArm }, at = h.at }
 	end
 
 	return body
 end
 
 -- A branch of an if or a match. In a tail position it is a function of its own, so its ? expressions return from it. Elsewhere it may not contain one.
-local collectBranch: (node: any, mode: string) -> any
-local collectUnderBinding: (body: any, mode: string) -> any
+local collectBranch: (node: Expr, mode: string) -> Expr
+
+-- The body of a let or mutual, which sees the names it binds. In tail position its ? expressions wrap the body, inside the binding, so they can use the names. Elsewhere it may not contain one, since its early return would have to leave the let before the names exist.
+local collectUnderBinding: (body: Expr, mode: string) -> Expr
 
 collectBranch = function(
-	node: any,
+	node: Expr,
 	mode: string
-): any
+): Expr
 	if mode == "fn" then
-		local own: { any } = {}
+		local own: { Hoist } = {}
 		const out = collect(node, own, "fn")
 		return wrapHoists(out, own)
 	end
 
-	local none: { any } = {}
+	local none: { Hoist } = {}
 	return collect(node, none, "none")
 end
 
-collect = function(
-	node: any,
-	hoists: { any },
+collectUnderBinding = function(
+	body: Expr,
 	mode: string
-): any
-	const k = node.k
+): Expr
+	if mode == "fn" then
+		local own: { Hoist } = {}
+		const out = collect(body, own, "fn")
+		return wrapHoists(out, own)
+	end
 
-	if k == "try" then
+	local none: { Hoist } = {}
+	return collect(body, none, "none")
+end
+
+collect = function(
+	node: Expr,
+	hoists: { Hoist },
+	mode: string
+): Expr
+	if node.k == "try" then
 		if mode == "none" then
 			fail(node.at, "? can only be used where it runs whenever its function does, or in the tail of an if or match")
 		end
@@ -210,31 +244,31 @@ collect = function(
 		const name = fresh()
 		table.insert(hoists, { name = name, expr = inner, at = node.at })
 		return { k = "name", name = name, at = node.at }
-	elseif k == "app" then
+	elseif node.k == "app" then
 		const cm = childMode(mode)
-		local args: { any } = {}
+		local args: { Expr } = {}
 
 		for _, a in node.args do
 			table.insert(args, collect(a, hoists, cm))
 		end
 
 		return { k = "app", f = collect(node.f, hoists, cm), args = args, at = node.at }
-	elseif k == "list" then
-		local items: { any } = {}
+	elseif node.k == "list" then
+		local items: { Expr } = {}
 
 		for _, a in node.items do
 			table.insert(items, collect(a, hoists, childMode(mode)))
 		end
 
 		return { k = "list", items = items, at = node.at }
-	elseif k == "pair" then
+	elseif node.k == "pair" then
 		return {
 			k = "pair",
 			a = collect(node.a, hoists, childMode(mode)),
 			b = collect(node.b, hoists, childMode(mode)),
 			at = node.at,
 		}
-	elseif k == "let" then
+	elseif node.k == "let" then
 		return {
 			k = "let",
 			name = node.name,
@@ -243,9 +277,9 @@ collect = function(
 			rec = node.rec,
 			at = node.at,
 		}
-	elseif k == "mutual" then
+	elseif node.k == "mutual" then
 		return { k = "mutual", bindings = node.bindings, body = collectUnderBinding(node.body, mode), at = node.at }
-	elseif k == "if" then
+	elseif node.k == "if" then
 		return {
 			k = "if",
 			c = collect(node.c, hoists, childMode(mode)),
@@ -253,8 +287,8 @@ collect = function(
 			e = collectBranch(node.e, mode),
 			at = node.at,
 		}
-	elseif k == "match" then
-		local arms: { any } = {}
+	elseif node.k == "match" then
+		local arms: { Arm } = {}
 
 		for _, arm in node.arms do
 			table.insert(arms, { pat = arm.pat, body = collectBranch(arm.body, mode), at = arm.at })
@@ -272,26 +306,11 @@ collect = function(
 	return node
 end
 
--- The body of a let or mutual, which sees the names it binds. In tail position its ? expressions wrap the body, inside the binding, so they can use the names. Elsewhere it may not contain one, since its early return would have to leave the let before the names exist.
-collectUnderBinding = function(
-	body: any,
-	mode: string
-): any
-	if mode == "fn" then
-		local own: { any } = {}
-		const out = collect(body, own, "fn")
-		return wrapHoists(out, own)
-	end
-
-	local none: { any } = {}
-	return collect(body, none, "none")
-end
-
 -- The body of a function, or of the program: its own ? expressions, with the early returns around it.
 local function contextify(
-	body: any
-): any
-	local own: { any } = {}
+	body: Expr
+): Expr
+	local own: { Hoist } = {}
 	const out = collect(body, own, "fn")
 	return wrapHoists(out, own)
 end
@@ -300,12 +319,14 @@ end
 
 -- A mutual group, as a surface tree, in the way the L1 reader builds it: one fix over a dispatch on a tag, and each name a call through the group.
 local function mutualSurface(
-	node: any
-): any
-	local n = #node.bindings
+	bindings: { Binding },
+	body: Expr,
+	at: Pos
+): Expr
+	local n = #bindings
 	local names: { string } = {}
 
-	for _, b in node.bindings do
+	for _, b in bindings do
 		if b.value.k ~= "fn" then
 			fail(b.at, "mutual binds functions, so that they can call each other")
 		end
@@ -314,109 +335,49 @@ local function mutualSurface(
 		table.insert(names, b.name)
 	end
 
-	local function nameNode(
-		name: string
-	): any
-		return { k = "name", name = name, at = node.at }
-	end
-
+	-- member(g, j) is the j-th function of the group g, as a function of y: g j y.
 	local function member(
 		g: string,
 		j: number
-	): any
-		return {
-			k = "fn",
-			names = { " y" },
-			body = {
-				k = "app",
-				f = { k = "app", f = nameNode(g), args = { { k = "int", n = j, at = node.at } }, at = node.at },
-				args = { nameNode(" y") },
-				at = node.at,
-			},
-			at = node.at,
-		}
+	): Expr
+		return fnE({ " y" }, appE(appE(nameE(g, at), { intE(j, at) }, at), { nameE(" y", at) }, at), at)
 	end
 
+	-- branch(j) runs the j-th function, with every name of the group bound to its member.
 	local function branch(
 		j: number
-	): any
-		local body: any = {
-			k = "app",
-			f = node.bindings[j].value,
-			args = { nameNode(" x") },
-			at = node.at,
-		}
+	): Expr
+		local bodyE: Expr = appE(bindings[j].value, { nameE(" x", at) }, at)
 
 		for k = n, 1, -1 do
-			body = {
-				k = "let",
-				name = names[k],
-				value = member(" self", k - 1),
-				body = body,
-				rec = false,
-				at = node.at,
-			}
+			bodyE = letE(names[k], member(" self", k - 1), bodyE, at)
 		end
 
-		return body
+		return bodyE
 	end
 
 	local chain = branch(n)
 
 	for j = n - 1, 1, -1 do
-		chain = {
-			k = "if",
-			c = {
-				k = "app",
-				f = nameNode("="),
-				args = { nameNode(" tag"), { k = "int", n = j - 1, at = node.at } },
-				at = node.at,
-			},
-			t = branch(j),
-			e = chain,
-			at = node.at,
-		}
+		chain = ifE(appE(nameE("=", at), { nameE(" tag", at), intE(j - 1, at) }, at), branch(j), chain, at)
 	end
 
-	const dispatch = {
-		k = "fn",
-		names = { " self" },
-		body = {
-			k = "fn",
-			names = { " tag" },
-			body = { k = "fn", names = { " x" }, body = chain, at = node.at },
-			at = node.at,
-		},
-		at = node.at,
-	}
-
-	local body = node.body
+	const dispatch = fnE({ " self" }, fnE({ " tag" }, fnE({ " x" }, chain, at), at), at)
+	local groupBody = body
 
 	for k = n, 1, -1 do
-		body = {
-			k = "let",
-			name = names[k],
-			value = member(" group", k - 1),
-			body = body,
-			rec = false,
-			at = node.at,
-		}
+		groupBody = letE(names[k], member(" group", k - 1), groupBody, at)
 	end
 
-	return {
-		k = "let",
-		name = " group",
-		value = { k = "rawfix", value = dispatch, at = node.at },
-		body = body,
-		rec = false,
-		at = node.at,
-	}
+	const fixed: Expr = { k = "rawfix", value = dispatch, at = at }
+	return letE(" group", fixed, groupBody, at)
 end
 
 -- DESUGARING
 
-local desugar: (node: any, scope: { string }, ctors: { [string]: Ctor }) -> M.Expr
+local desugar: (node: Expr, scope: { string }, ctors: { [string]: Ctor }) -> M.Expr
 
+-- A string is a list of its bytes, as numbers.
 local function stringValue(
 	bytes: { number }
 ): M.Expr
@@ -430,11 +391,11 @@ local function stringValue(
 end
 
 local function resolveName(
-	node: any,
+	name: string,
+	at: Pos,
 	scope: { string },
 	ctors: { [string]: Ctor }
 ): M.Expr
-	const name = node.name
 	const found = indexOf(scope, name)
 
 	if found ~= nil then
@@ -467,18 +428,15 @@ local function resolveName(
 		return M.construct(c.tag, M.nilv())
 	end
 
-	fail(node.at, string.format("%s is not bound", name))
-	return M.nilv()
+	return fail(at, string.format("%s is not bound", name))
 end
 
 local function desugarApp(
-	node: any,
+	head: Expr,
+	args: { Expr },
 	scope: { string },
 	ctors: { [string]: Ctor }
 ): M.Expr
-	const head = node.f
-	const args = node.args
-
 	if head.k == "name" and indexOf(scope, head.name) == nil and UNARY[head.name] ~= nil and #args >= 1 then
 		local e = UNARY[head.name](desugar(args[1], scope, ctors))
 
@@ -539,7 +497,7 @@ local function desugarApp(
 end
 
 local function buildArms(
-	arms: { any },
+	arms: { Arm },
 	i: number,
 	scope: { string },
 	ctors: { [string]: Ctor }
@@ -552,13 +510,15 @@ local function buildArms(
 	const arm = arms[i]
 	const pat = arm.pat
 
-	if pat.k == "wild" or pat.k == "bind" then
+	if pat.k == "wild" then
 		if i < #arms then
 			fail(arms[i + 1].at, "an arm after a catch-all arm is unreachable")
 		end
 
-		if pat.k == "wild" then
-			return desugar(arm.body, scope, ctors)
+		return desugar(arm.body, scope, ctors)
+	elseif pat.k == "bind" then
+		if i < #arms then
+			fail(arms[i + 1].at, "an arm after a catch-all arm is unreachable")
 		end
 
 		checkBinder(pat.name, pat.at)
@@ -592,31 +552,30 @@ local function buildArms(
 end
 
 local function desugarMatch(
-	node: any,
+	scrut: Expr,
+	arms: { Arm },
 	scope: { string },
 	ctors: { [string]: Ctor }
 ): M.Expr
-	const s = desugar(node.scrut, scope, ctors)
+	const s = desugar(scrut, scope, ctors)
 	const inner = withNames(scope, { " scrut" })
-	return M.app(M.lam(buildArms(node.arms, 1, inner, ctors)), s)
+	return M.app(M.lam(buildArms(arms, 1, inner, ctors)), s)
 end
 
 desugar = function(
-	node: any,
+	node: Expr,
 	scope: { string },
 	ctors: { [string]: Ctor }
 ): M.Expr
-	const k = node.k
-
-	if k == "int" then
+	if node.k == "int" then
 		return M.int(node.n)
-	elseif k == "str" then
+	elseif node.k == "str" then
 		return stringValue(node.bytes)
-	elseif k == "nil" then
+	elseif node.k == "nil" then
 		return M.nilv()
-	elseif k == "name" then
-		return resolveName(node, scope, ctors)
-	elseif k == "list" then
+	elseif node.k == "name" then
+		return resolveName(node.name, node.at, scope, ctors)
+	elseif node.k == "list" then
 		local e = M.nilv()
 		local items: { M.Expr } = {}
 
@@ -629,11 +588,11 @@ desugar = function(
 		end
 
 		return e
-	elseif k == "pair" then
+	elseif node.k == "pair" then
 		return M.cell(desugar(node.a, scope, ctors), desugar(node.b, scope, ctors))
-	elseif k == "app" then
-		return desugarApp(node, scope, ctors)
-	elseif k == "fn" then
+	elseif node.k == "app" then
+		return desugarApp(node.f, node.args, scope, ctors)
+	elseif node.k == "fn" then
 		local names: { string } = {}
 
 		for _, name in node.names do
@@ -646,15 +605,14 @@ desugar = function(
 			table.insert(names, name)
 		end
 
-		const body = desugar(contextify(node.body), withNames(scope, names), ctors)
-		local e = body
+		local e = desugar(contextify(node.body), withNames(scope, names), ctors)
 
 		for _ = 1, #names do
 			e = M.lam(e)
 		end
 
 		return e
-	elseif k == "let" then
+	elseif node.k == "let" then
 		checkBinder(node.name, node.at)
 		const inner = withNames(scope, { node.name })
 
@@ -670,25 +628,23 @@ desugar = function(
 		end
 
 		return M.app(M.lam(desugar(node.body, inner, ctors)), desugar(node.value, scope, ctors))
-	elseif k == "mutual" then
-		return desugar(mutualSurface(node), scope, ctors)
-	elseif k == "rawfix" then
+	elseif node.k == "mutual" then
+		return desugar(mutualSurface(node.bindings, node.body, node.at), scope, ctors)
+	elseif node.k == "rawfix" then
 		return M.app(M.fix, desugar(node.value, scope, ctors))
-	elseif k == "if" then
+	elseif node.k == "if" then
 		return M.ite(desugar(node.c, scope, ctors), desugar(node.t, scope, ctors), desugar(node.e, scope, ctors))
-	elseif k == "match" then
-		return desugarMatch(node, scope, ctors)
-	elseif k == "try" then
-		fail(node.at, "? was not rewritten: it is in a place the early-return rule does not reach")
+	elseif node.k == "match" then
+		return desugarMatch(node.scrut, node.arms, scope, ctors)
 	end
 
-	fail(node.at, "unknown form in the tree")
-	return M.nilv()
+	-- A try was rewritten by collect, so one that reaches here sits where the early-return rule does not reach.
+	return fail(node.at, "? was not rewritten: it is in a place the early-return rule does not reach")
 end
 
 -- The program, as an expression with the names of its imports free in it. importNames is in the order the file lists them.
 local function desugarProgram(
-	ast: any,
+	ast: Parser.Program,
 	importNames: { string },
 	ctors: { [string]: Ctor }
 ): M.Expr
@@ -699,6 +655,21 @@ local function desugarProgram(
 	end
 
 	return desugar(contextify(ast.expr), scope, ctors)
+end
+
+-- An expression of a file, with the same imports in scope, as desugarProgram does for the program.
+local function desugarExpr(
+	ast: Expr,
+	importNames: { string },
+	ctors: { [string]: Ctor }
+): M.Expr
+	local scope: { string } = {}
+
+	for _, name in importNames do
+		table.insert(scope, 1, name)
+	end
+
+	return desugar(contextify(ast), scope, ctors)
 end
 
 -- Binds each import around the program. The imported programs are closed, so their expressions can be placed at the top.
@@ -717,19 +688,7 @@ end
 
 return {
 	desugarProgram = desugarProgram,
+	desugarExpr = desugarExpr,
 	buildCtors = buildCtors,
 	wrapImports = wrapImports,
-	desugarExpr = function(
-		ast: any,
-		importNames: { string },
-		ctors: { [string]: Ctor }
-	): M.Expr
-		local scope: { string } = {}
-
-		for _, name in importNames do
-			table.insert(scope, 1, name)
-		end
-
-		return desugar(contextify(ast), scope, ctors)
-	end,
 }

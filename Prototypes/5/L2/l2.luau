@@ -21,12 +21,12 @@ export type Compiled = {
 	expr: VM.Expr,
 	names: { string },
 	values: { VM.Expr },
-	ctors: { [string]: any },
+	ctors: { [string]: Desugar.Ctor },
 }
 
 -- An error from the parser or the desugarer counts lines from the start of the program section. This moves it to the line of the file.
 local function atFileLine(
-	err: any,
+	err: unknown,
 	firstLine: number
 ): string
 	const msg = tostring(err)
@@ -48,7 +48,7 @@ compileFile = function(
 	stack: { string }
 ): Compiled
 	const file = ProgramFile.parse(text)
-	local parsed: any
+	local parsed: Parser.Program? = nil
 
 	local ok, err = pcall(function()
 		parsed = Parser.parse(file.program)
@@ -58,7 +58,8 @@ compileFile = function(
 		error(atFileLine(err, file.programLine), 0)
 	end
 
-	const ctors = Desugar.buildCtors(parsed.decls)
+	const program = parsed :: Parser.Program
+	const ctors = Desugar.buildCtors(program.decls)
 	local names: { string } = {}
 	local values: { VM.Expr } = {}
 	const chain = table.clone(stack)
@@ -83,7 +84,7 @@ compileFile = function(
 	local expr: VM.Expr
 
 	ok, err = pcall(function()
-		expr = Desugar.wrapImports(Desugar.desugarProgram(parsed, names, ctors), values)
+		expr = Desugar.wrapImports(Desugar.desugarProgram(program, names, ctors), values)
 	end)
 
 	if not ok then
