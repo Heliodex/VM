@@ -79,7 +79,7 @@ Every value has a tag. **Open (section 8):** the tag representation and the tags
 
 A string is a list of Int values, each from 0 to 255, so `"ab"` is `[97 98]`.
 
-A list `[a b c]` is the pair chain `(a . (b . (c . ~)))`. A pair `(a . b)` is one pair cell, which is not a list unless `b` is a list. The printer writes a list with brackets and a pair with a dot, so the two forms never print the same way.
+A list `[a b c]` is the pair chain `(a . (b . (c . ~)))`. A pair `(a . b)` is one pair cell, which is not a list unless `b` is a list. A list's items are whole expressions, so a pair inside a list needs parentheses: `[1 (2 . 3)]` is the list of 1 and the pair `(2 . 3)`. A dot inside brackets is a syntax error, so `[1 2 . 3]` is refused. An improper list is written as nested pairs, `(1 . (2 . 3))`. The printer writes a list with brackets and a pair with a dot, so the two forms never print the same way.
 
 ## 6. Primitives
 
@@ -188,10 +188,9 @@ describe r = match r {
 
 ## 13. Open questions
 
-Decided: prefix application only, with no infix sugar for now (3.3); tags for constructors in the machine (section 8); the results model (section 9); the dispatch expressions (section 9.4); layout and binding (section 11), with `letrec` for recursion, newlines separating arms, and indentation deferred.
+Decided: a dot inside brackets is a syntax error, so a pair in a list is written with parentheses, `[1 (2 . 3)]`, and an improper list is nested pairs (section 5); prefix application only, with no infix sugar for now (3.3); tags for constructors in the machine (section 8); the results model (section 9); the dispatch expressions (section 9.4); layout and binding (section 11), with `letrec` for recursion, newlines separating arms, and indentation deferred.
 
 1. The text syntax for constructors: how `Ok v` and `Err e` are written and printed.
 4. How a user declares their own constructors and their tags. The examples assume `Ok` and `Err` are built in, with tags 0 and 1.
-5. The meaning of `[1 2 . 3]`, a list with an improper tail.
 2. Data form for constructors, so a constructor can be an output of a program.
 3. Exact tag numbers for `Ok` and `Err`, and the representation of nil and strings.
