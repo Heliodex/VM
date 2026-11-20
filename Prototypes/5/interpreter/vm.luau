@@ -15,7 +15,6 @@
 
 export type Expr =
 	| QuoteExpr
-	| NilExpr
 	| VarExpr
 	| LamExpr
 	| PinExpr
@@ -27,8 +26,8 @@ export type Expr =
 	| ApplyExpr
 	| PrimExpr
 
-export type QuoteExpr = { op: "quote", value: number }
-export type NilExpr = { op: "nil" }
+-- A quoted value is data: an integer, or nil. nil is quoted, so there is no expression for it of its own.
+export type QuoteExpr = { op: "quote", value: Value }
 -- index counts the binders between the variable and its binder, so 0 is the innermost.
 export type VarExpr = { op: "var", index: number }
 export type LamExpr = { op: "lam", body: Expr }
@@ -215,9 +214,6 @@ const function run(
 				-- Evaluate expr in env. Either finish with a value, or push a frame and move to a subexpression.
 				if expr.op == "quote" then
 					value = expr.value
-					returning = true
-				elseif expr.op == "nil" then
-					value = NIL
 					returning = true
 				elseif expr.op == "var" then
 					value = lookup(env, expr.index)
@@ -471,9 +467,11 @@ function M.int(
 	}
 end
 
+-- nil, as a quoted value.
 function M.nilv(): Expr
 	return {
-		op = "nil",
+		op = "quote",
+		value = NIL,
 	}
 end
 

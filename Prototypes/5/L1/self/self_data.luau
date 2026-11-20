@@ -26,7 +26,6 @@ const C = "(head (tail (tail args)))"
 -- The branch for each tag. Lam builds a function as data. Apply reads one out, checks its tag, and runs its body.
 const BRANCH: { [number]: string } = {
 	[0] = A,
-	[1] = "~",
 	[2] = `(({LOOKUP} {A}) env)`,
 	[3] = `[1 [{A} env]]`,
 	[4] = `(pin {ev(A)})`,
@@ -49,7 +48,9 @@ const BRANCH: { [number]: string } = {
 -- A chain of ifs on the tag, checking 0 first and falling through to the highest.
 local chain = BRANCH[18]
 for tag = 17, 0, -1 do
-	chain = `(if (= tag {tag}) {BRANCH[tag]} {chain})`
+	if BRANCH[tag] ~= nil then
+		chain = `(if (= tag {tag}) {BRANCH[tag]} {chain})`
+	end
 end
 
 const EVAL_DATA = `(fix (fn rec (fn node (fn env ((fn (tag args) {chain}) (head node) (tail node))))))`

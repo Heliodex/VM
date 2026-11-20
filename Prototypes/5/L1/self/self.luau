@@ -49,7 +49,6 @@ const function build(
 	-- What each tag does, as the text of its branch. The branch for tag k is BRANCH[k].
 	const BRANCH: { [number]: string } = {
 		[0] = A, -- a quoted value is stored as it is
-		[1] = "~",
 		[2] = `(({lookup} {A}) env)`,
 		[3] = `(fn v ((rec {A}) ({extend} v env)))`,
 		[4] = `(pin {ev(A)})`,
@@ -72,7 +71,9 @@ const function build(
 	-- A chain of ifs on the tag, checking 0 first and falling through to the highest.
 	local chain = BRANCH[18]
 	for tag = 17, 0, -1 do
-		chain = `(if (= tag {tag}) {BRANCH[tag]} {chain})`
+		if BRANCH[tag] ~= nil then
+			chain = `(if (= tag {tag}) {BRANCH[tag]} {chain})`
+		end
 	end
 
 	return `(fix (fn rec (fn node (fn env ((fn (tag args) {chain}) (head node) (tail node))))))`

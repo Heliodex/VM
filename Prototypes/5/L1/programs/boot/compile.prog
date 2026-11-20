@@ -16,7 +16,7 @@ The result is [0 quoted] or [1 message]. A stage never raises: every compile ste
 	(let qBin (fn (tag a b) [tag a b ~])
 	(let qIf (fn (c t e) [9 c t e ~])
 	(let qApp (fn (f a) [10 f a ~])
-	(let qNil [1 ~]
+	(let qNil [0 ~ ~]
 	(let qInner (qLam (qApp (qVar 1) (qLam (qApp (qApp (qVar 1) (qVar 1)) (qVar 0)))))
 	(let qFixE (qLam (qApp qInner qInner))
 	(let payOf (fn x (tail (tail x)))
@@ -139,7 +139,7 @@ The result is [0 quoted] or [1 message]. A stage never raises: every compile ste
 		(compile node scope))))))))))))))))))))))))))))))))))))))))))))))))
 ---
 [[0 1 42] ~] => [0 [0 42 ~]] fuel 100000
-[[1 1 "~"] ~] => [0 [1 ~]] fuel 100000
+[[1 1 "~"] ~] => [0 [0 ~ ~]] fuel 100000
 [[1 1 "x"] ~] => [1 "name is not bound"] fuel 100000
 [[1 1 "if"] ~] => [1 "a reserved word cannot be a variable"] fuel 100000
 [[2 1 (list [1 1 "fn"] [1 1 "x"] [1 1 "x"])] ~] => [0 [3 [2 0 ~] ~]] fuel 100000

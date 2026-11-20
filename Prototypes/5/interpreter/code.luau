@@ -59,8 +59,6 @@ toValue = function(
 ): M.Value
 	if e.op == "quote" then
 		return node(0, { e.value })
-	elseif e.op == "nil" then
-		return node(1, {})
 	elseif e.op == "var" then
 		return node(2, { e.index })
 	elseif e.op == "lam" then
@@ -142,14 +140,15 @@ fromValue = function(
 	if n == 0 then
 		const a = items(parts, 1)[1]
 
+		if a == M.NIL then
+			return M.nilv()
+		end
+
 		if not isInteger(a) then
-			error("a quoted value must be an integer", 0)
+			error("a quoted value must be an integer or nil", 0)
 		end
 
 		return M.int(a :: number)
-	elseif n == 1 then
-		items(parts, 0)
-		return M.nilv()
 	elseif n == 2 then
 		const index = items(parts, 1)[1]
 

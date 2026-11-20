@@ -26,9 +26,11 @@ printAt = function(
 	depth: number
 ): string
 	if e.op == "quote" then
+		if e.value == VM.NIL then
+			return "~"
+		end
+
 		return tostring(e.value)
-	elseif e.op == "nil" then
-		return "~"
 	elseif e.op == "var" then
 		const binder = depth - 1 - e.index
 
