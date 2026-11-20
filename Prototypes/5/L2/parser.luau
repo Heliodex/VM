@@ -51,8 +51,24 @@ export type Expr =
 	| { k: "match", scrut: Expr, arms: { Arm }, at: Pos }
 	| { k: "try", e: Expr, at: Pos }
 	| { k: "rawfix", value: Expr, at: Pos }
+	| { k: "check", e: Expr, test: Test?, at: Pos }
 
 export type Arm = { pat: Pattern, body: Expr, at: Pos }
+
+-- What a run-time check looks for, made by the checker from a type. Each test is a shape of value: any accepts every value, and a list or sum that refers to itself uses rec, with its fixdef around the whole test.
+export type Test =
+	{ kind: "any" }
+	| { kind: "nil" }
+	| { kind: "int" }
+	| { kind: "fn" }
+	| { kind: "pin" }
+	| { kind: "pair", a: Test, b: Test }
+	| { kind: "list", item: Test, tail: Test }
+	| { kind: "sum", ctors: { SumTest } }
+	| { kind: "rec", key: string }
+	| { kind: "fixdef", key: string, body: Test }
+
+export type SumTest = { tag: number, payload: Test }
 
 export type Binding = { name: string, value: Expr, at: Pos }
 

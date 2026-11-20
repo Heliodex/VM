@@ -1,7 +1,7 @@
 --!strict
 -- THE L2 ENTRY POINT
 --
--- Compiles an L2 program file, with its imports, to a machine expression, and evaluates the L2 expressions of its tests on that machine. The stages are the parser (parser.luau), the desugarer (desugar.luau), and the machine (interpreter/vm.luau). The type checker is not in the pipeline yet.
+-- Compiles an L2 program file, with its imports, to a machine expression, and evaluates the L2 expressions of its tests on that machine. The stages are the parser (parser.luau), the checker (checker.luau), the desugarer (desugar.luau), and the machine (interpreter/vm.luau). A program's input is checked when it is run, so the program is applied to its input through a check.
 --
 --   L2.compile(text, resolve, name): Compiled    raises an error, with the file's line, if the file does not compile
 --   L2.evalText(compiled, text, fuel): Value     evaluates an expression of the file, with its imports in scope
@@ -12,6 +12,7 @@
 const VM = require "../interpreter/vm"
 const Lifecycle = require "../interpreter/lifecycle"
 const Parser = require "./parser"
+const Checker = require "./checker"
 const Desugar = require "./desugar"
 const ProgramFile = require "./programfile"
 
@@ -22,6 +23,7 @@ export type Compiled = {
 	names: { string },
 	values: { VM.Expr },
 	ctors: { [string]: Desugar.Ctor },
+	scheme: Checker.Scheme,
 }
 
 -- An error from the parser or the desugarer counts lines from the start of the program section. This moves it to the line of the file.
@@ -62,6 +64,7 @@ compileFile = function(
 	const ctors = Desugar.buildCtors(program.decls)
 	local names: { string } = {}
 	local values: { VM.Expr } = {}
+	local importSchemes: { { name: string, scheme: Checker.Scheme } } = {}
 	const chain = table.clone(stack)
 	table.insert(chain, name)
 
@@ -79,12 +82,24 @@ compileFile = function(
 		const sub = compileFile(importText :: string, resolve, import.file, chain)
 		table.insert(names, import.name)
 		table.insert(values, sub.expr)
+		table.insert(importSchemes, { name = import.name, scheme = sub.scheme })
 	end
 
+	local checked: Checker.Result? = nil
+
+	ok, err = pcall(function()
+		checked = Checker.check(program, importSchemes, name)
+	end)
+
+	if not ok then
+		error(atFileLine(err, file.programLine), 0)
+	end
+
+	const result = checked :: Checker.Result
 	local expr: VM.Expr
 
 	ok, err = pcall(function()
-		expr = Desugar.wrapImports(Desugar.desugarProgram(program, names, ctors), values)
+		expr = Desugar.boundary(Desugar.wrapImports(Desugar.desugarProgram(result.expr, names, ctors), values), result.input)
 	end)
 
 	if not ok then
@@ -96,6 +111,7 @@ compileFile = function(
 		names = names,
 		values = values,
 		ctors = ctors,
+		scheme = result.scheme,
 	}
 end
 

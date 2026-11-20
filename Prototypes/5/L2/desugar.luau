@@ -13,9 +13,11 @@
 --
 -- Early return. A `?` returns from the function it is in, so the rewrite must not run it when it would not run otherwise. A `?` is allowed where the expression runs whenever the function does: in the function's body, in let values, in arguments, and so on. Inside an if branch or a match arm it is allowed only when that if or match is itself the function's result, and then the branch is a function of its own. Anywhere else it is an error. The rewrite is done on the surface tree before desugaring, so the names it introduces are plain names.
 --
---   Desugar.desugarProgram(ast, importNames, ctors): VM.Expr
+--   Desugar.desugarProgram(expr, importNames, ctors): VM.Expr    expr is the checked tree (checker.luau)
+--   Desugar.desugarExpr(expr, importNames, ctors): VM.Expr      an expression that is not checked, such as a test's
 --   Desugar.buildCtors(decls): { [string]: Ctor }
 --   Desugar.wrapImports(expr, importExprs): VM.Expr
+--   Desugar.boundary(expr, test): VM.Expr                       the program, with its input checked when it is run
 
 const M = require "../interpreter/vm"
 const Primitives = require "../interpreter/primitives"
@@ -26,6 +28,7 @@ type Arm = Parser.Arm
 type Pattern = Parser.Pattern
 type Pos = Parser.Pos
 type Binding = Parser.Binding
+type Test = Parser.Test
 
 export type Ctor = { tag: number, payload: boolean, sum: string }
 
@@ -277,6 +280,8 @@ collect = function(
 			rec = node.rec,
 			at = node.at,
 		}
+	elseif node.k == "check" then
+		return { k = "check", e = collect(node.e, hoists, childMode(mode)), test = node.test, at = node.at }
 	elseif node.k == "mutual" then
 		return { k = "mutual", bindings = node.bindings, body = collectUnderBinding(node.body, mode), at = node.at }
 	elseif node.k == "if" then
@@ -371,6 +376,131 @@ local function mutualSurface(
 
 	const fixed: Expr = { k = "rawfix", value = dispatch, at = at }
 	return letE(" group", fixed, groupBody, at)
+end
+
+-- The position of a name in scope, which the caller knows is there.
+local function slot(
+	scope: { string },
+	name: string
+): number
+	const found = indexOf(scope, name)
+
+	if found == nil then
+		error(string.format("internal: %s is not in scope", name), 0)
+	end
+
+	return found
+end
+
+-- RUN-TIME CHECKS
+
+-- A check compiles to a predicate over the value: a machine expression that gives 1 when the value has the shape of its test and 0 when it does not. The value is reached by a path from a name in scope: h takes the head, t the tail and p the payload.
+
+local KIND_TAG = Primitives.BY_SYMBOL["@"].tag
+
+-- A failed check ends the run as a machine error, as any other failure does.
+local CHECK_FAIL = M.head(M.nilv())
+
+local function extend(
+	path: { string },
+	op: string
+): { string }
+	local out = table.clone(path)
+	table.insert(out, op)
+	return out
+end
+
+local function valueOf(
+	base: string,
+	path: { string },
+	scope: { string }
+): M.Expr
+	local e = M.var(slot(scope, base))
+
+	for _, op in path do
+		if op == "h" then
+			e = M.head(e)
+		elseif op == "t" then
+			e = M.tail(e)
+		else
+			e = M.payload(e)
+		end
+	end
+
+	return e
+end
+
+local function kindIs(
+	base: string,
+	path: { string },
+	scope: { string },
+	k: number
+): M.Expr
+	return M.prim(Primitives.TAG.eq, M.prim(KIND_TAG, valueOf(base, path, scope)), M.int(k))
+end
+
+-- The predicate of a test, on the value at base and path. A rec or fixdef refers to a predicate by its key, which is a name in scope.
+local compilePred: (Test, string, { string }, { string }) -> M.Expr
+
+compilePred = function(
+	test: Test,
+	base: string,
+	path: { string },
+	scope: { string }
+): M.Expr
+	if test.kind == "any" then
+		return M.int(1)
+	elseif test.kind == "int" then
+		return kindIs(base, path, scope, 0)
+	elseif test.kind == "nil" then
+		return kindIs(base, path, scope, 1)
+	elseif test.kind == "fn" then
+		return kindIs(base, path, scope, 3)
+	elseif test.kind == "pin" then
+		return kindIs(base, path, scope, 4)
+	elseif test.kind == "pair" then
+		return M.ite(
+			kindIs(base, path, scope, 2),
+			M.ite(
+				compilePred(test.a, base, extend(path, "h"), scope),
+				compilePred(test.b, base, extend(path, "t"), scope),
+				M.int(0)
+			),
+			M.int(0)
+		)
+	elseif test.kind == "list" then
+		local cell = M.ite(
+			compilePred(test.item, base, extend(path, "h"), scope),
+			compilePred(test.tail, base, extend(path, "t"), scope),
+			M.int(0)
+		)
+		return M.ite(kindIs(base, path, scope, 1), M.int(1), M.ite(kindIs(base, path, scope, 2), cell, M.int(0)))
+	elseif test.kind == "sum" then
+		local chain: M.Expr = M.int(0)
+
+		for i = #test.ctors, 1, -1 do
+			const c = test.ctors[i]
+			const tagIs = M.prim(Primitives.TAG.eq, M.tagof(valueOf(base, path, scope)), M.int(c.tag))
+			chain = M.ite(tagIs, compilePred(c.payload, base, extend(path, "p"), scope), chain)
+		end
+
+		return M.ite(kindIs(base, path, scope, 5), chain, M.int(0))
+	elseif test.kind == "rec" then
+		return M.app(M.var(slot(scope, "self:" .. test.key)), valueOf(base, path, scope))
+	end
+
+	-- A fixdef: the predicate of its body, as a fixed point that knows itself by its key. Its body is on its own value, x.
+	const inner = { "x", "self:" .. test.key, table.unpack(scope) }
+	const body = compilePred(test.body, "x", {}, inner)
+	return M.app(M.app(M.fix, M.lam(M.lam(body))), valueOf(base, path, scope))
+end
+
+-- The value e, checked: it is e when it has the test's shape, and the run fails when it does not.
+local function checkValue(
+	test: Test,
+	e: M.Expr
+): M.Expr
+	return M.app(M.lam(M.ite(compilePred(test, "v", {}, { "v" }), M.var(0), CHECK_FAIL)), e)
 end
 
 -- DESUGARING
@@ -630,6 +760,8 @@ desugar = function(
 		return M.app(M.lam(desugar(node.body, inner, ctors)), desugar(node.value, scope, ctors))
 	elseif node.k == "mutual" then
 		return desugar(mutualSurface(node.bindings, node.body, node.at), scope, ctors)
+	elseif node.k == "check" then
+		return checkValue(node.test :: Test, desugar(node.e, scope, ctors))
 	elseif node.k == "rawfix" then
 		return M.app(M.fix, desugar(node.value, scope, ctors))
 	elseif node.k == "if" then
@@ -644,7 +776,7 @@ end
 
 -- The program, as an expression with the names of its imports free in it. importNames is in the order the file lists them.
 local function desugarProgram(
-	ast: Parser.Program,
+	expr: Expr,
 	importNames: { string },
 	ctors: { [string]: Ctor }
 ): M.Expr
@@ -654,7 +786,7 @@ local function desugarProgram(
 		table.insert(scope, 1, name)
 	end
 
-	return desugar(contextify(ast.expr), scope, ctors)
+	return desugar(contextify(expr), scope, ctors)
 end
 
 -- An expression of a file, with the same imports in scope, as desugarProgram does for the program.
@@ -670,6 +802,14 @@ local function desugarExpr(
 	end
 
 	return desugar(contextify(ast), scope, ctors)
+end
+
+-- The whole program as the run applies it: a function that checks its input against the test, then runs the program on it. The program is closed by then, since its imports are bound.
+local function boundary(
+	expr: M.Expr,
+	test: Test
+): M.Expr
+	return M.lam(M.app(expr, checkValue(test, M.var(0))))
 end
 
 -- Binds each import around the program. The imported programs are closed, so their expressions can be placed at the top.
@@ -691,4 +831,5 @@ return {
 	desugarExpr = desugarExpr,
 	buildCtors = buildCtors,
 	wrapImports = wrapImports,
+	boundary = boundary,
 }

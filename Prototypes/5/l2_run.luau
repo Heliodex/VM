@@ -69,7 +69,7 @@ const MALFORMED: { { name: string, text: string, reason: string } } = {
 	},
 	{
 		name = "a ? in a let value that is not the function's result",
-		text = "h\n---\n---\nfn s (g (let v = s\nv?))\n---\n1 => 1 fuel 10\n",
+		text = "h\n---\n---\nlet g = fn x x\nfn s (g (let v = s\nv?))\n---\n1 => 1 fuel 10\n",
 		reason = "? can only be used where it runs whenever its function does",
 	},
 	{
@@ -89,7 +89,7 @@ const MALFORMED: { { name: string, text: string, reason: string } } = {
 	},
 	{
 		name = "a primitive bound as a name",
-		text = "h\n---\n---\nlet + = 1\n+\n---\n1 => 1 fuel 10\n",
+		text = "h\n---\n---\nlet + = 1\nfn x x\n---\n1 => 1 fuel 10\n",
 		reason = "is a primitive, and cannot be bound",
 	},
 	{
@@ -104,7 +104,7 @@ const MALFORMED: { { name: string, text: string, reason: string } } = {
 	},
 	{
 		name = "a letrec that does not bind a fn",
-		text = "h\n---\n---\nletrec x = 1\nx\n---\n1 => 1 fuel 10\n",
+		text = "h\n---\n---\nletrec x = 1\nfn y x\n---\n1 => 1 fuel 10\n",
 		reason = "letrec binds a fn",
 	},
 	{
@@ -121,6 +121,41 @@ const MALFORMED: { { name: string, text: string, reason: string } } = {
 		name = "an import of a file that is not there",
 		text = "h\n---\nhelper = missing.prog\n---\nfn x x\n---\n1 => 1 fuel 10\n",
 		reason = "cannot find missing.prog",
+	},
+	{
+		name = "an argument of the wrong type",
+		text = "h\n---\n---\nfn x (+ x [1])\n---\n1 => 1 fuel 10\n",
+		reason = "expected Int, but this is [Int]",
+	},
+	{
+		name = "an if condition that is a list",
+		text = "h\n---\n---\nfn x (if [1] 1 2)\n---\n1 => 1 fuel 10\n",
+		reason = "expected Int, but this is [Int]",
+	},
+	{
+		name = "a value that contains itself",
+		text = "h\n---\n---\nfn x (x x)\n---\n1 => 1 fuel 10\n",
+		reason = "would be an infinite type",
+	},
+	{
+		name = "a match that does not cover every constructor",
+		text = "h\n---\n---\ntype Option a = None | Some a\nfn o match o {\n\tNone -> 0\n}\n---\n1 => 1 fuel 10\n",
+		reason = "does not cover Some",
+	},
+	{
+		name = "a pattern from another sum",
+		text = "h\n---\n---\ntype A = X | Y\ntype B = P | Q\nfn a match a {\n\tX -> 0\n\tP -> 1\n}\n---\n1 => 1 fuel 10\n",
+		reason = "P belongs to B",
+	},
+	{
+		name = "a program that is not a function",
+		text = "h\n---\n---\n1\n---\n1 => 1 fuel 10\n",
+		reason = "must be a function of its input",
+	},
+	{
+		name = "a ? in a function that does not return a Result",
+		text = "h\n---\n---\nfn x (+ x (Ok 1)?)\n---\n1 => 1 fuel 10\n",
+		reason = "expected",
 	},
 	{
 		name = "a file with no tests",
