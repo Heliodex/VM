@@ -1,0 +1,11 @@
+Factorial, with a recursive function bound by letrec.
+---
+
+---
+fn n
+  letrec f = fn k (if (= k 0) 1 (* k (f (- k 1))))
+  in f n
+---
+0 => 1 fuel 100000
+5 => 120 fuel 100000
+10 => 3628800 fuel 100000

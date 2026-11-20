@@ -1,0 +1,9 @@
+Adds one to its input. The simplest L2 program: a function of one name.
+---
+
+---
+fn x (+ x 1)
+---
+0 => 1 fuel 1000
+41 => 42 fuel 1000
+-1 => 0 fuel 1000

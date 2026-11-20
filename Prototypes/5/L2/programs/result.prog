@@ -1,0 +1,12 @@
+Early return with ?. nonneg gives Ok for a number that is not negative, and Err otherwise. twice is a function that uses ? on it.
+---
+
+---
+let nonneg = fn n (if (< n 0) (Err 1) (Ok n))
+in fn n
+  let a = (nonneg n)?
+  in Ok (+ a a)
+---
+3 => Ok 6 fuel 1000
+0 => Ok 0 fuel 1000
+-1 => Err 1 fuel 1000
