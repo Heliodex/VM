@@ -186,11 +186,77 @@ describe r = match r {
 }
 ```
 
-## 13. Open questions
+## 13. Types (first version)
+
+The first version has a small static type system for surface programs. Quoted and binary forms are untyped, as in L1. The checker runs on surface syntax, before compilation, and it is not part of the machine.
+
+### 13.1 Types
+
+```
+t ::= Int                 an integer
+    | Nil                 the empty list, ~
+    | (t . t)             a pair
+    | t -> t              a function, curried
+    | Pin t               a suspended value (section 7)
+    | a                   a type variable
+    | Name t*             a declared sum, such as Result t e
+    | Dyn                 a value from untyped code (13.4)
+```
+
+A list of `t` has type `[t]`, a built-in recursive type. Its values are the pair chains of section 5, so `[t]` is `(t . [t])` or `Nil`. A list literal `[a b c]` has type `[t]` when each item has type `t`.
+
+### 13.2 Inference
+
+Types are inferred with Hindley–Milner: unification, with let-polymorphism for `let` and `letrec` bindings. A function's type is generalised at its `let` or `letrec`, so `fn x x` is `a -> a` and can be used at two types.
+
+Recursive functions (`letrec`) are checked monomorphically within their own body, as usual for HM, and generalised afterwards. `mutual` groups are checked together and generalised together.
+
+### 13.3 Primitives and forms
+
+- `+ - * / %` have type `Int -> Int -> Int`.
+- `< =` have type `Int -> Int -> Int`, since the machine returns 0 or 1.
+- `@` has type `a -> Int`, the kind of any value.
+- `head` and `tail` have type `(a . b) -> a` and `(a . b) -> b`. The address form (`index`) is typed by its steps.
+- `if c t e` needs `c : Int`, and `t` and `e` must have the same type.
+- `pin e` has type `Pin t` when `e : t`, and `force` has type `Pin t -> t`.
+- `fix` has type `(a -> a) -> a`.
+
+### 13.4 Sums and constructors
+
+A sum is declared once, with its constructors and their payload types:
+
+```
+type Result a e = Ok a | Err e
+```
+
+Each constructor has a tag, from 0 up, by declaration order, so `Ok` is 0 and `Err` is 1. `Ok v` has type `Result a e` when `v : a`. A `match` on a sum must cover every constructor, or have a wildcard arm (section 9.3). The arms' bodies must have the same type.
+
+The result of `?` on `Result a e` is `a`, and the enclosing function must return `Result b e`, with the same `e`.
+
+### 13.5 Untyped code and Dyn
+
+A quoted program, or a program decoded from binary, is untyped. Evaluating it gives a value of type `Dyn`.
+
+- A `Dyn` value used where a specific type is needed must pass a run-time check: an `Int` must be an integer, a pair must be a pair, and a constructor must have the declared tag. A failed check is an error, as a machine failure is.
+- A typed value passed into untyped code is not checked, and it is still a valid value of its type.
+
+So a program can run untyped code, and the types it has are kept at the boundary by a check that is part of the surface language's compiled form, not the machine.
+
+### 13.6 What is not checked
+
+- Machine failures (a wrong-kind `head`, a divide by zero) are not types. They end the run, as in L1.
+- Quoted and binary forms are not checked when they are read. The check happens when a `Dyn` value is used at a type.
+- Effects, subtyping, type classes and kinds are not in the first version.
+
+### 13.7 The bootstrap
+
+The L2 compiler written in L2 is checked as a surface program, so it is typed. Its output, the quoted form, is untyped, which is the same situation as any other quoted code.
+
+## 14. Open questions
 
 Decided: a dot inside brackets is a syntax error, so a pair in a list is written with parentheses, `[1 (2 . 3)]`, and an improper list is nested pairs (section 5); prefix application only, with no infix sugar for now (3.3); tags for constructors in the machine (section 8); the results model (section 9); the dispatch expressions (section 9.4); layout and binding (section 11), with `letrec` for recursion, newlines separating arms, and indentation deferred.
 
 1. The text syntax for constructors: how `Ok v` and `Err e` are written and printed.
-4. How a user declares their own constructors and their tags. The examples assume `Ok` and `Err` are built in, with tags 0 and 1.
 2. Data form for constructors, so a constructor can be an output of a program.
-3. Exact tag numbers for `Ok` and `Err`, and the representation of nil and strings.
+3. Exact tag numbers for user sums, and the representation of nil and strings.
+4. Whether `Dyn` checks should be inserted automatically, or only where a `Dyn` value is written with an explicit annotation.
