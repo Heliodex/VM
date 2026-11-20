@@ -162,31 +162,6 @@ const function binary(
 	return value, nil
 end
 
--- The text a raise carries: a list of bytes. A value that is not text gives a fixed message, so the failure still says something.
-const function textOf(
-	v: Value
-): string
-	local bytes: { string } = {}
-	local cur: Value = v
-
-	while type(cur) == "table" and cur.kind == "cell" do
-		const h = cur.head
-
-		if type(h) ~= "number" or h < 0 or h > 255 or math.floor(h) ~= h then
-			return "raised with a value that is not text"
-		end
-
-		table.insert(bytes, string.char(h))
-		cur = cur.tail
-	end
-
-	if cur ~= NIL then
-		return "raised with a value that is not text"
-	end
-
-	return table.concat(bytes)
-end
-
 -- The kind of a value: 0 integer, 1 nil, 2 cell, 3 function, 4 pin.
 const function kindOf(
 	v: Value
@@ -490,11 +465,7 @@ const function run(
 
 					value = result :: number
 				else
-					-- The only frame left is a unary primitive.
-					if frame.tag == Primitives.TAG.raise then
-						return failed(textOf(value), steps)
-					end
-
+					-- The only unary primitive is kind.
 					value = kindOf(value)
 				end
 			end

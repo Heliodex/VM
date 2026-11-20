@@ -103,7 +103,7 @@ A list `[a b c]` is the pair chain `(a . (b . (c . ~)))`. A pair `(a . b)` is on
 
 ## 6. Primitives
 
-Primitives are the functions the machine provides. They are written as names, with the symbols from the table in `interpreter/primitives.luau`: `+ - * / % < = @ !`. Their full names are `add sub mul div mod lt eq kind raise`. `!` takes a string, which is a list of bytes, and ends the run with it as its error message. Primitives take values with their tags checked by the surface layer (section 8). The raw opcodes take untagged values.
+Primitives are the functions the machine provides. They are written as names, with the symbols from the table in `interpreter/primitives.luau`: `+ - * / % < = @`. Their full names are `add sub mul div mod lt eq kind`. Primitives take values with their tags checked by the surface layer (section 8). The raw opcodes take untagged values.
 
 `@` (kind) returns the tag of a value as an integer, using the same numbers as L1: 0 Int, 1 Nil, 2 Pair, 3 Fn, 4 Pin.
 
