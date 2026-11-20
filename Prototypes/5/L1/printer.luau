@@ -106,6 +106,14 @@ printAt = function(
 		return `({Primitives.BY_TAG[e.tag].symbol} {printAt(e.a, depth)} {printAt((e.b :: VM.Expr), depth)})`
 	end
 
+	if e.op == "construct" then
+		return `(construct {tostring(e.tag)} {printAt(e.e, depth)})`
+	elseif e.op == "tagof" then
+		return `(tagof {printAt(e.e, depth)})`
+	elseif e.op == "payload" then
+		return `(payload {printAt(e.e, depth)})`
+	end
+
 	error("unknown expression", 0)
 end
 

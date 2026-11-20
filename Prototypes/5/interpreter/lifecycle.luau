@@ -28,9 +28,9 @@ export type ByteResult =
 	| { status: "out_of_fuel", steps: number }
 	| { status: "not_data", steps: number }
 
--- The output check, as a program. Its tags are 0 for data and 1 for a function.
+-- The output check, as a program. Its tags are 0 for data and 1 for a function or a constructor, neither of which has a text form yet.
 const CHECK = Reader.parse(
-	"(fix (fn rec (fn v (if (= (@ v) 4) (rec (force v)) (if (= (@ v) 2) (let h (rec (head v)) (if (= (head h) 1) h (let t (rec (tail v)) (if (= (head t) 1) t [0 [(tail h) (tail t)]])))) (if (= (@ v) 3) [1 ~] [0 v]))))))"
+	"(fix (fn rec (fn v (if (= (@ v) 4) (rec (force v)) (if (= (@ v) 2) (let h (rec (head v)) (if (= (head h) 1) h (let t (rec (tail v)) (if (= (head t) 1) t [0 [(tail h) (tail t)]])))) (if (= (@ v) 3) [1 ~] (if (= (@ v) 5) [1 ~] [0 v])))))))"
 )
 
 -- Runs the program on the input, and checks the output. The outcome is a Result.

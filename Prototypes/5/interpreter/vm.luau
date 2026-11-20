@@ -24,6 +24,9 @@ export type Expr =
 	| IfExpr
 	| ApplyExpr
 	| PrimExpr
+	| ConstructExpr
+	| TagofExpr
+	| PayloadExpr
 
 -- A quoted value is data: an integer, or nil. nil is quoted, so there is no expression for it of its own.
 export type QuoteExpr = { op: "quote", value: Value }
@@ -39,6 +42,10 @@ export type IfExpr = { op: "if", c: Expr, t: Expr, e: Expr }
 export type ApplyExpr = { op: "apply", f: Expr, arg: Expr }
 -- The primitive is its tag, from primitives.luau. b is absent for the unary primitive kind
 export type PrimExpr = { op: "prim", tag: number, a: Expr, b: Expr? }
+-- A constructor is a tag, a whole number from 0 up, with one payload. tagof gives the tag of a constructor, or -1 for any other value. payload gives the payload of a constructor, and is an error for any other value. A match is a tagof test, then a payload.
+export type ConstructExpr = { op: "construct", tag: number, e: Expr }
+export type TagofExpr = { op: "tagof", e: Expr }
+export type PayloadExpr = { op: "payload", e: Expr }
 
 -- VALUES
 
@@ -47,7 +54,8 @@ export type Cell = { kind: "cell", head: Value, tail: Value }
 export type Closure = { kind: "closure", body: Expr, env: Binding? }
 -- result is set once the pin has been forced. busy is set while it is being forced, so a pin that forces itself is caught.
 export type Pin = { kind: "pin", expr: Expr, env: Binding?, busy: boolean, result: Value? }
-export type Value = number | Nil | Cell | Closure | Pin
+export type Con = { kind: "con", tag: number, payload: Value }
+export type Value = number | Nil | Cell | Closure | Pin | Con
 
 -- A linked list of variable bindings, innermost first.
 export type Binding = { value: Value, rest: Binding? }
@@ -64,6 +72,9 @@ type Frame =
 	| { k: "cell", expr: Expr, env: Binding? }
 	| { k: "cellhead", head: Value }
 	| { k: "force" }
+	| { k: "construct", tag: number }
+	| { k: "tagof" }
+	| { k: "payload" }
 	| { k: "index", n: number }
 	| { k: "if", t: Expr, e: Expr, env: Binding? }
 	| { k: "apply", arg: Expr, env: Binding? }
@@ -173,6 +184,10 @@ const function kindOf(
 		return 3
 	end
 
+	if v.kind == "con" then
+		return 5
+	end
+
 	return 4
 end
 
@@ -243,6 +258,22 @@ const function run(
 				elseif expr.op == "force" then
 					push {
 						k = "force",
+					}
+					expr = expr.e
+				elseif expr.op == "construct" then
+					push {
+						k = "construct",
+						tag = expr.tag,
+					}
+					expr = expr.e
+				elseif expr.op == "tagof" then
+					push {
+						k = "tagof",
+					}
+					expr = expr.e
+				elseif expr.op == "payload" then
+					push {
+						k = "payload",
 					}
 					expr = expr.e
 				elseif expr.op == "index" then
@@ -364,6 +395,24 @@ const function run(
 						rest = frame.fn.env,
 					}
 					returning = false
+				elseif frame.k == "construct" then
+					value = {
+						kind = "con",
+						tag = frame.tag,
+						payload = value,
+					}
+				elseif frame.k == "tagof" then
+					value =
+						if type(value) == "table" and value.kind == "con" then
+							value.tag
+						else
+							-1
+				elseif frame.k == "payload" then
+					if type(value) ~= "table" or value.kind ~= "con" then
+						return fail "a payload of a non-constructor"
+					end
+
+					value = value.payload
 				elseif frame.k == "force" then
 					if type(value) ~= "table" or value.kind ~= "pin" then
 						return fail "forcing a non-pin"
@@ -446,6 +495,10 @@ const function show(
 
 	if v.kind == "pin" then
 		return "<pin>"
+	end
+
+	if v.kind == "con" then
+		return `<con {tostring(v.tag)} {show(v.payload)}>`
 	end
 
 	local parts: { string } = {}
@@ -613,6 +666,42 @@ function M.force(
 ): Expr
 	return {
 		op = "force",
+		e = e,
+	}
+end
+
+-- A constructor with the given tag, from 0 up, and payload e.
+function M.construct(
+	tag: number,
+	e: Expr
+): Expr
+	if tag < 0 or tag > MAX_INTEGER or tag ~= math.floor(tag) then
+		error(string.format("a constructor tag is a whole number from 0 up, not %s", tostring(tag)), 0)
+	end
+
+	return {
+		op = "construct",
+		tag = tag,
+		e = e,
+	}
+end
+
+-- The tag of the constructor e gives, or -1 for any other value.
+function M.tagof(
+	e: Expr
+): Expr
+	return {
+		op = "tagof",
+		e = e,
+	}
+end
+
+-- The payload of the constructor e gives. It is an error for any other value.
+function M.payload(
+	e: Expr
+): Expr
+	return {
+		op = "payload",
 		e = e,
 	}
 end

@@ -24,6 +24,9 @@
 --  16 lt, args (a b)
 --  17 eq, args (a b)
 --  18 kind, args (a)
+--  19 construct, args (tag e)
+--  20 tagof, args (e)
+--  21 payload, args (e)
 --
 -- toValue(e) quotes an expression. fromValue(v) reads a quoted program back, and checks it: a tag that is not known, or a list of the wrong length, is an error, so a program from outside cannot make the machine see a form it does not have. toExpr(v) gives an expression that evaluates to the data value v, which is what the self-interpreter quotes with.
 --
@@ -81,6 +84,12 @@ toValue = function(
 		return node(5, { toValue(e.head), toValue(e.tail) })
 	elseif e.op == "index" then
 		return node(6, { e.n, toValue(e.e) })
+	elseif e.op == "construct" then
+		return node(19, { e.tag, toValue(e.e) })
+	elseif e.op == "tagof" then
+		return node(20, { toValue(e.e) })
+	elseif e.op == "payload" then
+		return node(21, { toValue(e.e) })
 	elseif e.op == "force" then
 		return node(8, { toValue(e.e) })
 	elseif e.op == "if" then
@@ -140,7 +149,7 @@ fromValue = function(
 
 	const tag = v.head
 
-	if not isInteger(tag) or (tag :: number) < 0 or (tag :: number) > 18 then
+	if not isInteger(tag) or (tag :: number) < 0 or (tag :: number) > 21 then
 		error(`a program has no form with tag {tostring(tag)}`, 0)
 	end
 
@@ -192,6 +201,18 @@ fromValue = function(
 		return M.app(fromValue(pair[1]), fromValue(pair[2]))
 	elseif n == 18 then
 		return M.prim(Primitives.TAG.kind, fromValue(items(parts, 1)[1]))
+	elseif n == 19 then
+		const pair = items(parts, 2)
+
+		if not isInteger(pair[1]) or (pair[1] :: number) < 0 then
+			error("a constructor tag is a whole number from 0 up", 0)
+		end
+
+		return M.construct(pair[1] :: number, fromValue(pair[2]))
+	elseif n == 20 then
+		return M.tagof(fromValue(items(parts, 1)[1]))
+	elseif n == 21 then
+		return M.payload(fromValue(items(parts, 1)[1]))
 	end
 
 	if Primitives.BY_TAG[n] == nil then

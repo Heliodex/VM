@@ -6,6 +6,7 @@
 --   luau run.luau      (from Prototypes/5)
 
 const Examples = require "./examples/examples"
+const Constructors = require "./examples/constructors"
 const Programs = require "./L1/examples/programs"
 const Reader = require "./L1/reader"
 const Text = require "./L1/examples/text"
@@ -60,6 +61,10 @@ for _, ex in Examples do
 	report(ex)
 end
 
+for _, ex in Constructors do
+	report(ex)
+end
+
 for _, ex in Text.examples do
 	report(ex)
 end
@@ -94,6 +99,9 @@ const builderRejects: { [string]: () -> VM.Expr } = {
 	end,
 	["an integer past the range"] = function()
 		return VM.int(9007199254740992)
+	end,
+	["a constructor with a negative tag"] = function()
+		return VM.construct(-1, VM.int(1))
 	end,
 	["an index below 2"] = function()
 		return VM.index(1, VM.int(1))

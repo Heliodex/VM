@@ -67,13 +67,17 @@ const function build(
 		[16] = `(< {ev(A)} {ev(B)})`,
 		[17] = `(= {ev(A)} {ev(B)})`,
 		[18] = `(@ {ev(A)})`,
+		-- The constructor forms have no text syntax in L1, so the interpreter cannot build them: an interpreted program that uses one fails as an error, as a malformed form would.
+		[19] = "(head ~)",
+		[20] = "(head ~)",
+		[21] = "(head ~)",
 		[14] = `(/ {ev(A)} {ev(B)})`,
 		[15] = `(% {ev(A)} {ev(B)})`,
 	}
 
 	-- A chain of ifs on the tag, checking 0 first and falling through to the highest.
-	local chain = BRANCH[18]
-	for tag = 17, 0, -1 do
+	local chain = "(head ~)"
+	for tag = 21, 0, -1 do
 		if BRANCH[tag] ~= nil then
 			chain = `(if (= tag {tag}) {BRANCH[tag]} {chain})`
 		end

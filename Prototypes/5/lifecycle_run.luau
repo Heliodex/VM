@@ -155,6 +155,12 @@ do
 	check("bad input bytes are an error", result.status == "error" and result.steps == 0, result.status)
 end
 
+-- A constructor has no text form yet, so it is built directly, and it is not data: a program that returns one is not_data.
+do
+	const constructed = Lifecycle.run(VM.lam(VM.construct(0, VM.int(1))), VM.NIL, 1000)
+	check("a constructor is not data", constructed.status == "not_data", constructed.status)
+end
+
 print(string.format("%d of %d checks passed", total - failures, total))
 
 if failures > 0 then
