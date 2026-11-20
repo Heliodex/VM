@@ -24,10 +24,10 @@ export type Ty =
 
 export type Scheme = { vars: { Ty }, ty: Ty }
 
-export type Result = { expr: Parser.Expr, input: Parser.Test, scheme: Scheme }
+export type Result = { expr: Parser.Expr, input: Parser.Test, inputExpect: string, scheme: Scheme }
 
 type Pos = Parser.Pos
-type CheckNode = { k: "check", e: Parser.Expr, test: Parser.Test?, at: Pos }
+type CheckNode = { k: "check", e: Parser.Expr, test: Parser.Test?, expect: string, at: Pos }
 type Pending = { node: CheckNode, ty: Ty }
 
 type SumCtor = { name: string, tag: number, payload: Ty? }
@@ -629,7 +629,7 @@ local function use(
 	at: Pos
 ): Parser.Expr
 	if unifyAt(at, actual, expected) then
-		const c: CheckNode = { k = "check", e = node, test = nil, at = at }
+		const c: CheckNode = { k = "check", e = node, test = nil, expect = "", at = at }
 		table.insert(cx.pending, { node = c, ty = expected })
 		return c
 	end
@@ -975,11 +975,13 @@ local function check(
 
 	for _, pending in cx.pending do
 		pending.node.test = describe(cx, pending.ty)
+		pending.node.expect = render(pending.ty, false)
 	end
 
 	return {
 		expr = expr,
 		input = describe(cx, input),
+		inputExpect = render(input, false),
 		scheme = generalize(ty, -1),
 	}
 end

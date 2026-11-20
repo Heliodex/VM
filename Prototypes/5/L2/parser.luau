@@ -51,7 +51,7 @@ export type Expr =
 	| { k: "match", scrut: Expr, arms: { Arm }, at: Pos }
 	| { k: "try", e: Expr, at: Pos }
 	| { k: "rawfix", value: Expr, at: Pos }
-	| { k: "check", e: Expr, test: Test?, at: Pos }
+	| { k: "check", e: Expr, test: Test?, expect: string, at: Pos }
 
 export type Arm = { pat: Pattern, body: Expr, at: Pos }
 

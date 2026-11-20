@@ -99,7 +99,7 @@ compileFile = function(
 	local expr: VM.Expr
 
 	ok, err = pcall(function()
-		expr = Desugar.boundary(Desugar.wrapImports(Desugar.desugarProgram(result.expr, names, ctors), values), result.input)
+		expr = Desugar.boundary(Desugar.wrapImports(Desugar.desugarProgram(result.expr, names, ctors), values), result.input, result.inputExpect)
 	end)
 
 	if not ok then

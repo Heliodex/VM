@@ -102,7 +102,7 @@ A list `[a b c]` is the pair chain `(a . (b . (c . ~)))`. A pair `(a . b)` is on
 
 ## 6. Primitives
 
-Primitives are the functions the machine provides. They are written as names, with the symbols from the table in `interpreter/primitives.luau`: `+ - * / % < = @`. Their full names are `add sub mul div mod lt eq kind`. Primitives take values with their tags checked by the surface layer (section 8). The raw opcodes take untagged values.
+Primitives are the functions the machine provides. They are written as names, with the symbols from the table in `interpreter/primitives.luau`: `+ - * / % < = @ !`. Their full names are `add sub mul div mod lt eq kind raise`. `!` takes a string, which is a list of bytes, and ends the run with it as its error message. Primitives take values with their tags checked by the surface layer (section 8). The raw opcodes take untagged values.
 
 `@` (kind) returns the tag of a value as an integer, using the same numbers as L1: 0 Int, 1 Nil, 2 Pair, 3 Fn, 4 Pin.
 
@@ -285,7 +285,7 @@ The result of `?` on `Result a e` is `a`, and the enclosing function must return
 
 A quoted program, or a program decoded from binary, is untyped. Evaluating it gives a value of type `Dyn`.
 
-- Inference inserts the check automatically, with no annotation, wherever a `Dyn` value meets a specific type. A `Dyn` value used where a specific type is needed passes a run-time check: an `Int` must be an integer, a pair must be a pair, and a constructor must have the declared tag. A failed check is an error, as a machine failure is.
+- Inference inserts the check automatically, with no annotation, wherever a `Dyn` value meets a specific type. A `Dyn` value used where a specific type is needed passes a run-time check: an `Int` must be an integer, a pair must be a pair, and a constructor must have the declared tag. A failed check is an error, as a machine failure is. Its message is `expected` and the type, such as `expected Int`.
 - A typed value passed into untyped code is not checked, and it is still a valid value of its type.
 
 So a program can run untyped code, and the types it has are kept at the boundary by a check that is part of the surface language's compiled form, not the machine.

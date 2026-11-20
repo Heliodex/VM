@@ -30,19 +30,30 @@ const function check(
 	end
 end
 
--- Checks src with one untyped import named raw, runs it on input with raw bound to value, and gives the outcome.
+-- Checks src with one untyped import named raw, runs it on input with raw bound to value, and gives the outcome. A failed run gives its status and its message. The input is an expression that gives the value the program is run on.
 const function runDyn(
 	src: string,
 	value: VM.Expr,
-	input: number
+	inputExpr: VM.Expr
 ): string
+	const given = VM.run(inputExpr, 1000)
+
+	if given.status ~= "value" then
+		error("the input does not give a value", 0)
+	end
+
+	const input = given.value :: VM.Value
 	const parsed = Parser.parse(src)
 	const result = Checker.check(parsed, { { name = "raw", scheme = Checker.untyped() } }, "dyn.prog")
 	const expr = Desugar.wrapImports(Desugar.desugarProgram(result.expr, { "raw" }, {}), { value })
-	const outcome = Lifecycle.run(Desugar.boundary(expr, result.input), input, 100000)
+	const outcome = Lifecycle.run(Desugar.boundary(expr, result.input, result.inputExpect), input, 100000)
 
 	if outcome.status == "value" then
 		return "value " .. Data.write(outcome.value)
+	end
+
+	if outcome.status == "error" then
+		return "error " .. outcome.message
 	end
 
 	return outcome.status
@@ -65,8 +76,10 @@ for _, case in SHOWN do
 end
 
 -- An untyped value used as an Int: fine when it is one, refused when it is not.
-check("an untyped integer is used at Int", runDyn("fn x (+ raw x)", VM.int(5), 1) == "value 6", runDyn("fn x (+ raw x)", VM.int(5), 1))
-check("an untyped constructor is refused at Int", runDyn("fn x (+ raw x)", VM.construct(0, VM.int(5)), 1) == "error", runDyn("fn x (+ raw x)", VM.construct(0, VM.int(5)), 1))
+check("an untyped integer is used at Int", runDyn("fn x (+ raw x)", VM.int(5), VM.int(1)) == "value 6", runDyn("fn x (+ raw x)", VM.int(5), VM.int(1)))
+check("an untyped constructor is refused at Int", runDyn("fn x (+ raw x)", VM.construct(0, VM.int(5)), VM.int(1)) == "error expected Int", runDyn("fn x (+ raw x)", VM.construct(0, VM.int(5)), VM.int(1)))
+check("an input of the wrong shape is refused on entry", runDyn("fn x (+ x 1)", VM.int(0), VM.construct(0, VM.int(1))) == "error expected Int", runDyn("fn x (+ x 1)", VM.int(0), VM.construct(0, VM.int(1))))
+check("a list input is refused where an Int is needed", runDyn("fn x (+ x 1)", VM.int(0), VM.cell(VM.int(1), VM.nilv())) == "error expected Int", runDyn("fn x (+ x 1)", VM.int(0), VM.cell(VM.int(1), VM.nilv())))
 
 print(string.format("%d of %d checks passed", total - failures, total))
 

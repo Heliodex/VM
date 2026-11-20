@@ -281,7 +281,7 @@ collect = function(
 			at = node.at,
 		}
 	elseif node.k == "check" then
-		return { k = "check", e = collect(node.e, hoists, childMode(mode)), test = node.test, at = node.at }
+		return { k = "check", e = collect(node.e, hoists, childMode(mode)), test = node.test, expect = node.expect, at = node.at }
 	elseif node.k == "mutual" then
 		return { k = "mutual", bindings = node.bindings, body = collectUnderBinding(node.body, mode), at = node.at }
 	elseif node.k == "if" then
@@ -398,8 +398,18 @@ end
 
 local KIND_TAG = Primitives.BY_SYMBOL["@"].tag
 
--- A failed check ends the run as a machine error, as any other failure does.
-local CHECK_FAIL = M.head(M.nilv())
+-- A string as a list of its bytes, as the surface writes it.
+local function textValue(
+	s: string
+): M.Expr
+	local e = M.nilv()
+
+	for i = #s, 1, -1 do
+		e = M.cell(M.int(string.byte(s, i) :: number), e)
+	end
+
+	return e
+end
 
 local function extend(
 	path: { string },
@@ -495,12 +505,14 @@ compilePred = function(
 	return M.app(M.app(M.fix, M.lam(M.lam(body))), valueOf(base, path, scope))
 end
 
--- The value e, checked: it is e when it has the test's shape, and the run fails when it does not.
+-- The value e, checked: it is e when it has the test's shape. When it does not, the run fails with "expected" and the type.
 local function checkValue(
 	test: Test,
+	expect: string,
 	e: M.Expr
 ): M.Expr
-	return M.app(M.lam(M.ite(compilePred(test, "v", {}, { "v" }), M.var(0), CHECK_FAIL)), e)
+	const fail = M.prim(Primitives.TAG.raise, textValue("expected " .. expect))
+	return M.app(M.lam(M.ite(compilePred(test, "v", {}, { "v" }), M.var(0), fail)), e)
 end
 
 -- DESUGARING
@@ -761,7 +773,7 @@ desugar = function(
 	elseif node.k == "mutual" then
 		return desugar(mutualSurface(node.bindings, node.body, node.at), scope, ctors)
 	elseif node.k == "check" then
-		return checkValue(node.test :: Test, desugar(node.e, scope, ctors))
+		return checkValue(node.test :: Test, node.expect, desugar(node.e, scope, ctors))
 	elseif node.k == "rawfix" then
 		return M.app(M.fix, desugar(node.value, scope, ctors))
 	elseif node.k == "if" then
@@ -807,9 +819,10 @@ end
 -- The whole program as the run applies it: a function that checks its input against the test, then runs the program on it. The program is closed by then, since its imports are bound.
 local function boundary(
 	expr: M.Expr,
-	test: Test
+	test: Test,
+	expect: string
 ): M.Expr
-	return M.lam(M.app(expr, checkValue(test, M.var(0))))
+	return M.lam(M.app(expr, checkValue(test, expect, M.var(0))))
 end
 
 -- Binds each import around the program. The imported programs are closed, so their expressions can be placed at the top.
