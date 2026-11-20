@@ -9,7 +9,7 @@ L2 is the next language on the machine in `interpreter/`. It keeps what L1 learn
 - Easy to parse: one token of lookahead, no precedence table beyond a few operators, no layout rules.
 - Every value is tagged, so an operation on the wrong kind of value is a clear error.
 - Small core. Everything else is a library function.
-- Positions (line and column) are kept through every stage, so errors point at source.
+- Positions (line and column) are kept by the reader and the desugarer, so errors from them point at source. The type checker reports errors by node identifier, not by position.
 - Programs and results are data, as in L1, so the existing binary and printed formats keep working.
 
 Non-goals for now: a module system beyond imports, effects, a foreign-function interface, and concurrency.
@@ -21,9 +21,10 @@ Tokens, separated by whitespace or by delimiters:
 - Integers: a `-` immediately followed by digits is part of the integer, so `-5` is a literal. `- 5`, with a space, is the symbol `-` applied to 5. Range as in L1, from -(2^53 - 1) to 2^53 - 1.
 - A token that starts with a digit, or with `-` and a digit, must be a whole integer. So `1-2` is a lexical error. Names such as `x-1` are single symbols.
 - Strings: `"..."` with the escapes `\"`, `\\`, `\n`, `\t`, `\0`. A string is a list of bytes (see section 5).
-- Symbols (names and operators): a maximal run of characters that are not whitespace, `(`, `)`, `[`, `]`, `{`, `}`, `"`, or `;`. A symbol cannot start with a digit.
+- Symbols (names and operators): a maximal run of characters that are not whitespace, `(`, `)`, `[`, `]`, `{`, `}`, `"`, `;`, or `.`. A symbol cannot start with a digit.
+- The dot `.` is a token of its own, used only in pairs, so `(1 . 2)` is a pair and `(1.2)` is a lexical error. The arrow `->` is a token of its own, reserved for match arms. A `-` is never part of an arrow, so `x->y` is `x`, `->`, `y`.
 - Comments: `;` to the end of the line.
-- Delimiters: `(`, `)`, `[`, `]`, `{`, `}`.
+- Delimiters: `(`, `)`, `[`, `]`, `{`, `}`, `.`, and `->`.
 
 ## 3. Syntax
 
@@ -38,11 +39,18 @@ app    ::= atom+                application, curried: f a b is (f a) b
          | "letrec" name "=" expr "in" expr    (recursive; section 12)
          | "mutual" "(" binding+ ")" "in" expr    (section 12)
          | "if" expr expr expr   branch on an integer: nonzero is true
-         | "match" expr "{" arm+ "}"    (section 9.3; arms are multi-line, section 12)
+         | "match" expr "{" newline arm+ "}"    (section 9.3; arms are multi-line, section 12)
 atom   ::= integer | string | name | "~" | list | pair | "(" expr ")"
 list   ::= "[" expr* "]"        a proper list
 pair   ::= "(" expr "." expr ")"
 params ::= name | "(" name+ ")"
+binding ::= "(" name expr ")"     a name for a function in a mutual group, as in L1
+arm     ::= pattern "->" expr     the body ends at the end of its line (section 12)
+pattern ::= Name                  a constructor with no payload, e.g. None
+          | Name name             a constructor with a variable payload, e.g. Ok v
+          | Name "_"              a constructor, payload ignored, e.g. Err _
+          | "_"                   any value, ignored
+          | name                  any value, bound to the name
 ```
 
 `?` ends an application, so `parse s?` is `(parse s)?`, and it applies to the whole call on its left. To apply `?` to an argument, wrap it in parentheses: `g (parse s)?`. `?` appears at most once at the end of an application, so `f x? y` and `e??` are syntax errors. `?` is not an atom.
@@ -57,13 +65,17 @@ Application is juxtaposition: `f x y` is `(f x) y`. An atom is any single expres
 
 Operators are ordinary names, so `+ 1 2` is application of `+`. Infix forms `a + b` are not part of this draft; they can be added later as sugar with a fixed precedence table. **Open:** whether to add infix sugar for the primitives.
 
+### 3.3a Equality
+
+`=` is the integer equality primitive, and gives 0 or 1. Equality on other values (constructors, pairs, lists, strings) is not defined in the first version. A program tests a constructor with `match`, and compares strings and lists by walking them.
+
 ### 3.4 Names
 
 Names are symbols that are not reserved (section 3.5). Names are lexically scoped and must be bound before use. Shadowing is allowed in a nested scope.
 
 ### 3.5 Reserved words
 
-`fn`, `let`, `in`, `if`, `match`, `~`, and the primitives' symbols, listed in section 6. `in` is a reserved word because `let` uses it.
+`fn`, `let`, `letrec`, `in`, `if`, `match`, `mutual`, `~`, `_`, and the primitives' symbols, listed in section 6. `in` is reserved because `let` uses it.
 
 ## 4. Functions
 
@@ -143,15 +155,13 @@ Constructors are tagged values (section 8), so `kind` and `match` can tell them 
 
 `match e { pattern -> body ... }` evaluates `e`, tests the constructor of its value against each arm in order, and evaluates the body of the first arm that matches, with the pattern's variables bound.
 
-Patterns in the first version:
-
-- A constructor with a variable payload: `Ok v`, `Err e`.
-- A constructor with a wildcard payload: `Ok _`, `Err _`.
-- A wildcard: `_`, matching anything.
+Patterns in the first version are the forms in section 3.1: a constructor with no payload (`None`), with a variable payload (`Ok v`), or with a wildcard payload (`Err _`); a wildcard `_`; and a name, which binds the whole value and matches anything. A name pattern is always last, and an arm after it is reported as unreachable.
 
 Nested patterns are not in the first version. A nested pattern can be written as nested `match` expressions.
 
-Arms are lazy: only the body of the arm that matches is evaluated. The compiler checks that the arms cover every constructor of the scrutinee's type, or that a wildcard arm is present, and reports an error otherwise.
+Arms are on their own lines. A `match` is written over several lines, and there is no one-line form, so no separator is needed between arms.
+
+Arms are lazy: only the body of the arm that matches is evaluated. The compiler checks that the arms cover every constructor of the scrutinee's type, or that a catch-all arm (`_` or a name) is present, and reports an error otherwise.
 
 ### 9.4 The core primitive
 
@@ -172,7 +182,7 @@ Early return needs no machine change: `?` is a rewrite (section 9.2). The expres
 - Parse to a syntax tree with positions.
 - Desugar: `fn (x y)` to nested `lam`, infix (if added) to primitives, `let` to an application of `lam`, `letrec`-style recursion to `fix` as in L1.
 - Compile to the machine's `Expr`.
-- Tests: L1 programs ported to L2, with the same expected results, run through the same program-file format. Each port must give the same result as its L1 original.
+- Tests: L2 programs use the four-section program-file format of L1 (header, imports, program, tests), in `L2/programs/`. L1 programs are not ported; they stay as they are. L2 programs are tested against their own expected results, and the L2 reader and checker have their own test runner in the L2 module.
 
 ## 12. Layout and binding rules
 
