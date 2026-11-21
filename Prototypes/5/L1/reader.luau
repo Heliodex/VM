@@ -422,7 +422,8 @@ local function compileForm(name: string, node: { kind: "list"; items: { Node }; 
 			or definition.kind ~= "list"
 			or #definition.items == 0
 			or definition.items[1].kind ~= "sym"
-			or (definition.items[1] :: { kind: "sym"; name: string; line: number }).name ~= "fn" then
+			or (definition.items[1] :: { kind: "sym"; name: string; line: number }).name ~= "fn"
+		then
 			fail(definition.line, "letrec binds a fn, so the function can call itself")
 		end
 
