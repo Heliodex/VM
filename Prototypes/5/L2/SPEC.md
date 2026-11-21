@@ -231,7 +231,7 @@ t ::= Int                 an integer
     | Dyn                 a value from untyped code (13.4)
 ```
 
-A list of `t` has type `[t]`, a built-in recursive type. Its values are the pair chains of section 5, so a `[t]` value is `~` or a pair `(t . [t])`. The empty list is `~`, and it has type `[t]` for any `t`. A list literal `[a b c]` has type `[t]` when each item has type `t`. A pair and a list unify head to head and tail to tail, since a list is a pair or nil.
+A list of `t` has type `[t]`, a built-in recursive type. Its values are the pair chains of section 5, so a `[t]` value is `~` or a pair `(t . [t])`. The empty list is `~`, and it has type `[t]` for any `t`. A list literal `[a b c]` has type `[t]` when each item has type `t`. A pair and a list are different types, even though a list is a pair chain at run time: `(1 . ~)` has type `(Int . [Int])`, not `[Int]`, and `cons` builds a list from an item and a list (section 13.3).
 
 ### 13.2 Inference
 
@@ -262,7 +262,9 @@ Recursive functions (`letrec`) are checked monomorphically within their own body
 - `/` and `%` have type `Int -> Int -> Result Int [Int]`: a zero divisor gives `Err` with the reason, `division by zero` or `remainder by zero`.
 - `< =` have type `Int -> Int -> Int`, since the machine returns 0 or 1.
 - `@` has type `a -> Int`, the kind of any value.
-- `head` and `tail` have type `[a] -> Result a [Int]` and `[a] -> Result [a] [Int]`. On nil they give `Err` with the reason, `head of an empty list` or `tail of an empty list`. They take lists, so that a recursive function over a list is typed. A pair is accepted where a list is, when its second part is a list, so a pair whose parts have different types cannot be taken apart in the first version.
+- `head` and `tail` have type `[a] -> Result a [Int]` and `[a] -> Result [a] [Int]`. On nil they give `Err` with the reason, `head of an empty list` or `tail of an empty list`. They take lists, so that a recursive function over a list is typed. A pair is not a list, so `head` of a pair is a type error.
+- `fst` and `snd` have type `(a . b) -> a` and `(a . b) -> b`. A pair is never nil, so they give the part with no Result. A pair whose parts have different types is taken apart this way, so `(1 . (2 . 3))` has `fst` of `1` and `snd` of `(2 . 3)`.
+- `cons` has type `a -> [a] -> [a]`: `cons x xs` is the list with x in front of xs.
 - `if c t e` needs `c : Int`, and `t` and `e` must have the same type.
 - `pin e` has type `Pin t` when `e : t`, and `force` has type `Pin t -> t`.
 - `fix` has type `(a -> a) -> a`.

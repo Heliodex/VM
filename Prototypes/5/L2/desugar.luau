@@ -101,6 +101,9 @@ local DIVISION: { [string]: string } = {
 local UNARY: { [string]: (M.Expr) -> M.Expr } = {
 	head = checkedHead,
 	tail = checkedTail,
+	-- A pair is never nil, so fst and snd take its parts without a check.
+	fst = M.head,
+	snd = M.tail,
 	pin = M.pin,
 	force = M.force,
 	fix = function(
@@ -607,6 +610,10 @@ local function resolveName(
 		return M.lam(M.lam(M.prim(p.tag, M.var(1), M.var(0))))
 	end
 
+	if name == "cons" then
+		return M.lam(M.lam(M.cell(M.var(1), M.var(0))))
+	end
+
 	const unary = UNARY[name]
 
 	if unary ~= nil then
@@ -632,6 +639,17 @@ local function desugarApp(
 	scope: { string },
 	ctors: { [string]: Ctor }
 ): M.Expr
+	-- cons x xs is the cell with x as its head and xs as its tail.
+	if head.k == "name" and head.name == "cons" and indexOf(scope, "cons") == nil and #args >= 2 then
+		local e = M.cell(desugar(args[1], scope, ctors), desugar(args[2], scope, ctors))
+
+		for i = 3, #args do
+			e = M.app(e, desugar(args[i], scope, ctors))
+		end
+
+		return e
+	end
+
 	if head.k == "name" and indexOf(scope, head.name) == nil and UNARY[head.name] ~= nil and #args >= 1 then
 		local e = UNARY[head.name](desugar(args[1], scope, ctors))
 

@@ -1,0 +1,8 @@
+cons puts an item on the front of a list. Its result is a list, so head and tail can take it apart.
+---
+
+---
+fn n (cons n [1 2])
+---
+0 => [0 1 2] fuel 1000
+9 => [9 1 2] fuel 1000

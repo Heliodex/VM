@@ -64,6 +64,8 @@ const SHOWN: { { name: string, src: string, want: string } } = {
 	{ name = "a function of an integer", src = "fn x (+ x 1)", want = "(Int -> Int)" },
 	{ name = "head of a list gives its item", src = "fn l\n\tmatch (head l) {\n\t\tOk h -> (+ h 1)\n\t\tErr e -> 0\n\t}", want = "([Int] -> Int)" },
 	{ name = "head gives a Result", src = "fn x (head [x 1])", want = "(Int -> Result Int ([Int]))" },
+	{ name = "fst and snd take a pair apart", src = "fn p (+ (fst p) (snd p))", want = "((Int . Int) -> Int)" },
+	{ name = "cons makes a list", src = "fn x (cons x [1])", want = "(Int -> [Int])" },
 	{ name = "division gives a Result", src = "fn x (/ 10 x)", want = "(Int -> Result Int ([Int]))" },
 	{ name = "a sum takes its own type", src = "type Option a = None | Some a\nfn o match o {\n\tNone -> 0\n\tSome v -> v\n}", want = "(Option Int -> Int)" },
 	{ name = "a match result is a Result", src = "fn x (if x (Ok 1) (Err 2))", want = "(Int -> Result Int Int)" },
@@ -140,6 +142,10 @@ for _ in string.gmatch(twoErrors, "[^\n]+") do
 end
 
 check("two type errors are both reported", errorLines == 2 and string.find(twoErrors, "line 1", 1, true) ~= nil and string.find(twoErrors, "line 2", 1, true) ~= nil, twoErrors)
+
+-- A pair is not a list: head of a pair is a type error, and so is fst of a list.
+check("head of a pair is a type error", string.find(typeOf("fn x (head (1 . 2))"), "but this is (Int . Int)", 1, true) ~= nil, typeOf("fn x (head (1 . 2))"))
+check("fst of a list is a type error", string.find(typeOf("fn x (fst [1 2])"), "but this is [Int]", 1, true) ~= nil, typeOf("fn x (fst [1 2])"))
 
 print(string.format("%d of %d checks passed", total - failures, total))
 

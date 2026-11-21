@@ -1,0 +1,8 @@
+Pairs and lists are different types. fst and snd take a pair apart, with no Result, since a pair is never nil. cons puts an item on the front of a list. A pair whose second part is a pair holds parts of different types.
+---
+
+---
+fn p (+ (fst p) (fst (snd p)))
+---
+(1 . (2 . 3)) => 3 fuel 1000
+(5 . (-2 . ~)) => 3 fuel 1000

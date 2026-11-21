@@ -261,18 +261,6 @@ unify = function(
 		mismatch(a, b)
 	end
 
-	if a.name == "pair" and b.name == "list" then
-		unify(a.args[1], b.args[1])
-		unify(a.args[2], b)
-		return
-	end
-
-	if a.name == "list" and b.name == "pair" then
-		unify(a.args[1], b.args[1])
-		unify(a, b.args[2])
-		return
-	end
-
 	if a.name ~= b.name or #a.args ~= #b.args then
 		mismatch(a, b)
 	end
@@ -561,6 +549,19 @@ do
 
 	const tailA = fresh(-1)
 	BUILTINS.tail = { vars = { tailA }, ty = arrow(listOf(tailA), resultOf(listOf(tailA))) }
+
+	-- A pair is never nil, so its parts are taken apart without a Result. A pair and a list are different types.
+	const fstA = fresh(-1)
+	const fstB = fresh(-1)
+	BUILTINS.fst = { vars = { fstA, fstB }, ty = arrow(pairOf(fstA, fstB), fstA) }
+
+	const sndA = fresh(-1)
+	const sndB = fresh(-1)
+	BUILTINS.snd = { vars = { sndA, sndB }, ty = arrow(pairOf(sndA, sndB), sndB) }
+
+	-- cons puts an item on the front of a list.
+	const consA = fresh(-1)
+	BUILTINS.cons = { vars = { consA }, ty = arrow(consA, arrow(listOf(consA), listOf(consA))) }
 
 	const pinA = fresh(-1)
 	BUILTINS.pin = { vars = { pinA }, ty = arrow(pinA, pinOf(pinA)) }
