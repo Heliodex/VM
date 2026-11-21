@@ -70,7 +70,6 @@ const KEYWORDS: { [string]: boolean } = {
 	letrec = true,
 	["if"] = true,
 	match = true,
-	mutual = true,
 	check = true,
 	untyped = true,
 	type = true,
@@ -658,28 +657,6 @@ local function parse(text: string): Program
 		return { k = "match"; scrut = scrut; arms = arms; at = at(start) }
 	end
 
-	local function parseMutual(): Expr
-		const start = advance()
-		const saved = sig
-		sig = false
-		expectKind "("
-		local bindings: { Binding } = {}
-
-		while cur().kind == "(" do
-			advance()
-			const nameTok = expectKind "sym"
-			const value = parseExpr()
-			expectKind ")"
-			table.insert(bindings, { name = word(nameTok); value = value; at = at(nameTok) })
-		end
-
-		expectKind ")"
-		const body = parseExpr()
-		sig = saved
-
-		return { k = "mutual"; bindings = bindings; body = body; at = at(start) }
-	end
-
 	-- check e: the value of e, tested when it is used at a type. The operand is an atom, so an application needs parentheses.
 	local function parseCheck(): Expr
 		const start = advance()
@@ -708,8 +685,6 @@ local function parse(text: string): Program
 				return parseIf()
 			elseif word(t) == "match" then
 				return parseMatch()
-			elseif word(t) == "mutual" then
-				return parseMutual()
 			elseif word(t) == "check" then
 				return parseCheck()
 			elseif word(t) == "untyped" then

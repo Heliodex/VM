@@ -6,7 +6,7 @@
 --   fn (x y) body         a function of x, then of y: lam, lam
 --   let x = e, then b     a non-recursive binding: (lam b) applied to e
 --   letrec f = fn ..., then b  a recursive function: fix, as in L1
---   mutual (...) b        a group of functions that call each other, as in L1: one fix, dispatched by a tag
+--   letrec { ... } b      a group of functions that call each other, as in L1: one fix, dispatched by a tag
 --   if c t e              ite; only the branch taken runs
 --   match e { ... }       the scrutinee is bound, and each arm tests its constructor's tag: tagof, then payload
 --   e?                    early return, rewritten as a match on the result, in the function it appears in

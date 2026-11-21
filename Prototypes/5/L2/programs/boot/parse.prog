@@ -86,10 +86,9 @@ let isKw = (fn t
 	(if (isWord t "letrec") 1
 	(if (isWord t "if") 1
 	(if (isWord t "match") 1
-	(if (isWord t "mutual") 1
 	(if (isWord t "check") 1
 	(if (isWord t "untyped") 1
-	(if (isWord t "type") 1 (isWord t "cond")))))))))))
+	(if (isWord t "type") 1 (isWord t "cond"))))))))))
 let isCapB = (fn w
 	(if (< (first w) 65) 0 (if (< 90 (first w)) 0 1)))
 let atomStartT = (fn t
@@ -276,31 +275,32 @@ letrec lastExpr = (fn l
 		(lastExpr (after l))))
 
 fn toks
-	mutual ((parseType (fn (ts sig)
+	letrec {
+		parseType = (fn (ts sig)
 		(let base = (parseBaseType ts sig)?
 		(let n = (norm (snd base) sig)
 		(if (= (kn (tok n)) 7)
 			(let r = (parseType (after n) sig)?
 			(Ok ((TFun ((fst base) . ((fst r) . (at (tok n))))) . (snd r))))
-			(Ok ((fst base) . n)))))))
-		(parseBaseType (fn (ts sig)
+			(Ok ((fst base) . n))))))
+		parseBaseType = (fn (ts sig)
 		(let r = (parseTypeAtom ts sig)?
-		(baseTail (fst r) (snd r) sig))))
-		(baseTail (fn (f rest sig)
+		(baseTail (fst r) (snd r) sig)))
+		baseTail = (fn (f rest sig)
 		(if (isCapTy f)
 			(let args = (parseTypeArgs rest sig)?
 			(if (= (@ (fst args)) 1)
 				(Ok (f . (snd args)))
 				(Ok ((TApp ((fst (tyP f)) . ((fst args) . (snd (tyP f))))) . (snd args)))))
-			(Ok (f . rest)))))
-		(parseTypeArgs (fn (ts sig)
+			(Ok (f . rest))))
+		parseTypeArgs = (fn (ts sig)
 		(let n = (norm ts sig)
 		(if (typeAtomStartT (tok n))
 			(let r = (parseTypeAtom n sig)?
 			(let more = (parseTypeArgs (snd r) sig)?
 			(Ok ((cons (fst r) (fst more)) . (snd more)))))
-			(Ok (~ . n))))))
-		(parseTypeAtom (fn (ts sig)
+			(Ok (~ . n)))))
+		parseTypeAtom = (fn (ts sig)
 		(let n = (norm ts sig)
 		(let t = (tok n)
 		(if (isSymT t)
@@ -309,27 +309,27 @@ fn toks
 				(parseParenType (after n) t)
 				(if (= (kn t) 2)
 					(parseBrackType (after n) t)
-					(failTok t "expected a type"))))))))
-		(parseParenType (fn (ts t)
+					(failTok t "expected a type")))))))
+		parseParenType = (fn (ts t)
 		(let r1 = (parseType ts 0)?
 		(let n1 = (norm (snd r1) 0)
 		(if (= (kn (tok n1)) 6)
 			(let r2 = (parseType (after n1) 0)?
 			(closeParen (TPair ((fst r1) . ((fst r2) . (at t)))) (snd r2)))
-			(closeParen (fst r1) n1))))))
-		(parseBrackType (fn (ts t)
+			(closeParen (fst r1) n1)))))
+		parseBrackType = (fn (ts t)
 		(let r = (parseType ts 0)?
 		(let c = (expectK (snd r) 0 3)?
-		(Ok ((TList ((fst r) . (at t))) . (snd c)))))))
-		(parseTypeDecl (fn ts
+		(Ok ((TList ((fst r) . (at t))) . (snd c))))))
+		parseTypeDecl = (fn ts
 		(let start = (tok ts)
 		(let nameR = (expectK (after ts) 1 13)?
 		(let u = (requireCap (fst nameR) "a type's name starts with a capital letter")?
 		(let pr = (paramsLoop (snd nameR))?
 		(let eqR = (expectW (snd pr) 1 "=")?
 		(let cr = (consLoop (snd eqR))?
-		(Ok (((symOf (fst nameR)) . ((fst pr) . ((fst cr) . (at start)))) . (snd cr)))))))))))
-		(paramsLoop (fn ts
+		(Ok (((symOf (fst nameR)) . ((fst pr) . ((fst cr) . (at start)))) . (snd cr))))))))))
+		paramsLoop = (fn ts
 		(let n = (norm ts 1)
 		(let t = (tok n)
 		(if (isSymT t)
@@ -339,8 +339,8 @@ fn toks
 					(Ok (~ . n))
 					(let more = (paramsLoop (after n))?
 					(Ok ((cons (symOf t) (fst more)) . (snd more))))))
-			(Ok (~ . n)))))))
-		(consLoop (fn ts
+			(Ok (~ . n))))))
+		consLoop = (fn ts
 		(let cr = (expectK ts 1 13)?
 		(let u = (requireCap (fst cr) "a constructor's name starts with a capital letter")?
 		(let pr = (payloadOf (snd cr))?
@@ -349,12 +349,12 @@ fn toks
 		(if (isWord (tok n) "|")
 			(let more = (consLoop (after n))?
 			(Ok ((cons con (fst more)) . (snd more))))
-			(Ok ((cons con ~) . n))))))))))
-		(payloadOf (fn ts
+			(Ok ((cons con ~) . n)))))))))
+		payloadOf = (fn ts
 		(if (typeAtomStartT (tok ts))
 			(parseTypeAtom ts 1)
-			(Ok (NoType . ts)))))
-		(parseExpr (fn (ts sig)
+			(Ok (NoType . ts))))
+		parseExpr = (fn (ts sig)
 		(let n = (norm ts sig)
 		(let t = (tok n)
 		(if (isWord t "fn") (parseFn n sig)
@@ -362,30 +362,29 @@ fn toks
 		(if (isWord t "letrec") (parseLet n sig)
 		(if (isWord t "if") (parseIf n sig)
 		(if (isWord t "match") (parseMatch n sig)
-		(if (isWord t "mutual") (parseMutual n sig)
 		(if (isWord t "check") (parseCheck n sig)
 		(if (isWord t "untyped") (parseUntyped n sig)
-			(if (isWord t "cond") (parseCond n sig) (parseAppTail n sig))))))))))))))
-		(parseAppTail (fn (n sig)
+			(if (isWord t "cond") (parseCond n sig) (parseAppTail n sig))))))))))))
+		parseAppTail = (fn (n sig)
 		(let r = (parseApp n sig)?
 		(let n2 = (norm (snd r) sig)
 		(if (= (kn (tok n2)) 8)
 			(Ok ((ETry ((fst r) . (at (tok n2)))) . (after n2)))
-			(Ok ((fst r) . n2)))))))
-		(parseApp (fn (ts sig)
+			(Ok ((fst r) . n2))))))
+		parseApp = (fn (ts sig)
 		(let h = (parseAtom ts sig)?
 		(let as = (argsLoop (snd h) sig)?
 		(if (= (@ (fst as)) 1)
 			(Ok ((fst h) . (snd as)))
-			(Ok ((EApp ((fst h) . ((fst as) . (atOf (fst h))))) . (snd as))))))))
-		(argsLoop (fn (ts sig)
+			(Ok ((EApp ((fst h) . ((fst as) . (atOf (fst h))))) . (snd as)))))))
+		argsLoop = (fn (ts sig)
 		(let n = (norm ts sig)
 		(if (atomStartT (tok n))
 			(let a = (parseAtom n sig)?
 			(let more = (argsLoop (snd a) sig)?
 			(Ok ((cons (fst a) (fst more)) . (snd more)))))
-			(Ok (~ . n))))))
-		(parseAtom (fn (ts sig)
+			(Ok (~ . n)))))
+		parseAtom = (fn (ts sig)
 		(let n = (norm ts sig)
 		(let t = (tok n)
 		(if (= (kn t) 11)
@@ -398,18 +397,18 @@ fn toks
 						(parseListExpr (after n) t)
 						(if (= (kn t) 13)
 							(parseSymAtom n t)
-							(failTok t "expected a value here"))))))))))
-		(parseParenExpr (fn (ts t)
+							(failTok t "expected a value here")))))))))
+		parseParenExpr = (fn (ts t)
 		(let r1 = (parseExpr ts 0)?
 		(let n1 = (norm (snd r1) 0)
 		(if (= (kn (tok n1)) 6)
 			(let r2 = (parseExpr (after n1) 0)?
 			(closeParen (EPair ((fst r1) . ((fst r2) . (at t)))) (snd r2)))
-			(closeParen (fst r1) n1))))))
-		(parseListExpr (fn (ts t)
+			(closeParen (fst r1) n1)))))
+		parseListExpr = (fn (ts t)
 		(let items = (itemsLoop ts)?
-		(Ok ((EList ((fst items) . (at t))) . (snd items))))))
-		(itemsLoop (fn ts
+		(Ok ((EList ((fst items) . (at t))) . (snd items)))))
+		itemsLoop = (fn ts
 		(let n = (norm ts 0)
 		(let t = (tok n)
 		(if (= (kn t) 3)
@@ -418,33 +417,33 @@ fn toks
 				(failTok t "a list is never closed")
 				(let a = (parseAtom n 0)?
 				(let more = (itemsLoop (snd a))?
-				(Ok ((cons (fst a) (fst more)) . (snd more)))))))))))
-		(parseFn (fn (ts sig)
+				(Ok ((cons (fst a) (fst more)) . (snd more))))))))))
+		parseFn = (fn (ts sig)
 		(let start = (tok ts)
 		(let n1 = (norm (after ts) sig)
 		(let ps = (paramList n1 sig)?
 		(if (= (@ (fst ps)) 1)
 			(failTok start "fn needs at least one parameter")
-			(parseFnBody (snd ps) start sig (fst ps))))))))
-		(paramList (fn (n1 sig)
+			(parseFnBody (snd ps) start sig (fst ps)))))))
+		paramList = (fn (n1 sig)
 		(if (= (kn (tok n1)) 0)
 			(paramsParen (after n1))
 			(let nr = (expectK n1 sig 13)?
-			(Ok ((cons (symOf (fst nr)) ~) . (snd nr)))))))
-		(paramsParen (fn ts
+			(Ok ((cons (symOf (fst nr)) ~) . (snd nr))))))
+		paramsParen = (fn ts
 		(let n = (norm ts 0)
 		(if (= (kn (tok n)) 1)
 			(Ok (~ . (after n)))
 			(let nr = (expectK n 0 13)?
 			(let more = (paramsParen (snd nr))?
-			(Ok ((cons (symOf (fst nr)) (fst more)) . (snd more)))))))))
-		(parseFnBody (fn (rest start sig names)
+			(Ok ((cons (symOf (fst nr)) (fst more)) . (snd more))))))))
+		parseFnBody = (fn (rest start sig names)
 		(if (= (kn (tok rest)) 9)
 			(let n = (norm rest 0)
 			(let b = (parseExpr n sig)?
 			(Ok ((EFn (names . ((fst b) . (at start)))) . (snd b)))))
-			(failTok (tok rest) "a function's body starts on the line after its parameters"))))
-		(parseCond (fn (ts sig)
+			(failTok (tok rest) "a function's body starts on the line after its parameters")))
+		parseCond = (fn (ts sig)
 		(let start = (tok ts)
 		(let br = (expectK (after ts) sig 4)?
 		(if (= (kn (tok (snd br))) 9)
@@ -452,16 +451,16 @@ fn toks
 			(if (= (hasCatch (fst cs)) 1)
 				(Ok ((buildCond (fst cs)) . (snd cs)))
 				(failTok start "a cond needs a _ clause as its last clause")))
-			(failTok (tok (snd br)) "a cond needs a newline after {, before its first clause"))))))
-		(clausesLoop (fn (ts seen)
+			(failTok (tok (snd br)) "a cond needs a newline after {, before its first clause")))))
+		clausesLoop = (fn (ts seen)
 		(let n = (norm ts 0)
 		(let t = (tok n)
 		(if (= (kn t) 5)
 			(Ok (~ . (after n)))
 			(if (= seen 1)
 				(failTok t "the _ clause of a cond is its last clause")
-				(clauseItem n)))))))
-		(clauseItem (fn n
+				(clauseItem n))))))
+		clauseItem = (fn n
 		(if (isWord (tok n) "_")
 			(let ar = (expectK (after n) 1 7)?
 			(let b = (parseExpr (snd ar) 1)?
@@ -473,8 +472,8 @@ fn toks
 			(let b = (parseExpr (snd ar) 1)?
 			(let ok = (condEnd (snd b))?
 			(let more = (clausesLoop (snd b) 0)?
-			(Ok ((cons (0 . ((fst tst) . ((fst b) . (at (tok n))))) (fst more)) . (snd more)))))))))))
-		(parseBlock (fn (ts sig)
+			(Ok ((cons (0 . ((fst tst) . ((fst b) . (at (tok n))))) (fst more)) . (snd more))))))))))
+		parseBlock = (fn (ts sig)
 		(let start = (tok ts)
 		(let br = (expectK (after ts) sig 4)?
 		(if (= (kn (tok (snd br))) 9)
@@ -482,8 +481,8 @@ fn toks
 			(if (isWord start "letrec")
 				(Ok ((EMutual ((bindsOf (fst its)) . ((lastExpr (fst its)) . (at start)))) . (snd its)))
 				(Ok ((buildLets (fst its)) . (snd its)))))
-			(failTok (tok (snd br)) "a block needs a newline after {, before its first item"))))))
-		(blockItems (fn (ts rec seen)
+			(failTok (tok (snd br)) "a block needs a newline after {, before its first item")))))
+		blockItems = (fn (ts rec seen)
 		(let n = (norm ts 0)
 		(let t = (tok n)
 		(if (= (kn t) 5)
@@ -494,8 +493,8 @@ fn toks
 				(failTok t "a block's body is its last item")
 				(if (bindStart n)
 					(bindItem n rec)
-					(bodyItem n rec))))))))
-		(bindItem (fn (n rec)
+					(bodyItem n rec)))))))
+		bindItem = (fn (n rec)
 		(let nr = (expectK n 1 13)?
 		(let chk = (letNameOk (fst nr))?
 		(let er = (expectW (snd nr) 1 "=")?
@@ -506,17 +505,17 @@ fn toks
 					(bindMore nr v rec)
 					(failTok (fst nr) "a letrec block binds fns, so the functions can call each other"))
 				(bindMore nr v rec))
-			(failTok (tok (snd v)) "a block binding ends at the end of its line; wrap a longer value in parentheses"))))))))
-		(bindMore (fn (nr v rec)
+			(failTok (tok (snd v)) "a block binding ends at the end of its line; wrap a longer value in parentheses")))))))
+		bindMore = (fn (nr v rec)
 		(let more = (blockItems (snd v) rec 0)?
-		(Ok ((cons (1 . ((symOf (fst nr)) . ((fst v) . (at (fst nr))))) (fst more)) . (snd more))))))
-		(bodyItem (fn (n rec)
+		(Ok ((cons (1 . ((symOf (fst nr)) . ((fst v) . (at (fst nr))))) (fst more)) . (snd more)))))
+		bodyItem = (fn (n rec)
 		(let b = (parseExpr n 1)?
 		(if (= (lineEnd (snd b)) 1)
 			(let more = (blockItems (snd b) rec 1)?
 			(Ok ((cons (0 . (~ . ((fst b) . (at (tok n))))) (fst more)) . (snd more))))
-			(failTok (tok (snd b)) "a block's body ends at the end of its line; wrap a longer body in parentheses")))))
-		(parseLet (fn (ts sig)
+			(failTok (tok (snd b)) "a block's body ends at the end of its line; wrap a longer body in parentheses"))))
+		parseLet = (fn (ts sig)
 		(if (= (kn (tok (norm (after ts) sig))) 4)
 			(parseBlock ts sig)
 		(let start = (tok ts)
@@ -525,22 +524,22 @@ fn toks
 		(let er = (expectW (snd nr) sig "=")?
 		(if (= sig 1)
 			(failTok start "a let in a match arm needs parentheses around it")
-			(letValue (snd er) start (symOf (fst nr)))))))))))
-		(letValue (fn (ts start name)
+			(letValue (snd er) start (symOf (fst nr))))))))))
+		letValue = (fn (ts start name)
 		(let v = (parseExpr ts 1)?
 		(let rest = (snd v)
 		(if (= (kn (tok rest)) 9)
 			(let n = (norm rest 0)
 			(let b = (parseExpr n 0)?
 			(Ok ((ELet (name . ((fst v) . ((fst b) . ((if (isWord start "letrec") 1 0) . (at start)))))) . (snd b)))))
-			(failTok (tok rest) "a let value ends at the end of its line; wrap a longer value in parentheses"))))))
-		(parseIf (fn (ts sig)
+			(failTok (tok rest) "a let value ends at the end of its line; wrap a longer value in parentheses")))))
+		parseIf = (fn (ts sig)
 		(let start = (tok ts)
 		(let c = (parseAtom (after ts) sig)?
 		(let t = (parseAtom (snd c) sig)?
 		(let e = (parseAtom (snd t) sig)?
-		(Ok ((EIf ((fst c) . ((fst t) . ((fst e) . (at start))))) . (snd e)))))))))
-		(parseMatch (fn (ts sig)
+		(Ok ((EIf ((fst c) . ((fst t) . ((fst e) . (at start))))) . (snd e))))))))
+		parseMatch = (fn (ts sig)
 		(let start = (tok ts)
 		(let sc = (parseExpr (after ts) sig)?
 		(let br = (expectK (snd sc) sig 4)?
@@ -550,8 +549,8 @@ fn toks
 			(if (= (@ (fst arms)) 1)
 				(failTok start "a match needs at least one arm")
 				(Ok ((EMatch ((fst sc) . ((fst arms) . (at start)))) . (after (snd arms))))))
-			(failTok (tok b) "a match needs a newline after {, before its first arm"))))))))
-		(armsLoop (fn ts
+			(failTok (tok b) "a match needs a newline after {, before its first arm")))))))
+		armsLoop = (fn ts
 		(let n = (norm ts 0)
 		(if (= (kn (tok n)) 5)
 			(Ok (~ . n))
@@ -562,32 +561,16 @@ fn toks
 			(if (isArmEnd (tok r))
 				(let more = (armsLoop r)?
 				(Ok ((cons ((fst p) . ((fst body) . (at (tok n)))) (fst more)) . (snd more))))
-				(failTok (tok r) "an arm ends at the end of its line; wrap a longer body in parentheses"))))))))))
-		(parseMutual (fn (ts sig)
-		(let start = (tok ts)
-		(let op = (expectK (after ts) 0 0)?
-		(let bs = (mutualBindings (snd op))?
-		(let cr = (expectK (snd bs) 0 1)?
-		(let body = (parseExpr (snd cr) 0)?
-		(Ok ((EMutual ((fst bs) . ((fst body) . (at start)))) . (snd body))))))))))
-		(mutualBindings (fn ts
-		(let n = (norm ts 0)
-		(if (= (kn (tok n)) 0)
-			(let nr = (expectK (after n) 0 13)?
-			(let v = (parseExpr (snd nr) 0)?
-			(let cr = (expectK (snd v) 0 1)?
-			(let more = (mutualBindings (snd cr))?
-			(Ok ((cons ((symOf (fst nr)) . ((fst v) . (at (fst nr)))) (fst more)) . (snd more)))))))
-			(Ok (~ . n))))))
-		(parseCheck (fn (ts sig)
+				(failTok (tok r) "an arm ends at the end of its line; wrap a longer body in parentheses")))))))))
+		parseCheck = (fn (ts sig)
 		(let start = (tok ts)
 		(let a = (parseAtom (after ts) sig)?
-		(Ok ((ECheck ((fst a) . (at start))) . (snd a)))))))
-		(parseUntyped (fn (ts sig)
+		(Ok ((ECheck ((fst a) . (at start))) . (snd a))))))
+		parseUntyped = (fn (ts sig)
 		(let start = (tok ts)
 		(let a = (parseAtom (after ts) sig)?
-		(Ok ((EUntyped ((fst a) . (at start))) . (snd a)))))))
-		(declsLoop (fn ts
+		(Ok ((EUntyped ((fst a) . (at start))) . (snd a))))))
+		declsLoop = (fn ts
 		(let n = (norm ts 0)
 		(if (isWord (tok n) "type")
 			(let d = (parseTypeDecl n)?
@@ -595,8 +578,8 @@ fn toks
 				(let more = (declsLoop (snd d))?
 				(Ok ((cons (fst d) (fst more)) . (snd more))))
 				(failTok (tok (snd d)) "a type declaration ends at the end of its line")))
-			(Ok (~ . n))))))
-		(parseProgram (fn ts
+			(Ok (~ . n)))))
+		parseProgram = (fn ts
 		(let ds = (declsLoop ts)?
 		(let e = (parseExpr (snd ds) 0)?
 		(let n = (norm (snd e) 0)
@@ -605,12 +588,12 @@ fn toks
 			(let txt = (afterText (tok n))?
 			(let m = (append ("unexpected " . txt))?
 			(let m2 = (append (m . " after the expression"))?
-			(failTok (tok n) m2))))))))))
-		(isEndOfLine (fn t
-		(if (= (kn t) 9) 1 (= (kn t) 10))))
-		(isArmEnd (fn t
-		(if (= (kn t) 9) 1 (= (kn t) 5))))
-	)
+			(failTok (tok n) m2)))))))))
+		isEndOfLine = (fn t
+		(if (= (kn t) 9) 1 (= (kn t) 10)))
+		isArmEnd = (fn t
+		(if (= (kn t) 9) 1 (= (kn t) 5)))
 	parseProgram toks
+	}
 ---
 [((Num 1) . (1 . (1 . 0))) (Eof . (1 . (2 . 0)))] => Ok (~ . (EInt (1 . (1 . 1)))) fuel 100000

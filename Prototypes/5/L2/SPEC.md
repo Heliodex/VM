@@ -39,14 +39,12 @@ app    ::= atom+                application, curried: f a b is (f a) b
          | "fn" params newline expr    function; the body is on the line after the parameters (section 4)
          | "let" name "=" expr newline expr
          | "letrec" name "=" expr newline expr    (recursive; section 12)
-         | "mutual" "(" binding+ ")" expr    (section 12)
          | "if" expr expr expr   branch on an integer: nonzero is true
          | "match" expr "{" newline arm+ "}"    (section 9.3; arms are multi-line, section 12)
 atom   ::= integer | string | name | "~" | list | pair | "(" expr ")"
 list   ::= "[" expr* "]"        a proper list
 pair   ::= "(" expr "." expr ")"
 params ::= name | "(" name+ ")"
-binding ::= "(" name expr ")"     a name for a function in a mutual group, as in L1
 arm     ::= pattern "->" expr     the body ends at the end of its line (section 12)
 pattern ::= Name                  a constructor with no payload, e.g. None
           | Name name             a constructor with a variable payload, e.g. Ok v
@@ -77,7 +75,7 @@ Names are symbols that are not reserved (section 3.5). Names are lexically scope
 
 ### 3.5 Reserved words
 
-`fn`, `let`, `letrec`, `if`, `match`, `mutual`, `~`, `_`, and the primitives' symbols, listed in section 6.
+`fn`, `let`, `letrec`, `if`, `match`, `cond`, `~`, `_`, and the primitives' symbols, listed in section 6.
 
 ## 4. Functions
 
@@ -156,7 +154,7 @@ Constructors are tagged values (section 8), so `kind` and `match` can tell them 
 Where a `?` may appear is limited, so that hoisting never runs an expression that would not otherwise run:
 
 - In the body of a function, and in any expression that always runs with it (a let value, an argument, a list item, a pair part, an if condition, a match scrutinee), it is allowed. Its early return leaves the enclosing function.
-- In a let or mutual body, or in an if branch or match arm, it is allowed only when that let, if or match is itself the function's result. Then the branch is a function of its own, and the early return leaves it. The names the let binds are in scope for it.
+- In a let or letrec body, or in an if branch or match arm, it is allowed only when that let, if or match is itself the function's result. Then the branch is a function of its own, and the early return leaves it. The names the let binds are in scope for it.
 - Anywhere else, including an if branch or match arm that is not the function's result, it is an error.
 
 This is sound because L2 is pure: moving an evaluation earlier changes only which error is reported first, never a result. The payload types must match: a function that uses `?` on `Err e` must return `Err` with a compatible payload.
@@ -203,7 +201,7 @@ These rules are decided for the first version.
 - **Newlines** are whitespace, except inside a `match` block, where a newline ends an arm, and after the value of a `let` or `letrec`, where a newline ends the value.
 - **Arms** are `pattern -> body`. A body ends at the end of its line. To continue a body onto the next line, wrap it in parentheses, so the parser never needs a layout rule.
 - **Indentation** has no meaning. Indentation-based syntax is deferred, and it can be added to the lexer later without changing the grammar.
-- **`let`** is non-recursive, and has no keyword between its value and its body. The value ends at the end of its line, so a longer value is wrapped in parentheses, and the body starts on the next line. A `let` inside a match arm is wrapped in parentheses too, since the arm already ends at its line. A recursive function is written with **`letrec`**, which is `fix` as in L1, and a group of functions that call each other is one **`mutual`** form. Its body follows the close of its bindings, with no keyword between them.
+- **`let`** is non-recursive, and has no keyword between its value and its body. The value ends at the end of its line, so a longer value is wrapped in parentheses, and the body starts on the next line. A `let` inside a match arm is wrapped in parentheses too, since the arm already ends at its line. A recursive function is written with **`letrec`**, which is `fix` as in L1, and a group of functions that call each other is written as a `letrec` block (section 12.1).
 
 Example:
 
@@ -232,8 +230,8 @@ let {
 - A block is `let {` or `letrec {`, then items, then `}`. Items are separated by newlines, as the arms of a `match` are.
 - A binding is `name = expr`, and its value ends at the end of its line, as a `let` value does. A longer value is wrapped in parentheses.
 - The last item is the body. It is an expression with no `name =`, and it must be the last item: a block with no body, or with a binding after its body, is an error.
-- `let {` binds each name in order, so a binding sees the names before it, as a chain of `let`s does. `letrec {` binds all its names together, so the bindings can call each other, as a `mutual` group does, and each value must be a `fn`.
-- A block is sugar: `let {` is a chain of `let`s, and `letrec {` is a `mutual` group. It adds no expression to the machine, and it adds no new check.
+- `let {` binds each name in order, so a binding sees the names before it, as a chain of `let`s does. `letrec {` binds all its names together, so the bindings can call each other, and each value must be a `fn`.
+- A block is sugar: `let {` is a chain of `let`s, and `letrec {` is a group of mutually recursive functions. It adds no expression to the machine, and it adds no new check.
 - The braces end the block, so a block may sit inside a match arm, or inside any expression, without parentheses. Inside the braces, newlines separate items.
 - Early return (section 9.2) follows the rules for the body of a `let`: a `?` in a binding's value is allowed where a `let` value's would be, and a `?` in the body is allowed where a `let` body's would be.
 
@@ -281,7 +279,7 @@ The constructs:
 
 - `fn` makes an arrow type.
 - `letrec` binds its name before checking its body, and generalises afterwards.
-- `mutual` checks its group together and generalises the group after.
+- A `letrec` block checks its group together and generalises the group after.
 - `if` needs an `Int` condition, and its branches must have the same type.
 - `match` checks each pattern against the scrutinee's sum, requires the arms to have one type, and checks coverage: the arms' constructors must be the sum's constructors, or a catch-all arm must be present. Arms after a catch-all are reported as unreachable.
 
@@ -292,7 +290,7 @@ The output is the same tree with the check nodes inserted, and the desugarer tak
 
 Types are inferred with Hindley–Milner: unification, with let-polymorphism for `let` and `letrec` bindings. A function's type is generalised at its `let` or `letrec`, so `fn x x` is `a -> a` and can be used at two types.
 
-Recursive functions (`letrec`) are checked monomorphically within their own body, as usual for HM, and generalised afterwards. `mutual` groups are checked together and generalised together.
+Recursive functions (`letrec`) are checked monomorphically within their own body, as usual for HM, and generalised afterwards. The bindings of a `letrec` block are checked together and generalised together.
 
 ### 13.3 Primitives and forms
 
@@ -370,7 +368,7 @@ These were open, and are now settled:
 2. Constructors are tagged in the machine (section 8).
 3. The results model is a built-in sum `Result`, with `?` and `match` (section 9).
 4. The dispatch expressions are `tagof` and `payload` (section 9.4).
-5. Layout: newlines separate `match` arms and end a `let` value, a body continues only inside parentheses, indentation is deferred, `let` is non-recursive, `letrec` and `mutual` are for recursion (section 12).
+5. Layout: newlines separate `match` arms and end a `let` value, a body continues only inside parentheses, indentation is deferred, `let` is non-recursive, `letrec` is for recursion (section 12).
 6. A dot inside brackets is a syntax error, and nested pairs are written with parentheses (section 5).
 7. Constructor text syntax: a capitalised name applied by juxtaposition, and a bare name for a constructor with no payload (section 5).
 8. Constructor data form: `con TAG PAYLOAD` in the data text and tag byte 4 in the binary format (section 5).
