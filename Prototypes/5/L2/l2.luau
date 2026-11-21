@@ -134,7 +134,7 @@ local function evalText(
 	text: string,
 	fuel: number
 ): VM.Value
-	const parsed = Parser.parse(text)
+	const parsed = Parser.parse(text, true)
 	const expr = Desugar.wrapImports(Desugar.desugarExpr(parsed.expr, compiled.names, compiled.ctors), compiled.values)
 	const result = VM.run(expr, fuel)
 

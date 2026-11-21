@@ -2,7 +2,8 @@ Doubles an integer. A helper that other programs import.
 ---
 
 ---
-fn x (+ x x)
+fn x
+	(+ x x)
 ---
 2 => 4 fuel 1000
 -3 => -6 fuel 1000

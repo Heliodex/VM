@@ -36,7 +36,7 @@ expr   ::= app
          | "check" atom          the result of an explicit check of an untyped value (section 13.5)
          | "untyped" atom        the value of an atom, given the type Dyn (section 13.5)
 app    ::= atom+                application, curried: f a b is (f a) b
-         | "fn" params expr      function (section 4)
+         | "fn" params newline expr    function; the body is on the line after the parameters (section 4)
          | "let" name "=" expr newline expr
          | "letrec" name "=" expr newline expr    (recursive; section 12)
          | "mutual" "(" binding+ ")" expr    (section 12)
@@ -81,7 +81,9 @@ Names are symbols that are not reserved (section 3.5). Names are lexically scope
 
 ## 4. Functions
 
-`fn x body` is a function of one name. `fn (x y) body` is sugar for `fn x (fn y body)`. A function with no parameters is an error. Application is curried, so partial application gives a function.
+`fn x body` is a function of one name, and `fn (x y) body` is sugar for `fn x (fn y body)`. The body starts on the line after the parameters, so a newline is required between them: `fn x` and then `(+ x 1)` on the next line. A function with no parameters is an error. Application is curried, so partial application gives a function.
+
+A test's input is written on one line, so there the body may follow the parameters on the same line, as in `((fn x (+ x 1)) . [1 2 3])`. Only the test's input is exempt; a program's functions always break before the body.
 
 ## 5. Values
 

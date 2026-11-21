@@ -2,7 +2,8 @@ Early return with ?. nonneg gives Ok for a number that is not negative, and Err 
 ---
 
 ---
-let nonneg = fn n (if (< n 0) (Err 1) (Ok n))
+let nonneg = (fn n
+	(if (< n 0) (Err 1) (Ok n)))
 fn n
 	let a = (nonneg n)?
 	Ok (+ a a)

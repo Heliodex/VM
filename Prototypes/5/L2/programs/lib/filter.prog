@@ -4,12 +4,13 @@ Keeps the items of a list that a test accepts. The input is the pair (pred . xs)
 ---
 fn p
 	let pred = (fst p)
-	letrec f = fn l (if (= (@ l) 1)
+	letrec f = (fn l
+		(if (= (@ l) 1)
 		(Ok ~)
 		(let h = (head l)?
 		let t = (tail l)?
 		let r = (f t)?
-		if (pred h) (Ok (cons h r)) (Ok r)))
+		if (pred h) (Ok (cons h r)) (Ok r))))
 	f (snd p)
 ---
 ((fn x (< x 3)) . [1 5 2 4]) => Ok [1 2] fuel 1000

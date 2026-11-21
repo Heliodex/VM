@@ -2,7 +2,8 @@ Multiplies an integer by three. A helper in the lib folder, which other folders 
 ---
 
 ---
-fn x (+ x (+ x x))
+fn x
+	(+ x (+ x x))
 ---
 0 => 0 fuel 1000
 4 => 12 fuel 1000

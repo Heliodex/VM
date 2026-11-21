@@ -2,7 +2,8 @@ Remainder gives an Err for a zero divisor, as division does. The remainder is fl
 ---
 
 ---
-fn x (% 10 x)
+fn x
+	(% 10 x)
 ---
 3 => Ok 1 fuel 1000
 -3 => Ok -2 fuel 1000

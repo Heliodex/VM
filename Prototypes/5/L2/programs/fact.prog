@@ -3,7 +3,8 @@ Factorial, with a recursive function bound by letrec.
 
 ---
 fn n
-	letrec f = fn k (if (= k 0) 1 (* k (f (- k 1))))
+	letrec f = (fn k
+		(if (= k 0) 1 (* k (f (- k 1)))))
 	f n
 ---
 0 => 1 fuel 100000

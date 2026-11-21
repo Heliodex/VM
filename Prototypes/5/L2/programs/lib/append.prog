@@ -5,12 +5,13 @@ Joins two lists. The input is the pair (xs . ys); the output is Ok of xs followe
 fn p
 	let xs = (fst p)
 	let ys = (snd p)
-	letrec app = fn l (if (= (@ l) 1)
+	letrec app = (fn l
+		(if (= (@ l) 1)
 		(Ok ys)
 		(let h = (head l)?
 		let t = (tail l)?
 		let r = (app t)?
-		Ok (cons h r)))
+		Ok (cons h r))))
 	app xs
 ---
 (~ . ~) => Ok ~ fuel 1000

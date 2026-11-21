@@ -2,7 +2,8 @@ The smaller of two integers. The input is the pair (a . b).
 ---
 
 ---
-fn p (if (< (fst p) (snd p)) (fst p) (snd p))
+fn p
+	(if (< (fst p) (snd p)) (fst p) (snd p))
 ---
 (3 . 7) => 3 fuel 1000
 (7 . 3) => 3 fuel 1000

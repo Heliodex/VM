@@ -4,14 +4,15 @@ Puts an integer into a sorted list, before the first item that is larger. The in
 ---
 fn p
 	let x = (fst p)
-	letrec ins = fn l (if (= (@ l) 1)
+	letrec ins = (fn l
+		(if (= (@ l) 1)
 		(Ok (cons x ~))
 		(let h = (head l)?
 		if (< x h)
 			(Ok (cons x l))
 			(let t = (tail l)?
 			let r = (ins t)?
-			Ok (cons h r))))
+			Ok (cons h r)))))
 	ins (snd p)
 ---
 (3 . [1 2 5]) => Ok [1 2 3 5] fuel 1000

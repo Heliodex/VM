@@ -2,7 +2,8 @@ Uses double.prog, imported under the name double.
 ---
 double = double.prog
 ---
-fn x double (+ x 1)
+fn x
+	double (+ x 1)
 ---
 5 => 12 fuel 1000
 0 => 2 fuel 1000

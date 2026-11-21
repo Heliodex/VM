@@ -4,12 +4,13 @@ Applies a function to every item of a list. The input is the pair (f . xs): f is
 ---
 fn p
 	let f = (fst p)
-	letrec m = fn l (if (= (@ l) 1)
+	letrec m = (fn l
+		(if (= (@ l) 1)
 		(Ok ~)
 		(let h = (head l)?
 		let t = (tail l)?
 		let r = (m t)?
-		Ok (cons (f h) r)))
+		Ok (cons (f h) r))))
 	m (snd p)
 ---
 ((fn x (+ x 1)) . [1 2 3]) => Ok [2 3 4] fuel 1000

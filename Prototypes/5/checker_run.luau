@@ -61,14 +61,14 @@ end
 
 -- The types of programs, as the checker writes them. Each is concrete, so it has no variable numbers to compare.
 const SHOWN: { { name: string, src: string, want: string } } = {
-	{ name = "a function of an integer", src = "fn x (+ x 1)", want = "(Int -> Int)" },
+	{ name = "a function of an integer", src = "fn x\n\t(+ x 1)", want = "(Int -> Int)" },
 	{ name = "head of a list gives its item", src = "fn l\n\tmatch (head l) {\n\t\tOk h -> (+ h 1)\n\t\tErr e -> 0\n\t}", want = "([Int] -> Int)" },
-	{ name = "head gives a Result", src = "fn x (head [x 1])", want = "(Int -> Result Int ([Int]))" },
-	{ name = "fst and snd take a pair apart", src = "fn p (+ (fst p) (snd p))", want = "((Int . Int) -> Int)" },
-	{ name = "cons makes a list", src = "fn x (cons x [1])", want = "(Int -> [Int])" },
-	{ name = "division gives a Result", src = "fn x (/ 10 x)", want = "(Int -> Result Int ([Int]))" },
-	{ name = "a sum takes its own type", src = "type Option a = None | Some a\nfn o match o {\n\tNone -> 0\n\tSome v -> v\n}", want = "(Option Int -> Int)" },
-	{ name = "a match result is a Result", src = "fn x (if x (Ok 1) (Err 2))", want = "(Int -> Result Int Int)" },
+	{ name = "head gives a Result", src = "fn x\n\t(head [x 1])", want = "(Int -> Result Int ([Int]))" },
+	{ name = "fst and snd take a pair apart", src = "fn p\n\t(+ (fst p) (snd p))", want = "((Int . Int) -> Int)" },
+	{ name = "cons makes a list", src = "fn x\n\t(cons x [1])", want = "(Int -> [Int])" },
+	{ name = "division gives a Result", src = "fn x\n\t(/ 10 x)", want = "(Int -> Result Int ([Int]))" },
+	{ name = "a sum takes its own type", src = "type Option a = None | Some a\nfn o\n\tmatch o {\n\tNone -> 0\n\tSome v -> v\n}", want = "(Option Int -> Int)" },
+	{ name = "a match result is a Result", src = "fn x\n\t(if x (Ok 1) (Err 2))", want = "(Int -> Result Int Int)" },
 }
 
 for _, case in SHOWN do
@@ -114,7 +114,7 @@ const function typeOf(
 end
 
 -- A value from untyped code used at Int without a check is a type error, and the message says it is untyped.
-const refusal = typeOf("fn x (+ raw x)")
+const refusal = typeOf("fn x\n\t(+ raw x)")
 check("an untyped value is refused at Int without a check", string.find(refusal, "expected Int, but this is Dyn", 1, true) ~= nil, refusal)
 
 -- An explicit check gives Ok when the value has the type, and Err with the expected type when it does not.
@@ -124,17 +124,17 @@ check("an explicit check gives Err for a constructor", runDyn(CHECKED, VM.constr
 check("an explicit check gives Err for a list", runDyn(CHECKED, VM.cell(VM.int(1), VM.nilv()), VM.int(1)) == "value " .. writtenOf(VM.construct(1, bytesOf("expected Int"))), runDyn(CHECKED, VM.cell(VM.int(1), VM.nilv()), VM.int(1)))
 
 -- The input is checked on entry, and a wrong input gives Err as the run's value.
-check("an input of the wrong shape gives Err on entry", runDyn("fn x (+ x 1)", VM.int(0), VM.construct(0, VM.int(1))) == "value " .. writtenOf(VM.construct(1, bytesOf("expected Int"))), runDyn("fn x (+ x 1)", VM.int(0), VM.construct(0, VM.int(1))))
-check("a list input gives Err on entry where an Int is needed", runDyn("fn x (+ x 1)", VM.int(0), VM.cell(VM.int(1), VM.nilv())) == "value " .. writtenOf(VM.construct(1, bytesOf("expected Int"))), runDyn("fn x (+ x 1)", VM.int(0), VM.cell(VM.int(1), VM.nilv())))
+check("an input of the wrong shape gives Err on entry", runDyn("fn x\n\t(+ x 1)", VM.int(0), VM.construct(0, VM.int(1))) == "value " .. writtenOf(VM.construct(1, bytesOf("expected Int"))), runDyn("fn x\n\t(+ x 1)", VM.int(0), VM.construct(0, VM.int(1))))
+check("a list input gives Err on entry where an Int is needed", runDyn("fn x\n\t(+ x 1)", VM.int(0), VM.cell(VM.int(1), VM.nilv())) == "value " .. writtenOf(VM.construct(1, bytesOf("expected Int"))), runDyn("fn x\n\t(+ x 1)", VM.int(0), VM.cell(VM.int(1), VM.nilv())))
 
 -- The untyped form: a value made Dyn with untyped is used at a type only through check, so an Int passes and anything else gives Err.
 const UNTYPED = "fn x\n\tmatch (check (untyped x)) {\n\t\tOk v -> (+ v 1)\n\t\tErr e -> 0\n\t}"
 check("untyped makes a value Dyn, and check gives Ok for an integer", runDyn(UNTYPED, VM.int(0), VM.int(5)) == "value 6", runDyn(UNTYPED, VM.int(0), VM.int(5)))
 check("untyped makes a value Dyn, and check gives Err for a list", runDyn(UNTYPED, VM.int(0), VM.cell(VM.int(1), VM.nilv())) == "value 0", runDyn(UNTYPED, VM.int(0), VM.cell(VM.int(1), VM.nilv())))
-check("untyped gives Dyn, which is a type error without check", string.find(typeOf("fn x (+ (untyped x) 1)"), "but this is Dyn", 1, true) ~= nil, typeOf("fn x (+ (untyped x) 1)"))
+check("untyped gives Dyn, which is a type error without check", string.find(typeOf("fn x\n\t(+ (untyped x) 1)"), "but this is Dyn", 1, true) ~= nil, typeOf("fn x\n\t(+ (untyped x) 1)"))
 
 -- Every type error in a program is reported, one per line, not only the first.
-const twoErrors = typeOf("let a = (+ 1 [2])\nlet b = (+ 1 ~)\nfn x (+ x 0)")
+const twoErrors = typeOf("let a = (+ 1 [2])\nlet b = (+ 1 ~)\nfn x\n\t(+ x 0)")
 local errorLines = 0
 
 for _ in string.gmatch(twoErrors, "[^\n]+") do
@@ -144,8 +144,8 @@ end
 check("two type errors are both reported", errorLines == 2 and string.find(twoErrors, "line 1", 1, true) ~= nil and string.find(twoErrors, "line 2", 1, true) ~= nil, twoErrors)
 
 -- A pair is not a list: head of a pair is a type error, and so is fst of a list.
-check("head of a pair is a type error", string.find(typeOf("fn x (head (1 . 2))"), "but this is (Int . Int)", 1, true) ~= nil, typeOf("fn x (head (1 . 2))"))
-check("fst of a list is a type error", string.find(typeOf("fn x (fst [1 2])"), "but this is [Int]", 1, true) ~= nil, typeOf("fn x (fst [1 2])"))
+check("head of a pair is a type error", string.find(typeOf("fn x\n\t(head (1 . 2))"), "but this is (Int . Int)", 1, true) ~= nil, typeOf("fn x\n\t(head (1 . 2))"))
+check("fst of a list is a type error", string.find(typeOf("fn x\n\t(fst [1 2])"), "but this is [Int]", 1, true) ~= nil, typeOf("fn x\n\t(fst [1 2])"))
 
 print(string.format("%d of %d checks passed", total - failures, total))
 

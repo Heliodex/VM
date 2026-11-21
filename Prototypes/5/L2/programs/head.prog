@@ -2,7 +2,8 @@ Head gives Ok of the first item of a list, and an Err for nil. tail is the same,
 ---
 
 ---
-fn l (head l)
+fn l
+	(head l)
 ---
 [4 5] => Ok 4 fuel 1000
 ~ => Err [104 101 97 100 32 111 102 32 97 110 32 101 109 112 116 121 32 108 105 115 116] fuel 1000

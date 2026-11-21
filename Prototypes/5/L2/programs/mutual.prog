@@ -3,7 +3,9 @@ Even and odd, as a mutual group: each function calls the other.
 
 ---
 fn k
-	mutual ((ev (fn n (if (= n 0) 1 (od (- n 1))))) (od (fn n (if (= n 0) 0 (ev (- n 1))))))
+	mutual ((ev (fn n
+		(if (= n 0) 1 (od (- n 1))))) (od (fn n
+			(if (= n 0) 0 (ev (- n 1))))))
 	ev k
 ---
 0 => 1 fuel 100000
