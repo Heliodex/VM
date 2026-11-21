@@ -1,0 +1,207 @@
+The first part of the L2 checker, written in L2 with no mutation. The state is a value: a counter for the next variable, the bindings of the variables, and the errors so far. A binding is a list of (id . Bind), and a new binding is consed on the front, so a lookup finds the newest. Every operation gives back the state it changes. This file holds the types, the state, and unification. A test's output is the rendered first type, with the errors, as the Luau checker writes them.
+---
+---
+type Ty = TVar Int | TCon ([Int] . [Ty])
+type Bind = Unbound Int | Bound Ty
+type St = St (Int . ([(Int . Bind)] . [[Int]]))
+
+let first = (fn l
+	match (head l) {
+		Ok c -> c
+		Err e -> -1
+	})
+let tl = (fn l
+	match (tail l) {
+		Ok t -> t
+		Err e -> ~
+	})
+let hdE = (fn l
+	match (head l) {
+		Ok e -> e
+		Err e -> (0 . (Unbound 0))
+	})
+let hdT = (fn l
+	match (head l) {
+		Ok t -> t
+		Err e -> (TVar 0)
+	})
+let div10 = (fn n
+	match (/ n 10) {
+		Ok q -> q
+		Err e -> 0
+	})
+let mod10 = (fn n
+	match (% n 10) {
+		Ok r -> r
+		Err e -> 0
+	})
+letrec same = (fn (a b)
+	(if (= (@ a) 1)
+		(= (@ b) 1)
+		(if (= (@ b) 1)
+			0
+			(if (= (first a) (first b))
+				(same (tl a) (tl b))
+				0))))
+letrec lenOf = (fn l
+	(if (= (@ l) 1) 0 (+ 1 (lenOf (tl l)))))
+letrec cat = (fn (a b)
+	(if (= (@ a) 1)
+		b
+		(cons (first a) (cat (tl a) b))))
+letrec showNat = (fn n
+	(if (< n 10)
+		(cons (+ 48 n) ~)
+		(cat (showNat (div10 n)) (cons (+ 48 (mod10 n)) ~))))
+let varName = (fn id
+	(cat "?" (showNat id)))
+
+let stP = (fn st
+	match st {
+		St p -> p
+	})
+let nextOf = (fn st
+	(fst (stP st)))
+let bindsOf = (fn st
+	(fst (snd (stP st))))
+let errsOf = (fn st
+	(snd (snd (stP st))))
+let mkSt = (fn (n bs es)
+	(St (n . (bs . es))))
+letrec snoc = (fn (l x)
+	(if (= (@ l) 1)
+		(cons x ~)
+		(match (head l) {
+			Ok h -> (cons h (snoc (tl l) x))
+			Err e -> (cons x ~)
+		})))
+let addErr = (fn (st msg)
+	(mkSt (nextOf st) (bindsOf st) (snoc (errsOf st) msg)))
+
+letrec findB = (fn (bs id)
+	(if (= (@ bs) 1)
+		(Unbound 0)
+		(if (= (fst (hdE bs)) id)
+			(snd (hdE bs))
+			(findB (tl bs) id))))
+let levelOf = (fn b
+	match b {
+		Unbound lv -> lv
+		Bound t -> 0
+	})
+let fresh = (fn (st level)
+	(let n = (nextOf st)
+	((TVar n) . (mkSt (+ n 1) (cons (n . (Unbound level)) (bindsOf st)) (errsOf st)))))
+
+letrec prune = (fn (bs t)
+	(match t {
+		TVar id -> (match (findB bs id) {
+			Bound u -> (prune bs u)
+			Unbound lv -> t
+		})
+		TCon p -> t
+	}))
+
+letrec occurs = (fn (bs id t)
+	(letrec all = (fn args
+		(if (= (@ args) 1)
+			0
+			(if (occurs bs id (hdT args)) 1 (all (tl args)))))
+	(match (prune bs t) {
+		TVar y -> (= y id)
+		TCon p -> (all (snd p))
+	})))
+
+letrec lowerT = (fn (bs t level)
+	(letrec lowerArgs = (fn (b args)
+		(if (= (@ args) 1)
+			b
+			(lowerArgs (lowerT b (hdT args) level) (tl args))))
+	(match (prune bs t) {
+		TVar y -> (if (< level (levelOf (findB bs y))) (cons (y . (Unbound level)) bs) bs)
+		TCon p -> (lowerArgs bs (snd p))
+	})))
+
+let hasArgs = (fn (bs a)
+	match (prune bs a) {
+		TVar y -> 0
+		TCon p -> (if (= (@ (snd p)) 1) 0 1)
+	})
+
+letrec render = (fn (bs t)
+	(letrec argText = (fn a
+		(if (= (hasArgs bs a) 1)
+			(cat "(" (cat (render bs a) ")"))
+			(render bs a)))
+	(letrec argsText = (fn args
+		(if (= (@ args) 1)
+			~
+			(cat " " (cat (argText (hdT args)) (argsText (tl args))))))
+	(letrec renderCon = (fn (name args)
+		(if (same name "->")
+			(cat "(" (cat (render bs (hdT args)) (cat " -> " (cat (render bs (hdT (tl args))) ")"))))
+		(if (same name "pair")
+			(cat "(" (cat (render bs (hdT args)) (cat " . " (cat (render bs (hdT (tl args))) ")"))))
+		(if (same name "list")
+			(cat "[" (cat (render bs (hdT args)) "]"))
+			(if (= (@ args) 1)
+				name
+				(cat name (argsText args)))))))
+	(match (prune bs t) {
+		TVar y -> (varName y)
+		TCon p -> (renderCon (fst p) (snd p))
+	})))))
+
+let mismatch = (fn (st a e)
+	(addErr st (cat "expected " (cat (render (bindsOf st) e) (cat ", but this is " (render (bindsOf st) a))))))
+
+let bindVar = (fn (st id t)
+	(if (occurs (bindsOf st) id t)
+		(addErr st (cat (varName id) " would be an infinite type"))
+		(mkSt (nextOf st) (cons (id . (Bound t)) (lowerT (bindsOf st) t (levelOf (findB (bindsOf st) id)))) (errsOf st))))
+
+letrec unify = (fn (st a0 e0)
+	(letrec unifyArgs = (fn (st0 aa ea)
+		(if (= (@ aa) 1)
+			st0
+			(let st1 = (unify st0 (hdT aa) (hdT ea))
+			(if (< (lenOf (errsOf st0)) (lenOf (errsOf st1)))
+				st1
+				(unifyArgs st1 (tl aa) (tl ea))))))
+	(let unifyCon = (fn (st2 na aa ne ea a e)
+		(if (if (same na "Dyn") (same ne "Dyn") 0)
+			st2
+			(if (if (same na "Dyn") 1 (same ne "Dyn"))
+				(mismatch st2 a e)
+				(if (if (same na ne) (= (lenOf aa) (lenOf ea)) 0)
+					(unifyArgs st2 aa ea)
+					(mismatch st2 a e)))))
+	(let bs = (bindsOf st)
+	(let a = (prune bs a0)
+	(let e = (prune bs e0)
+	(match a {
+		TVar x -> (match e {
+			TVar y -> (if (= x y) st (bindVar st x e))
+			TCon q -> (bindVar st x e)
+		})
+		TCon p -> (match e {
+			TVar y -> (bindVar st y a)
+			TCon q -> (unifyCon st (fst p) (snd p) (fst q) (snd q) a e)
+		})
+	})))))))
+
+fn p
+	let st = (unify (mkSt 1000 ~ ~) (fst p) (snd p))
+	((render (bindsOf st) (fst p)) . (errsOf st))
+---
+((TCon ("Int" . ~)) . (TCon ("Int" . ~))) => ("Int" . ~) fuel 1000000
+((TCon ("Int" . ~)) . (TCon ("list" . [(TCon ("Int" . ~))]))) => ("Int" . ["expected [Int], but this is Int"]) fuel 1000000
+((TVar 1) . (TCon ("Int" . ~))) => ("Int" . ~) fuel 1000000
+((TVar 1) . (TVar 2)) => ("?2" . ~) fuel 1000000
+((TVar 1) . (TCon ("list" . [(TVar 1)]))) => ("?1" . ["?1 would be an infinite type"]) fuel 1000000
+((TCon ("Dyn" . ~)) . (TCon ("Int" . ~))) => ("Dyn" . ["expected Int, but this is Dyn"]) fuel 1000000
+((TVar 1) . (TCon ("Dyn" . ~))) => ("Dyn" . ~) fuel 1000000
+((TCon ("pair" . [(TCon ("Int" . ~)) (TCon ("Int" . ~))])) . (TCon ("list" . [(TCon ("Int" . ~))]))) => ("(Int . Int)" . ["expected [Int], but this is (Int . Int)"]) fuel 1000000
+((TCon ("->" . [(TCon ("Int" . ~)) (TCon ("Int" . ~))])) . (TCon ("->" . [(TCon ("Int" . ~)) (TCon ("Int" . ~))]))) => ("(Int -> Int)" . ~) fuel 1000000
+((TCon ("->" . [(TCon ("Int" . ~)) (TCon ("Int" . ~))])) . (TCon ("->" . [(TCon ("list" . [(TCon ("Int" . ~))])) (TCon ("list" . [(TCon ("Int" . ~))]))]))) => ("(Int -> Int)" . ["expected [Int], but this is Int"]) fuel 1000000
+(TCon ("Option" . [(TCon ("Int" . ~))]) . (TCon ("Option" . [(TVar 3)]))) => ("Option Int" . ~) fuel 1000000

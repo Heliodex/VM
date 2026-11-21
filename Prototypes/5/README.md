@@ -52,6 +52,7 @@ The second language is **L2** (language 2). It is typed, and it has the surface 
 | `lex_run.luau` | Checks the L2 tokenizer against the Luau lexer on every program file and a set of edge cases. |
 | `L2/programs/boot/parse.prog` | The L2 parser, written in L2: stage 2 of the L2 compiler in L2. It reads the tokenizer's output. |
 | `parse_run.luau` | Checks the L2 parser, run on the tokenizer's output, against the Luau parser on every L2 program file and a set of cases that reach each error. |
+| `L2/programs/boot/types.prog` | The first part of the L2 checker in L2, with no mutation: the types, the state, and unification. |
 
 ## Running
 
