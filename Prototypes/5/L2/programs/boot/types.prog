@@ -4,6 +4,8 @@ The first part of the L2 checker, written in L2 with no mutation. The state is a
 type Ty = TVar Int | TCon ([Int] . [Ty])
 type Bind = Unbound Int | Bound Ty
 type St = St (Int . ([(Int . Bind)] . [[Int]]))
+type Scheme = Scheme ([Int] . Ty)
+type Req = Unify (Ty . Ty) | Gen (Int . Ty) | Inst (Int . Scheme)
 
 let first = (fn l
 	match (head l) {
@@ -19,6 +21,11 @@ let hdE = (fn l
 	match (head l) {
 		Ok e -> e
 		Err e -> (0 . (Unbound 0))
+	})
+let hdM = (fn l
+	match (head l) {
+		Ok e -> e
+		Err e -> (0 . (TVar 0))
 	})
 let hdT = (fn l
 	match (head l) {
@@ -190,18 +197,103 @@ letrec unify = (fn (st a0 e0)
 		})
 	})))))))
 
+letrec memberI = (fn (x l)
+	(if (= (@ l) 1)
+		0
+		(if (= (first l) x) 1 (memberI x (tl l)))))
+
+letrec freeAbove = (fn (bs level t acc)
+	(letrec argsFree = (fn (acc2 args)
+		(if (= (@ args) 1)
+			acc2
+			(argsFree (freeAbove bs level (hdT args) acc2) (tl args))))
+	(match (prune bs t) {
+		TVar y -> (if (if (< level (levelOf (findB bs y))) (if (memberI y acc) 0 1) 0) (snoc acc y) acc)
+		TCon p -> (argsFree acc (snd p))
+	})))
+
+let generalize = (fn (st level t)
+	(Scheme ((freeAbove (bindsOf st) level t ~) . t)))
+
+let schemeVars = (fn s
+	match s {
+		Scheme p -> (fst p)
+	})
+let schemeTy = (fn s
+	match s {
+		Scheme p -> (snd p)
+	})
+
+letrec lookupM = (fn (m id dflt)
+	(if (= (@ m) 1)
+		dflt
+		(if (= (fst (hdM m)) id) (snd (hdM m)) (lookupM (tl m) id dflt))))
+
+letrec subst = (fn (bs m t)
+	(letrec substArgs = (fn args
+		(if (= (@ args) 1)
+			~
+			(cons (subst bs m (hdT args)) (substArgs (tl args)))))
+	(match (prune bs t) {
+		TVar y -> (lookupM m y (TVar y))
+		TCon p -> (TCon ((fst p) . (substArgs (snd p))))
+	})))
+
+letrec instMap = (fn (st level m vars)
+	(if (= (@ vars) 1)
+		(st . m)
+		(let fr = (fresh st level)
+		(instMap (snd fr) level (cons ((first vars) . (fst fr)) m) (tl vars)))))
+
+let instantiate = (fn (st level s)
+	(let r = (instMap st level ~ (schemeVars s))
+	((subst (bindsOf (fst r)) (snd r) (schemeTy s)) . (fst r))))
+
+letrec idsText = (fn l
+	(if (= (@ l) 1)
+		~
+		(cat (varName (first l)) (if (= (@ (tl l)) 1) ~ (cat " " (idsText (tl l)))))))
+
+let schemeText = (fn (bs s)
+	(if (= (@ (schemeVars s)) 1)
+		(render bs (schemeTy s))
+		(cat "forall " (cat (idsText (schemeVars s)) (cat ". " (render bs (schemeTy s)))))))
+
+let runUnify = (fn q
+	(let st = (unify (mkSt 1000 ~ ~) (fst q) (snd q))
+	((render (bindsOf st) (fst q)) . (errsOf st))))
+let runGen = (fn q
+	(let st = (mkSt 1000 ~ ~)
+	(let s = (generalize st (fst q) (snd q))
+	((schemeText (bindsOf st) s) . ~))))
+let runInst = (fn q
+	(let st = (mkSt 1000 ~ ~)
+	(let r = (instantiate st (fst q) (snd q))
+	((render (bindsOf (snd r)) (fst r)) . (errsOf (snd r))))))
+
 fn p
-	let st = (unify (mkSt 1000 ~ ~) (fst p) (snd p))
-	((render (bindsOf st) (fst p)) . (errsOf st))
+	match p {
+		Unify q -> (runUnify q)
+		Gen q -> (runGen q)
+		Inst q -> (runInst q)
+	}
 ---
-((TCon ("Int" . ~)) . (TCon ("Int" . ~))) => ("Int" . ~) fuel 1000000
-((TCon ("Int" . ~)) . (TCon ("list" . [(TCon ("Int" . ~))]))) => ("Int" . ["expected [Int], but this is Int"]) fuel 1000000
-((TVar 1) . (TCon ("Int" . ~))) => ("Int" . ~) fuel 1000000
-((TVar 1) . (TVar 2)) => ("?2" . ~) fuel 1000000
-((TVar 1) . (TCon ("list" . [(TVar 1)]))) => ("?1" . ["?1 would be an infinite type"]) fuel 1000000
-((TCon ("Dyn" . ~)) . (TCon ("Int" . ~))) => ("Dyn" . ["expected Int, but this is Dyn"]) fuel 1000000
-((TVar 1) . (TCon ("Dyn" . ~))) => ("Dyn" . ~) fuel 1000000
-((TCon ("pair" . [(TCon ("Int" . ~)) (TCon ("Int" . ~))])) . (TCon ("list" . [(TCon ("Int" . ~))]))) => ("(Int . Int)" . ["expected [Int], but this is (Int . Int)"]) fuel 1000000
-((TCon ("->" . [(TCon ("Int" . ~)) (TCon ("Int" . ~))])) . (TCon ("->" . [(TCon ("Int" . ~)) (TCon ("Int" . ~))]))) => ("(Int -> Int)" . ~) fuel 1000000
-((TCon ("->" . [(TCon ("Int" . ~)) (TCon ("Int" . ~))])) . (TCon ("->" . [(TCon ("list" . [(TCon ("Int" . ~))])) (TCon ("list" . [(TCon ("Int" . ~))]))]))) => ("(Int -> Int)" . ["expected [Int], but this is Int"]) fuel 1000000
-(TCon ("Option" . [(TCon ("Int" . ~))]) . (TCon ("Option" . [(TVar 3)]))) => ("Option Int" . ~) fuel 1000000
+Unify ((TCon ("Int" . ~)) . (TCon ("Int" . ~))) => ("Int" . ~) fuel 1000000
+Unify ((TCon ("Int" . ~)) . (TCon ("list" . [(TCon ("Int" . ~))]))) => ("Int" . ["expected [Int], but this is Int"]) fuel 1000000
+Unify ((TVar 1) . (TCon ("Int" . ~))) => ("Int" . ~) fuel 1000000
+Unify ((TVar 1) . (TVar 2)) => ("?2" . ~) fuel 1000000
+Unify ((TVar 1) . (TCon ("list" . [(TVar 1)]))) => ("?1" . ["?1 would be an infinite type"]) fuel 1000000
+Unify ((TCon ("Dyn" . ~)) . (TCon ("Int" . ~))) => ("Dyn" . ["expected Int, but this is Dyn"]) fuel 1000000
+Unify ((TVar 1) . (TCon ("Dyn" . ~))) => ("Dyn" . ~) fuel 1000000
+Unify ((TCon ("pair" . [(TCon ("Int" . ~)) (TCon ("Int" . ~))])) . (TCon ("list" . [(TCon ("Int" . ~))]))) => ("(Int . Int)" . ["expected [Int], but this is (Int . Int)"]) fuel 1000000
+Unify ((TCon ("->" . [(TCon ("Int" . ~)) (TCon ("Int" . ~))])) . (TCon ("->" . [(TCon ("Int" . ~)) (TCon ("Int" . ~))]))) => ("(Int -> Int)" . ~) fuel 1000000
+Unify ((TCon ("->" . [(TCon ("Int" . ~)) (TCon ("Int" . ~))])) . (TCon ("->" . [(TCon ("list" . [(TCon ("Int" . ~))])) (TCon ("list" . [(TCon ("Int" . ~))]))]))) => ("(Int -> Int)" . ["expected [Int], but this is Int"]) fuel 1000000
+Unify (TCon ("Option" . [(TCon ("Int" . ~))]) . (TCon ("Option" . [(TVar 3)]))) => ("Option Int" . ~) fuel 1000000
+Gen (-1 . (TVar 1)) => ("forall ?1. ?1" . ~) fuel 1000000
+Gen (-1 . (TCon ("->" . [(TVar 1) (TVar 2)]))) => ("forall ?1 ?2. (?1 -> ?2)" . ~) fuel 1000000
+Gen (-1 . (TCon ("Int" . ~))) => ("Int" . ~) fuel 1000000
+Gen (0 . (TVar 1)) => ("?1" . ~) fuel 1000000
+Inst (0 . (Scheme ([1] . (TCon ("->" . [(TVar 1) (TVar 1)]))))) => ("(?1000 -> ?1000)" . ~) fuel 1000000
+Inst (0 . (Scheme ([1 2] . (TCon ("->" . [(TVar 1) (TVar 2)]))))) => ("(?1000 -> ?1001)" . ~) fuel 1000000
+Inst (0 . (Scheme ([] . (TVar 5)))) => ("?5" . ~) fuel 1000000
+Inst (0 . (Scheme ([1] . (TCon ("list" . [(TVar 1)]))))) => ("[?1000]" . ~) fuel 1000000
