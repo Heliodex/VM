@@ -8,6 +8,8 @@ The bootstrap: the L1 reader is also written in L1, in `L1/programs/boot/`. Thre
 
 The reader's language is **L1** (language 1). Its keyword for a function is `fn`; the machine's expression for one is still called `lam`, since it is the same node the machine has always run. Its files are in `L1/`: the reader, the printer, the program-file format, the L1 programs and the L1 self-interpreter. Its tests are in `L1/examples/` and `L1/programs/`. The machine, the data and binary formats, the lifecycle and the driver are in `interpreter/`. They work on the expressions every language compiles to, so a later language can reuse them and add its own folder beside `L1/`.
 
+The second language is **L2** (language 2). It is typed, and it has the surface forms the reader of L1 does not: a built-in `Result` with `?` for early return, `match` on sums, `check` and `untyped` for values from untyped code, and pairs `(a . b)` distinct from lists `[a b]`. A type error is reported at its position, and every error in a program is reported, not only the first. Its specification is `L2/SPEC.md`, and it compiles to the same machine expressions L1 does. The machine has no failures of its own that a program can catch; division by zero, `head` and `tail` of nil give `Err` values, and only integer overflow ends a run. Its files are in `L2/`, and its program files are in `L2/programs/`, with the standard library in `L2/programs/lib/`.
+
 ## Files
 
 | Path | What it holds |
@@ -37,6 +39,15 @@ The reader's language is **L1** (language 1). Its keyword for a function is `fn`
 | `lifecycle_run.luau` | Checks the lifecycle: programs applied to inputs, the outcomes, and the same runs through the binary format. |
 | `printer_run.luau` | Checks the printer: the text for given programs, the refusal of an unbound variable, and a round trip for every example program. |
 | `driver_run.luau` | Checks the driver: sessions that keep a state, each way a step can end a session, and the same through bytes. |
+| `L2/SPEC.md` | The specification of L2: syntax, layout, the machine's forms it compiles to, and the types. |
+| `L2/lexer.luau`, `L2/parser.luau` | The L2 reader: text to a surface tree, with positions. |
+| `L2/checker.luau` | The type checker: Hindley–Milner inference with `Dyn`, which gives each `check` its test. |
+| `L2/desugar.luau` | Compiles a checked surface tree to machine expressions. Early return and the checks are compiled here. |
+| `L2/l2.luau` | Compiles an L2 program file: the imports, the checks, and the program. |
+| `L2/programfile.luau` | Reads an L2 program file. Tests may span lines. |
+| `L2/programs/*.prog`, `L2/programs/lib/*.prog` | L2 program files, and the L2 standard library. |
+| `l2_run.luau` | Runs every L2 program file and its tests, and checks that malformed programs are refused. |
+| `checker_run.luau` | Checks the type checker: inferred types, the type errors, and `check` and `untyped` on untyped values. |
 
 ## Running
 
@@ -53,6 +64,8 @@ Run from this directory.
 | The lifecycle checks | `luau lifecycle_run.luau` |
 | The printer checks | `luau printer_run.luau` |
 | The driver checks | `luau driver_run.luau` |
+| The L2 program checks | `lute run l2_run.luau` |
+| The L2 checker checks | `lute run checker_run.luau` |
 | The program file checks | `lute run programs_run.luau` |
 | The analyser | `luau-analyze interpreter/*.luau examples/*.luau self/*.luau run.luau self_run.luau self_data_run.luau` |
 | The formatter | `luau-format interpreter/*.luau examples/*.luau self/*.luau run.luau self_run.luau self_data_run.luau` |
@@ -171,7 +184,7 @@ double = double.prog
 ~ => error fuel 1000
 ```
 
-The imports section is empty in a file that uses none. Each line is `name = file`, and it binds `name`, inside the program, to the program of that file. The file is a path from the top of the `L1/programs/` folder, so `double.prog` is at the top, `lib/triple.prog` is in `lib`, and the same path means the same file from any importing file. A path that climbs above `L1/programs/` with `..` is an error. The runner also finds program files in the folders under `L1/programs/`, and runs their tests. An imported program is closed, so it cannot use the importing file's names. An import can itself import, but a cycle is an error, and so is an import that cannot be found. Imports are looked up through a resolver, so the parser never reads files itself.
+The imports section is empty in a file that uses none. L2 program files use the same four sections, but their tests may span lines, and their functions break before their bodies; see `L2/SPEC.md`. Each line is `name = file`, and it binds `name`, inside the program, to the program of that file. The file is a path from the top of the `L1/programs/` folder, so `double.prog` is at the top, `lib/triple.prog` is in `lib`, and the same path means the same file from any importing file. A path that climbs above `L1/programs/` with `..` is an error. The runner also finds program files in the folders under `L1/programs/`, and runs their tests. An imported program is closed, so it cannot use the importing file's names. An import can itself import, but a cycle is an error, and so is an import that cannot be found. Imports are looked up through a resolver, so the parser never reads files itself.
 
 The program section is read by `reader.luau`, with the imported names bound around it. There is no new program syntax. Each test line is an input, then `=>`, then an output, then `fuel` and a number of steps. Inputs and outputs are written in the reader's language, and each is evaluated to a value before the test runs, so `[1 ~]`, `(list 1 2)` and `"ab"` are all valid. The names of the file's imports are in scope for them. An input may be a function, such as `(fn x (+ x 1))`, since it is only given to the program; an output must be data, since functions cannot be compared, so a function there is refused. An output may also be one of `error`, `out_of_fuel` or `not_data`, which are the outcomes of a run. Blank lines in the test section are skipped, and a file needs at least one test.
 
