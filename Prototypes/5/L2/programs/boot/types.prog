@@ -14,6 +14,11 @@ type Expr = EInt (Int . (Int . Int)) | EStr ([Int] . (Int . Int)) | ENil (Int . 
 type Tr = TEmpty | TNode (Bind . (Tr . Tr))
 type Pat = PCon ([Int] . ([Int] . (Int . Int))) | PBind ([Int] . (Int . Int)) | PWild (Int . Int)
 
+let hdOr = (fn (l dflt)
+	match (head l) {
+		Ok x -> x
+		Err e -> dflt
+	})
 let first = (fn l
 	match (head l) {
 		Ok c -> c
@@ -23,16 +28,6 @@ let tl = (fn l
 	match (tail l) {
 		Ok t -> t
 		Err e -> ~
-	})
-let hdM = (fn l
-	match (head l) {
-		Ok e -> e
-		Err e -> (0 . (TVar 0))
-	})
-let hdT = (fn l
-	match (head l) {
-		Ok t -> t
-		Err e -> (TVar 0)
 	})
 let div10 = (fn n
 	match (/ n 10) {
@@ -136,7 +131,7 @@ letrec occurs = (fn (bs id t)
 	(letrec all = (fn args
 		(if (= (@ args) 1)
 			0
-			(if (occurs bs id (hdT args)) 1 (all (tl args)))))
+			(if (occurs bs id (hdOr args (TVar 0))) 1 (all (tl args)))))
 	(match (prune bs t) {
 		TVar y -> (= y id)
 		TCon p -> (all (snd p))
@@ -146,7 +141,7 @@ letrec lowerT = (fn (bs t level)
 	(letrec lowerArgs = (fn (b args)
 		(if (= (@ args) 1)
 			b
-			(lowerArgs (lowerT b (hdT args) level) (tl args))))
+			(lowerArgs (lowerT b (hdOr args (TVar 0)) level) (tl args))))
 	(match (prune bs t) {
 		TVar y -> (if (< level (levelOf (findB bs y))) (setB bs y (Unbound level)) bs)
 		TCon p -> (lowerArgs bs (snd p))
@@ -166,14 +161,14 @@ letrec render = (fn (bs t)
 	(letrec argsText = (fn args
 		(if (= (@ args) 1)
 			~
-			(cat " " (cat (argText (hdT args)) (argsText (tl args))))))
+			(cat " " (cat (argText (hdOr args (TVar 0))) (argsText (tl args))))))
 	(letrec renderCon = (fn (name args)
 		(if (same name "->")
-			(cat "(" (cat (render bs (hdT args)) (cat " -> " (cat (render bs (hdT (tl args))) ")"))))
+			(cat "(" (cat (render bs (hdOr args (TVar 0))) (cat " -> " (cat (render bs (hdOr (tl args) (TVar 0))) ")"))))
 		(if (same name "pair")
-			(cat "(" (cat (render bs (hdT args)) (cat " . " (cat (render bs (hdT (tl args))) ")"))))
+			(cat "(" (cat (render bs (hdOr args (TVar 0))) (cat " . " (cat (render bs (hdOr (tl args) (TVar 0))) ")"))))
 		(if (same name "list")
-			(cat "[" (cat (render bs (hdT args)) "]"))
+			(cat "[" (cat (render bs (hdOr args (TVar 0))) "]"))
 			(if (= (@ args) 1)
 				name
 				(cat name (argsText args)))))))
@@ -194,7 +189,7 @@ letrec unify = (fn (st a0 e0)
 	(letrec unifyArgs = (fn (st0 aa ea)
 		(if (= (@ aa) 1)
 			st0
-			(let st1 = (unify st0 (hdT aa) (hdT ea))
+			(let st1 = (unify st0 (hdOr aa (TVar 0)) (hdOr ea (TVar 0)))
 			(if (< (lenOf (errsOf st0)) (lenOf (errsOf st1)))
 				st1
 				(unifyArgs st1 (tl aa) (tl ea))))))
@@ -229,7 +224,7 @@ letrec freeAbove = (fn (bs level t acc)
 	(letrec argsFree = (fn (acc2 args)
 		(if (= (@ args) 1)
 			acc2
-			(argsFree (freeAbove bs level (hdT args) acc2) (tl args))))
+			(argsFree (freeAbove bs level (hdOr args (TVar 0)) acc2) (tl args))))
 	(match (prune bs t) {
 		TVar y -> (if (if (< level (levelOf (findB bs y))) (if (memberI y acc) 0 1) 0) (snoc acc y) acc)
 		TCon p -> (argsFree acc (snd p))
@@ -250,13 +245,13 @@ let schemeTy = (fn s
 letrec lookupM = (fn (m id dflt)
 	(if (= (@ m) 1)
 		dflt
-		(if (= (fst (hdM m)) id) (snd (hdM m)) (lookupM (tl m) id dflt))))
+		(if (= (fst (hdOr m (0 . (TVar 0)))) id) (snd (hdOr m (0 . (TVar 0)))) (lookupM (tl m) id dflt))))
 
 letrec subst = (fn (bs m t)
 	(letrec substArgs = (fn args
 		(if (= (@ args) 1)
 			~
-			(cons (subst bs m (hdT args)) (substArgs (tl args)))))
+			(cons (subst bs m (hdOr args (TVar 0))) (substArgs (tl args)))))
 	(match (prune bs t) {
 		TVar y -> (lookupM m y (TVar y))
 		TCon p -> (TCon ((fst p) . (substArgs (snd p))))
@@ -312,29 +307,9 @@ let atOfE = (fn e
 		ECheck p -> (snd p)
 		EUntyped p -> (snd p)
 	})
-let hdX = (fn l
-	match (head l) {
-		Ok x -> x
-		Err e -> (ENil (0 . 0))
-	})
-let hdN = (fn l
-	match (head l) {
-		Ok n -> n
-		Err e -> ~
-	})
-let hdP = (fn l
-	match (head l) {
-		Ok p -> p
-		Err e -> (~ . (EVar (Scheme (~ . (TVar 0)))))
-	})
-let hdMsg = (fn l
-	match (head l) {
-		Ok m -> m
-		Err e -> ~
-	})
 letrec lastMsg = (fn l
 	(if (= (@ (tl l)) 1)
-		(hdMsg l)
+		(hdOr l ~)
 		(lastMsg (tl l))))
 let posMsg = (fn (at msg)
 	(cat "line " (cat (showNat (fst at)) (cat ", column " (cat (showNat (snd at)) (cat ": " msg))))))
@@ -381,8 +356,8 @@ let builtinEnv = [
 letrec findE = (fn (env name)
 	(if (= (@ env) 1)
 		Missing
-		(if (same (fst (hdP env)) name)
-			(Found (snd (hdP env)))
+		(if (same (fst (hdOr env (~ . (EVar (Scheme (~ . (TVar 0))))))) name)
+			(Found (snd (hdOr env (~ . (EVar (Scheme (~ . (TVar 0))))))))
 			(findE (tl env) name))))
 
 ; A unification adds at most one error, so the error it adds gets the position of the node.
@@ -468,11 +443,6 @@ let withSt = (fn (ms st)
 	(mkMS st (msFixed ms) (msName ms) (msTy ms) (msArgs ms) (msCov ms) (msCatch ms)))
 let withCatch = (fn ms
 	(mkMS (msSt ms) (msFixed ms) (msName ms) (msTy ms) (msArgs ms) (msCov ms) 1))
-let hdCt = (fn l
-	match (head l) {
-		Ok c -> c
-		Err e -> (~ . (0 . 0))
-	})
 letrec freshN = (fn (st0 n level)
 	(if (= n 0)
 		(~ . st0)
@@ -482,25 +452,22 @@ letrec freshN = (fn (st0 n level)
 letrec zipM = (fn (ps as)
 	(if (= (@ ps) 1)
 		~
-		(cons ((first ps) . (hdT as)) (zipM (tl ps) (tl as)))))
+		(cons ((first ps) . (hdOr as (TVar 0))) (zipM (tl ps) (tl as)))))
 letrec missingNames = (fn (ctors cov)
 	(if (= (@ ctors) 1)
 		~
 		(let rest = (missingNames (tl ctors) cov)
-		(if (= (memberI (fst (snd (hdCt ctors))) cov) 1)
+		(if (= (memberI (fst (snd (hdOr ctors (~ . (0 . 0))))) cov) 1)
 			rest
-			(cons (fst (hdCt ctors)) rest)))))
+			(cons (fst (hdOr ctors (~ . (0 . 0)))) rest)))))
 letrec joinNames = (fn l
 	(if (= (@ l) 1)
 		~
 		(if (= (@ (tl l)) 1)
-			(hdN l)
-			(cat (hdN l) (cat ", " (joinNames (tl l)))))))
+			(hdOr l ~)
+			(cat (hdOr l ~) (cat ", " (joinNames (tl l)))))))
 
-; The constructor of a pattern. The first constructor fixes the sum, and the scrutinee is used at it.
 ; The constructor of a pattern, once the sum is known: its tag is covered, and its payload is bound to the name.
-; A constructor pattern. The first constructor fixes the sum, and the scrutinee is used at it.
-; A constructor pattern. The first constructor fixes the sum, and the scrutinee is used at it.
 let conPatGo = (fn (ms env name bind at tagv hasPay pay params scrutTy level)
 	let ms1 = (mkMS (msSt ms) (msFixed ms) (msName ms) (msTy ms) (msArgs ms) (cons tagv (msCov ms)) (msCatch ms))
 	let pt = (subst (bindsOf (msSt ms1)) (zipM params (msArgs ms1)) pay)
@@ -542,15 +509,10 @@ let armBody = (fn (inf ms env body resTy level)
 	(if (= (grew (snd r) s2) 1)
 		(0 . (withSt ms s2))
 		(1 . (withSt ms s2))))))
-let hdArm = (fn l
-	match (head l) {
-		Ok a -> a
-		Err e -> (PWild (0 . 0) . ((ENil (0 . 0)) . (0 . 0)))
-	})
 letrec armsLoop = (fn (inf ms env arms resTy scrutTy scrutAt level)
 	(if (= (@ arms) 1)
 		(1 . ms)
-		(let arm = (hdArm arms)
+		(let arm = (hdOr arms (PWild (0 . 0) . ((ENil (0 . 0)) . (0 . 0))))
 		(let pat = (fst arm)
 		(let body = (fst (snd arm))
 		(let aAt = (snd (snd arm))
@@ -590,7 +552,7 @@ letrec infer = (fn (st env node level)
 	(letrec inferItems = (fn (st0 items item)
 		(if (= (@ items) 1)
 			(1 . st0)
-			(let x = (hdX items)
+			(let x = (hdOr items (ENil (0 . 0)))
 			(let r = (infer st0 env x level)
 			(let s1 = (unifyAt (snd r) (atOfE x) (fst r) item)
 			(if (= (grew (snd r) s1) 1)
@@ -599,7 +561,7 @@ letrec infer = (fn (st env node level)
 	(letrec appArgs = (fn (st0 cur args at)
 		(if (= (@ args) 1)
 			(1 . (cur . st0))
-			(let x = (hdX args)
+			(let x = (hdOr args (ENil (0 . 0)))
 			(let r = (infer st0 env x level)
 			(let p1 = (fresh (snd r) level)
 			(let p2 = (fresh (snd p1) level)
@@ -619,7 +581,7 @@ letrec infer = (fn (st env node level)
 				(0 . ((fst rr) . s1))
 				(1 . ((fst rr) . s1))))))
 			(let p = (fresh st0 level)
-			(let envF2 = (cons ((hdN names) . (EVar (Scheme (~ . (fst p))))) envF)
+			(let envF2 = (cons ((hdOr names ~) . (EVar (Scheme (~ . (fst p))))) envF)
 			(let rest = (inferFn (snd p) envF2 (tl names) body)
 			((fst rest) . ((tArrow (fst p) (fst (snd rest))) . (snd (snd rest)))))))))
 	(match node {
@@ -697,26 +659,11 @@ let tvarId = (fn t
 letrec idsOf = (fn l
 	(if (= (@ l) 1)
 		~
-		(cons (tvarId (hdT l)) (idsOf (tl l)))))
+		(cons (tvarId (hdOr l (TVar 0))) (idsOf (tl l)))))
 let isNoType = (fn t
 	match t {
 		NoType -> 1
 		_ -> 0
-	})
-let hdD = (fn l
-	match (head l) {
-		Ok d -> d
-		Err e -> (~ . (~ . (~ . (0 . 0))))
-	})
-let hdCs = (fn l
-	match (head l) {
-		Ok c -> c
-		Err e -> (~ . (NoType . (0 . 0)))
-	})
-let hdInfo = (fn l
-	match (head l) {
-		Ok i -> i
-		Err e -> ((~ . (~ . (~ . (0 . 0)))) . ~)
 	})
 let findIs = (fn (env key)
 	match (findE env key) {
@@ -726,26 +673,16 @@ let findIs = (fn (env key)
 letrec ctorItems = (fn (cs k)
 	(if (= (@ cs) 1)
 		~
-		(cons ((fst (hdCs cs)) . (k . (- 1 (isNoType (fst (snd (hdCs cs))))))) (ctorItems (tl cs) (+ k 1)))))
+		(cons ((fst (hdOr cs (~ . (NoType . (0 . 0))))) . (k . (- 1 (isNoType (fst (snd (hdOr cs (~ . (NoType . (0 . 0)))))))))) (ctorItems (tl cs) (+ k 1)))))
 letrec zipNM = (fn (names ids)
 	(if (= (@ names) 1)
 		~
-		(cons ((hdN names) . (TVar (first ids))) (zipNM (tl names) (tl ids)))))
-let hdPm = (fn l
-	match (head l) {
-		Ok p -> p
-		Err e -> (~ . (TVar 0))
-	})
-let hdPT = (fn l
-	match (head l) {
-		Ok t -> t
-		Err e -> NoType
-	})
+		(cons ((hdOr names ~) . (TVar (first ids))) (zipNM (tl names) (tl ids)))))
 letrec pmFind = (fn (pm name)
 	(if (= (@ pm) 1)
 		(0 . (TVar 0))
-		(if (same (fst (hdPm pm)) name)
-			(1 . (snd (hdPm pm)))
+		(if (same (fst (hdOr pm (~ . (TVar 0)))) name)
+			(1 . (snd (hdOr pm (~ . (TVar 0)))))
 			(pmFind (tl pm) name))))
 let isCapB = (fn w
 	(if (< (first w) 65) 0 (if (< 90 (first w)) 0 1)))
@@ -778,7 +715,7 @@ let convName = (fn (env pm name at)
 letrec convArgs = (fn (conv env pm args)
 	(if (= (@ args) 1)
 		(Ok ~)
-		(match (conv env pm (hdPT args)) {
+		(match (conv env pm (hdOr args NoType)) {
 			Err e -> (Err e)
 			Ok a -> (match (convArgs conv env pm (tl args)) {
 				Err e -> (Err e)
@@ -824,7 +761,7 @@ letrec convType = (fn (env pm t)
 letrec prepSums = (fn (st env ds)
 	(if (= (@ ds) 1)
 		(Ok (st . (env . ~)))
-		(let d = (hdD ds)
+		(let d = (hdOr ds (~ . (~ . (~ . (0 . 0)))))
 		(let name = (fst d)
 		(if (if (same name "Int") 1 (findIs env (cat "#" name)))
 			(Err (posMsg (snd (snd (snd d))) (cat name " is already declared")))
@@ -838,7 +775,7 @@ letrec prepSums = (fn (st env ds)
 letrec conPass = (fn (st env cs k pm sumN ids)
 	(if (= (@ cs) 1)
 		(Ok (st . env))
-		(let c = (hdCs cs)
+		(let c = (hdOr cs (~ . (NoType . (0 . 0))))
 		(let cname = (fst c)
 		(let pay = (fst (snd c))
 		(let at = (snd (snd c))
@@ -851,7 +788,7 @@ letrec conPass = (fn (st env cs k pm sumN ids)
 letrec ctorsPass = (fn (st env infos)
 	(if (= (@ infos) 1)
 		(Ok (st . env))
-		(let inf = (hdInfo infos)
+		(let inf = (hdOr infos ((~ . (~ . (~ . (0 . 0)))) . ~))
 		(let d = (fst inf)
 		(let pm = (zipNM (fst (snd d)) (snd inf))
 		(let r = (conPass st env (fst (snd (snd d))) 0 pm (fst d) (snd inf))?
