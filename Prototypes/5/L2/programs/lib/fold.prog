@@ -7,10 +7,10 @@ fn p
 	let init = (fst (snd p))
 	letrec go = (fn (acc l)
 		(if (= (@ l) 1)
-		(Ok acc)
-		(let h = (head l)?
-		let t = (tail l)?
-		go (f (acc . h)) t)))
+			(Ok acc)
+			(let h = (head l)?
+				let t = (tail l)?
+				go (f (acc . h)) t)))
 	go init (snd (snd p))
 ---
 ((fn p

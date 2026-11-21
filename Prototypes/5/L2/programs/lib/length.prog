@@ -5,9 +5,9 @@ The number of items in a list. The output is Ok of its length, since taking the 
 fn xs
 	letrec go = (fn (l n)
 		(if (= (@ l) 1)
-		(Ok n)
-		(let t = (tail l)?
-		go t (+ n 1))))
+			(Ok n)
+			(let t = (tail l)?
+				go t (+ n 1))))
 	go xs 0
 ---
 ~ => Ok 0 fuel 1000

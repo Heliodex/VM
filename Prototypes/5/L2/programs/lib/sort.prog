@@ -5,11 +5,11 @@ insert = lib/insert.prog
 fn xs
 	letrec s = (fn l
 		(if (= (@ l) 1)
-		(Ok ~)
-		(let h = (head l)?
-		let t = (tail l)?
-		let r = (s t)?
-		insert (h . r))))
+			(Ok ~)
+			(let h = (head l)?
+				let t = (tail l)?
+				let r = (s t)?
+				insert (h . r))))
 	s xs
 ---
 ~ => Ok ~ fuel 100000

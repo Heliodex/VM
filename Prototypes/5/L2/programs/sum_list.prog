@@ -4,10 +4,10 @@ Sums a list of integers. A list is a chain of pairs ending in nil, and (@ l) is 
 ---
 letrec total = (fn l
 	(if (= (@ l) 1)
-	(Ok 0)
-	(let h = (head l)?
-	let t = (total ((tail l)?))?
-	Ok (+ h t))))
+		(Ok 0)
+		(let h = (head l)?
+			let t = (total ((tail l)?))?
+			Ok (+ h t))))
 total
 ---
 ~ => Ok 0 fuel 100000

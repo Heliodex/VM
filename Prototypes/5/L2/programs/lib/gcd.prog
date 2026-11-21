@@ -5,9 +5,9 @@ The greatest common divisor of two whole numbers, by Euclid's method. The input 
 fn p
 	letrec g = (fn (a b)
 		(if (= b 0)
-		(Ok a)
-		(let r = (% a b)?
-		g b r)))
+			(Ok a)
+			(let r = (% a b)?
+				g b r)))
 	g (fst p) (snd p)
 ---
 (12 . 18) => Ok 6 fuel 1000

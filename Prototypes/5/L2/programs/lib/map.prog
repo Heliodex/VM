@@ -6,11 +6,11 @@ fn p
 	let f = (fst p)
 	letrec m = (fn l
 		(if (= (@ l) 1)
-		(Ok ~)
-		(let h = (head l)?
-		let t = (tail l)?
-		let r = (m t)?
-		Ok (cons (f h) r))))
+			(Ok ~)
+			(let h = (head l)?
+				let t = (tail l)?
+				let r = (m t)?
+				Ok (cons (f h) r))))
 	m (snd p)
 ---
 ((fn x

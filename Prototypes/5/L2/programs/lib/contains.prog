@@ -6,12 +6,12 @@ fn p
 	let x = (fst p)
 	letrec c = (fn l
 		(if (= (@ l) 1)
-		(Ok 0)
-		(let h = (head l)?
-		if (= h x)
-			(Ok 1)
-			(let t = (tail l)?
-			c t))))
+			(Ok 0)
+			(let h = (head l)?
+				if (= h x)
+				(Ok 1)
+				(let t = (tail l)?
+					c t))))
 	c (snd p)
 ---
 (2 . [1 2 3]) => Ok 1 fuel 1000

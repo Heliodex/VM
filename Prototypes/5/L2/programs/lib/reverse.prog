@@ -5,10 +5,10 @@ Reverses a list. The output is Ok of the same items in the opposite order.
 fn xs
 	letrec rev = (fn (l acc)
 		(if (= (@ l) 1)
-		(Ok acc)
-		(let h = (head l)?
-		let t = (tail l)?
-		rev t (cons h acc))))
+			(Ok acc)
+			(let h = (head l)?
+				let t = (tail l)?
+				rev t (cons h acc))))
 	rev xs ~
 ---
 ~ => Ok ~ fuel 1000

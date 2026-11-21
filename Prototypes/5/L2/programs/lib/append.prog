@@ -7,11 +7,11 @@ fn p
 	let ys = (snd p)
 	letrec app = (fn l
 		(if (= (@ l) 1)
-		(Ok ys)
-		(let h = (head l)?
-		let t = (tail l)?
-		let r = (app t)?
-		Ok (cons h r))))
+			(Ok ys)
+			(let h = (head l)?
+				let t = (tail l)?
+				let r = (app t)?
+				Ok (cons h r))))
 	app xs
 ---
 (~ . ~) => Ok ~ fuel 1000
