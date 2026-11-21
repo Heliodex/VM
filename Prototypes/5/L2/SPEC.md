@@ -217,6 +217,26 @@ describe r = match r {
 }
 ```
 
+### 12.1 Proposed: block form for local bindings (not yet implemented)
+
+Several local names are bound in one block, instead of one `let` nested in the body of the last:
+
+```
+let {
+    f = (fn x (+ x 1))
+    g = (fn x (f (f x)))
+    (g 5)
+}
+```
+
+- A block is `let {` or `letrec {`, then items, then `}`. Items are separated by newlines, as the arms of a `match` are.
+- A binding is `name = expr`, and its value ends at the end of its line, as a `let` value does. A longer value is wrapped in parentheses.
+- The last item is the body. It is an expression with no `name =`, and it must be the last item: a block with no body, or with a binding after its body, is an error.
+- `let {` binds each name in order, so a binding sees the names before it, as a chain of `let`s does. `letrec {` binds all its names together, so the bindings can call each other, as a `mutual` group does, and each value must be a `fn`.
+- A block is sugar: `let {` is a chain of `let`s, and `letrec {` is a `mutual` group. It adds no expression to the machine, and it adds no new check.
+- The braces end the block, so a block may sit inside a match arm, or inside any expression, without parentheses. Inside the braces, newlines separate items.
+- Early return (section 9.2) follows the rules for the body of a `let`: a `?` in a binding's value is allowed where a `let` value's would be, and a `?` in the body is allowed where a `let` body's would be.
+
 ## 13. Types (first version)
 
 The first version has a small static type system for surface programs. Quoted and binary forms are untyped, as in L1. The checker runs on surface syntax, before compilation, and it is not part of the machine.
