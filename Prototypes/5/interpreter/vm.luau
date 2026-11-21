@@ -61,8 +61,7 @@ export type Outcome =
 	| { status: "out_of_fuel"; steps: number }
 -- The pending work of the machine. Each frame says what to do with the next value.
 type Frame =
-	| { k: "cell"; expr: Expr; env: Binding? }
-	| { k: "cellhead"; head: Value }
+	| { k: "cell"; expr: Expr; env: Binding?; head: Value? }
 	| { k: "force" }
 	| { k: "construct"; tag: number }
 	| { k: "tagof" }
@@ -307,19 +306,20 @@ const function run(program: Expr, fuel: number, initialEnv: Binding?): Outcome
 				depth -= 1
 
 				if frame.k == "cell" then
-					push {
-						k = "cellhead",
-						head = value,
-					}
-					expr = frame.expr
-					env = frame.env
-					returning = false
-				elseif frame.k == "cellhead" then
-					value = {
-						kind = "cell",
-						head = frame.head,
-						tail = value,
-					}
+					if frame.head == nil then
+						-- The head is done. The frame waits again, now for the tail.
+						frame.head = value
+						push(frame)
+						expr = frame.expr
+						env = frame.env
+						returning = false
+					else
+						value = {
+							kind = "cell",
+							head = frame.head,
+							tail = value,
+						}
+					end
 				elseif frame.k == "index" then
 					-- The steps of the address, low bit first. The low bit is the last step, so the steps are applied from the high end.
 					local path: { number } = {}
