@@ -52,7 +52,8 @@ The second language is **L2** (language 2). It is typed, and it has the surface 
 | `lex_run.luau` | Checks the L2 tokenizer against the Luau lexer on every program file and a set of edge cases. |
 | `L2/programs/boot/parse.prog` | The L2 parser, written in L2: stage 2 of the L2 compiler in L2. It reads the tokenizer's output. |
 | `parse_run.luau` | Checks the L2 parser, run on the tokenizer's output, against the Luau parser on every L2 program file and a set of cases that reach each error. |
-| `L2/programs/boot/types.prog` | The first part of the L2 checker in L2, with no mutation: the types, the state, and unification. |
+| `L2/programs/boot/types.prog` | The L2 checker in L2, with no mutation: the types, the state, unification, generalisation, and type inference for the core forms. |
+| `infer_run.luau` | Checks the L2 checker against the Luau checker on the programs of every L2 program file, and a set of cases for each form and error. Type variables are renamed by where they first appear, so numbering does not matter. |
 
 ## Running
 
@@ -73,6 +74,7 @@ Run from this directory.
 | The L2 checker checks | `lute run checker_run.luau` |
 | The L2 tokenizer against the Luau lexer | `lute run lex_run.luau` |
 | The L2 parser against the Luau parser | `lute run parse_run.luau` |
+| The L2 checker against the Luau checker | `lute run infer_run.luau` |
 | The program file checks | `lute run programs_run.luau` |
 | The analyser | `luau-analyze interpreter/*.luau examples/*.luau self/*.luau run.luau self_run.luau self_data_run.luau` |
 | The formatter | `luau-format interpreter/*.luau examples/*.luau self/*.luau run.luau self_run.luau self_data_run.luau` |

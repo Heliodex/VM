@@ -5,7 +5,10 @@ type Ty = TVar Int | TCon ([Int] . [Ty])
 type Bind = Unbound Int | Bound Ty
 type St = St (Int . ([(Int . Bind)] . [[Int]]))
 type Scheme = Scheme ([Int] . Ty)
-type Req = Unify (Ty . Ty) | Gen (Int . Ty) | Inst (Int . Scheme)
+type Look = Found Scheme | Missing
+type Req = Unify (Ty . Ty) | Gen (Int . Ty) | Inst (Int . Scheme) | Infer Expr
+type Expr = EInt (Int . (Int . Int)) | EStr ([Int] . (Int . Int)) | ENil (Int . Int) | EName ([Int] . (Int . Int)) | EList ([Expr] . (Int . Int)) | EPair (Expr . (Expr . (Int . Int))) | EApp (Expr . ([Expr] . (Int . Int))) | EFn ([[Int]] . (Expr . (Int . Int))) | ELet ([Int] . (Expr . (Expr . (Int . (Int . Int))))) | EMutual ([([Int] . (Expr . (Int . Int)))] . (Expr . (Int . Int))) | EIf (Expr . (Expr . (Expr . (Int . Int)))) | EMatch (Expr . ([(Pat . (Expr . (Int . Int)))] . (Int . Int))) | ETry (Expr . (Int . Int)) | ECheck (Expr . (Int . Int)) | EUntyped (Expr . (Int . Int))
+type Pat = PCon ([Int] . ([Int] . (Int . Int))) | PBind ([Int] . (Int . Int)) | PWild (Int . Int)
 
 let first = (fn l
 	match (head l) {
@@ -271,11 +274,222 @@ let runInst = (fn q
 	(let r = (instantiate st (fst q) (snd q))
 	((render (bindsOf (snd r)) (fst r)) . (errsOf (snd r))))))
 
+let atOfE = (fn e
+	match e {
+		EInt p -> (snd p)
+		EStr p -> (snd p)
+		ENil p -> p
+		EName p -> (snd p)
+		EList p -> (snd p)
+		EPair p -> (snd (snd p))
+		EApp p -> (snd (snd p))
+		EFn p -> (snd (snd p))
+		ELet p -> (snd (snd (snd (snd p))))
+		EMutual p -> (snd (snd p))
+		EIf p -> (snd (snd (snd p)))
+		EMatch p -> (snd (snd p))
+		ETry p -> (snd p)
+		ECheck p -> (snd p)
+		EUntyped p -> (snd p)
+	})
+let hdX = (fn l
+	match (head l) {
+		Ok x -> x
+		Err e -> (ENil (0 . 0))
+	})
+let hdN = (fn l
+	match (head l) {
+		Ok n -> n
+		Err e -> ~
+	})
+let hdP = (fn l
+	match (head l) {
+		Ok p -> p
+		Err e -> (~ . (Scheme (~ . (TVar 0))))
+	})
+let hdMsg = (fn l
+	match (head l) {
+		Ok m -> m
+		Err e -> ~
+	})
+letrec lastMsg = (fn l
+	(if (= (@ (tl l)) 1)
+		(hdMsg l)
+		(lastMsg (tl l))))
+let posMsg = (fn (at msg)
+	(cat "line " (cat (showNat (fst at)) (cat ", column " (cat (showNat (snd at)) (cat ": " msg))))))
+
+let tInt = (TCon ("Int" . ~))
+let tArrow = (fn (a b)
+	(TCon ("->" . [a b])))
+let tList = (fn a
+	(TCon ("list" . [a])))
+let tPair = (fn (a b)
+	(TCon ("pair" . [a b])))
+let tRes = (fn (a e)
+	(TCon ("Result" . [a e])))
+let tPin = (fn a
+	(TCon ("Pin" . [a])))
+let mono = (fn (name ty)
+	(name . (Scheme (~ . ty))))
+let poly = (fn (vars name ty)
+	(name . (Scheme (vars . ty))))
+
+let builtinEnv = [
+	(mono "+" (tArrow tInt (tArrow tInt tInt)))
+	(mono "-" (tArrow tInt (tArrow tInt tInt)))
+	(mono "*" (tArrow tInt (tArrow tInt tInt)))
+	(mono "<" (tArrow tInt (tArrow tInt tInt)))
+	(mono "=" (tArrow tInt (tArrow tInt tInt)))
+	(mono "/" (tArrow tInt (tArrow tInt (tRes tInt (tList tInt)))))
+	(mono "%" (tArrow tInt (tArrow tInt (tRes tInt (tList tInt)))))
+	(poly [1] "@" (tArrow (TVar 1) tInt))
+	(poly [1] "head" (tArrow (tList (TVar 1)) (tRes (TVar 1) (tList tInt))))
+	(poly [1] "tail" (tArrow (tList (TVar 1)) (tRes (tList (TVar 1)) (tList tInt))))
+	(poly [1 2] "fst" (tArrow (tPair (TVar 1) (TVar 2)) (TVar 1)))
+	(poly [1 2] "snd" (tArrow (tPair (TVar 1) (TVar 2)) (TVar 2)))
+	(poly [1] "cons" (tArrow (TVar 1) (tArrow (tList (TVar 1)) (tList (TVar 1)))))
+	(poly [1] "pin" (tArrow (TVar 1) (tPin (TVar 1))))
+	(poly [1] "force" (tArrow (tPin (TVar 1)) (TVar 1)))
+	(poly [1] "fix" (tArrow (tArrow (TVar 1) (TVar 1)) (TVar 1)))
+]
+
+letrec findE = (fn (env name)
+	(if (= (@ env) 1)
+		Missing
+		(if (same (fst (hdP env)) name)
+			(Found (snd (hdP env)))
+			(findE (tl env) name))))
+
+; A unification adds at most one error, so the error it adds gets the position of the node.
+let addPos = (fn (st0 st1 at)
+	(if (< (lenOf (errsOf st0)) (lenOf (errsOf st1)))
+		(mkSt (nextOf st1) (bindsOf st1) (snoc (errsOf st0) (posMsg at (lastMsg (errsOf st1)))))
+		st1))
+let unifyAt = (fn (st at a e)
+	(addPos st (unify st a e) at))
+
+let lookupName = (fn (st env p level)
+	match (findE env (fst p)) {
+		Found s -> (instantiate st level s)
+		Missing -> (let fr = (fresh st level)
+			((fst fr) . (addErr (snd fr) (posMsg (snd p) (cat (fst p) " is not bound")))))
+	})
+
+; A program's type must be a function, unless it is not known yet: a concrete type that is not an arrow is an error.
+let badProgram = (fn (bs t)
+	match (prune bs t) {
+		TVar y -> 0
+		TCon p -> (if (same (fst p) "->") 0 1)
+	})
+
+; A step of a node that unifies with the node's own type. When it fails, the node is abandoned: the Luau checker raises there, and the node gets a fresh type, so no later step of the node runs. A failure in a child does not abandon the node, since the child is abandoned on its own.
+let grew = (fn (a b)
+	(if (< (lenOf (errsOf a)) (lenOf (errsOf b))) 1 0))
+
+letrec infer = (fn (st env node level)
+	(letrec inferItems = (fn (st0 items item)
+		(if (= (@ items) 1)
+			(1 . st0)
+			(let x = (hdX items)
+			(let r = (infer st0 env x level)
+			(let s1 = (unifyAt (snd r) (atOfE x) (fst r) item)
+			(if (= (grew (snd r) s1) 1)
+				(0 . s1)
+				(inferItems s1 (tl items) item)))))))
+	(letrec appArgs = (fn (st0 cur args at)
+		(if (= (@ args) 1)
+			(1 . (cur . st0))
+			(let x = (hdX args)
+			(let r = (infer st0 env x level)
+			(let p1 = (fresh (snd r) level)
+			(let p2 = (fresh (snd p1) level)
+			(let s1 = (unifyAt (snd p2) at cur (tArrow (fst p1) (fst p2)))
+			(if (= (grew (snd p2) s1) 1)
+				(0 . (cur . s1))
+				(let s2 = (unifyAt s1 (atOfE x) (fst r) (fst p1))
+				(if (= (grew s1 s2) 1)
+					(0 . ((fst p2) . s2))
+					(appArgs s2 (fst p2) (tl args) at)))))))))))
+	(letrec inferFn = (fn (st0 envF names body)
+		(if (= (@ names) 1)
+			(let rr = (fresh st0 level)
+			(let rb = (infer (snd rr) envF body level)
+			(let s1 = (unifyAt (snd rb) (atOfE body) (fst rb) (fst rr))
+			(if (= (grew (snd rb) s1) 1)
+				(0 . ((fst rr) . s1))
+				(1 . ((fst rr) . s1))))))
+			(let p = (fresh st0 level)
+			(let envF2 = (cons ((hdN names) . (Scheme (~ . (fst p)))) envF)
+			(let rest = (inferFn (snd p) envF2 (tl names) body)
+			((fst rest) . ((tArrow (fst p) (fst (snd rest))) . (snd (snd rest)))))))))
+	(match node {
+		EInt p -> (tInt . st)
+		EStr p -> ((tList tInt) . st)
+		ENil p -> (let fr = (fresh st level)
+			((tList (fst fr)) . (snd fr)))
+		EName p -> (lookupName st env p level)
+		EList p -> (let item = (fresh st level)
+			(let r = (inferItems (snd item) (fst p) (fst item))
+			(if (= (fst r) 1)
+				((tList (fst item)) . (snd r))
+				(fresh (snd r) level))))
+		EPair p -> (let ra = (infer st env (fst p) level)
+			(let rb = (infer (snd ra) env (fst (snd p)) level)
+			((tPair (fst ra) (fst rb)) . (snd rb))))
+		EApp p -> (let rf = (infer st env (fst p) level)
+			(let r = (appArgs (snd rf) (fst rf) (fst (snd p)) (snd (snd p)))
+			(if (= (fst r) 1)
+				(snd r)
+				(fresh (snd (snd r)) level))))
+		EFn p -> (let r = (inferFn st env (fst p) (fst (snd p)))
+			(if (= (fst r) 1)
+				(snd r)
+				(fresh (snd (snd r)) level)))
+		ELet p -> (if (= (fst (snd (snd (snd p)))) 1)
+			(let f = (fresh st (+ level 1))
+			(let recEnv = (cons ((fst p) . (Scheme (~ . (fst f)))) env)
+			(let v = (infer (snd f) recEnv (fst (snd p)) (+ level 1))
+			(let s2 = (unifyAt (snd v) (atOfE (fst (snd p))) (fst v) (fst f))
+			(if (= (grew (snd v) s2) 1)
+				(fresh s2 level)
+				(let env2 = (cons ((fst p) . (generalize s2 level (fst f))) env)
+				(infer s2 env2 (fst (snd (snd p))) level)))))))
+			(let v = (infer st env (fst (snd p)) (+ level 1))
+			(let env2 = (cons ((fst p) . (generalize (snd v) level (fst v))) env)
+			(infer (snd v) env2 (fst (snd (snd p))) level))))
+		EIf p -> (let rc = (infer st env (fst p) level)
+			(let rt = (infer (snd rc) env (fst (snd p)) level)
+			(let re = (infer (snd rt) env (fst (snd (snd p))) level)
+			(let s1 = (unifyAt (snd re) (atOfE (fst p)) (fst rc) tInt)
+			(if (= (grew (snd re) s1) 1)
+				(fresh s1 level)
+				(let s2 = (unifyAt s1 (atOfE (fst (snd (snd p)))) (fst re) (fst rt))
+				(if (= (grew s1 s2) 1)
+					(fresh s2 level)
+					((fst rt) . s2))))))))
+		_ -> (let fr = (fresh st level)
+			((fst fr) . (addErr (snd fr) (posMsg (atOfE node) "this form is not checked yet"))))
+	})))))
+
+; The type of a whole program: a function of its input. Its output is the rendered type, and the errors.
+let inferProgram = (fn ex
+	(let r = (infer (mkSt 1000 ~ ~) builtinEnv ex 0)
+	(let st1 = (snd r)
+	(if (= (badProgram (bindsOf st1) (fst r)) 1)
+		(let st3 = (addErr st1 (posMsg (atOfE ex) (cat "the program must be a function of its input, but it is " (render (bindsOf st1) (fst r)))))
+		((render (bindsOf st3) (fst r)) . (errsOf st3)))
+		(let inp = (fresh st1 0)
+		(let outp = (fresh (snd inp) 0)
+		(let st2 = (unifyAt (snd outp) (atOfE ex) (fst r) (tArrow (fst inp) (fst outp)))
+		((render (bindsOf st2) (fst r)) . (errsOf st2)))))))))
+
 fn p
 	match p {
 		Unify q -> (runUnify q)
 		Gen q -> (runGen q)
 		Inst q -> (runInst q)
+		Infer ex -> (inferProgram ex)
 	}
 ---
 Unify ((TCon ("Int" . ~)) . (TCon ("Int" . ~))) => ("Int" . ~) fuel 1000000
