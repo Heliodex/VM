@@ -6,10 +6,10 @@
 --   lute run lex_run.luau      (from Prototypes/5)
 
 const L2 = require "./L2/l2"
-const ProgramFile = require "./L2/programfile"
 const Lexer = require "./L2/lexer"
-const VM = require "./interpreter/vm"
+const ProgramFile = require "./L2/programfile"
 const Data = require "./interpreter/data"
+const VM = require "./interpreter/vm"
 const fs = require "@lute/fs"
 
 local failures = 0
@@ -21,6 +21,7 @@ local function readFile(path: string): string
 	const handle = fs.open(path)
 	const text = fs.read(handle)
 	fs.close(handle)
+
 	return text
 end
 
@@ -35,9 +36,8 @@ local function resolve(name: string): string?
 end
 
 -- The L2 tokenizer, compiled from its program file.
-const tokenizerText = readFile("L2/programs/boot/lex.prog")
+const tokenizerText = readFile "L2/programs/boot/lex.prog"
 const tokenizer = L2.compile(tokenizerText, resolve, "boot/lex.prog")
-
 -- The tag of each kind, in the order the L2 type Kind declares its constructors.
 const KIND_TAG: { [string]: number } = {
 	["("] = 0,
@@ -83,7 +83,11 @@ const function tokenValue(t: Lexer.Token): VM.Value
 
 	if t.kind == "int" then
 		const n = t.value :: number
-		payload = if n == 0 then 0 else n
+		payload =
+			if n == 0 then
+				0
+			else
+				n
 	elseif t.kind == "str" then
 		payload = bytesValue(t.value :: { number })
 	elseif t.kind == "sym" then
@@ -91,7 +95,12 @@ const function tokenValue(t: Lexer.Token): VM.Value
 	end
 
 	const kind: VM.Value = { kind = "con", tag = KIND_TAG[t.kind], payload = payload }
-	const spaced: VM.Value = if t.spaced then 1 else 0
+	const spaced: VM.Value =
+		if t.spaced then
+			1
+		else
+			0
+
 	return {
 		kind = "cell",
 		head = kind,
@@ -118,19 +127,21 @@ end
 
 -- The L2 tokenizer's outcome for src, as the same text.
 const function l2Value(src: string): string
-	const result = L2.run(tokenizer, bytesValue(stringBytes(src)), 100000000)
+	const result = L2.run(tokenizer, bytesValue(stringBytes(src)), 1e8)
 
 	if result.status == "value" then
 		return Data.write(result.value)
 	end
 
-	return "the tokenizer " .. result.status .. (if result.status == "error" then ": " .. result.message else "")
+	return "the tokenizer " .. result.status .. (
+		if result.status == "error" then
+			": " .. result.message
+		else
+			""
+	)
 end
 
-const function check(
-	name: string,
-	src: string
-)
+const function check(name: string, src: string)
 	total += 1
 	const want = expectedValue(src)
 	const got = l2Value(src)
@@ -184,13 +195,13 @@ const EDGE = {
 	"a.",
 	".",
 	"(a.b)",
-	"\"ab\"",
-	"\"a",
-	"\"a\nb\"",
-	"\"\\q\"",
-	"\"\\0\\t\\n\\\\\\\"\"",
+	'"ab"',
+	'"a',
+	'"a\nb"',
+	'"\\q"',
+	'"\\0\\t\\n\\\\\\""',
 	"\\",
-	"\"\\",
+	'"\\',
 	"99999999999999999999",
 	"9007199254740991",
 	"9007199254740990",
@@ -217,8 +228,8 @@ const EDGE = {
 	"9007199254740991.",
 	"(\n)",
 	"a\n  b",
-	"\"\"",
-	"\"x\\\"y\"",
+	'""',
+	'"x\\"y"',
 	"a . ",
 }
 

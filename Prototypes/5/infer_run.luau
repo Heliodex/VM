@@ -7,10 +7,10 @@
 --
 --   lute run infer_run.luau      (from Prototypes/5)
 
-const L2 = require "./L2/l2"
-const ProgramFile = require "./L2/programfile"
-const Parser = require "./L2/parser"
 const Checker = require "./L2/checker"
+const L2 = require "./L2/l2"
+const Parser = require "./L2/parser"
+const ProgramFile = require "./L2/programfile"
 const VM = require "./interpreter/vm"
 const fs = require "@lute/fs"
 
@@ -24,6 +24,7 @@ local function readFile(path: string): string
 	const handle = fs.open(path)
 	const text = fs.read(handle)
 	fs.close(handle)
+
 	return text
 end
 
@@ -37,9 +38,9 @@ local function resolve(name: string): string?
 	return nil
 end
 
-const tokenizer = L2.compile(readFile("L2/programs/boot/lex.prog"), resolve, "boot/lex.prog")
-const parser = L2.compile(readFile("L2/programs/boot/parse.prog"), resolve, "boot/parse.prog")
-const checkerProgram = L2.compile(readFile("L2/programs/boot/types.prog"), resolve, "boot/types.prog")
+const tokenizer = L2.compile(readFile "L2/programs/boot/lex.prog", resolve, "boot/lex.prog")
+const parser = L2.compile(readFile "L2/programs/boot/parse.prog", resolve, "boot/parse.prog")
+const checkerProgram = L2.compile(readFile "L2/programs/boot/types.prog", resolve, "boot/types.prog")
 
 -- The bytes of a string, and a string of the bytes of a list of values.
 const function bytesValue(s: string): VM.Value
@@ -82,14 +83,20 @@ const function canon(s: string): string
 	local names: { [string]: string } = {}
 	local count = 0
 
-	return (string.gsub(s, "%?(%d+)", function(id: string): string
-		if names[id] == nil then
-			count += 1
-			names[id] = `?v{count}`
-		end
+	return (
+		string.gsub(
+			s,
+			"%?(%d+)",
+			function(id: string): string
+				if names[id] == nil then
+					count += 1
+					names[id] = `?v{count}`
+				end
 
-		return names[id]
-	end))
+				return names[id]
+			end
+		)
+	)
 end
 
 -- The outcome of the Luau checker: its type, or its errors.
@@ -106,30 +113,34 @@ const function luauOutcome(src: string): string?
 		return "type " .. canon(Checker.showScheme((res :: Checker.Result).scheme))
 	end
 
-	const message = if type(res) == "table" then (res :: { typeError: string }).typeError else tostring(res)
+	const message =
+		if type(res) == "table" then
+			(res :: { typeError: string }).typeError
+		else
+			tostring(res)
+
 	return "error " .. canon(message)
 end
 
 -- The outcome of the L2 checker, run on the expression of an L2 parse.
 local function l2Outcome(src: string): string?
-	const tokenized = L2.run(tokenizer, bytesValue(src), 100000000)
+	const tokenized = L2.run(tokenizer, bytesValue(src), 1e8)
 
 	if tokenized.status ~= "value" then
 		return nil
 	end
 
-	const parsed = L2.run(parser, (tokenized.value :: VM.Con).payload, 500000000)
+	const parsed = L2.run(parser, (tokenized.value :: VM.Con).payload, 5e8)
 
 	if parsed.status ~= "value" or (parsed.value :: VM.Con).tag ~= 0 then
 		return nil
 	end
 
 	const program = (parsed.value :: VM.Con).payload :: VM.Cell
-
 	-- The request Infer (tag 3 of Req) with the program: its declarations, then its body.
 	const request: VM.Value = { kind = "con", tag = 3, payload = program }
 	-- The checker's own source takes more than 1e9 steps (about 11 minutes for this suite), so the limit is 1e10.
-	const result = L2.run(checkerProgram, request, 10000000000)
+	const result = L2.run(checkerProgram, request, 1e10)
 
 	if result.status ~= "value" then
 		return "the checker " .. result.status
@@ -166,6 +177,7 @@ local function check(name: string, src: string)
 
 	if want == nil or got == nil then
 		skipped += 1
+
 		return
 	end
 
@@ -228,7 +240,7 @@ const CASES = {
 	"fn x\n\tunbound",
 	"5",
 	"~",
-	"\"ab\"",
+	'"ab"',
 	"[1 2 3]",
 	"(1 . [2])",
 	"[(1 . 2) (3 . 4)]",
@@ -307,14 +319,7 @@ for i, src in CASES do
 	check(`case {i}`, src)
 end
 
-print(string.format(
-	"%d of %d programs give the same type or errors as the Luau checker (%d types, %d errors, %d skipped: the parser refuses them or a form is not handled yet)",
-	total - failures,
-	total,
-	types,
-	errors,
-	skipped
-))
+print(string.format("%d of %d programs give the same type or errors as the Luau checker (%d types, %d errors, %d skipped: the parser refuses them or a form is not handled yet)", total - failures, total, types, errors, skipped))
 
 if failures > 0 then
 	error(string.format("%d program(s) differ", failures))

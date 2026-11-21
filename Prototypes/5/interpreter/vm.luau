@@ -275,7 +275,6 @@ const function run(program: Expr, fuel: number, initialEnv: Binding?): Outcome
 						b = expr.b,
 						env = env,
 					}
-
 					expr = expr.a
 				end
 			else

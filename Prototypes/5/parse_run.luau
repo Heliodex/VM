@@ -8,11 +8,10 @@
 --   lute run parse_run.luau      (from Prototypes/5)
 
 const L2 = require "./L2/l2"
-const ProgramFile = require "./L2/programfile"
 const Parser = require "./L2/parser"
-const Lexer = require "./L2/lexer"
-const VM = require "./interpreter/vm"
+const ProgramFile = require "./L2/programfile"
 const Data = require "./interpreter/data"
+const VM = require "./interpreter/vm"
 const fs = require "@lute/fs"
 
 local failures = 0
@@ -25,6 +24,7 @@ local function readFile(path: string): string
 	const handle = fs.open(path)
 	const text = fs.read(handle)
 	fs.close(handle)
+
 	return text
 end
 
@@ -38,11 +38,10 @@ local function resolve(name: string): string?
 	return nil
 end
 
-const tokenizer = L2.compile(readFile("L2/programs/boot/lex.prog"), resolve, "boot/lex.prog")
-const parser = L2.compile(readFile("L2/programs/boot/parse.prog"), resolve, "boot/parse.prog")
+const tokenizer = L2.compile(readFile "L2/programs/boot/lex.prog", resolve, "boot/lex.prog")
+const parser = L2.compile(readFile "L2/programs/boot/parse.prog", resolve, "boot/parse.prog")
 
 -- VALUES
-
 const function bytesOf(s: string): VM.Value
 	local v: VM.Value = VM.NIL
 
@@ -77,16 +76,24 @@ const function posOf(at: { line: number, col: number }): VM.Value
 end
 
 const function intOf(n: number): VM.Value
-	return if n == 0 then 0 else n
+	return
+		if n == 0 then
+			0
+		else
+			n
 end
 
 -- THE LUAU TREE, AS VALUES
-
 local convertExpr: (Parser.Expr) -> VM.Value
 
 local function convertPattern(p: Parser.Pattern): VM.Value
 	if p.k == "con" then
-		const bind: VM.Value = if p.bind ~= nil then bytesOf(p.bind :: string) else VM.NIL
+		const bind: VM.Value =
+			if p.bind ~= nil then
+				bytesOf(p.bind :: string)
+			else
+				VM.NIL
+
 		return conOf(0, cellOf(bytesOf(p.name), cellOf(bind, posOf(p.at))))
 	elseif p.k == "bind" then
 		return conOf(1, cellOf(bytesOf(p.name), posOf(p.at)))
@@ -113,6 +120,7 @@ local function convertType(t: Parser.Type): VM.Value
 	end
 
 	const f = t :: { k: string, a: Parser.Type, b: Parser.Type, at: { line: number, col: number } }
+
 	return conOf(4, cellOf(convertType(f.a), cellOf(convertType(f.b), posOf(f.at))))
 end
 
@@ -150,7 +158,12 @@ convertExpr = function(e: Parser.Expr): VM.Value
 
 		return conOf(7, cellOf(listOf(names), cellOf(convertExpr(e.body), posOf(e.at))))
 	elseif e.k == "let" then
-		const rec = if e.rec then 1 else 0
+		const rec =
+			if e.rec then
+				1
+			else
+				0
+
 		return conOf(8, cellOf(bytesOf(e.name), cellOf(convertExpr(e.value), cellOf(convertExpr(e.body), cellOf(rec, posOf(e.at))))))
 	elseif e.k == "mutual" then
 		local bindings: { VM.Value } = {}
@@ -177,6 +190,7 @@ convertExpr = function(e: Parser.Expr): VM.Value
 	end
 
 	const u = e :: { k: string, e: Parser.Expr, at: { line: number, col: number } }
+
 	return conOf(14, cellOf(convertExpr(u.e), posOf(u.at)))
 end
 
@@ -194,7 +208,11 @@ const function convertProgram(p: Parser.Program): VM.Value
 		local cons: { VM.Value } = {}
 
 		for _, c in d.cons do
-			const payload: VM.Value = if c.payload ~= nil then convertType(c.payload :: Parser.Type) else conOf(5, VM.NIL)
+			const payload: VM.Value =
+				if c.payload ~= nil then
+					convertType(c.payload :: Parser.Type)
+				else
+					conOf(5, VM.NIL)
 			table.insert(cons, cellOf(bytesOf(c.name), cellOf(payload, posOf(c.at))))
 		end
 
@@ -205,7 +223,6 @@ const function convertProgram(p: Parser.Program): VM.Value
 end
 
 -- THE TWO PARSERS
-
 -- The Luau parser's outcome as an L2 Result value: Ok of the program, or Err of the message.
 const function expectedValue(src: string): string
 	const ok, res = pcall(Parser.parse, src)
@@ -219,29 +236,32 @@ end
 
 -- The L2 tokenizer, then the L2 parser on its tokens. nil when the tokenizer refuses the text.
 const function l2Value(src: string): string?
-	const tokenized = L2.run(tokenizer, bytesOf(src), 100000000)
+	const tokenized = L2.run(tokenizer, bytesOf(src), 1e8)
 
 	if tokenized.status ~= "value" then
 		return nil
 	end
 
-	const result = L2.run(parser, (tokenized.value :: VM.Con).payload, 500000000)
+	const result = L2.run(parser, (tokenized.value :: VM.Con).payload, 5e8)
 
 	if result.status == "value" then
 		return Data.write(result.value)
 	end
 
-	return "the parser " .. result.status .. (if result.status == "error" then ": " .. result.message else "")
+	return "the parser " .. result.status .. (
+		if result.status == "error" then
+			": " .. result.message
+		else
+			""
+	)
 end
 
-const function check(
-	name: string,
-	src: string
-)
+const function check(name: string, src: string)
 	const got = l2Value(src)
 
 	if got == nil then
 		skipped += 1
+
 		return
 	end
 
@@ -366,7 +386,7 @@ const CASES = {
 	"f (fn x\n\tx) 1",
 	"[(fn x\n\tx) 1]",
 	"f ~ _",
-	"f \"ab\" 1",
+	'f "ab" 1',
 	"f ;comment\n1",
 	"(a . b) . c",
 	"-\n5",
@@ -398,14 +418,7 @@ for i, src in CASES do
 	check(`case {i}`, src)
 end
 
-print(string.format(
-	"%d of %d programs give the same tree or error as the Luau parser (%d trees, %d errors, %d skipped: the tokenizer refuses them)",
-	total - failures,
-	total,
-	trees,
-	errors,
-	skipped
-))
+print(string.format("%d of %d programs give the same tree or error as the Luau parser (%d trees, %d errors, %d skipped: the tokenizer refuses them)", total - failures, total, trees, errors, skipped))
 
 if failures > 0 then
 	error(string.format("%d program(s) differ", failures))
