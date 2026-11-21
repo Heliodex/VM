@@ -3,7 +3,7 @@
 --
 -- L2/programs/boot/types.prog infers the type of a program from its syntax tree. Each input here is run through the L2 tokenizer and parser, then through the L2 checker, and through the Luau checker. The two must agree on the type of the program, or on its errors. Type variables are numbered by where they first appear, so the numbering of the two checkers does not matter.
 --
--- An input that the parser refuses is skipped, since parse_run.luau checks the parser. So is an input that has a form the pure checker does not handle yet, or a type declaration, since the pure checker has no user sums yet.
+-- An input that the parser refuses is skipped, since parse_run.luau checks the parser. So is an input that has a form the pure checker does not handle yet.
 --
 --   lute run infer_run.luau      (from Prototypes/5)
 
@@ -127,13 +127,10 @@ local function l2Outcome(src: string): string?
 	const program = (parsed.value :: VM.Con).payload :: VM.Cell
 	const decls = program.head
 
-	if decls ~= VM.NIL then
-		return nil
-	end
-
-	-- The request Infer (tag 3 of Req) with the expression.
-	const request: VM.Value = { kind = "con", tag = 3, payload = program.tail }
-	const result = L2.run(checkerProgram, request, 1000000000)
+	-- The request Infer (tag 3 of Req) with the program: its declarations, then its body.
+	const request: VM.Value = { kind = "con", tag = 3, payload = program }
+	-- The checker's own source takes more than 1e9 steps (about 11 minutes for this suite), so the limit is 1e10.
+	const result = L2.run(checkerProgram, request, 10000000000)
 
 	if result.status ~= "value" then
 		return "the checker " .. result.status
@@ -273,6 +270,38 @@ const CASES = {
 	"fn x\n\tmatch x {\n\t\tOk v -> v\n\t\tErr e -> (+ e 1)\n\t}",
 	"fn x\n\tmatch x {\n\t\tOk v -> (+ v 1)\n\t\tErr e -> 0\n\t}",
 	"fn x\n\tmatch x {\n\t\tOk v -> v\n\t\tErr e -> (+ e 1)\n\t}",
+	"type Option a = None | Some a\n\nfn x\n\tSome x",
+	"type Option a = None | Some a\n\nfn x\n\tmatch x {\n\t\tNone -> 0\n\t\tSome v -> v\n\t}",
+	"type Option a = None | Some a\n\nfn x\n\tmatch x {\n\t\tNone -> 0\n\t}",
+	"type Option a = None | Some a\n\nfn x\n\tmatch x {\n\t\tSome v -> v\n\t\tNone -> 0\n\t\tSome w -> w\n\t}",
+	"type Tree = Leaf | Node (Tree . Tree)\n\nfn x\n\tNode (x . Leaf)",
+	"type Tree = Leaf | Node (Tree . Tree)\n\nfn x\n\tNode (Leaf . Leaf)",
+	"type Tree = Leaf | Node (Tree . Tree)\n\nfn x\n\tmatch x {\n\t\tLeaf -> 0\n\t\tNode (l . r) -> 1\n\t}",
+	"type Tree = Leaf | Node (Tree . Tree)\n\nfn x\n\tmatch x {\n\t\tLeaf -> 0\n\t\tNode p -> 1\n\t}",
+	"type A = X\ntype B = X\n\nfn x\n\tx",
+	"type A = X\ntype A = Y\n\nfn x\n\tx",
+	"type A = X Foo\n\nfn x\n\tx",
+	"type Box a = Box a\n\nfn x\n\tBox x",
+	"type Box a = Box a\ntype U = U Box\n\nfn x\n\tx",
+	"type A = P Int\n\nfn x\n\t(P x)",
+	"type A = X\n\nfn x\n\tY x",
+	"type A = X | Y Int\n\nfn x\n\tmatch x {\n\t\tX -> 1\n\t\tY n -> (+ n 1)\n\t}",
+	"type A = X | Y Int\ntype B = Z | W\n\nfn x\n\tmatch x {\n\t\tX -> 1\n\t\tZ -> 2\n\t}",
+	"type A = X | Y Int\n\nfn x\n\tmatch x {\n\t\tX -> 1\n\t\tY -> 2\n\t}",
+	"fn r\n\tr?",
+	"fn r\n\tlet v = r?\n\tOk v",
+	"fn r\n\tlet v = r?\n\tlet w = (Err 1)?\n\tOk (+ v w)",
+	"fn r\n\tlet v = r?\n\tv",
+	"fn r\n\t(Ok (+ (r?) 1))",
+	"fn (r s)\n\tlet a = (r s)?\n\tOk a",
+	"fn x\n\tcheck x",
+	"fn x\n\tuntyped x",
+	"fn x\n\tcheck (+ x 1)",
+	"fn x\n\tuntyped (+ x 1)",
+	"fn x\n\t(+ (untyped x) 1)",
+	"fn x\n\t(+ (check x) 1)",
+	"fn x\n\tlet y = (check x)\n\ty",
+	"type Option a = None | Some a\n\nfn x\n\tlet v = (match x {\n\t\tNone -> 0\n\t\tSome n -> n\n\t})\n\tv",
 }
 
 for i, src in CASES do

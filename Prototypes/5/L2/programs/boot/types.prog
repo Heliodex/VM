@@ -5,8 +5,10 @@ type Ty = TVar Int | TCon ([Int] . [Ty])
 type Bind = Unbound Int | Bound Ty
 type St = St (Int . ([(Int . Bind)] . [[Int]]))
 type Scheme = Scheme ([Int] . Ty)
-type Look = Found Scheme | Missing
-type Req = Unify (Ty . Ty) | Gen (Int . Ty) | Inst (Int . Scheme) | Infer Expr
+type Entry = EVar Scheme | ECtor ([Int] . ([Int] . (Int . (Int . Ty)))) | ESum ([Int] . ([Int] . [([Int] . (Int . Int))]))
+type Look = Found Entry | Missing
+type PTy = TName ([Int] . (Int . Int)) | TApp ([Int] . ([PTy] . (Int . Int))) | TPair (PTy . (PTy . (Int . Int))) | TList (PTy . (Int . Int)) | TFun (PTy . (PTy . (Int . Int))) | NoType
+type Req = Unify (Ty . Ty) | Gen (Int . Ty) | Inst (Int . Scheme) | Infer ([([Int] . ([[Int]] . ([([Int] . (PTy . (Int . Int)))] . (Int . Int))))] . Expr)
 type MS = MS (St . (Int . ([Int] . (Ty . ([Ty] . ([Int] . Int))))))
 type Expr = EInt (Int . (Int . Int)) | EStr ([Int] . (Int . Int)) | ENil (Int . Int) | EName ([Int] . (Int . Int)) | EList ([Expr] . (Int . Int)) | EPair (Expr . (Expr . (Int . Int))) | EApp (Expr . ([Expr] . (Int . Int))) | EFn ([[Int]] . (Expr . (Int . Int))) | ELet ([Int] . (Expr . (Expr . (Int . (Int . Int))))) | EMutual ([([Int] . (Expr . (Int . Int)))] . (Expr . (Int . Int))) | EIf (Expr . (Expr . (Expr . (Int . Int)))) | EMatch (Expr . ([(Pat . (Expr . (Int . Int)))] . (Int . Int))) | ETry (Expr . (Int . Int)) | ECheck (Expr . (Int . Int)) | EUntyped (Expr . (Int . Int))
 type Pat = PCon ([Int] . ([Int] . (Int . Int))) | PBind ([Int] . (Int . Int)) | PWild (Int . Int)
@@ -306,7 +308,7 @@ let hdN = (fn l
 let hdP = (fn l
 	match (head l) {
 		Ok p -> p
-		Err e -> (~ . (Scheme (~ . (TVar 0))))
+		Err e -> (~ . (EVar (Scheme (~ . (TVar 0)))))
 	})
 let hdMsg = (fn l
 	match (head l) {
@@ -321,6 +323,7 @@ let posMsg = (fn (at msg)
 	(cat "line " (cat (showNat (fst at)) (cat ", column " (cat (showNat (snd at)) (cat ": " msg))))))
 
 let tInt = (TCon ("Int" . ~))
+let tDyn = (TCon ("Dyn" . ~))
 let tArrow = (fn (a b)
 	(TCon ("->" . [a b])))
 let tList = (fn a
@@ -332,9 +335,9 @@ let tRes = (fn (a e)
 let tPin = (fn a
 	(TCon ("Pin" . [a])))
 let mono = (fn (name ty)
-	(name . (Scheme (~ . ty))))
+	(name . (EVar (Scheme (~ . ty)))))
 let poly = (fn (vars name ty)
-	(name . (Scheme (vars . ty))))
+	(name . (EVar (Scheme (vars . ty)))))
 
 let builtinEnv = [
 	(mono "+" (tArrow tInt (tArrow tInt tInt)))
@@ -353,8 +356,9 @@ let builtinEnv = [
 	(poly [1] "pin" (tArrow (TVar 1) (tPin (TVar 1))))
 	(poly [1] "force" (tArrow (tPin (TVar 1)) (TVar 1)))
 	(poly [1] "fix" (tArrow (tArrow (TVar 1) (TVar 1)) (TVar 1)))
-	(poly [1 2] "Ok" (tArrow (TVar 1) (tRes (TVar 1) (TVar 2))))
-	(poly [1 2] "Err" (tArrow (TVar 2) (tRes (TVar 1) (TVar 2))))
+	("Ok" . (ECtor ("Result" . ([1 2] . (0 . (1 . (TVar 1)))))))
+	("Err" . (ECtor ("Result" . ([1 2] . (1 . (1 . (TVar 2)))))))
+	("#Result" . (ESum ("Result" . ([1 2] . [("Ok" . (0 . 1)) ("Err" . (1 . 1))]))))
 ]
 
 letrec findE = (fn (env name)
@@ -372,11 +376,43 @@ let addPos = (fn (st0 st1 at)
 let unifyAt = (fn (st at a e)
 	(addPos st (unify st a e) at))
 
+letrec varsOf = (fn l
+	(if (= (@ l) 1)
+		~
+		(cons (TVar (first l)) (varsOf (tl l)))))
+let ctorSch = (fn (name params hasPay payload)
+	(if (= hasPay 1)
+		(Scheme (params . (tArrow payload (TCon (name . (varsOf params))))))
+		(Scheme (params . (TCon (name . (varsOf params)))))))
+let ctorScheme = (fn c
+	match c {
+		ECtor p -> (ctorSch (fst p) (fst (snd p)) (fst (snd (snd (snd p)))) (snd (snd (snd (snd p)))))
+		_ -> (Scheme (~ . (TVar 0)))
+	})
+let retEntry = (fn e
+	match e {
+		EVar s -> (schemeTy s)
+		_ -> (TVar 0)
+	})
+let retOf = (fn env
+	match (findE env "#ret") {
+		Found e -> (retEntry e)
+		Missing -> (TVar 0)
+	})
+
+let notBound = (fn (st p level)
+	(let fr = (fresh st level)
+	((fst fr) . (addErr (snd fr) (posMsg (snd p) (cat (fst p) " is not bound"))))))
+let lookupEntry = (fn (st e p level)
+	match e {
+		EVar s -> (instantiate st level s)
+		ECtor c -> (instantiate st level (ctorScheme (ECtor c)))
+		_ -> (notBound st p level)
+	})
 let lookupName = (fn (st env p level)
 	match (findE env (fst p)) {
-		Found s -> (instantiate st level s)
-		Missing -> (let fr = (fresh st level)
-			((fst fr) . (addErr (snd fr) (posMsg (snd p) (cat (fst p) " is not bound")))))
+		Found e -> (lookupEntry st e p level)
+		Missing -> (notBound st p level)
 	})
 
 ; A program's type must be a function, unless it is not known yet: a concrete type that is not an arrow is an error.
@@ -390,10 +426,6 @@ let badProgram = (fn (bs t)
 let grew = (fn (a b)
 	(if (< (lenOf (errsOf a)) (lenOf (errsOf b))) 1 0))
 
-; The built-in sum Result: each constructor is (name . (tag . (has payload . payload type)))
-let resultCtors = [("Ok" . (0 . (1 . (TVar 1)))) ("Err" . (1 . (1 . (TVar 2))))]
-let resultName = "Result"
-let resultParams = [1 2]
 
 let msP = (fn ms
 	match ms {
@@ -422,14 +454,8 @@ let withCatch = (fn ms
 let hdCt = (fn l
 	match (head l) {
 		Ok c -> c
-		Err e -> (~ . (0 . (0 . (TVar 0))))
+		Err e -> (~ . (0 . 0))
 	})
-letrec ctorIn = (fn (ctors name)
-	(if (= (@ ctors) 1)
-		(0 . (0 . (0 . (TVar 0))))
-		(if (same (fst (hdCt ctors)) name)
-			(1 . (snd (hdCt ctors)))
-			(ctorIn (tl ctors) name))))
 letrec freshN = (fn (st0 n level)
 	(if (= n 0)
 		(~ . st0)
@@ -455,30 +481,42 @@ letrec joinNames = (fn l
 			(cat (hdN l) (cat ", " (joinNames (tl l)))))))
 
 ; The constructor of a pattern. The first constructor fixes the sum, and the scrutinee is used at it.
-let conPatGo = (fn (ms env bind at tagv hasPay pay scrutTy level)
-	(let ms1 = (mkMS (msSt ms) (msFixed ms) (msName ms) (msTy ms) (msArgs ms) (cons tagv (msCov ms)) (msCatch ms))
-	(let pt = (subst (bindsOf (msSt ms1)) (zipM resultParams (msArgs ms1)) pay)
+; The constructor of a pattern, once the sum is known: its tag is covered, and its payload is bound to the name.
+; A constructor pattern. The first constructor fixes the sum, and the scrutinee is used at it.
+; A constructor pattern. The first constructor fixes the sum, and the scrutinee is used at it.
+let conPatGo = (fn (ms env name bind at tagv hasPay pay params scrutTy level)
+	let ms1 = (mkMS (msSt ms) (msFixed ms) (msName ms) (msTy ms) (msArgs ms) (cons tagv (msCov ms)) (msCatch ms))
+	let pt = (subst (bindsOf (msSt ms1)) (zipM params (msArgs ms1)) pay)
 	(if (= (@ bind) 1)
 		(1 . (ms1 . env))
 		(if (= hasPay 0)
-			(0 . ((withSt ms1 (addErr (msSt ms1) (posMsg at (cat "" "has no payload to bind")))) . env))
-			(1 . (ms1 . (cons (bind . (Scheme (~ . pt))) env))))))))
+			(0 . ((withSt ms1 (addErr (msSt ms1) (posMsg at (cat name " has no payload to bind")))) . env))
+			(1 . (ms1 . (cons (bind . (EVar (Scheme (~ . pt)))) env))))))
+let conCtor = (fn (ms env c name bind at scrutTy scrutAt level)
+	(if (= (msFixed ms) 1)
+		(if (same (fst c) (msName ms))
+			(conPatGo ms env name bind at (fst (snd (snd c))) (fst (snd (snd (snd c)))) (snd (snd (snd (snd c)))) (fst (snd c)) scrutTy level)
+			(0 . ((withSt ms (addErr (msSt ms) (posMsg at (cat name (cat " belongs to " (cat (fst c) (cat ", but the match is on " (msName ms)))))))) . env)))
+		(let fr = (freshN (msSt ms) (lenOf (fst (snd c))) level)
+		(let sumT = (TCon ((fst c) . (fst fr)))
+		(let s2 = (unifyAt (snd fr) scrutAt scrutTy sumT)
+		(if (= (grew (snd fr) s2) 1)
+			(0 . ((withSt ms s2) . env))
+			(conPatGo (mkMS s2 1 (fst c) sumT (fst fr) (msCov ms) (msCatch ms)) env name bind at (fst (snd (snd c))) (fst (snd (snd (snd c)))) (snd (snd (snd (snd c)))) (fst (snd c)) scrutTy level)))))))
+let conEntry = (fn (ms env e name bind at scrutTy scrutAt level)
+	match e {
+		ECtor c -> (conCtor ms env c name bind at scrutTy scrutAt level)
+		_ -> (0 . ((withSt ms (addErr (msSt ms) (posMsg at (cat name " is not a constructor")))) . env))
+	})
 let conPat = (fn (ms env name bind at scrutTy scrutAt level)
-	(let c = (ctorIn resultCtors name)
-	(if (= (fst c) 0)
-		(0 . ((withSt ms (addErr (msSt ms) (posMsg at (cat name " is not a constructor")))) . env))
-		(if (= (msFixed ms) 1)
-			(conPatGo ms env bind at (fst (snd c)) (fst (snd (snd c))) (snd (snd (snd c))) scrutTy level)
-			(let fr = (freshN (msSt ms) (lenOf resultParams) level)
-			(let sumT = (TCon (resultName . (fst fr)))
-			(let s2 = (unifyAt (snd fr) scrutAt scrutTy sumT)
-			(if (= (grew (snd fr) s2) 1)
-				(0 . ((withSt ms s2) . env))
-				(conPatGo (mkMS s2 1 resultName sumT (fst fr) (msCov ms) (msCatch ms)) env bind at (fst (snd c)) (fst (snd (snd c))) (snd (snd (snd c))) scrutTy level)))))))))
+	match (findE env name) {
+		Found e -> (conEntry ms env e name bind at scrutTy scrutAt level)
+		Missing -> (0 . ((withSt ms (addErr (msSt ms) (posMsg at (cat name " is not a constructor")))) . env))
+	})
 let armPat = (fn (ms env pat scrutTy scrutAt level)
 	(match pat {
 		PCon p -> (conPat ms env (fst p) (fst (snd p)) (snd (snd p)) scrutTy scrutAt level)
-		PBind p -> (1 . ((withCatch ms) . (cons ((fst p) . (Scheme (~ . scrutTy))) env)))
+		PBind p -> (1 . ((withCatch ms) . (cons ((fst p) . (EVar (Scheme (~ . scrutTy)))) env)))
 		PWild p -> (1 . ((withCatch ms) . env))
 	}))
 let armBody = (fn (inf ms env body resTy level)
@@ -508,15 +546,25 @@ letrec armsLoop = (fn (inf ms env arms resTy scrutTy scrutAt level)
 				(if (= (fst br) 0)
 					(0 . (snd br))
 					(armsLoop inf (snd br) env (tl arms) resTy scrutTy scrutAt level))))))))))))
+let sumCtorsEntry = (fn e
+	match e {
+		ESum s -> (snd (snd s))
+		_ -> ~
+	})
+let sumCtorsOf = (fn (env name)
+	match (findE env (cat "#" name)) {
+		Found e -> (sumCtorsEntry e)
+		Missing -> ~
+	})
 let inferMatchWith = (fn (inf st env p level)
 	(let rs = (inf st env (fst p) level)
 	(let rr = (fresh (snd rs) level)
-	(let r = (armsLoop inf (mkMS (snd rr) 0 resultName (TVar 0) ~ ~ 0) env (fst (snd p)) (fst rr) (fst rs) (atOfE (fst p)) level)
+	(let r = (armsLoop inf (mkMS (snd rr) 0 "Result" (TVar 0) ~ ~ 0) env (fst (snd p)) (fst rr) (fst rs) (atOfE (fst p)) level)
 	(if (= (fst r) 0)
 		(fresh (msSt (snd r)) level)
 		(if (= (msCatch (snd r)) 1)
 			((fst rr) . (msSt (snd r)))
-			(let missing = (missingNames resultCtors (msCov (snd r)))
+			(let missing = (missingNames (sumCtorsOf env (msName (snd r))) (msCov (snd r)))
 			(if (= (@ missing) 1)
 				((fst rr) . (msSt (snd r)))
 				(fresh (addErr (msSt (snd r)) (posMsg (snd (snd p)) (cat "match does not cover " (joinNames missing)))) level)))))))))
@@ -548,13 +596,13 @@ letrec infer = (fn (st env node level)
 	(letrec inferFn = (fn (st0 envF names body)
 		(if (= (@ names) 1)
 			(let rr = (fresh st0 level)
-			(let rb = (infer (snd rr) envF body level)
+			(let rb = (infer (snd rr) (cons ("#ret" . (EVar (Scheme (~ . (fst rr))))) envF) body level)
 			(let s1 = (unifyAt (snd rb) (atOfE body) (fst rb) (fst rr))
 			(if (= (grew (snd rb) s1) 1)
 				(0 . ((fst rr) . s1))
 				(1 . ((fst rr) . s1))))))
 			(let p = (fresh st0 level)
-			(let envF2 = (cons ((hdN names) . (Scheme (~ . (fst p)))) envF)
+			(let envF2 = (cons ((hdN names) . (EVar (Scheme (~ . (fst p))))) envF)
 			(let rest = (inferFn (snd p) envF2 (tl names) body)
 			((fst rest) . ((tArrow (fst p) (fst (snd rest))) . (snd (snd rest)))))))))
 	(match node {
@@ -582,15 +630,15 @@ letrec infer = (fn (st env node level)
 				(fresh (snd (snd r)) level)))
 		ELet p -> (if (= (fst (snd (snd (snd p)))) 1)
 			(let f = (fresh st (+ level 1))
-			(let recEnv = (cons ((fst p) . (Scheme (~ . (fst f)))) env)
+			(let recEnv = (cons ((fst p) . (EVar (Scheme (~ . (fst f))))) env)
 			(let v = (infer (snd f) recEnv (fst (snd p)) (+ level 1))
 			(let s2 = (unifyAt (snd v) (atOfE (fst (snd p))) (fst v) (fst f))
 			(if (= (grew (snd v) s2) 1)
 				(fresh s2 level)
-				(let env2 = (cons ((fst p) . (generalize s2 level (fst f))) env)
+				(let env2 = (cons ((fst p) . (EVar (generalize s2 level (fst f)))) env)
 				(infer s2 env2 (fst (snd (snd p))) level)))))))
 			(let v = (infer st env (fst (snd p)) (+ level 1))
-			(let env2 = (cons ((fst p) . (generalize (snd v) level (fst v))) env)
+			(let env2 = (cons ((fst p) . (EVar (generalize (snd v) level (fst v)))) env)
 			(infer (snd v) env2 (fst (snd (snd p))) level))))
 		EIf p -> (let rc = (infer st env (fst p) level)
 			(let rt = (infer (snd rc) env (fst (snd p)) level)
@@ -603,13 +651,201 @@ letrec infer = (fn (st env node level)
 					(fresh s2 level)
 					((fst rt) . s2))))))))
 		EMatch p -> (inferMatchWith infer st env p level)
+		ETry p -> (let rt = (infer st env (fst p) level)
+			(let okT = (fresh (snd rt) level)
+			(let errT = (fresh (snd okT) level)
+			(let s1 = (unifyAt (snd errT) (atOfE (fst p)) (fst rt) (tRes (fst okT) (fst errT)))
+			(if (= (grew (snd errT) s1) 1)
+				(fresh s1 level)
+				(let rr = (fresh s1 level)
+				(let s2 = (unifyAt (snd rr) (snd p) (tRes (fst rr) (fst errT)) (retOf env))
+				(if (= (grew (snd rr) s2) 1)
+					(fresh s2 level)
+					((fst okT) . s2)))))))))
+		ECheck p -> (let r = (infer st env (fst p) level)
+			(let t = (fresh (snd r) (- 0 1))
+			((tRes (fst t) (tList tInt)) . (snd t))))
+		EUntyped p -> (let r = (infer st env (fst p) level)
+			(tDyn . (snd r)))
 		_ -> (let fr = (fresh st level)
 			((fst fr) . (addErr (snd fr) (posMsg (atOfE node) "this form is not checked yet"))))
 	})))))
 
 ; The type of a whole program: a function of its input. Its output is the rendered type, and the errors.
-let inferProgram = (fn ex
-	(let r = (infer (mkSt 1000 ~ ~) builtinEnv ex 0)
+let tvarId = (fn t
+	match t {
+		TVar i -> i
+		TCon p -> 0
+	})
+letrec idsOf = (fn l
+	(if (= (@ l) 1)
+		~
+		(cons (tvarId (hdT l)) (idsOf (tl l)))))
+let isNoType = (fn t
+	match t {
+		NoType -> 1
+		_ -> 0
+	})
+let hdD = (fn l
+	match (head l) {
+		Ok d -> d
+		Err e -> (~ . (~ . (~ . (0 . 0))))
+	})
+let hdCs = (fn l
+	match (head l) {
+		Ok c -> c
+		Err e -> (~ . (NoType . (0 . 0)))
+	})
+let hdInfo = (fn l
+	match (head l) {
+		Ok i -> i
+		Err e -> ((~ . (~ . (~ . (0 . 0)))) . ~)
+	})
+let findIs = (fn (env key)
+	match (findE env key) {
+		Found e -> 1
+		Missing -> 0
+	})
+letrec ctorItems = (fn (cs k)
+	(if (= (@ cs) 1)
+		~
+		(cons ((fst (hdCs cs)) . (k . (- 1 (isNoType (fst (snd (hdCs cs))))))) (ctorItems (tl cs) (+ k 1)))))
+letrec zipNM = (fn (names ids)
+	(if (= (@ names) 1)
+		~
+		(cons ((hdN names) . (TVar (first ids))) (zipNM (tl names) (tl ids)))))
+let hdPm = (fn l
+	match (head l) {
+		Ok p -> p
+		Err e -> (~ . (TVar 0))
+	})
+let hdPT = (fn l
+	match (head l) {
+		Ok t -> t
+		Err e -> NoType
+	})
+letrec pmFind = (fn (pm name)
+	(if (= (@ pm) 1)
+		(0 . (TVar 0))
+		(if (same (fst (hdPm pm)) name)
+			(1 . (snd (hdPm pm)))
+			(pmFind (tl pm) name))))
+let isCapB = (fn w
+	(if (< (first w) 65) 0 (if (< 90 (first w)) 0 1)))
+
+; The type of a declared constructor's payload, with the declaration's parameters as variables.
+let sumArity = (fn (ids name at args)
+	(if (= (lenOf ids) (lenOf args))
+		(Ok (TCon (name . args)))
+		(Err (posMsg at (cat name (cat " takes " (cat (showNat (lenOf ids)) (cat " types, but is given " (showNat (lenOf args))))))))))
+let sumApplyEntry = (fn (e name at args)
+	match e {
+		ESum s -> (sumArity (fst (snd s)) name at args)
+		_ -> (Err (posMsg at (cat name " is not a type")))
+	})
+let sumApplied = (fn (env name at args)
+	match (findE env (cat "#" name)) {
+		Found e -> (sumApplyEntry e name at args)
+		Missing -> (Err (posMsg at (cat name " is not a type")))
+	})
+let convName = (fn (env pm name at)
+	(if (isCapB name)
+		(if (same name "Int")
+			(Ok tInt)
+			(sumApplied env name at ~))
+		(let f = (pmFind pm name)
+		(if (= (fst f) 1)
+			(Ok (snd f))
+			(Err (posMsg at (cat name " is not a type variable of this declaration")))))))
+; Converts the arguments of a sum type, in order. The converter is passed in, since the arguments refer back to the type converter.
+letrec convArgs = (fn (conv env pm args)
+	(if (= (@ args) 1)
+		(Ok ~)
+		(match (conv env pm (hdPT args)) {
+			Err e -> (Err e)
+			Ok a -> (match (convArgs conv env pm (tl args)) {
+				Err e -> (Err e)
+				Ok more -> (Ok (cons a more))
+			})
+		})))
+let convApp = (fn (conv env pm p)
+	match (convArgs conv env pm (fst (snd p))) {
+		Err e -> (Err e)
+		Ok args -> (sumApplied env (fst p) (snd (snd p)) args)
+	})
+let convPair = (fn (conv env pm p)
+	match (conv env pm (fst p)) {
+		Err e -> (Err e)
+		Ok a -> (match (conv env pm (fst (snd p))) {
+			Err e -> (Err e)
+			Ok b -> (Ok (tPair a b))
+		})
+	})
+let convFunT = (fn (conv env pm p)
+	match (conv env pm (fst p)) {
+		Err e -> (Err e)
+		Ok a -> (match (conv env pm (fst (snd p))) {
+			Err e -> (Err e)
+			Ok b -> (Ok (tArrow a b))
+		})
+	})
+let convListT = (fn (conv env pm item)
+	match (conv env pm item) {
+		Err e -> (Err e)
+		Ok a -> (Ok (tList a))
+	})
+letrec convType = (fn (env pm t)
+	match t {
+		TName p -> (convName env pm (fst p) (snd p))
+		TApp p -> (convApp convType env pm p)
+		TPair p -> (convPair convType env pm p)
+		TList p -> (convListT convType env pm (fst p))
+		TFun p -> (convFunT convType env pm p)
+		NoType -> (Ok (TVar 0))
+	})
+; The first pass declares every sum, with its parameters and constructors, so that the sums can refer to one another.
+letrec prepSums = (fn (st env ds)
+	(if (= (@ ds) 1)
+		(Ok (st . (env . ~)))
+		(let d = (hdD ds)
+		(let name = (fst d)
+		(if (if (same name "Int") 1 (findIs env (cat "#" name)))
+			(Err (posMsg (snd (snd (snd d))) (cat name " is already declared")))
+			(let fr = (freshN st (lenOf (fst (snd d))) (- 0 1))
+			(let ids = (idsOf (fst fr))
+			(let env2 = (cons ((cat "#" name) . (ESum (name . (ids . (ctorItems (fst (snd (snd d))) 0))))) env)
+			(let more = (prepSums (snd fr) env2 (tl ds))?
+			(Ok ((fst more) . ((fst (snd more)) . (cons (d . ids) (snd (snd more)))))))))))))))
+
+; The second pass gives each constructor its entry, with its payload type.
+letrec conPass = (fn (st env cs k pm sumN ids)
+	(if (= (@ cs) 1)
+		(Ok (st . env))
+		(let c = (hdCs cs)
+		(let cname = (fst c)
+		(let pay = (fst (snd c))
+		(let at = (snd (snd c))
+		(if (findIs env cname)
+			(Err (posMsg at (cat cname " is already declared")))
+			(if (= (isNoType pay) 1)
+				(conPass st (cons (cname . (ECtor (sumN . (ids . (k . (0 . (TVar 0))))))) env) (tl cs) (+ k 1) pm sumN ids)
+				(let ty = (convType env pm pay)?
+				(conPass st (cons (cname . (ECtor (sumN . (ids . (k . (1 . ty)))))) env) (tl cs) (+ k 1) pm sumN ids))))))))))
+letrec ctorsPass = (fn (st env infos)
+	(if (= (@ infos) 1)
+		(Ok (st . env))
+		(let inf = (hdInfo infos)
+		(let d = (fst inf)
+		(let pm = (zipNM (fst (snd d)) (snd inf))
+		(let r = (conPass st env (fst (snd (snd d))) 0 pm (fst d) (snd inf))?
+		(ctorsPass (fst r) (snd r) (tl infos))))))))
+let declareAll = (fn (st env ds)
+	(let p = (prepSums st env ds)?
+	(ctorsPass (fst p) (fst (snd p)) (snd (snd p)))))
+
+let inferBody = (fn (st env ex)
+	(let rv = (fresh st 0)
+	(let r = (infer (snd rv) (cons ("#ret" . (EVar (Scheme (~ . (fst rv))))) env) ex 0)
 	(let st1 = (snd r)
 	(if (= (badProgram (bindsOf st1) (fst r)) 1)
 		(let st3 = (addErr st1 (posMsg (atOfE ex) (cat "the program must be a function of its input, but it is " (render (bindsOf st1) (fst r)))))
@@ -617,7 +853,14 @@ let inferProgram = (fn ex
 		(let inp = (fresh st1 0)
 		(let outp = (fresh (snd inp) 0)
 		(let st2 = (unifyAt (snd outp) (atOfE ex) (fst r) (tArrow (fst inp) (fst outp)))
-		((render (bindsOf st2) (fst r)) . (errsOf st2)))))))))
+		((render (bindsOf st2) (fst r)) . (errsOf st2))))))))))
+
+; The type of a whole program: its declarations, then the body, which is a function of its input.
+let inferProgram = (fn prog
+	(match (declareAll (mkSt 1000 ~ ~) builtinEnv (fst prog)) {
+		Err msg -> ("" . (cons msg ~))
+		Ok d -> (inferBody (fst d) (snd d) (snd prog))
+	}))
 
 fn p
 	match p {
