@@ -125,7 +125,6 @@ local function l2Outcome(src: string): string?
 	end
 
 	const program = (parsed.value :: VM.Con).payload :: VM.Cell
-	const decls = program.head
 
 	-- The request Infer (tag 3 of Req) with the program: its declarations, then its body.
 	const request: VM.Value = { kind = "con", tag = 3, payload = program }
