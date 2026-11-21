@@ -69,7 +69,6 @@ type Frame =
 	| { k: "index"; n: number }
 	| { k: "if"; t: Expr; e: Expr; env: Binding? }
 	| { k: "apply"; arg: Expr; env: Binding?; fn: Closure? }
-	| { k: "update"; pin: Pin }
 	| { k: "prim"; tag: number; b: Expr?; env: Binding?; first: Value? }
 const Primitives = require "./primitives"
 const NIL: Nil = {
