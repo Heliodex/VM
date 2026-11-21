@@ -173,6 +173,8 @@ Arms are on their own lines. A `match` is written over several lines, and there 
 
 Arms are lazy: only the body of the arm that matches is evaluated. The compiler checks that the arms cover every constructor of the scrutinee's type, or that a catch-all arm (`_` or a name) is present, and reports an error otherwise.
 
+`if` and `match` are both kept, because they test different things. `if` tests an integer: nonzero is true, which is the machine's own branch. `match` dispatches on the constructor of a sum, and the checker requires every constructor to be covered. Making `match` the only form would need integer literal patterns and a catch-all, so `if c t e` would be `match c { 0 -> e; _ -> t }`: longer at every use, with the same machine branch. The two share their rules for early return (section 9.2), so there is no duplicated logic to remove.
+
 ### 9.4 The core primitive
 
 The machine's dispatch is two expressions, `tagof` and `payload` (section 8). A `match` tests `tagof` against each constructor's tag, and binds `payload` in the arm that matches. `match`, `?` and the constructors are built on them by the reader. A tag test is one step, with no closure per arm.
