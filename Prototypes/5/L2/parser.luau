@@ -14,7 +14,7 @@
 --
 -- The surface tree is the types below. The rawfix form is never written in source: the desugarer makes it for a mutual group.
 --
---   Parser.parse(text, inline?): Program    raises an error, with the line and column, if the text is not a program. inline lets a function's body share its line, as a test's input does
+--   Parser.parse(text): Program    raises an error, with the line and column, if the text is not a program
 
 const Lexer = require "./lexer"
 
@@ -94,13 +94,10 @@ local function isCapital(
 end
 
 local function parse(
-	text: string,
-	inline: boolean?
+	text: string
 ): Program
 	const toks = Lexer.tokenize(text)
 	local pos = 1
-	-- A test's input is one line, so its functions may have their bodies on it. A program's functions have their bodies on the line after their parameters.
-	const inlineFns = inline == true
 	local sig = false
 
 	local function raw(): Lexer.Token
@@ -400,13 +397,11 @@ local function parse(
 
 		-- The body starts on the line after the parameters, so a function's parameters and body are always on different lines.
 		if raw().kind ~= "NL" then
-			if not inlineFns then
-				fail(raw(), "a function's body starts on the line after its parameters")
-			end
-		else
-			while raw().kind == "NL" do
-				pos += 1
-			end
+			fail(raw(), "a function's body starts on the line after its parameters")
+		end
+
+		while raw().kind == "NL" do
+			pos += 1
 		end
 
 		return { k = "fn", names = names, body = parseExpr(), at = at(start) }

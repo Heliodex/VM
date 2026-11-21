@@ -83,8 +83,6 @@ Names are symbols that are not reserved (section 3.5). Names are lexically scope
 
 `fn x body` is a function of one name, and `fn (x y) body` is sugar for `fn x (fn y body)`. The body starts on the line after the parameters, so a newline is required between them: `fn x` and then `(+ x 1)` on the next line. A function with no parameters is an error. Application is curried, so partial application gives a function.
 
-A test's input is written on one line, so there the body may follow the parameters on the same line, as in `((fn x (+ x 1)) . [1 2 3])`. Only the test's input is exempt; a program's functions always break before the body.
-
 ## 5. Values
 
 Every value has a kind, which `@` reports (section 6). The kinds are:
@@ -194,7 +192,7 @@ Early return needs no machine change: `?` is a rewrite (section 9.2). The expres
 - Parse to a syntax tree with positions.
 - Desugar: `fn (x y)` to nested `lam`, infix (if added) to primitives, `let` to an application of `lam`, `letrec`-style recursion to `fix` as in L1.
 - Compile to the machine's `Expr`.
-- Tests: L2 programs use the four-section program-file format of L1 (header, imports, program, tests), in `L2/programs/`. L1 programs are not ported; they stay as they are. L2 programs are tested against their own expected results, and the L2 reader and checker have their own test runner in the L2 module.
+- Tests: L2 programs use the four-section program-file format of L1 (header, imports, program, tests), in `L2/programs/`. A test is an input, `=>`, an output, and fuel. A test may span lines: a line that starts with a space or a tab continues the test before it, so a function in an input breaks before its body like any other function. L1 programs are not ported; they stay as they are. L2 programs are tested against their own expected results, and the L2 reader and checker have their own test runner in the L2 module.
 
 ## 12. Layout and binding rules
 

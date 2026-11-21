@@ -1,7 +1,7 @@
 --!strict
 -- THE L2 PROGRAM FILE
 --
--- The four-section format of L1 (interpreter-independent text), for L2 programs: a header, the imports, the program, and the tests, separated by lines that hold only ---. The imports are name = path lines, and a path is from the top of the programs folder. A test line is an input, then =>, then an output, then fuel and a number of steps. The input and output are L2 expressions, and they may use the imports.
+-- The four-section format of L1 (interpreter-independent text), for L2 programs: a header, the imports, the program, and the tests, separated by lines that hold only ---. The imports are name = path lines, and a path is from the top of the programs folder. A test is an input, then =>, then an output, then fuel and a number of steps. It is one line, or it continues onto the lines after it that are indented, so the input or the output may span lines. The input and output are L2 expressions, and they may use the imports.
 --
 --   ProgramFile.parse(text): File     raises an error, with the line, if the file is not well formed
 --
@@ -128,13 +128,24 @@ local function parse(
 		end
 	end
 
+	-- A test starts on a line of its own. Lines after it that start with a space or a tab continue it, so an input or an output may span lines.
 	local tests: { Test } = {}
+	local i = third + 1
 
-	for i = third + 1, #lines do
-		const line = trim(lines[i])
+	while i <= #lines do
+		if trim(lines[i]) == "" then
+			i += 1
+		else
+			const start = i
+			local parts: { string } = { lines[i] }
+			i += 1
 
-		if line ~= "" then
-			table.insert(tests, parseTest(line, i))
+			while i <= #lines and trim(lines[i]) ~= "" and string.match(lines[i], "^[ \t]") ~= nil do
+				table.insert(parts, lines[i])
+				i += 1
+			end
+
+			table.insert(tests, parseTest(table.concat(parts, "\n"), start))
 		end
 	end
 
