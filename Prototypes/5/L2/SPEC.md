@@ -217,7 +217,7 @@ describe r = match r {
 }
 ```
 
-### 12.1 Proposed: block form for local bindings (not yet implemented)
+### 12.1 Block form for local bindings
 
 Several local names are bound in one block, instead of one `let` nested in the body of the last:
 
@@ -236,6 +236,22 @@ let {
 - A block is sugar: `let {` is a chain of `let`s, and `letrec {` is a `mutual` group. It adds no expression to the machine, and it adds no new check.
 - The braces end the block, so a block may sit inside a match arm, or inside any expression, without parentheses. Inside the braces, newlines separate items.
 - Early return (section 9.2) follows the rules for the body of a `let`: a `?` in a binding's value is allowed where a `let` value's would be, and a `?` in the body is allowed where a `let` body's would be.
+
+### 12.2 cond
+
+`cond` tries its clauses in order, and gives the body of the first whose test is nonzero. A clause is a test, `->`, and a body, one clause to a line, as the arms of a `match` are. The last clause is `_`, the catch-all, so the value always exists:
+
+```
+cond {
+    (< x 0) -> -1
+    (= x 0) -> 0
+    _ -> 1
+}
+```
+
+- `cond` is sugar for nested `if`s: the example is `if (< x 0) -1 (if (= x 0) 0 1)`. It adds no expression to the machine and no new check, and each test must be an integer, as an `if` condition must be.
+- The `_` clause must be the last clause, and a `cond` must have one.
+- `cond` is a keyword, so it cannot be used as a name.
 
 ## 13. Types (first version)
 

@@ -89,7 +89,7 @@ let isKw = (fn t
 	(if (isWord t "mutual") 1
 	(if (isWord t "check") 1
 	(if (isWord t "untyped") 1
-	(isWord t "type"))))))))))
+	(if (isWord t "type") 1 (isWord t "cond")))))))))))
 let isCapB = (fn w
 	(if (< (first w) 65) 0 (if (< 90 (first w)) 0 1)))
 let atomStartT = (fn t
@@ -217,6 +217,64 @@ let atOf = (fn e
 		EUntyped p -> (snd p)
 	})
 
+let hdI = (fn l
+	match (head l) {
+		Ok i -> i
+		Err e -> (0 . (~ . ((ENil (0 . 0)) . (0 . 0))))
+	})
+let itemName = (fn i
+	(fst (snd i)))
+let itemExpr = (fn i
+	(fst (snd (snd i))))
+let itemAt = (fn i
+	(snd (snd (snd i))))
+let hdC = (fn l
+	match (head l) {
+		Ok c -> c
+		Err e -> (0 . ((ENil (0 . 0)) . ((ENil (0 . 0)) . (0 . 0))))
+	})
+let catchOf = (fn c
+	(fst c))
+let testOf = (fn c
+	(fst (snd c)))
+let bodyOf = (fn c
+	(fst (snd (snd c))))
+let atC = (fn c
+	(snd (snd (snd c))))
+let isFnE = (fn e
+	match e {
+		EFn p -> 1
+		_ -> 0
+	})
+let bindStart = (fn n
+	(if (isSymT (tok n)) (isWord (tok (after n)) "=") 0))
+let lineEnd = (fn ts
+	(if (= (kn (tok ts)) 9) 1 (= (kn (tok ts)) 5)))
+let condEnd = (fn ts
+	(if (= (lineEnd ts) 1)
+		(Ok 1)
+		(failTok (tok ts) "a cond clause ends at the end of its line; wrap a longer body in parentheses")))
+letrec buildCond = (fn l
+	(if (= (catchOf (hdC l)) 1)
+		(bodyOf (hdC l))
+		(EIf ((testOf (hdC l)) . ((bodyOf (hdC l)) . ((buildCond (after l)) . (atC (hdC l))))))))
+letrec hasCatch = (fn l
+	(if (= (@ l) 1)
+		0
+		(if (= (catchOf (hdC l)) 1) 1 (hasCatch (after l)))))
+letrec buildLets = (fn l
+	(if (= (@ (after l)) 1)
+		(itemExpr (hdI l))
+		(ELet ((itemName (hdI l)) . ((itemExpr (hdI l)) . ((buildLets (after l)) . (0 . (itemAt (hdI l)))))))))
+letrec bindsOf = (fn l
+	(if (= (@ (after l)) 1)
+		~
+		(cons ((itemName (hdI l)) . ((itemExpr (hdI l)) . (itemAt (hdI l)))) (bindsOf (after l)))))
+letrec lastExpr = (fn l
+	(if (= (@ (after l)) 1)
+		(itemExpr (hdI l))
+		(lastExpr (after l))))
+
 fn toks
 	mutual ((parseType (fn (ts sig)
 		(let base = (parseBaseType ts sig)?
@@ -307,7 +365,7 @@ fn toks
 		(if (isWord t "mutual") (parseMutual n sig)
 		(if (isWord t "check") (parseCheck n sig)
 		(if (isWord t "untyped") (parseUntyped n sig)
-			(parseAppTail n sig)))))))))))))
+			(if (isWord t "cond") (parseCond n sig) (parseAppTail n sig))))))))))))))
 		(parseAppTail (fn (n sig)
 		(let r = (parseApp n sig)?
 		(let n2 = (norm (snd r) sig)
@@ -386,14 +444,88 @@ fn toks
 			(let b = (parseExpr n sig)?
 			(Ok ((EFn (names . ((fst b) . (at start)))) . (snd b)))))
 			(failTok (tok rest) "a function's body starts on the line after its parameters"))))
+		(parseCond (fn (ts sig)
+		(let start = (tok ts)
+		(let br = (expectK (after ts) sig 4)?
+		(if (= (kn (tok (snd br))) 9)
+			(let cs = (clausesLoop (snd br) 0)?
+			(if (= (hasCatch (fst cs)) 1)
+				(Ok ((buildCond (fst cs)) . (snd cs)))
+				(failTok start "a cond needs a _ clause as its last clause")))
+			(failTok (tok (snd br)) "a cond needs a newline after {, before its first clause"))))))
+		(clausesLoop (fn (ts seen)
+		(let n = (norm ts 0)
+		(let t = (tok n)
+		(if (= (kn t) 5)
+			(Ok (~ . (after n)))
+			(if (= seen 1)
+				(failTok t "the _ clause of a cond is its last clause")
+				(clauseItem n)))))))
+		(clauseItem (fn n
+		(if (isWord (tok n) "_")
+			(let ar = (expectK (after n) 1 7)?
+			(let b = (parseExpr (snd ar) 1)?
+			(let ok = (condEnd (snd b))?
+			(let more = (clausesLoop (snd b) 1)?
+			(Ok ((cons (1 . ((ENil (0 . 0)) . ((fst b) . (at (tok n))))) (fst more)) . (snd more)))))))
+			(let tst = (parseExpr n 1)?
+			(let ar = (expectK (snd tst) 1 7)?
+			(let b = (parseExpr (snd ar) 1)?
+			(let ok = (condEnd (snd b))?
+			(let more = (clausesLoop (snd b) 0)?
+			(Ok ((cons (0 . ((fst tst) . ((fst b) . (at (tok n))))) (fst more)) . (snd more)))))))))))
+		(parseBlock (fn (ts sig)
+		(let start = (tok ts)
+		(let br = (expectK (after ts) sig 4)?
+		(if (= (kn (tok (snd br))) 9)
+			(let its = (blockItems (snd br) (isWord start "letrec") 0)?
+			(if (isWord start "letrec")
+				(Ok ((EMutual ((bindsOf (fst its)) . ((lastExpr (fst its)) . (at start)))) . (snd its)))
+				(Ok ((buildLets (fst its)) . (snd its)))))
+			(failTok (tok (snd br)) "a block needs a newline after {, before its first item"))))))
+		(blockItems (fn (ts rec seen)
+		(let n = (norm ts 0)
+		(let t = (tok n)
+		(if (= (kn t) 5)
+			(if (= seen 1)
+				(Ok (~ . (after n)))
+				(failTok t "a block needs a body after its bindings"))
+			(if (= seen 1)
+				(failTok t "a block's body is its last item")
+				(if (bindStart n)
+					(bindItem n rec)
+					(bodyItem n rec))))))))
+		(bindItem (fn (n rec)
+		(let nr = (expectK n 1 13)?
+		(let chk = (letNameOk (fst nr))?
+		(let er = (expectW (snd nr) 1 "=")?
+		(let v = (parseExpr (snd er) 1)?
+		(if (= (kn (tok (snd v))) 9)
+			(if (= rec 1)
+				(if (isFnE (fst v))
+					(bindMore nr v rec)
+					(failTok (fst nr) "a letrec block binds fns, so the functions can call each other"))
+				(bindMore nr v rec))
+			(failTok (tok (snd v)) "a block binding ends at the end of its line; wrap a longer value in parentheses"))))))))
+		(bindMore (fn (nr v rec)
+		(let more = (blockItems (snd v) rec 0)?
+		(Ok ((cons (1 . ((symOf (fst nr)) . ((fst v) . (at (fst nr))))) (fst more)) . (snd more))))))
+		(bodyItem (fn (n rec)
+		(let b = (parseExpr n 1)?
+		(if (= (lineEnd (snd b)) 1)
+			(let more = (blockItems (snd b) rec 1)?
+			(Ok ((cons (0 . (~ . ((fst b) . (at (tok n))))) (fst more)) . (snd more))))
+			(failTok (tok (snd b)) "a block's body ends at the end of its line; wrap a longer body in parentheses")))))
 		(parseLet (fn (ts sig)
+		(if (= (kn (tok (norm (after ts) sig))) 4)
+			(parseBlock ts sig)
 		(let start = (tok ts)
 		(let nr = (expectK (after ts) sig 13)?
 		(let chk = (letNameOk (fst nr))?
 		(let er = (expectW (snd nr) sig "=")?
 		(if (= sig 1)
 			(failTok start "a let in a match arm needs parentheses around it")
-			(letValue (snd er) start (symOf (fst nr))))))))))
+			(letValue (snd er) start (symOf (fst nr)))))))))))
 		(letValue (fn (ts start name)
 		(let v = (parseExpr ts 1)?
 		(let rest = (snd v)

@@ -1,0 +1,15 @@
+A let block binds its names one after another, so each binding sees the ones before it, and the body is the last item.
+---
+
+---
+fn x
+	let {
+		f = (fn y
+			(+ y 1))
+		g = (fn y
+			(f (f y)))
+		(g x)
+	}
+---
+0 => 2 fuel 1000
+5 => 7 fuel 1000

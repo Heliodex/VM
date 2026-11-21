@@ -74,6 +74,7 @@ const KEYWORDS: { [string]: boolean } = {
 	check = true,
 	untyped = true,
 	type = true,
+	cond = true,
 }
 
 local function isCapital(name: string): boolean
@@ -386,8 +387,156 @@ local function parse(text: string): Program
 		return { k = "fn"; names = names; body = parseExpr(); at = at(start) }
 	end
 
+	-- let { ... } and letrec { ... }: a block of bindings, then a body. Each binding is name = value, and the items are separated by newlines, as the arms of a match are. The block is sugar: let { is a chain of lets, and letrec { is a mutual group, so the parser builds those.
+	local function parseBlock(start: Lexer.Token): Expr
+		expectKind "{"
+
+		if toks[pos].kind ~= "NL" then
+			fail(toks[pos], "a block needs a newline after {, before its first item")
+		end
+
+		const rec = word(start) == "letrec"
+		const saved = sig
+		sig = true
+		local bindings: { Binding } = {}
+		local body: Expr? = nil
+
+		while true do
+			while toks[pos].kind == "NL" do
+				pos += 1
+			end
+
+			if toks[pos].kind == "}" then
+				break
+			end
+
+			if body ~= nil then
+				fail(toks[pos], "a block's body is its last item")
+			end
+
+			if toks[pos].kind == "sym" and toks[pos + 1].kind == "sym" and toks[pos + 1].value == "=" then
+				const nameTok = expectKind "sym"
+
+				if KEYWORDS[word(nameTok)] or word(nameTok) == "_" or isCapital(word(nameTok)) then
+					fail(nameTok, string.format("%s cannot be bound by let", word(nameTok)))
+				end
+
+				expectSym "="
+				const value = parseExpr()
+
+				if toks[pos].kind ~= "NL" then
+					fail(toks[pos], "a block binding ends at the end of its line; wrap a longer value in parentheses")
+				end
+
+				if rec and value.k ~= "fn" then
+					fail(nameTok, "a letrec block binds fns, so the functions can call each other")
+				end
+
+				table.insert(bindings, { name = word(nameTok); value = value; at = at(nameTok) })
+			else
+				body = parseExpr()
+
+				if toks[pos].kind ~= "NL" and toks[pos].kind ~= "}" then
+					fail(toks[pos], "a block's body ends at the end of its line; wrap a longer body in parentheses")
+				end
+			end
+		end
+
+		if body == nil then
+			fail(toks[pos], "a block needs a body after its bindings")
+		end
+
+		const bodyExpr = body :: Expr
+		pos += 1
+		sig = saved
+
+		if rec then
+			return { k = "mutual"; bindings = bindings; body = bodyExpr; at = at(start) }
+		end
+
+		local result = bodyExpr
+
+		for i = #bindings, 1, -1 do
+			const b = bindings[i]
+			result = { k = "let"; name = b.name; value = b.value; body = result; rec = false; at = b.at }
+		end
+
+		return result
+	end
+
+	-- cond { test -> body ... _ -> body }: clauses tried in order, the first whose test is nonzero gives its body. The last clause is _, the catch-all. It is written as nested ifs.
+	local function parseCond(): Expr
+		const start = advance()
+		expectKind "{"
+
+		if toks[pos].kind ~= "NL" then
+			fail(toks[pos], "a cond needs a newline after {, before its first clause")
+		end
+
+		const saved = sig
+		sig = true
+		local tests: { Expr? } = {}
+		local bodies: { Expr } = {}
+		local ats: { Pos } = {}
+		local sawCatchAll = false
+
+		while true do
+			while toks[pos].kind == "NL" do
+				pos += 1
+			end
+
+			if toks[pos].kind == "}" then
+				break
+			end
+
+			if sawCatchAll then
+				fail(toks[pos], "the _ clause of a cond is its last clause")
+			end
+
+			const clauseStart = toks[pos]
+			local test: Expr? = nil
+
+			if toks[pos].kind == "sym" and word(toks[pos]) == "_" then
+				advance()
+				expectKind "->"
+				sawCatchAll = true
+			else
+				test = parseExpr()
+				expectKind "->"
+			end
+
+			const body = parseExpr()
+			table.insert(tests, test)
+			table.insert(bodies, body)
+			table.insert(ats, at(clauseStart))
+
+			if toks[pos].kind ~= "NL" and toks[pos].kind ~= "}" then
+				fail(toks[pos], "a cond clause ends at the end of its line; wrap a longer body in parentheses")
+			end
+		end
+
+		if not sawCatchAll then
+			fail(start, "a cond needs a _ clause as its last clause")
+		end
+
+		pos += 1
+		sig = saved
+		local result: Expr = bodies[#bodies]
+
+		for i = #bodies - 1, 1, -1 do
+			result = { k = "if"; c = tests[i] :: Expr; t = bodies[i]; e = result; at = ats[i] }
+		end
+
+		return result
+	end
+
 	local function parseLet(): Expr
 		const start = advance()
+
+		if cur().kind == "{" then
+			return parseBlock(start)
+		end
+
 		const nameTok = expectKind "sym"
 
 		if KEYWORDS[word(nameTok)] or word(nameTok) == "_" or isCapital(word(nameTok)) then
@@ -565,6 +714,8 @@ local function parse(text: string): Program
 				return parseCheck()
 			elseif word(t) == "untyped" then
 				return parseUntyped()
+			elseif word(t) == "cond" then
+				return parseCond()
 			end
 		end
 

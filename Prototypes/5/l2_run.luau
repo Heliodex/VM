@@ -60,6 +60,31 @@ const MALFORMED: { {
 		reason = "starts on the line after its parameters",
 	},
 	{
+		name = "a cond with no _ clause",
+		text = "h\n---\n---\ncond {\n\t(= 1 1) -> 2\n}\n---\n1 => 1 fuel 10\n",
+		reason = "needs a _ clause as its last clause",
+	},
+	{
+		name = "a cond clause after the _ clause",
+		text = "h\n---\n---\ncond {\n\t_ -> 2\n\t(= 1 1) -> 3\n}\n---\n1 => 1 fuel 10\n",
+		reason = "the _ clause of a cond is its last clause",
+	},
+	{
+		name = "a letrec block that binds a non-function",
+		text = "h\n---\n---\nletrec {\n\tx = 1\n\tx\n}\n---\n1 => 1 fuel 10\n",
+		reason = "a letrec block binds fns",
+	},
+	{
+		name = "a block with no body",
+		text = "h\n---\n---\nlet {\n\tx = 1\n}\n---\n1 => 1 fuel 10\n",
+		reason = "needs a body after its bindings",
+	},
+	{
+		name = "a block whose body is not last",
+		text = "h\n---\n---\nlet {\n\tx\n\ty = 1\n}\n---\n1 => 1 fuel 10\n",
+		reason = "a block's body is its last item",
+	},
+	{
 		name = "a whole integer that is not whole",
 		text = "h\n---\n---\nfn x\n\t(+ 1-2 x)\n---\n1 => 1 fuel 10\n",
 		reason = "is not a whole integer",
