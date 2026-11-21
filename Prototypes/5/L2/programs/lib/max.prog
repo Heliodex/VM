@@ -1,0 +1,9 @@
+The larger of two integers. The input is the pair (a . b).
+---
+
+---
+fn p (if (< (fst p) (snd p)) (snd p) (fst p))
+---
+(3 . 7) => 7 fuel 1000
+(7 . 3) => 7 fuel 1000
+(-2 . -5) => -2 fuel 1000

@@ -1,0 +1,16 @@
+The sum of a list of integers, as Ok of the sum. The sum of nil is 0.
+---
+
+---
+fn xs
+	letrec s = fn l (if (= (@ l) 1)
+		(Ok 0)
+		(let h = (head l)?
+		let t = (tail l)?
+		let r = (s t)?
+		Ok (+ h r)))
+	s xs
+---
+~ => Ok 0 fuel 1000
+[1 2 3] => Ok 6 fuel 1000
+[-4 4 10] => Ok 10 fuel 1000

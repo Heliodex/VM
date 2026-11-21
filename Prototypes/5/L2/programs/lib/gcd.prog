@@ -1,0 +1,16 @@
+The greatest common divisor of two whole numbers, by Euclid's method. The input is the pair (a . b). The gcd of 0 and 0 is 0. The output is Ok of the gcd, or Err if a remainder fails.
+---
+
+---
+fn p
+	letrec g = fn (a b) (if (= b 0)
+		(Ok a)
+		(let r = (% a b)?
+		g b r))
+	g (fst p) (snd p)
+---
+(12 . 18) => Ok 6 fuel 1000
+(7 . 13) => Ok 1 fuel 1000
+(0 . 5) => Ok 5 fuel 1000
+(9 . 0) => Ok 9 fuel 1000
+(100 . 75) => Ok 25 fuel 1000
