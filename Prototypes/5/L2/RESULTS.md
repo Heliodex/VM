@@ -38,7 +38,7 @@ Unwinding (`try`/`catch`) would need a handler frame in the machine that discard
 2. **`match` as a core form.** It tests the tag and binds the payload. Patterns are constructors with names, with a wildcard. It is the only way to inspect a sum, so the compiler can check that every case is handled.
 3. **`?` as sugar for early return.** It works in any expression position: the compiler hoists `e?` into a `let` in the same function, which is sound because L2 is pure. The error type of a function is the type of its `Err` payload, and `?` requires the payload types to match, as in Rust without the conversion trait.
 4. **Errors as data.** The `Err` payload is an ordinary value. Structured information is a record or a tagged value, and a message is a string. Error sets are not needed: a sum type covers them, and naming a union of error types is a type alias.
-5. **Machine failures stay `error`.** A wrong-kind `head` or a divide by zero is a bug in the program, not an expected failure, so it ends the run, as in L1. `error` cannot be caught.
+5. **Faults are values where the program can expect them, and `error` where it cannot.** A zero divisor for `/` or `%`, and `head` or `tail` of nil, give `Err` with a message, so a program can handle them with `match` or `?`. Integer overflow is still a machine error, and it ends the run, as in L1. `error` cannot be caught.
 6. **No effects or `try` in L2's first version.** Both are reasonable later additions. Effects would need continuation capture in the machine, and that is a separate project with its own design.
 
 ## What this does to the bootstrap
