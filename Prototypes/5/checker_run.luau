@@ -125,6 +125,22 @@ check("an explicit check gives Err for a list", runDyn(CHECKED, VM.cell(VM.int(1
 check("an input of the wrong shape gives Err on entry", runDyn("fn x (+ x 1)", VM.int(0), VM.construct(0, VM.int(1))) == "value " .. writtenOf(VM.construct(1, bytesOf("expected Int"))), runDyn("fn x (+ x 1)", VM.int(0), VM.construct(0, VM.int(1))))
 check("a list input gives Err on entry where an Int is needed", runDyn("fn x (+ x 1)", VM.int(0), VM.cell(VM.int(1), VM.nilv())) == "value " .. writtenOf(VM.construct(1, bytesOf("expected Int"))), runDyn("fn x (+ x 1)", VM.int(0), VM.cell(VM.int(1), VM.nilv())))
 
+-- The untyped form: a value made Dyn with untyped is used at a type only through check, so an Int passes and anything else gives Err.
+const UNTYPED = "fn x\n\tmatch (check (untyped x)) {\n\t\tOk v -> (+ v 1)\n\t\tErr e -> 0\n\t}"
+check("untyped makes a value Dyn, and check gives Ok for an integer", runDyn(UNTYPED, VM.int(0), VM.int(5)) == "value 6", runDyn(UNTYPED, VM.int(0), VM.int(5)))
+check("untyped makes a value Dyn, and check gives Err for a list", runDyn(UNTYPED, VM.int(0), VM.cell(VM.int(1), VM.nilv())) == "value 0", runDyn(UNTYPED, VM.int(0), VM.cell(VM.int(1), VM.nilv())))
+check("untyped gives Dyn, which is a type error without check", string.find(typeOf("fn x (+ (untyped x) 1)"), "but this is Dyn", 1, true) ~= nil, typeOf("fn x (+ (untyped x) 1)"))
+
+-- Every type error in a program is reported, one per line, not only the first.
+const twoErrors = typeOf("let a = (+ 1 [2])\nlet b = (+ 1 ~)\nfn x (+ x 0)")
+local errorLines = 0
+
+for _ in string.gmatch(twoErrors, "[^\n]+") do
+	errorLines += 1
+end
+
+check("two type errors are both reported", errorLines == 2 and string.find(twoErrors, "line 1", 1, true) ~= nil and string.find(twoErrors, "line 2", 1, true) ~= nil, twoErrors)
+
 print(string.format("%d of %d checks passed", total - failures, total))
 
 if failures > 0 then

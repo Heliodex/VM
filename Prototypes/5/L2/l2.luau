@@ -31,14 +31,20 @@ local function atFileLine(
 	err: unknown,
 	firstLine: number
 ): string
-	const msg = tostring(err)
-	const line, column, rest = string.match(msg, "^line (%d+), column (%d+): (.*)$")
+	-- A checker error can have several lines, one for each error, and each gets the file's line.
+	local out: { string } = {}
 
-	if line ~= nil and column ~= nil and rest ~= nil then
-		return string.format("line %d, column %s: %s", (tonumber(line) :: number) + firstLine - 1, column, rest)
+	for piece in string.gmatch(tostring(err), "[^\n]+") do
+		const line, column, rest = string.match(piece, "^line (%d+), column (%d+): (.*)$")
+
+		if line ~= nil and column ~= nil and rest ~= nil then
+			table.insert(out, string.format("line %d, column %s: %s", (tonumber(line) :: number) + firstLine - 1, column, rest))
+		else
+			table.insert(out, piece)
+		end
 	end
 
-	return msg
+	return table.concat(out, "\n")
 end
 
 local compileFile: (text: string, resolve: (string) -> string?, name: string, stack: { string }) -> Compiled

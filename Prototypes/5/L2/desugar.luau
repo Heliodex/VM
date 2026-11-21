@@ -340,6 +340,8 @@ collect = function(
 			rec = node.rec,
 			at = node.at,
 		}
+	elseif node.k == "untyped" then
+		return { k = "untyped", e = collect(node.e, hoists, childMode(mode)), at = node.at }
 	elseif node.k == "check" then
 		return { k = "check", e = collect(node.e, hoists, childMode(mode)), test = node.test, expect = node.expect, at = node.at }
 	elseif node.k == "mutual" then
@@ -825,6 +827,8 @@ desugar = function(
 		return M.app(M.lam(desugar(node.body, inner, ctors)), desugar(node.value, scope, ctors))
 	elseif node.k == "mutual" then
 		return desugar(mutualSurface(node.bindings, node.body, node.at), scope, ctors)
+	elseif node.k == "untyped" then
+		return desugar(node.e, scope, ctors)
 	elseif node.k == "check" then
 		return checkValue(node.test :: Test, node.expect, desugar(node.e, scope, ctors))
 	elseif node.k == "rawfix" then

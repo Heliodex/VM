@@ -34,6 +34,7 @@ Tokens, separated by whitespace or by delimiters:
 expr   ::= app
          | app "?"               early return on a failure (section 9.2)
          | "check" atom          the result of an explicit check of an untyped value (section 13.5)
+         | "untyped" atom        the value of an atom, given the type Dyn (section 13.5)
 app    ::= atom+                application, curried: f a b is (f a) b
          | "fn" params expr      function (section 4)
          | "let" name "=" expr newline expr
@@ -236,7 +237,7 @@ A list of `t` has type `[t]`, a built-in recursive type. Its values are the pair
 
 The checker is unification with mutable type variables, following Algorithm W. Each variable records the nesting depth at which it was created, and a `let` or `letrec` generalises the variables created deeper than its own level. Unification has the usual occurs check.
 
-The checker runs on the parser's tree, before the desugarer. It reports a type error at the source position of the node where it is found.
+The checker runs on the parser's tree, before the desugarer. It reports every type error, one per line, at the source position of the node where it is found. A node with a type error gets a fresh type, so the rest of the program is still checked, and the errors after the first are not lost. Later errors can follow from an earlier one.
 
 The constructs:
 
@@ -287,7 +288,7 @@ The result of `?` on `Result a e` is `a`, and the enclosing function must return
 
 A quoted program, or a program decoded from binary, is untyped. Evaluating it gives a value of type `Dyn`.
 
-- A `Dyn` value is used at a specific type only through `check e`, which is written in the program. `check e` gives `Ok e` when the value has the shape of the type its use gives it, and `Err` with the message `expected` and the type, such as `expected Int`, when it does not. An `Int` must be an integer, a pair must be a pair, and a constructor must have the declared tag. Without a check, a `Dyn` value used at `Int` is a type error, such as `expected Int, but this is Dyn`.
+- `untyped e` gives the value of `e` the type `Dyn`, with no test. It is how a program makes an untyped value, since any value can be seen as untyped data. A `Dyn` value is used at a specific type only through `check e`, which is written in the program. `check e` gives `Ok e` when the value has the shape of the type its use gives it, and `Err` with the message `expected` and the type, such as `expected Int`, when it does not. An `Int` must be an integer, a pair must be a pair, and a constructor must have the declared tag. Without a check, a `Dyn` value used at `Int` is a type error, such as `expected Int, but this is Dyn`.
 - A typed value passed into untyped code is not checked, and it is still a valid value of its type.
 
 So a program can run untyped code, and the types it has are kept at the boundary by an explicit check. The check is part of the surface language's compiled form, not the machine, and a failed check is a value, so it can be matched and handled like any other error.

@@ -39,6 +39,7 @@ type Cx = {
 	sumNames: { [string]: string },
 	ctors: { [string]: CtorInfo },
 	pending: { Pending },
+	errors: { string },
 }
 
 local counter = 0
@@ -158,7 +159,7 @@ local function failAt(
 		text = string.format("line %d, column %d: %s", at.line, at.col, msg)
 	end
 
-	error(text, 0)
+	error({ typeError = text }, 0)
 end
 
 -- The position of the node whose unification is running, for the errors it raises.
@@ -371,6 +372,7 @@ local function newCx(): Cx
 			Err = { sum = result, ctor = err },
 		},
 		pending = {},
+		errors = {},
 	}
 end
 
@@ -618,9 +620,53 @@ local function use(
 	return node
 end
 
-local infer: (Cx, { [string]: Scheme }, Parser.Expr, number, Ty) -> (Parser.Expr, Ty)
+local inferNode: (Cx, { [string]: Scheme }, Parser.Expr, number, Ty) -> (Parser.Expr, Ty)
 
-infer = function(
+-- Records a type error, and rethrows anything else, since that is a bug in the checker.
+local function recordError(
+	cx: Cx,
+	err: unknown
+)
+	if type(err) == "table" and (err :: { typeError: string? }).typeError ~= nil then
+		table.insert(cx.errors, (err :: { typeError: string }).typeError)
+		return
+	end
+
+	error(err, 0)
+end
+
+-- Runs a step of the check that may fail with a type error. The error is recorded, and the check goes on.
+local function attempt(
+	cx: Cx,
+	run: () -> ()
+)
+	const ok, err = pcall(run)
+
+	if not ok then
+		recordError(cx, err)
+	end
+end
+
+-- Infers a node. A type error in it is recorded, and the node gets a fresh type, so the other errors are found too.
+local infer = function(
+	cx: Cx,
+	env: { [string]: Scheme },
+	node: Parser.Expr,
+	level: number,
+	ret: Ty
+): (Parser.Expr, Ty)
+	const ok, result, ty = pcall(inferNode, cx, env, node, level, ret)
+
+	if ok then
+		return result :: Parser.Expr, ty :: Ty
+	end
+
+	recordError(cx, result)
+	return node, fresh(level)
+end
+
+
+inferNode = function(
 	cx: Cx,
 	env: { [string]: Scheme },
 	node: Parser.Expr,
@@ -820,6 +866,9 @@ infer = function(
 		end
 
 		return { k = "match", scrut = scrut, arms = arms, at = node.at }, resTy
+	elseif node.k == "untyped" then
+		const e = infer(cx, env, node.e, level, ret)
+		return { k = "untyped", e = e, at = node.at }, DYN
 	elseif node.k == "check" then
 		const e = infer(cx, env, node.e, level, ret)
 
@@ -840,7 +889,7 @@ infer = function(
 	end
 
 	-- Only the parser's forms reach the checker. The desugarer's rawfix form and check nodes are never in its input.
-	error(string.format("line %d, column %d: this form cannot be checked", node.at.line, node.at.col), 0)
+	error({ typeError = string.format("line %d, column %d: this form cannot be checked", node.at.line, node.at.col) }, 0)
 end
 
 -- DESCRIBING TYPES AS TESTS
@@ -952,15 +1001,22 @@ local function check(
 	end
 
 	const expr, ty = infer(cx, env, program.expr, 0, fresh(0))
-	const p = prune(ty)
-
-	if p.k == "con" and p.name ~= "->" then
-		failAt(program.expr.at, "the program must be a function of its input, but it is " .. render(ty, false))
-	end
-
 	const input = fresh(0)
 	const out = fresh(0)
-	unifyAt(program.expr.at, ty, arrow(input, out))
+
+	attempt(cx, function()
+		const p = prune(ty)
+
+		if p.k == "con" and p.name ~= "->" then
+			failAt(program.expr.at, "the program must be a function of its input, but it is " .. render(ty, false))
+		end
+
+		unifyAt(program.expr.at, ty, arrow(input, out))
+	end)
+
+	if #cx.errors > 0 then
+		error(table.concat(cx.errors, "\n"), 0)
+	end
 
 	for _, pending in cx.pending do
 		pending.node.test = describe(cx, pending.ty)

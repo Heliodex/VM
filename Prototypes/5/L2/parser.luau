@@ -52,6 +52,7 @@ export type Expr =
 	| { k: "try", e: Expr, at: Pos }
 	| { k: "rawfix", value: Expr, at: Pos }
 	| { k: "check", e: Expr, test: Test?, expect: string, at: Pos }
+	| { k: "untyped", e: Expr, at: Pos }
 
 export type Arm = { pat: Pattern, body: Expr, at: Pos }
 
@@ -82,6 +83,7 @@ const KEYWORDS: { [string]: boolean } = {
 	match = true,
 	mutual = true,
 	check = true,
+	untyped = true,
 	type = true,
 }
 
@@ -543,6 +545,13 @@ local function parse(
 		return { k = "check", e = e, test = nil, expect = "", at = at(start) }
 	end
 
+	-- untyped e: the value of e, given the type Dyn. A Dyn value is used at a type only through check.
+	local function parseUntyped(): Expr
+		const start = advance()
+		const e = parseAtom()
+		return { k = "untyped", e = e, at = at(start) }
+	end
+
 	parseExpr = function(): Expr
 		const t = cur()
 
@@ -559,6 +568,8 @@ local function parse(
 				return parseMutual()
 			elseif word(t) == "check" then
 				return parseCheck()
+			elseif word(t) == "untyped" then
+				return parseUntyped()
 			end
 		end
 
