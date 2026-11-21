@@ -62,18 +62,15 @@ export type Outcome =
 -- The pending work of the machine. Each frame says what to do with the next value.
 type Frame =
 	| { k: "cell"; expr: Expr; env: Binding?; head: Value? }
-	| { k: "force" }
+	| { k: "force"; pin: Pin? }
 	| { k: "construct"; tag: number }
 	| { k: "tagof" }
 	| { k: "payload" }
 	| { k: "index"; n: number }
 	| { k: "if"; t: Expr; e: Expr; env: Binding? }
-	| { k: "apply"; arg: Expr; env: Binding? }
-	| { k: "argument"; arg: Expr; env: Binding?; fn: Closure }
+	| { k: "apply"; arg: Expr; env: Binding?; fn: Closure? }
 	| { k: "update"; pin: Pin }
-	| { k: "binary"; tag: number; b: Expr; env: Binding? }
-	| { k: "second"; tag: number; first: Value }
-	| { k: "unary"; tag: number }
+	| { k: "prim"; tag: number; b: Expr?; env: Binding?; first: Value? }
 const Primitives = require "./primitives"
 const NIL: Nil = {
 	kind = "nil",
@@ -272,22 +269,13 @@ const function run(program: Expr, fuel: number, initialEnv: Binding?): Outcome
 					}
 					expr = expr.f
 				else
-					-- The only expression left is a primitive.
-					if expr.b == nil then
-						push(
-							{
-								k = "unary",
-								tag = expr.tag,
-							} :: Frame
-						)
-					else
-						push {
-							k = "binary",
-							tag = expr.tag,
-							b = expr.b,
-							env = env,
-						}
-					end
+					-- The only expression left is a primitive: its first operand is evaluated, then its second if it has one.
+					push {
+						k = "prim",
+						tag = expr.tag,
+						b = expr.b,
+						env = env,
+					}
 
 					expr = expr.a
 				end
@@ -360,26 +348,25 @@ const function run(program: Expr, fuel: number, initialEnv: Binding?): Outcome
 					env = frame.env
 					returning = false
 				elseif frame.k == "apply" then
-					if type(value) ~= "table" or value.kind ~= "closure" then
-						return failed("applying a non-function", steps)
-					end
+					if frame.fn == nil then
+						-- The function is done. The frame waits again, now for the argument.
+						if type(value) ~= "table" or value.kind ~= "closure" then
+							return failed("applying a non-function", steps)
+						end
 
-					push {
-						k = "argument",
-						arg = frame.arg,
-						env = frame.env,
-						fn = value,
-					}
-					expr = frame.arg
-					env = frame.env
-					returning = false
-				elseif frame.k == "argument" then
-					expr = frame.fn.body
-					env = {
-						value = value,
-						rest = frame.fn.env,
-					}
-					returning = false
+						frame.fn = value :: Closure
+						push(frame)
+						expr = frame.arg
+						env = frame.env
+						returning = false
+					else
+						expr = frame.fn.body
+						env = {
+							value = value,
+							rest = frame.fn.env,
+						}
+						returning = false
+					end
 				elseif frame.k == "construct" then
 					value = {
 						kind = "con",
@@ -399,52 +386,53 @@ const function run(program: Expr, fuel: number, initialEnv: Binding?): Outcome
 
 					value = value.payload
 				elseif frame.k == "force" then
-					if type(value) ~= "table" or value.kind ~= "pin" then
-						return failed("forcing a non-pin", steps)
-					end
-
-					const result = value.result
-
-					if result then
-						value = result
+					if frame.pin ~= nil then
+						-- The pin's expression is done, so its value is the pin's result.
+						frame.pin.result = value
+						frame.pin.busy = false
 					else
-						if value.busy then
-							return failed("a pin forced itself", steps)
+						if type(value) ~= "table" or value.kind ~= "pin" then
+							return failed("forcing a non-pin", steps)
 						end
 
-						const pin: Pin = value
-						pin.busy = true
-						push {
-							k = "update",
-							pin = pin,
-						}
-						expr = pin.expr
-						env = pin.env
+						const result = value.result
+
+						if result then
+							value = result
+						else
+							if value.busy then
+								return failed("a pin forced itself", steps)
+							end
+
+							const pin: Pin = value
+							pin.busy = true
+							frame.pin = pin
+							push(frame)
+							expr = pin.expr
+							env = pin.env
+							returning = false
+						end
+					end
+				elseif frame.k == "prim" then
+					if frame.b ~= nil and frame.first == nil then
+						-- The first operand is done. The frame waits again, now for the second.
+						frame.first = value
+						push(frame)
+						expr = frame.b
+						env = frame.env
 						returning = false
-					end
-				elseif frame.k == "update" then
-					frame.pin.result = value
-					frame.pin.busy = false
-				elseif frame.k == "binary" then
-					push {
-						k = "second",
-						tag = frame.tag,
-						first = value,
-					}
-					expr = frame.b
-					env = frame.env
-					returning = false
-				elseif frame.k == "second" then
-					const result, message = binary(frame.tag, frame.first, value)
+					elseif frame.b == nil then
+						-- The only unary primitive is kind.
+						value = kindOf(value)
+					else
+						const result, message = binary(frame.tag, frame.first :: Value, value)
 
-					if message ~= nil then
-						return failed(message, steps)
-					end
+						if message ~= nil then
+							return failed(message, steps)
+						end
 
-					value = result :: number
-				else
-					-- The only unary primitive is kind.
-					value = kindOf(value)
+						value = result :: number
+					end
 				end
 			end
 		end
