@@ -529,24 +529,36 @@ local function ctorWithArgs(
 	return substitute(payload, map)
 end
 
+-- The type of an operation that can fail: a Result of its value, with a message as the error.
+local function resultOf(
+	t: Ty
+): Ty
+	return con("Result", { t, listOf(INT) })
+end
+
 -- BUILT-IN NAMES
 
 -- The types of the primitives and the built-in forms (section 13.3). Their variables are never bound, so every use instantiates them.
 local BUILTINS: { [string]: Scheme } = {}
 
 do
-	for _, sym in { "+", "-", "*", "/", "%", "<", "=" } do
+	for _, sym in { "+", "-", "*", "<", "=" } do
 		BUILTINS[sym] = { vars = {}, ty = arrow(INT, arrow(INT, INT)) }
+	end
+
+	-- Division and remainder give an Err for a zero divisor.
+	for _, sym in { "/", "%" } do
+		BUILTINS[sym] = { vars = {}, ty = arrow(INT, arrow(INT, resultOf(INT))) }
 	end
 
 	const kindA = fresh(-1)
 	BUILTINS["@"] = { vars = { kindA }, ty = arrow(kindA, INT) }
 
 	const headA = fresh(-1)
-	BUILTINS.head = { vars = { headA }, ty = arrow(listOf(headA), headA) }
+	BUILTINS.head = { vars = { headA }, ty = arrow(listOf(headA), resultOf(headA)) }
 
 	const tailA = fresh(-1)
-	BUILTINS.tail = { vars = { tailA }, ty = arrow(listOf(tailA), listOf(tailA)) }
+	BUILTINS.tail = { vars = { tailA }, ty = arrow(listOf(tailA), resultOf(listOf(tailA))) }
 
 	const pinA = fresh(-1)
 	BUILTINS.pin = { vars = { pinA }, ty = arrow(pinA, pinOf(pinA)) }

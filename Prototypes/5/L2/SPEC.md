@@ -135,7 +135,7 @@ A constructor is not data until the data form in section 5 is implemented, so a 
 
 The comparison and recommendation are in `L2/RESULTS.md`: a tagged sum type `Ok v | Err e` with `match`, `?` as sugar for early return, and no effects or `try` in the first version.
 
-Runtime errors from the machine (a wrong-kind `head`, a divide by zero) end the run as `error` with a message, as in L1.
+Division by zero and `head` or `tail` of nil give `Err` as a value (section 13.3). Integer overflow is still a machine error, and ends the run as `error` with a message, as in L1.
 
 ### 9.1 Sums
 
@@ -257,10 +257,11 @@ Recursive functions (`letrec`) are checked monomorphically within their own body
 
 ### 13.3 Primitives and forms
 
-- `+ - * / %` have type `Int -> Int -> Int`.
+- `+ - *` have type `Int -> Int -> Int`.
+- `/` and `%` have type `Int -> Int -> Result Int [Int]`: a zero divisor gives `Err` with the reason, `division by zero` or `remainder by zero`.
 - `< =` have type `Int -> Int -> Int`, since the machine returns 0 or 1.
 - `@` has type `a -> Int`, the kind of any value.
-- `head` and `tail` have type `[a] -> a` and `[a] -> [a]`. They take lists, so that a recursive function over a list is typed. A pair is accepted where a list is, when its second part is a list, so a pair whose parts have different types cannot be taken apart in the first version.
+- `head` and `tail` have type `[a] -> Result a [Int]` and `[a] -> Result [a] [Int]`. On nil they give `Err` with the reason, `head of an empty list` or `tail of an empty list`. They take lists, so that a recursive function over a list is typed. A pair is accepted where a list is, when its second part is a list, so a pair whose parts have different types cannot be taken apart in the first version.
 - `if c t e` needs `c : Int`, and `t` and `e` must have the same type.
 - `pin e` has type `Pin t` when `e : t`, and `force` has type `Pin t -> t`.
 - `fix` has type `(a -> a) -> a`.
@@ -312,7 +313,7 @@ The payload check is deep: a `Dyn` value used as `Result Int Str` checks the pay
 
 ### 13.6 What is not checked
 
-- Machine failures (a wrong-kind `head`, a divide by zero) are not types. They end the run, as in L1.
+- Machine failures (integer overflow past 2^53, and the other faults the machine has) are not types. They end the run, as in L1. Division, remainder, `head` and `tail` do not reach the machine's failures: their checks are in the desugarer, and they give `Err` as a value.
 - Quoted and binary forms are not checked when they are read. The check happens when a `Dyn` value is used at a type.
 - Effects, subtyping, type classes and kinds are not in the first version.
 

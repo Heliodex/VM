@@ -62,7 +62,9 @@ end
 -- The types of programs, as the checker writes them. Each is concrete, so it has no variable numbers to compare.
 const SHOWN: { { name: string, src: string, want: string } } = {
 	{ name = "a function of an integer", src = "fn x (+ x 1)", want = "(Int -> Int)" },
-	{ name = "head of a list gives its item", src = "fn l (+ (head l) 1)", want = "([Int] -> Int)" },
+	{ name = "head of a list gives its item", src = "fn l\n\tmatch (head l) {\n\t\tOk h -> (+ h 1)\n\t\tErr e -> 0\n\t}", want = "([Int] -> Int)" },
+	{ name = "head gives a Result", src = "fn x (head [x 1])", want = "(Int -> Result Int ([Int]))" },
+	{ name = "division gives a Result", src = "fn x (/ 10 x)", want = "(Int -> Result Int ([Int]))" },
 	{ name = "a sum takes its own type", src = "type Option a = None | Some a\nfn o match o {\n\tNone -> 0\n\tSome v -> v\n}", want = "(Option Int -> Int)" },
 	{ name = "a match result is a Result", src = "fn x (if x (Ok 1) (Err 2))", want = "(Int -> Result Int Int)" },
 }

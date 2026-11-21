@@ -37,10 +37,70 @@ type Hoist = { name: string, expr: Expr, at: Pos }
 
 local counter = 0
 
--- The built-in unary forms of section 7 and section 6. head and tail are the index expression, so a chain of them is one step.
+-- A string as a list of its bytes, as the surface writes it.
+local function textValue(
+	s: string
+): M.Expr
+	local e = M.nilv()
+
+	for i = #s, 1, -1 do
+		e = M.cell(M.int(string.byte(s, i) :: number), e)
+	end
+
+	return e
+end
+
+-- The checked forms of the operations that can fail. Each gives Ok with the result, or Err with the reason. Each operand is bound once, so it is evaluated once.
+
+-- x / y or x % y: Err with the reason when y is zero, and Ok of the operation otherwise. tag is div or mod.
+local function checkedDivision(
+	tag: number,
+	x: M.Expr,
+	y: M.Expr,
+	reason: string
+): M.Expr
+	const body = M.ite(
+		M.prim(Primitives.TAG.eq, M.var(0), M.int(0)),
+		M.construct(1, textValue(reason)),
+		M.construct(0, M.prim(tag, M.var(1), M.var(0)))
+	)
+	return M.app(M.app(M.lam(M.lam(body)), x), y)
+end
+
+-- head x: Ok of the head when x is a pair, and Err when it is nil. A list is a pair or nil, so the test is the kind of x: 2 for a pair.
+local function checkedHead(
+	x: M.Expr
+): M.Expr
+	const body = M.ite(
+		M.prim(Primitives.TAG.eq, M.prim(Primitives.TAG.kind, M.var(0)), M.int(2)),
+		M.construct(0, M.head(M.var(0))),
+		M.construct(1, textValue("head of an empty list"))
+	)
+	return M.app(M.lam(body), x)
+end
+
+-- tail x: Ok of the tail when x is a pair, and Err when it is nil.
+local function checkedTail(
+	x: M.Expr
+): M.Expr
+	const body = M.ite(
+		M.prim(Primitives.TAG.eq, M.prim(Primitives.TAG.kind, M.var(0)), M.int(2)),
+		M.construct(0, M.tail(M.var(0))),
+		M.construct(1, textValue("tail of an empty list"))
+	)
+	return M.app(M.lam(body), x)
+end
+
+-- The reason each division gives Err, by the name of its primitive.
+local DIVISION: { [string]: string } = {
+	div = "division by zero",
+	mod = "remainder by zero",
+}
+
+-- The built-in unary forms of section 7 and section 6. head and tail give a Result, so they are checked (checkedHead, checkedTail).
 local UNARY: { [string]: (M.Expr) -> M.Expr } = {
-	head = M.head,
-	tail = M.tail,
+	head = checkedHead,
+	tail = checkedTail,
 	pin = M.pin,
 	force = M.force,
 	fix = function(
@@ -398,19 +458,6 @@ end
 
 local KIND_TAG = Primitives.BY_SYMBOL["@"].tag
 
--- A string as a list of its bytes, as the surface writes it.
-local function textValue(
-	s: string
-): M.Expr
-	local e = M.nilv()
-
-	for i = #s, 1, -1 do
-		e = M.cell(M.int(string.byte(s, i) :: number), e)
-	end
-
-	return e
-end
-
 local function extend(
 	path: { string },
 	op: string
@@ -551,6 +598,10 @@ local function resolveName(
 			return M.lam(M.prim(p.tag, M.var(0)))
 		end
 
+		if DIVISION[p.name] ~= nil then
+			return M.lam(M.lam(checkedDivision(p.tag, M.var(1), M.var(0), DIVISION[p.name])))
+		end
+
 		return M.lam(M.lam(M.prim(p.tag, M.var(1), M.var(0))))
 	end
 
@@ -597,6 +648,8 @@ local function desugarApp(
 
 			if p.arity == 1 then
 				e = M.prim(p.tag, desugar(args[1], scope, ctors))
+			elseif DIVISION[p.name] ~= nil then
+				e = checkedDivision(p.tag, desugar(args[1], scope, ctors), desugar(args[2], scope, ctors), DIVISION[p.name])
 			else
 				e = M.prim(p.tag, desugar(args[1], scope, ctors), desugar(args[2], scope, ctors))
 			end
