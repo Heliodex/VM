@@ -5,19 +5,15 @@
 --
 --   lute run l2_run.luau      (from Prototypes/5)
 
-const fs = require "@lute/fs"
-const Data = require "./interpreter/data"
 const L2 = require "./L2/l2"
 const ProgramFile = require "./L2/programfile"
+const Data = require "./interpreter/data"
+const fs = require "@lute/fs"
 
 local failures = 0
 local total = 0
 
-const function check(
-	name: string,
-	ok: boolean,
-	detail: string
-)
+const function check(name: string, ok: boolean, detail: string)
 	total += 1
 
 	if ok then
@@ -25,22 +21,18 @@ const function check(
 	else
 		failures += 1
 		print(string.format("FAIL  %s  -> %s", name, detail))
-	end
-end
+end end
 
-const function readFile(
-	path: string
-): string
+const function readFile(path: string): string
 	const handle = fs.open(path)
 	const text = fs.read(handle)
 	fs.close(handle)
+
 	return text
 end
 
 -- The text of a program file in L2/programs/, or nil if there is none.
-const function resolve(
-	name: string
-): string?
+const function resolve(name: string): string?
 	const ok, text = pcall(readFile, `L2/programs/{name}`)
 
 	if ok then
@@ -51,7 +43,11 @@ const function resolve(
 end
 
 -- Malformed programs, each with a fragment of the reason it should be refused.
-const MALFORMED: { { name: string, text: string, reason: string } } = {
+const MALFORMED: { {
+	name: string,
+	text: string,
+	reason: string,
+} } = {
 	{
 		name = "a list with a dot inside it",
 		text = "h\n---\n---\n[1 . 2]\n---\n1 => 1 fuel 10\n",
@@ -169,27 +165,40 @@ for _, case in MALFORMED do
 	check(
 		`refuses {case.name}`,
 		not ok and string.find(tostring(err), case.reason, 1, true) ~= nil,
-		if ok then "it compiled, but it should not" else tostring(err)
+		if ok then
+			"it compiled, but it should not"
+		else
+			tostring(err)
 	)
 end
 
 -- Every .prog file in L2/programs/, each run with its tests, including the ones that are only imported elsewhere.
 local files: { string } = {}
 
-for _, entry in fs.listdir("L2/programs") do
-	if entry.type == "file" and string.sub(entry.name, -5) == ".prog" then
-		table.insert(files, entry.name)
+-- Lists the program files in a folder, and in its subfolders, with their paths from the top of L2/programs.
+local function listPrograms(folder: string, prefix: string, out: { string })
+	for _, entry in fs.listdir(folder) do
+		if entry.type == "dir" then
+			listPrograms(`{folder}/{entry.name}`, `{prefix}{entry.name}/`, out)
+		elseif entry.type == "file" and string.sub(entry.name, -5) == ".prog" then
+			table.insert(out, `{prefix}{entry.name}`)
+		end
 	end
 end
 
-table.sort(files)
+listPrograms("L2/programs", "", files)
 
+table.sort(files)
 local tests = 0
 
 for _, name in files do
 	const ok, res = pcall(function()
 		const text = readFile(`L2/programs/{name}`)
-		return { file = ProgramFile.parse(text), compiled = L2.compile(text, resolve, name) }
+
+		return {
+			file = ProgramFile.parse(text),
+			compiled = L2.compile(text, resolve, name),
+		}
 	end)
 
 	if not ok then
@@ -202,7 +211,6 @@ for _, name in files do
 
 		for _, test in file.tests do
 			tests += 1
-
 			const ran, input = pcall(L2.evalText, compiled, test.input, L2.VALUE_FUEL)
 
 			if not ran then
@@ -228,10 +236,7 @@ for _, name in files do
 
 				-- The step count is shown so a test that is close to its fuel can be seen.
 				check(`{name}:{test.line}`, pass, `{got} in {result.steps} steps (fuel {test.fuel})`)
-			end
-		end
-	end
-end
+end end end end
 
 print(string.format("%d of %d checks passed (%d program files, %d tests)", total - failures, total, #files, tests))
 
