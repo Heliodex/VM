@@ -3,7 +3,7 @@ The first part of the L2 checker, written in L2 with no mutation. The state is a
 ---
 type Ty = TVar Int | TCon ([Int] . [Ty])
 type Bind = Unbound Int | Bound Ty
-type St = St (Int . ([(Int . Bind)] . [[Int]]))
+type St = St (Int . (Tr . [[Int]]))
 type Scheme = Scheme ([Int] . Ty)
 type Entry = EVar Scheme | ECtor ([Int] . ([Int] . (Int . (Int . Ty)))) | ESum ([Int] . ([Int] . [([Int] . (Int . Int))]))
 type Look = Found Entry | Missing
@@ -11,6 +11,7 @@ type PTy = TName ([Int] . (Int . Int)) | TApp ([Int] . ([PTy] . (Int . Int))) | 
 type Req = Unify (Ty . Ty) | Gen (Int . Ty) | Inst (Int . Scheme) | Infer ([([Int] . ([[Int]] . ([([Int] . (PTy . (Int . Int)))] . (Int . Int))))] . Expr)
 type MS = MS (St . (Int . ([Int] . (Ty . ([Ty] . ([Int] . Int))))))
 type Expr = EInt (Int . (Int . Int)) | EStr ([Int] . (Int . Int)) | ENil (Int . Int) | EName ([Int] . (Int . Int)) | EList ([Expr] . (Int . Int)) | EPair (Expr . (Expr . (Int . Int))) | EApp (Expr . ([Expr] . (Int . Int))) | EFn ([[Int]] . (Expr . (Int . Int))) | ELet ([Int] . (Expr . (Expr . (Int . (Int . Int))))) | EMutual ([([Int] . (Expr . (Int . Int)))] . (Expr . (Int . Int))) | EIf (Expr . (Expr . (Expr . (Int . Int)))) | EMatch (Expr . ([(Pat . (Expr . (Int . Int)))] . (Int . Int))) | ETry (Expr . (Int . Int)) | ECheck (Expr . (Int . Int)) | EUntyped (Expr . (Int . Int))
+type Tr = TEmpty | TNode (Bind . (Tr . Tr))
 type Pat = PCon ([Int] . ([Int] . (Int . Int))) | PBind ([Int] . (Int . Int)) | PWild (Int . Int)
 
 let first = (fn l
@@ -22,11 +23,6 @@ let tl = (fn l
 	match (tail l) {
 		Ok t -> t
 		Err e -> ~
-	})
-let hdE = (fn l
-	match (head l) {
-		Ok e -> e
-		Err e -> (0 . (Unbound 0))
 	})
 let hdM = (fn l
 	match (head l) {
@@ -91,12 +87,33 @@ letrec snoc = (fn (l x)
 let addErr = (fn (st msg)
 	(mkSt (nextOf st) (bindsOf st) (snoc (errsOf st) msg)))
 
+let halfOf = (fn n
+	match (/ n 2) {
+		Ok q -> q
+		Err e -> 0
+	})
+let oddOf = (fn n
+	match (% n 2) {
+		Ok r -> r
+		Err e -> 0
+	})
+let pickSide = (fn (lr b)
+	(if (= b 1) (snd lr) (fst lr)))
+; The bindings are a binary trie on the id: the path from the root takes the bits of the id, lowest first, and the node at the end of the path holds the id's binding. A node with no binding holds Unbound 0, which is what a missing id means.
 letrec findB = (fn (bs id)
-	(if (= (@ bs) 1)
-		(Unbound 0)
-		(if (= (fst (hdE bs)) id)
-			(snd (hdE bs))
-			(findB (tl bs) id))))
+	match bs {
+		TEmpty -> (Unbound 0)
+		TNode p -> (if (= id 0) (fst p) (findB (pickSide (snd p) (oddOf id)) (halfOf id)))
+	})
+letrec setB = (fn (bs id b)
+	match bs {
+		TEmpty -> (setB (TNode ((Unbound 0) . (TEmpty . TEmpty))) id b)
+		TNode p -> (if (= id 0)
+			(TNode (b . (snd p)))
+			(if (= (oddOf id) 1)
+				(TNode ((fst p) . ((fst (snd p)) . (setB (snd (snd p)) (halfOf id) b))))
+				(TNode ((fst p) . ((setB (fst (snd p)) (halfOf id) b) . (snd (snd p)))))))
+	})
 let levelOf = (fn b
 	match b {
 		Unbound lv -> lv
@@ -104,7 +121,7 @@ let levelOf = (fn b
 	})
 let fresh = (fn (st level)
 	(let n = (nextOf st)
-	((TVar n) . (mkSt (+ n 1) (cons (n . (Unbound level)) (bindsOf st)) (errsOf st)))))
+	((TVar n) . (mkSt (+ n 1) (setB (bindsOf st) n (Unbound level)) (errsOf st)))))
 
 letrec prune = (fn (bs t)
 	(match t {
@@ -131,7 +148,7 @@ letrec lowerT = (fn (bs t level)
 			b
 			(lowerArgs (lowerT b (hdT args) level) (tl args))))
 	(match (prune bs t) {
-		TVar y -> (if (< level (levelOf (findB bs y))) (cons (y . (Unbound level)) bs) bs)
+		TVar y -> (if (< level (levelOf (findB bs y))) (setB bs y (Unbound level)) bs)
 		TCon p -> (lowerArgs bs (snd p))
 	})))
 
@@ -171,7 +188,7 @@ let mismatch = (fn (st a e)
 let bindVar = (fn (st id t)
 	(if (occurs (bindsOf st) id t)
 		(addErr st (cat (varName id) " would be an infinite type"))
-		(mkSt (nextOf st) (cons (id . (Bound t)) (lowerT (bindsOf st) t (levelOf (findB (bindsOf st) id)))) (errsOf st))))
+		(mkSt (nextOf st) (setB (lowerT (bindsOf st) t (levelOf (findB (bindsOf st) id))) id (Bound t)) (errsOf st))))
 
 letrec unify = (fn (st a0 e0)
 	(letrec unifyArgs = (fn (st0 aa ea)
@@ -266,14 +283,14 @@ let schemeText = (fn (bs s)
 		(cat "forall " (cat (idsText (schemeVars s)) (cat ". " (render bs (schemeTy s)))))))
 
 let runUnify = (fn q
-	(let st = (unify (mkSt 1000 ~ ~) (fst q) (snd q))
+	(let st = (unify (mkSt 1000 TEmpty ~) (fst q) (snd q))
 	((render (bindsOf st) (fst q)) . (errsOf st))))
 let runGen = (fn q
-	(let st = (mkSt 1000 ~ ~)
+	(let st = (mkSt 1000 TEmpty ~)
 	(let s = (generalize st (fst q) (snd q))
 	((schemeText (bindsOf st) s) . ~))))
 let runInst = (fn q
-	(let st = (mkSt 1000 ~ ~)
+	(let st = (mkSt 1000 TEmpty ~)
 	(let r = (instantiate st (fst q) (snd q))
 	((render (bindsOf (snd r)) (fst r)) . (errsOf (snd r))))))
 
@@ -857,7 +874,7 @@ let inferBody = (fn (st env ex)
 
 ; The type of a whole program: its declarations, then the body, which is a function of its input.
 let inferProgram = (fn prog
-	(match (declareAll (mkSt 1000 ~ ~) builtinEnv (fst prog)) {
+	(match (declareAll (mkSt 1000 TEmpty ~) builtinEnv (fst prog)) {
 		Err msg -> ("" . (cons msg ~))
 		Ok d -> (inferBody (fst d) (snd d) (snd prog))
 	}))
