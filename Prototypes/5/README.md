@@ -50,6 +50,8 @@ The second language is **L2** (language 2). It is typed, and it has the surface 
 | `checker_run.luau` | Checks the type checker: inferred types, the type errors, and `check` and `untyped` on untyped values. |
 | `L2/programs/boot/lex.prog` | The L2 tokenizer, written in L2: the first stage of the L2 compiler in L2. |
 | `lex_run.luau` | Checks the L2 tokenizer against the Luau lexer on every program file and a set of edge cases. |
+| `L2/programs/boot/parse.prog` | The L2 parser, written in L2: stage 2 of the L2 compiler in L2. It reads the tokenizer's output. |
+| `parse_run.luau` | Checks the L2 parser, run on the tokenizer's output, against the Luau parser on every L2 program file and a set of cases that reach each error. |
 
 ## Running
 
@@ -69,6 +71,7 @@ Run from this directory.
 | The L2 program checks | `lute run l2_run.luau` |
 | The L2 checker checks | `lute run checker_run.luau` |
 | The L2 tokenizer against the Luau lexer | `lute run lex_run.luau` |
+| The L2 parser against the Luau parser | `lute run parse_run.luau` |
 | The program file checks | `lute run programs_run.luau` |
 | The analyser | `luau-analyze interpreter/*.luau examples/*.luau self/*.luau run.luau self_run.luau self_data_run.luau` |
 | The formatter | `luau-format interpreter/*.luau examples/*.luau self/*.luau run.luau self_run.luau self_data_run.luau` |
