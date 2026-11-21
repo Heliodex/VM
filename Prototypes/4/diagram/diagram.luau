@@ -10,41 +10,37 @@
 --
 -- `toSvg` only reads Net.Tag / Net.Link / Net.Free.
 
+local Net = require "../engine/net"
+local Types = require "../engine/types"
 local G = require "./drawing/geometry"
 local Layout = require "./drawing/layout"
 local Orient = require "./drawing/orient"
 local Route = require "./drawing/route"
-local Net = require "../engine/net"
-local Types = require "../engine/types"
 
 type Symbol = Types.Symbol
 type Net = Types.Net
 
-const function colorOf(
-	symbol: Symbol
-): (string, string, string)
+const function colorOf(symbol: Symbol): (string, string, string)
 	if symbol == "Gamma" then
 		return "#c8e6c9", "#2e7d32", "#1b5e20"
 	elseif symbol == "Delta" then
 		return "#bbdefb", "#1565c0", "#0d47a1"
 	else
 		return "#f8bbd0", "#c2185b", "#880e4f"
-end end
+	end
+end
 
-const function labelOf(
-	symbol: Symbol
-): string
+const function labelOf(symbol: Symbol): string
 	if symbol == "Gamma" then
 		return "γ"
 	elseif symbol == "Delta" then
 		return "δ"
 	else
 		return "ε"
-end end
+	end
+end
 
-const function toSvg(
-	net: Net
-): string
+const function toSvg(net: Net): string
 	const cells = Net.liveCells(net)
 	const pos = Layout.layout(net, cells)
 	const scene = Orient.orient(net, cells, pos)
@@ -52,9 +48,7 @@ const function toSvg(
 	local minX, minY = math.huge, math.huge
 	local maxX, maxY = -math.huge, -math.huge
 
-	const function include(
-		v: G.Vec
-	)
+	const function include(v: G.Vec)
 		minX = math.min(minX, v.x)
 		minY = math.min(minY, v.y)
 		maxX = math.max(maxX, v.x)
@@ -76,7 +70,8 @@ const function toSvg(
 			include(tip[c])
 			include(e1[c])
 			include(e2[c])
-	end end
+		end
+	end
 
 	const wireStyle = 'fill="none" stroke="#78909c" stroke-width="1.6" stroke-linecap="round"'
 	const stubStyle = 'fill="none" stroke="#90a4ae" stroke-width="1.4" stroke-linecap="round"'
@@ -141,7 +136,11 @@ const function toSvg(
 						include(c1)
 						include(c2)
 						wires[#wires + 1] = `<path d="M {G.fmt(P.x)} {G.fmt(P.y)} C {G.fmt(c1.x)} {G.fmt(c1.y)} {G.fmt(c2.x)} {G.fmt(c2.y)} {G.fmt(Q.x)} {G.fmt(Q.y)}" {wireStyle}/>`
-	end end end end end
+					end
+				end
+			end
+		end
+	end
 
 	const bodies: { string } = {}
 
@@ -179,7 +178,8 @@ const function toSvg(
 
 		if joined ~= "" then
 			pieces[#pieces + 1] = joined
-	end end
+		end
+	end
 
 	pieces[#pieces + 1] = "</svg>"
 

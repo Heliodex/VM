@@ -22,7 +22,6 @@
 const M = require "../interpreter/vm"
 
 export type TokenValue = string | number | { number } | nil
-
 export type Token = {
 	kind: string,
 	value: TokenValue,
@@ -31,32 +30,27 @@ export type Token = {
 	spaced: boolean,
 }
 
-const function isSpace(
-	c: string
-): boolean
+const function isSpace(c: string): boolean
 	return c == " " or c == "\t" or c == "\r" or c == "\n"
 end
 
-const function isDelimiter(
-	c: string
-): boolean
-	return isSpace(c)
+const function isDelimiter(c: string): boolean
+	return false
+		or isSpace(c)
 		or c == "("
 		or c == ")"
 		or c == "["
 		or c == "]"
 		or c == "{"
 		or c == "}"
-		or c == "\""
+		or c == '"'
 		or c == ";"
 		or c == "."
 		or c == "?"
 		or c == ""
 end
 
-const function tokenize(
-	src: string
-): { Token }
+const function tokenize(src: string): { Token }
 	local tokens: { Token } = {}
 	local i = 1
 	local line = 1
@@ -64,31 +58,25 @@ const function tokenize(
 	local spaced = true
 	local n = #src
 
-	local function at(
-		pos: number
-	): number
+	local function at(pos: number): number
 		return pos - lineStart + 1
 	end
 
-	local function fail(
-		pos: number,
-		msg: string
-	)
+	local function fail(pos: number, msg: string)
 		error(string.format("line %d, column %d: %s", line, at(pos), msg), 0)
 	end
 
-	local function push(
-		kind: string,
-		value: TokenValue,
-		pos: number
-	)
-		table.insert(tokens, {
-			kind = kind,
-			value = value,
-			line = line,
-			col = at(pos),
-			spaced = spaced,
-		})
+	local function push(kind: string, value: TokenValue, pos: number)
+		table.insert(
+			tokens,
+			{
+				kind = kind,
+				value = value,
+				line = line,
+				col = at(pos),
+				spaced = spaced,
+			}
+		)
 		spaced = false
 	end
 
@@ -122,7 +110,7 @@ const function tokenize(
 
 			push(".", nil, i)
 			i += 1
-		elseif c == "\"" then
+		elseif c == '"' then
 			local bytes: { number } = {}
 			local j = i + 1
 
@@ -133,7 +121,7 @@ const function tokenize(
 
 				const ch = string.sub(src, j, j)
 
-				if ch == "\"" then
+				if ch == '"' then
 					break
 				end
 
@@ -144,7 +132,7 @@ const function tokenize(
 				if ch == "\\" then
 					const escape = string.sub(src, j + 1, j + 1)
 
-					if escape == "\"" then
+					if escape == '"' then
 						table.insert(bytes, 34)
 					elseif escape == "\\" then
 						table.insert(bytes, 92)
@@ -191,9 +179,8 @@ const function tokenize(
 
 			const word = string.sub(src, start, j - 1)
 			i = j
-
 			const second = string.sub(word, 2, 2)
-			const startsNumber = string.match(word, "^%d") ~= nil or (string.sub(word, 1, 1) == "-" and string.match(second, "^%d") ~= nil)
+			const startsNumber = string.match(word, "^%d") ~= nil or string.sub(word, 1, 1) == "-" and string.match(second, "^%d") ~= nil
 
 			if startsNumber then
 				if not string.match(word, "^%-?%d+$") then
@@ -214,6 +201,7 @@ const function tokenize(
 	end
 
 	push("eof", nil, i)
+
 	return tokens
 end
 

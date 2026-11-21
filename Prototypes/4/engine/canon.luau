@@ -62,26 +62,27 @@ const function refine(
 
 			if id ~= colour[c] then
 				changed = true
-		end end
+			end
+		end
 
 		colour = next
 
 		if not changed then
 			break
-	end end
+		end
+	end
 
 	return colour
 end
 
 -- Colour refinement that looks only at port kinds: principal or auxiliary, free or wired, and for a wire, the kind of port at its far end and that partner's colour. This is what the diagram placer uses to find cells that the drawing can swap.
-const function refineKinds(
-	net: Net,
-	cells: { Cell }
-): {
+const function refineKinds(net: Net, cells: { Cell }): {
 	[Cell]: string,
 }
 	return refine(
-		net, cells, function(
+		net,
+		cells,
+		function(
 			c: Cell,
 			colour: {
 				[Cell]: string,
@@ -106,7 +107,8 @@ const function refineKinds(
 						else
 							"A"
 					table.insert(parts, `{mine}{theirs}{colour[Net.owner(q)]}`)
-			end end
+				end
+			end
 
 			table.sort(parts)
 
@@ -118,10 +120,7 @@ end
 -- Same net up to renaming of cells. Cell ids are recycled during reduction, so two equal results usually have completely different ids.
 -- One net's cells are walked in the order its wires visit them, and each is committed to a cell of the other, checking as it goes that every wire whose far end is already committed agrees.
 -- Checking only once the whole renaming is built would try every renaming of the net before rejecting any of them, which is hopeless once more than a dozen cells share a symbol.
-const function isomorphic(
-	a: Net,
-	b: Net
-): boolean
+const function isomorphic(a: Net, b: Net): boolean
 	const left, right = Net.liveCells(a), Net.liveCells(b)
 
 	if #left ~= #right then
@@ -159,7 +158,11 @@ const function isomorphic(
 					if near ~= c and not walked[near] then
 						walked[near] = true
 						table.insert(queue, near)
-	end end end end end
+					end
+				end
+			end
+		end
+	end
 
 	const map: {
 		[Cell]: Cell,
@@ -170,10 +173,7 @@ const function isomorphic(
 
 	-- Whether the two cells agree everywhere their wires already reach a committed cell.
 	-- A wire whose far end is not committed yet cannot be judged, but it will be judged from the other side when that end is committed.
-	const function agrees(
-		ca: Cell,
-		cb: Cell
-	): boolean
+	const function agrees(ca: Cell, cb: Cell): boolean
 		const pa, pb = (ca - 1) * Net.STRIDE, (cb - 1) * Net.STRIDE
 
 		for slot = 1, Net.STRIDE do
@@ -203,14 +203,13 @@ const function isomorphic(
 
 			if claimed ~= nil and claimed ~= there then
 				return false
-		end end
+			end
+		end
 
 		return true
 	end
 
-	const function search(
-		i: number
-	): boolean
+	const function search(i: number): boolean
 		if i > #order then
 			return true
 		end
@@ -226,7 +225,8 @@ const function isomorphic(
 				end
 
 				map[ca], back[cb] = nil, nil
-		end end
+			end
+		end
 
 		return false
 	end

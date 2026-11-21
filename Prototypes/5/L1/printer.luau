@@ -9,22 +9,16 @@
 --
 --   Printer.print(e): string      raises an error for a variable that is not bound
 
-const VM = require "../interpreter/vm"
 const Primitives = require "../interpreter/primitives"
+const VM = require "../interpreter/vm"
 
-const function binderName(
-	depth: number
-): string
+const function binderName(depth: number): string
 	return `v{depth}`
 end
 
 -- Prints e, which has depth binders around it.
 local printAt: (e: VM.Expr, depth: number) -> string
-
-printAt = function(
-	e: VM.Expr,
-	depth: number
-): string
+printAt = function(e: VM.Expr, depth: number): string
 	if e.op == "quote" then
 		if e.value == VM.NIL then
 			return "~"
@@ -54,6 +48,7 @@ printAt = function(
 		end
 
 		table.insert(parts, printAt(cur, depth))
+
 		return "[" .. table.concat(parts, " ") .. "]"
 	elseif e.op == "index" then
 		-- The address is written as the steps that name it, innermost first, so that reading the text takes head and tail steps that the reader joins back into the same index.
@@ -68,7 +63,11 @@ printAt = function(
 		local text = printAt(e.e, depth)
 
 		for i = #steps, 1, -1 do
-			text = if steps[i] == 0 then `(head {text})` else `(tail {text})`
+			text =
+				if steps[i] == 0 then
+					`(head {text})`
+				else
+					`(tail {text})`
 		end
 
 		return text
@@ -103,7 +102,7 @@ printAt = function(
 			return `({Primitives.BY_TAG[e.tag].symbol} {printAt(e.a, depth)})`
 		end
 
-		return `({Primitives.BY_TAG[e.tag].symbol} {printAt(e.a, depth)} {printAt((e.b :: VM.Expr), depth)})`
+		return `({Primitives.BY_TAG[e.tag].symbol} {printAt(e.a, depth)} {printAt(e.b :: VM.Expr, depth)})`
 	end
 
 	if e.op == "construct" then
@@ -118,9 +117,7 @@ printAt = function(
 end
 
 -- Prints a whole program. Its outermost binders are the ones the reader gives to a fn, from depth 0.
-const function print(
-	e: VM.Expr
-): string
+const function print(e: VM.Expr): string
 	return printAt(e, 0)
 end
 

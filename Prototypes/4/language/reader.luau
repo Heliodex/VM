@@ -19,16 +19,12 @@ export type Expr = {
 	-- the byte offset where the expression starts in the source, if it came from source
 	read at: number?,
 }
-
 type Token = {
 	text: string,
 	at: number,
 }
 
-const function num(
-	n: number,
-	at: number?
-): Expr
+const function num(n: number, at: number?): Expr
 	return {
 		kind = "num",
 		value = n,
@@ -36,10 +32,7 @@ const function num(
 	}
 end
 
-const function sym(
-	name: string,
-	at: number?
-): Expr
+const function sym(name: string, at: number?): Expr
 	return {
 		kind = "sym",
 		name = name,
@@ -47,10 +40,7 @@ const function sym(
 	}
 end
 
-const function list(
-	items: { Expr },
-	at: number?
-): Expr
+const function list(items: { Expr }, at: number?): Expr
 	return {
 		kind = "list",
 		items = items,
@@ -59,16 +49,14 @@ const function list(
 end
 
 -- Splits the source into brackets, atoms and nothing else.
-const function tokenize(
-	src: string
-): { Token }
+const function tokenize(src: string): { Token }
 	const tokens: { Token } = {}
 	local pos = 1
 
 	while true do
 		-- skip whitespace, which may be empty
 		const _, stop = string.find(src, "^%s*", pos)
-		pos = (stop :: number) + 1
+		pos = stop :: number + 1
 
 		if pos > #src then
 			break
@@ -78,20 +66,30 @@ const function tokenize(
 
 		if c == ";" then
 			const newline = string.find(src, "\n", pos, true)
-			pos = if newline then (newline :: number) + 1 else #src + 1
+			pos =
+				if newline then
+					newline :: number + 1
+				else
+					#src + 1
 		elseif c == "(" or c == ")" or c == "'" then
-			table.insert(tokens, {
-				text = c,
-				at = pos,
-			})
+			table.insert(
+				tokens,
+				{
+					text = c,
+					at = pos,
+				}
+			)
 			pos += 1
 		else
 			const first, last = string.find(src, "^[^%s();']+", pos)
-			table.insert(tokens, {
-				text = string.sub(src, first :: number, last :: number),
-				at = pos,
-			})
-			pos = (last :: number) + 1
+			table.insert(
+				tokens,
+				{
+					text = string.sub(src, first :: number, last :: number),
+					at = pos,
+				}
+			)
+			pos = last :: number + 1
 		end
 	end
 
@@ -99,10 +97,7 @@ const function tokenize(
 end
 
 -- The expression starting at token `i`, and the index of the token after it.
-local function parseAt(
-	tokens: { Token },
-	i: number
-): (Expr, number)
+local function parseAt(tokens: { Token }, i: number): (Expr, number)
 	const t = tokens[i]
 
 	if not t then
@@ -117,10 +112,13 @@ local function parseAt(
 	if t.text == "'" then
 		const quoted, after = parseAt(tokens, i + 1)
 
-		return list({
-			sym("quote", t.at),
-			quoted,
-		}, t.at), after
+		return list(
+			{
+				sym("quote", t.at),
+				quoted,
+			},
+			t.at
+		), after
 	end
 
 	if t.text == "(" then
@@ -152,9 +150,7 @@ local function parseAt(
 end
 
 -- Every expression in the source, in order. An empty source has none.
-const function read(
-	src: string
-): { Expr }
+const function read(src: string): { Expr }
 	const tokens = tokenize(src)
 	const forms: { Expr } = {}
 	local i = 1
@@ -169,9 +165,7 @@ const function read(
 end
 
 -- An expression written back as source, with single spaces, so that a test can compare the shape of what was read.
-const function show(
-	e: Expr
-): string
+const function show(e: Expr): string
 	if e.kind == "num" then
 		return tostring(e.value)
 	elseif e.kind == "sym" then

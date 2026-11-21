@@ -13,15 +13,19 @@ type Pt = {
 }
 
 local function var(name: string): Var
-	return table.freeze { type = "var", name = name } :: Var
+	return table.freeze { type = "var"; name = name } :: Var
 end
 
 local function p(a1: Thing, a2: Thing): Pt
-	return table.freeze { type = "pt", _1 = a1, _2 = a2 } :: Pt
+	return table.freeze { type = "pt"; _1 = a1; _2 = a2 } :: Pt
 end
 
 local function view(e: Thing): string
-	return if e.type == "var" then e.name else `({view(e._1)}{view(e._2)})`
+	return
+		if e.type == "var" then
+			e.name
+		else
+			`({view(e._1)}{view(e._2)})`
 end
 
 local function equalVar(a: Var, b: Var): boolean
@@ -35,35 +39,50 @@ local function equalPt(a: Pt, b: Pt): boolean
 end
 
 function equal(a: Thing, b: Thing): boolean
-	return if a.type == "var" and b.type == "var"
-		then equalVar(a, b)
-		elseif a.type == "pt" and b.type == "pt" then equalPt(a, b)
-		else false
+	return
+		if a.type == "var" and b.type == "var" then
+			equalVar(a, b)
+		elseif a.type == "pt" and b.type == "pt" then
+			equalPt(a, b)
+		else
+			false
 end
 
 local function sub(e: Thing, from: Thing, to: Thing): Thing
-	return if equal(e, from)
-		then to
-		elseif e.type == "var" then e
-		else p(sub(e._1, from, to), sub(e._2, from, to))
+	return
+		if equal(e, from) then
+			to
+		elseif e.type == "var" then
+			e
+		else
+			p(sub(e._1, from, to), sub(e._2, from, to))
 end
 
 local function beta(e: Pt): Thing
-	return if e._1.type == "var" then e else sub(e._1._2, e._1._1, e._2)
+	return
+		if e._1.type == "var" then
+			e
+		else
+			sub(e._1._2, e._1._1, e._2)
 end
 
 local function reduce(e: Thing): Thing
 	print("-", view(e))
+
 	if e.type == "var" then
 		return e
 	end
+
 	local newe = beta(e)
-	return if equal(newe, e) then e else reduce(newe)
+
+	return
+		if equal(newe, e) then
+			e
+		else
+			reduce(newe)
 end
 
-local A, B, C, D, E, F, G =
-	var "A", var "B", var "C", var "D", var "E", var "F", var "G"
-
+local A, B, C, D, E, F, G = var "A", var "B", var "C", var "D", var "E", var "F", var "G"
 local tests = {
 	A,
 	p(A, B),

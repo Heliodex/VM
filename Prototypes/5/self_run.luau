@@ -7,21 +7,18 @@
 --
 --   luau self_run.luau      (from Prototypes/5)
 
-const Examples = require "./examples/examples"
-const Self = require "./L1/self/self"
-const Text = require "./L1/examples/text"
 const Programs = require "./L1/examples/programs"
+const Text = require "./L1/examples/text"
+const Self = require "./L1/self/self"
+const Examples = require "./examples/examples"
 const VM = require "./interpreter/vm"
 
 const FUEL_FACTOR = 50
-
 local failures = 0
 local total = 0
 
 -- The outcome of a run as one string, so two runs can be compared. Errors are reduced to "error", since the messages come from different machines.
-const function describe(
-	r: VM.Outcome
-): string
+const function describe(r: VM.Outcome): string
 	if r.status == "value" then
 		return "value " .. VM.show(r.value)
 	elseif r.status == "error" then
@@ -42,11 +39,15 @@ const function check(
 )
 	const direct = VM.run(ex.program, ex.fuel)
 	const interpreted = VM.run(Self.interpret(ex.program), ex.fuel * FUEL_FACTOR)
-
 	-- The direct run is the reference: it must match the example, and the interpreted run must match it.
-	local expected = if ex.outcome == "value" then "value " .. tostring(ex.expect) elseif ex.outcome == "error" then "error" else "out of fuel"
+	local expected =
+		if ex.outcome == "value" then
+			"value " .. tostring(ex.expect)
+		elseif ex.outcome == "error" then
+			"error"
+		else
+			"out of fuel"
 	local pass = describe(direct) == expected and describe(interpreted) == describe(direct)
-
 	total += 1
 
 	if pass then

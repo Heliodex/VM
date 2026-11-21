@@ -3,11 +3,11 @@
 --
 -- Each test builds a net, says what it should reduce to, and gives the step budget it is allowed.
 
+local L = require "../calculus/lambda"
 local B = require "../engine/builder"
 local Canon = require "../engine/canon"
 local G = require "../engine/gadgets"
 local H = require "../engine/harness"
-local L = require "../calculus/lambda"
 local Net = require "../engine/net"
 local Types = require "../engine/types"
 
@@ -19,9 +19,7 @@ type Port = Types.Port
 -- Free ports are whatever was left unwired, and are where the answer of a reduction is expected to show up.
 type Build = (Builder) -> ()
 
-const function build(
-	f: Build
-): Net
+const function build(f: Build): Net
 	local b = B.new()
 	f(b)
 
@@ -30,13 +28,10 @@ end
 
 -- lambda tests ---------------------------------------------------------------
 -- The identity abstraction, as a value. Its root is the abstraction's principal port and its variable is used once, straight through to the body.
-const function identity(
-	b: Builder
-): Port
+const function identity(b: Builder): Port
 	return L.lam(
-		b, function(
-			x: Port
-		): Port
+		b,
+		function(x: Port): Port
 			return x
 		end
 	)
@@ -45,24 +40,17 @@ end
 -- gadget tests ----------------------------------------------------------------
 -- A probe closes off a port without anything reducing, since it is wired on an auxiliary.
 -- Left bare, a cancelled multiplexer pair leaves no cells at all, and in a net with no cells every wiring looks like every other, so a probe has to carry a tail whose length says which port it came from before a crossed pairing can be told apart from the identity.
-local function tail(
-	b: Builder,
-	h: B.Handle,
-	depth: number
-)
+local function tail(b: Builder, h: B.Handle, depth: number)
 	local cur = h
 
 	for _ = 1, depth do
 		const next = b:gamma()
 		b:wire(cur.aux2, next.aux1)
 		cur = next
-end end
+	end
+end
 
-local function probe(
-	b: Builder,
-	p: Port,
-	depth: number
-): B.Handle
+local function probe(b: Builder, p: Port, depth: number): B.Handle
 	const h = b:gamma()
 	b:wire(h.aux1, p)
 	tail(b, h, depth)
@@ -72,17 +60,14 @@ end
 
 -- The net a gadget pair should reduce to when port i of one side meets port image(i) of the other.
 -- Every port carries a tail of its own length, so a pairing other than the one expected ends up joining tails of different lengths and cannot pass for the right one.
-local function paired(
-	b: Builder,
-	n: number,
-	image: (number) -> number
-)
+local function paired(b: Builder, n: number, image: (number) -> number)
 	for i = 1, n do
 		const left, right = b:gamma(), b:gamma()
 		b:wire(left.aux1, right.aux1)
 		tail(b, left, i - 1)
 		tail(b, right, image(i) - 1)
-end end
+	end
+end
 
 -- A test has exactly one of two expectations.
 -- `expect` builds the normal form, which the reduction must reach and which must match up to renaming.
@@ -97,9 +82,7 @@ type Test = {
 const tests: { Test } = {
 	{
 		name = "epsilon-epsilon annihilates to nothing",
-		start = function(
-			b
-		)
+		start = function(b)
 			local e1, e2 = b:epsilon(), b:epsilon()
 			b:meet(e1, e2)
 		end,
@@ -108,9 +91,7 @@ const tests: { Test } = {
 	},
 	{
 		name = "gamma-gamma exchanges its wires",
-		start = function(
-			b
-		)
+		start = function(b)
 			local g1, g2 = b:gamma(), b:gamma()
 			local d1, d2, d3, d4 = b:delta(), b:delta(), b:delta(), b:delta()
 			b:meet(g1, g2)
@@ -120,9 +101,7 @@ const tests: { Test } = {
 			b:wire(g2.aux2, d4.aux1)
 		end,
 		-- the crossed pairs become the deltas' own auxiliaries
-		expect = function(
-			b
-		)
+		expect = function(b)
 			local d1, d2, d3, d4 = b:delta(), b:delta(), b:delta(), b:delta()
 			b:wire(d1.aux1, d4.aux1)
 			b:wire(d2.aux1, d3.aux1)
@@ -130,9 +109,7 @@ const tests: { Test } = {
 	},
 	{
 		name = "delta-delta is straight",
-		start = function(
-			b
-		)
+		start = function(b)
 			local d1, d2 = b:delta(), b:delta()
 			local g1, g2, g3, g4 = b:gamma(), b:gamma(), b:gamma(), b:gamma()
 			b:meet(d1, d2)
@@ -141,9 +118,7 @@ const tests: { Test } = {
 			b:wire(d2.aux1, g3.aux1)
 			b:wire(d2.aux2, g4.aux1)
 		end,
-		expect = function(
-			b
-		)
+		expect = function(b)
 			local g1, g2, g3, g4 = b:gamma(), b:gamma(), b:gamma(), b:gamma()
 			b:wire(g1.aux1, g3.aux1)
 			b:wire(g2.aux1, g4.aux1)
@@ -151,9 +126,7 @@ const tests: { Test } = {
 	},
 	{
 		name = "gamma-erase spawns one eraser per auxiliary",
-		start = function(
-			b
-		)
+		start = function(b)
 			local g = b:gamma()
 			local d1, d2 = b:delta(), b:delta()
 			local e = b:epsilon()
@@ -161,9 +134,7 @@ const tests: { Test } = {
 			b:wire(g.aux1, d1.aux1)
 			b:wire(g.aux2, d2.aux1)
 		end,
-		expect = function(
-			b
-		)
+		expect = function(b)
 			local d1, d2 = b:delta(), b:delta()
 			local e1, e2 = b:epsilon(), b:epsilon()
 			b:wire(d1.aux1, e1.principal)
@@ -172,15 +143,11 @@ const tests: { Test } = {
 	},
 	{
 		name = "gamma meets delta in the commutation square",
-		start = function(
-			b
-		)
+		start = function(b)
 			local g, d = b:gamma(), b:delta()
 			b:meet(g, d)
 		end,
-		expect = function(
-			b
-		)
+		expect = function(b)
 			local d1, d2 = b:delta(), b:delta()
 			local g1, g2 = b:gamma(), b:gamma()
 			b:wire(d1.aux2, g1.aux1)
@@ -191,9 +158,7 @@ const tests: { Test } = {
 	},
 	{
 		name = "a gamma erased on every port vanishes completely",
-		start = function(
-			b
-		)
+		start = function(b)
 			local g = b:gamma()
 			local e1, e2, e3 = b:epsilon(), b:epsilon(), b:epsilon()
 			b:meet(g, e1)
@@ -205,9 +170,7 @@ const tests: { Test } = {
 	},
 	{
 		name = "M3 meets its dual and cancels to nothing",
-		start = function(
-			b
-		)
+		start = function(b)
 			const m = G.multiplexer(b, 3)
 			const d = G.dualMultiplexer(b, 3)
 			b:wire(m.principal, d.principal)
@@ -217,9 +180,7 @@ const tests: { Test } = {
 	},
 	{
 		name = "M3 meeting its dual joins its ports in order",
-		start = function(
-			b
-		)
+		start = function(b)
 			const m = G.multiplexer(b, 3)
 			const d = G.dualMultiplexer(b, 3)
 			b:wire(m.principal, d.principal)
@@ -230,23 +191,21 @@ const tests: { Test } = {
 
 			for k, p in d.ports do
 				probe(b, p, k - 1)
-		end end,
+			end
+		end,
 		-- the k-th port on one side has to meet the k-th on the other, so each pair is rebuilt with its tails
-		expect = function(
-			b
-		)
+		expect = function(b)
 			for k = 1, 3 do
 				const left, right = b:gamma(), b:gamma()
 				b:wire(left.aux1, right.aux1)
 				tail(b, left, k - 1)
 				tail(b, right, k - 1)
-		end end,
+			end
+		end,
 	},
 	{
 		name = "T3 meets itself and cancels to nothing",
-		start = function(
-			b
-		)
+		start = function(b)
 			const x = G.autodualMultiplexer(b, 3)
 			const y = G.autodualMultiplexer(b, 3)
 			b:wire(x.principal, y.principal)
@@ -256,9 +215,7 @@ const tests: { Test } = {
 	},
 	{
 		name = "T3 meeting itself joins its ports in order",
-		start = function(
-			b
-		)
+		start = function(b)
 			const x = G.autodualMultiplexer(b, 3)
 			const y = G.autodualMultiplexer(b, 3)
 			b:wire(x.principal, y.principal)
@@ -269,23 +226,21 @@ const tests: { Test } = {
 
 			for k, p in y.ports do
 				probe(b, p, k - 1)
-		end end,
+			end
+		end,
 		-- a delta chain is its own dual, so this cancels against a plain copy of itself rather than against a mirrored one
-		expect = function(
-			b
-		)
+		expect = function(b)
 			for k = 1, 3 do
 				const left, right = b:gamma(), b:gamma()
 				b:wire(left.aux1, right.aux1)
 				tail(b, left, k - 1)
 				tail(b, right, k - 1)
-		end end,
+			end
+		end,
 	},
 	{
 		name = "T(1,1) meets itself and swaps its first pair",
-		start = function(
-			b
-		)
+		start = function(b)
 			const x = G.transpositor(b, 1, 1)
 			const y = G.transpositor(b, 1, 1)
 			b:wire(x.principal, y.principal)
@@ -296,14 +251,13 @@ const tests: { Test } = {
 
 			for i, p in y.ports do
 				probe(b, p, i - 1)
-		end end,
-		expect = function(
-			b
-		)
+			end
+		end,
+		expect = function(b)
 			paired(
-				b, 3, function(
-					i
-				)
+				b,
+				3,
+				function(i)
 					return
 						if i <= 2 then
 							3 - i
@@ -315,9 +269,7 @@ const tests: { Test } = {
 	},
 	{
 		name = "T(2,1) meets itself and swaps both its pairs",
-		start = function(
-			b
-		)
+		start = function(b)
 			const x = G.transpositor(b, 2, 1)
 			const y = G.transpositor(b, 2, 1)
 			b:wire(x.principal, y.principal)
@@ -328,15 +280,14 @@ const tests: { Test } = {
 
 			for i, p in y.ports do
 				probe(b, p, i - 1)
-		end end,
+			end
+		end,
 		-- the first four ports are swapped in pairs and the fifth is left alone
-		expect = function(
-			b
-		)
+		expect = function(b)
 			paired(
-				b, 5, function(
-					i
-				)
+				b,
+				5,
+				function(i)
 					return
 						if i <= 4 then
 							if i % 2 == 1 then
@@ -351,9 +302,7 @@ const tests: { Test } = {
 	},
 	{
 		name = "T(sigma) meets itself and realises sigma",
-		start = function(
-			b
-		)
+		start = function(b)
 			const sigma = {
 				3,
 				2,
@@ -369,15 +318,14 @@ const tests: { Test } = {
 
 			for i, p in y.ports do
 				probe(b, p, i - 1)
-		end end,
+			end
+		end,
 		-- a transposition of two ports that are not next to each other, so the relabelling onto the transpositor is doing real work
-		expect = function(
-			b
-		)
+		expect = function(b)
 			paired(
-				b, 3, function(
-					i
-				)
+				b,
+				3,
+				function(i)
 					return 4 - i
 				end
 			)
@@ -385,9 +333,7 @@ const tests: { Test } = {
 	},
 	{
 		name = "delta(epsilon, x) = gamma(x, epsilon)",
-		start = function(
-			b
-		)
+		start = function(b)
 			local d, g = b:delta(), b:gamma()
 			local e1, e2 = b:epsilon(), b:epsilon()
 			b:meet(d, g)
@@ -400,30 +346,22 @@ const tests: { Test } = {
 	},
 	{
 		name = "lambda: identity applied to identity is identity",
-		start = function(
-			b
-		)
+		start = function(b)
 			L.app(b, identity(b), identity(b))
 		end,
-		expect = function(
-			b
-		)
+		expect = function(b)
 			identity(b)
 		end,
 	},
 	{
 		name = "lambda: constant applied to two values erases the second",
-		start = function(
-			b
-		)
+		start = function(b)
 			const constant = L.lam(
-				b, function(
-					x: Port
-				): Port
+				b,
+				function(x: Port): Port
 					return L.lam(
-						b, function(
-							_y: Port
-						): Port
+						b,
+						function(_y: Port): Port
 							return x
 						end
 					)
@@ -431,21 +369,16 @@ const tests: { Test } = {
 			)
 			L.app(b, L.app(b, constant, identity(b)), identity(b))
 		end,
-		expect = function(
-			b
-		)
+		expect = function(b)
 			identity(b)
 		end,
 	},
 	{
 		name = "lambda: a variable used twice is shared",
-		start = function(
-			b
-		)
+		start = function(b)
 			const double = L.lam(
-				b, function(
-					x: Port
-				): Port
+				b,
+				function(x: Port): Port
 					const copies = L.share(b, x, 2)
 
 					return L.app(b, copies[1], copies[2])
@@ -453,21 +386,16 @@ const tests: { Test } = {
 			)
 			L.app(b, double, identity(b))
 		end,
-		expect = function(
-			b
-		)
+		expect = function(b)
 			identity(b)
 		end,
 	},
 	{
 		name = "lambda: a variable used three times is shared",
-		start = function(
-			b
-		)
+		start = function(b)
 			const triple = L.lam(
-				b, function(
-					x: Port
-				): Port
+				b,
+				function(x: Port): Port
 					const copies = L.share(b, x, 3)
 
 					return L.app(b, L.app(b, copies[1], copies[2]), copies[3])
@@ -475,29 +403,22 @@ const tests: { Test } = {
 			)
 			L.app(b, triple, identity(b))
 		end,
-		expect = function(
-			b
-		)
+		expect = function(b)
 			identity(b)
 		end,
 	},
 	{
 		name = "lambda: an unused argument is erased",
-		start = function(
-			b
-		)
+		start = function(b)
 			const ignore = L.lam(
-				b, function(
-					_x: Port
-				): Port
+				b,
+				function(_x: Port): Port
 					return identity(b)
 				end
 			)
 			L.app(b, ignore, identity(b))
 		end,
-		expect = function(
-			b
-		)
+		expect = function(b)
 			identity(b)
 		end,
 	},
@@ -505,11 +426,7 @@ const tests: { Test } = {
 
 -- Whether a test's reduction met its expectation: a normal form that matches `expect`, or the outcome `diverges` names, with a well-formed net either way.
 -- A test with neither expectation fails, so a case cannot pass by saying nothing.
-const function verdict(
-	test: Test,
-	net: Net,
-	report: H.Report
-): boolean
+const function verdict(test: Test, net: Net, report: H.Report): boolean
 	if not Net.wellFormed(net) then
 		return false
 	end

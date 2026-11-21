@@ -14,8 +14,8 @@
 --       -- result.kind is "defined", then "value"
 --   end
 
-const Compile = require "./compile"
 const H = require "../engine/harness"
+const Compile = require "./compile"
 const Reader = require "./reader"
 const V = require "./values"
 
@@ -28,7 +28,6 @@ export type Result = {
 	message: string?,
 	at: number?,
 }
-
 export type Session = {
 	compile: Compile.Session,
 }
@@ -41,11 +40,8 @@ const function new(): Session
 end
 
 -- An error's message, without the position that the compiler puts in front of it.
-const function messageOf(
-	err: any
-): string
+const function messageOf(err: any): string
 	local text = tostring(err)
-
 	-- errors raised in the compiler start with "file:line: "
 	local stripped = string.gsub(text, "^[^%s]*%.luau:%d+: ", "")
 
@@ -53,9 +49,7 @@ const function messageOf(
 end
 
 -- The name a definition gives, from its form.
-local function nameOf(
-	form: Reader.Expr
-): string?
+local function nameOf(form: Reader.Expr): string?
 	const items = form.items
 
 	if items == nil or items[2] == nil or items[2].kind ~= "sym" then
@@ -66,20 +60,14 @@ local function nameOf(
 end
 
 -- The results of a form, built with their kinds fixed.
-local function definedResult(
-	name: string?
-): Result
+local function definedResult(name: string?): Result
 	return {
 		kind = "defined",
 		name = name,
 	}
 end
 
-local function valueResult(
-	value: V.Value?,
-	outcome: string,
-	steps: number
-): Result
+local function valueResult(value: V.Value?, outcome: string, steps: number): Result
 	return {
 		kind = "value",
 		value = value,
@@ -88,10 +76,7 @@ local function valueResult(
 	}
 end
 
-local function errorResult(
-	message: string,
-	at: number?
-): Result
+local function errorResult(message: string, at: number?): Result
 	return {
 		kind = "error",
 		message = message,
@@ -100,12 +85,7 @@ local function errorResult(
 end
 
 -- Evaluates each form of `source` in order, in the session, and returns one result for each. `budget` is the number of steps each expression may take. `plain` says the budget is only a limit: a form that uses it up is reported as not finishing, without the cycle check that tests use (see harness.luau).
-const function evaluate(
-	session: Session,
-	source: string,
-	budget: number,
-	plain: boolean?
-): { Result }
+const function evaluate(session: Session, source: string, budget: number, plain: boolean?): { Result }
 	const results: { Result } = {}
 	const readOk, forms = pcall(Reader.read, source)
 

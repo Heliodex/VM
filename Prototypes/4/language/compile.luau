@@ -27,12 +27,12 @@
 --   const report, net = Compile.evaluate("(define double (lambda (n) (+ n n))) (double 3)")
 --   -- S.readNet(net) is 6
 
-const B = require "../engine/builder"
-const H = require "../engine/harness"
 const L = require "../calculus/lambda"
 const Rec = require "../calculus/recursion"
-const Reader = require "./reader"
+const B = require "../engine/builder"
+const H = require "../engine/harness"
 const Types = require "../engine/types"
+const Reader = require "./reader"
 const V = require "./values"
 
 type Builder = B.Builder
@@ -41,7 +41,6 @@ type Port = Types.Port
 type Expr = Reader.Expr
 -- How many steps a program may take before it is given up on.
 const BUDGET = 200000
-
 -- What a name stands for in a scope.
 -- A "param" is a variable of an enclosing lambda, and a "self" is the recursive call of the function being defined. Both hold a pool of copies, one for each use still to come.
 -- A "def" is a top-level definition, compiled afresh at each use. Its scope is the top-level scope as it was before the definition, so it is closed.
@@ -53,7 +52,7 @@ type Binding = {
 	scope: Scope?,
 	recursive: boolean?,
 	-- for a self binding of a specialised function: which parameters were fixed to function arguments (by position), and the parameter names
-	dropped: { [number]: boolean }?,
+	dropped: { boolean }?,
 	params: { string }?,
 }
 type Scope = {
@@ -74,17 +73,11 @@ const KEYWORDS: {
 	quote = true,
 }
 
-const function isSym(
-	e: Expr?,
-	name: string
-): boolean
+const function isSym(e: Expr?, name: string): boolean
 	return e ~= nil and e.kind == "sym" and e.name == name
 end
 
-const function contains(
-	names: { string },
-	name: string
-): boolean
+const function contains(names: { string }, name: string): boolean
 	for _, n in names do
 		if n == name then
 			return true
@@ -95,10 +88,7 @@ const function contains(
 end
 
 -- The names from position `from` on.
-const function rest(
-	names: { string },
-	from: number
-): { string }
+const function rest(names: { string }, from: number): { string }
 	const out: { string } = {}
 
 	for i = from, #names do
@@ -113,10 +103,9 @@ type Lambda = {
 	names: { string },
 	body: Expr,
 }
+
 -- The lambda that `e` is, if it is one.
-const function lambdaParts(
-	e: Expr
-): Lambda?
+const function lambdaParts(e: Expr): Lambda?
 	if e.kind ~= "list" then
 		return nil
 	end
@@ -158,12 +147,7 @@ end
 local countIn: (string, Expr, boolean) -> number
 
 -- How many times `name` is used free in (lambda names body).
-local function countFree(
-	name: string,
-	names: { string },
-	body: Expr,
-	routed: boolean
-): number
+local function countFree(name: string, names: { string }, body: Expr, routed: boolean): number
 	if contains(names, name) then
 		return 0
 	end
@@ -171,15 +155,15 @@ local function countFree(
 	return countIn(name, body, routed)
 end
 
-countIn = function(
-	name: string,
-	e: Expr,
-	routed: boolean
-): number
+countIn = function(name: string, e: Expr, routed: boolean): number
 	if e.kind == "num" then
 		return 0
 	elseif e.kind == "sym" then
-		return if e.name == name then 1 else 0
+		return
+			if e.name == name then
+				1
+			else
+				0
 	end
 
 	const lambda = lambdaParts(e)
@@ -194,7 +178,12 @@ countIn = function(
 		const condition = countIn(name, items[2], routed)
 		const branches = countIn(name, items[3], routed) + countIn(name, items[4], routed)
 
-		return condition + if branches > 0 then 1 else 0
+		return condition + (
+			if branches > 0 then
+				1
+			else
+				0
+		)
 	end
 
 	local total = 0
@@ -205,26 +194,18 @@ countIn = function(
 
 	return total
 end
-
 local compile: (Expr, Scope, Builder) -> Port
 -- The form being built, by its byte offset, so that an error can say where it is. It is left at the form that raised the error.
 local currentAt: number? = nil
 local compileNode: (Expr, Scope, Builder) -> Port
 
 -- The lambda over names[i], then the ones after it, with the body under all of them. Each parameter's pool holds one copy for each use in what follows it.
-local function bindParams(
-	names: { string },
-	i: number,
-	body: Expr,
-	scope: Scope,
-	b: Builder
-): Port
+local function bindParams(names: { string }, i: number, body: Expr, scope: Scope, b: Builder): Port
 	const name = names[i]
 
 	return L.lam(
-		b, function(
-			x: Port
-		): Port
+		b,
+		function(x: Port): Port
 			const copies = L.share(b, x, countFree(name, rest(names, i + 1), body, false))
 			const inner = table.clone(scope)
 			inner[name] = {
@@ -243,10 +224,7 @@ local function bindParams(
 end
 
 -- A value for a variable or a recursive call, taken from its pool.
-local function takeCopy(
-	binding: Binding,
-	b: Builder
-): Port
+local function takeCopy(binding: Binding, b: Builder): Port
 	const pool = binding.pool :: { Port }
 
 	if #pool == 0 then
@@ -262,19 +240,9 @@ local function takeCopy(
 	return p
 end
 
-
 -- The function over the parameters that are not fixed to function arguments, with the code of the function itself as its first argument. A use of the name inside stands for a recall of that code, and drops the arguments that were fixed.
 -- A parameter in `dropped` is bound by the scope to the function argument that replaces it, so the body builds that argument where it is used.
-local function compileFunction(
-	name: string,
-	params: { string },
-	body: Expr,
-	scope: Scope,
-	dropped: {
-		[number]: boolean,
-	},
-	own: Builder
-): Port
+local function compileFunction(name: string, params: { string }, body: Expr, scope: Scope, dropped: { boolean }, own: Builder): Port
 	const remaining: { string } = {}
 
 	for i, param in params do
@@ -288,9 +256,8 @@ local function compileFunction(
 	end
 
 	return L.lam(
-		own, function(
-			code: Port
-		): Port
+		own,
+		function(code: Port): Port
 			const copies = L.share(own, code, countFree(name, remaining, body, true))
 			const inner = table.clone(scope)
 			inner[name] = {
@@ -307,27 +274,23 @@ local function compileFunction(
 end
 
 -- A top-level definition, built where it is used. A recursive one is tied through recursion.luau, which builds its code once into the net being built.
-local function useDefinition(
-	binding: Binding,
-	b: Builder
-): Port
+local function useDefinition(binding: Binding, b: Builder): Port
 	if binding.recursive then
 		const lambda = lambdaParts(binding.expr :: Expr) :: Lambda
 
-		return Rec.tie(b, function(
-			own: Builder
-		): Port
-			return compileFunction(binding.name, lambda.names, lambda.body, binding.scope :: Scope, {}, own)
-		end)
+		return Rec.tie(
+			b,
+			function(own: Builder): Port
+				return compileFunction(binding.name, lambda.names, lambda.body, binding.scope :: Scope, {}, own)
+			end
+		)
 	end
 
 	return compile(binding.expr :: Expr, binding.scope :: Scope, b)
 end
 
 -- The name of the function being defined, if the scope is inside its body.
-const function selfNameOf(
-	scope: Scope
-): string?
+const function selfNameOf(scope: Scope): string?
 	for name, binding in scope do
 		if binding.kind == "self" then
 			return name
@@ -338,22 +301,15 @@ const function selfNameOf(
 end
 
 -- An if whose branches use the recursive name. Each branch is a lambda that takes the code as its argument, so the code only unfolds in the branch the condition chooses. The unchosen branch is erased with its argument unsupplied.
-local function compileRoutedIf(
-	selfName: string,
-	items: { Expr },
-	scope: Scope,
-	b: Builder
-): Port
+local function compileRoutedIf(selfName: string, items: { Expr }, scope: Scope, b: Builder): Port
 	-- the one copy of the code that the chosen branch receives
 	const code = table.remove(scope[selfName].pool :: { Port }, 1) :: Port
 	const condition = compile(items[2], scope, b)
-	const branch = function(
-		e: Expr
-	): Port
+
+	const function branch(e: Expr): Port
 		return L.lam(
-			b, function(
-				k: Port
-			): Port
+			b,
+			function(k: Port): Port
 				const inner = table.clone(scope)
 				inner[selfName] = {
 					kind = "self",
@@ -367,6 +323,7 @@ local function compileRoutedIf(
 			end
 		)
 	end
+
 	const yes = branch(items[3])
 	const no = branch(items[4])
 
@@ -418,11 +375,7 @@ end
 
 -- An application of a known function to closed arguments, compiled by putting each argument in the place of its parameter as source, so every use builds a fresh copy and nothing is shared.
 -- The function is a lambda written here, or a non-recursive definition whose expression is a lambda. Anything else, or an argument that depends on a variable of an enclosing lambda, is left to the general case.
-local function inlineCall(
-	items: { Expr },
-	scope: Scope,
-	b: Builder
-): Port?
+local function inlineCall(items: { Expr }, scope: Scope, b: Builder): Port?
 	const args: { Expr } = {}
 
 	for i = 2, #items do
@@ -474,10 +427,7 @@ local function inlineCall(
 end
 
 -- Whether `e` is a function: a lambda, or a name for a definition of one, or for a recursive definition.
-local function isFunctionExpr(
-	e: Expr,
-	scope: Scope
-): boolean
+local function isFunctionExpr(e: Expr, scope: Scope): boolean
 	if lambdaParts(e) then
 		return true
 	end
@@ -485,7 +435,7 @@ local function isFunctionExpr(
 	if e.kind == "sym" then
 		const binding = scope[e.name :: string]
 
-		return binding ~= nil and binding.kind == "def" and (binding.recursive == true or (binding.expr ~= nil and lambdaParts(binding.expr :: Expr) ~= nil))
+		return binding ~= nil and binding.kind == "def" and (binding.recursive == true or binding.expr ~= nil and lambdaParts(binding.expr :: Expr) ~= nil)
 	end
 
 	return false
@@ -493,16 +443,9 @@ end
 
 -- A call of a recursive definition with some function arguments. Each function argument is fixed into the function, so the function is built once for these arguments and nothing is copied at run time. The other arguments are passed as usual.
 -- A function argument must not depend on a variable of an enclosing lambda, because it could not then be built again at each use. Returns nil if no argument is a function, so the call is compiled as usual.
-local function specialiseCall(
-	binding: Binding,
-	args: { Expr },
-	scope: Scope,
-	b: Builder
-): Port?
+local function specialiseCall(binding: Binding, args: { Expr }, scope: Scope, b: Builder): Port?
 	const lambda = lambdaParts(binding.expr :: Expr) :: Lambda
-	const dropped: {
-		[number]: boolean,
-	} = {}
+	const dropped: { boolean } = {}
 	const fixed = table.clone(binding.scope :: Scope)
 	local any = false
 
@@ -536,11 +479,12 @@ local function specialiseCall(
 		error(`{binding.name} takes {#lambda.names} arguments, and one of them is a function, so it must be given all of them`)
 	end
 
-	local fn = Rec.tie(b, function(
-		own: Builder
-	): Port
-		return compileFunction(binding.name, lambda.names, lambda.body, fixed, dropped, own)
-	end)
+	local fn = Rec.tie(
+		b,
+		function(own: Builder): Port
+			return compileFunction(binding.name, lambda.names, lambda.body, fixed, dropped, own)
+		end
+	)
 
 	for i, arg in args do
 		if not dropped[i] then
@@ -552,10 +496,7 @@ local function specialiseCall(
 end
 
 -- The value of a quoted expression: a symbol is a symbol value, a number is a number, and a list is the pairs of its items, ending in nil.
-local function quoted(
-	e: Expr,
-	b: Builder
-): Port
+local function quoted(e: Expr, b: Builder): Port
 	if e.kind == "num" then
 		return V.numberValue(b, e.value :: number)
 	elseif e.kind == "sym" then
@@ -573,11 +514,7 @@ local function quoted(
 end
 
 -- The port that the expression `e` evaluates to, built into `b`.
-compileNode = function(
-	e: Expr,
-	scope: Scope,
-	b: Builder
-): Port
+compileNode = function(e: Expr, scope: Scope, b: Builder): Port
 	if e.kind == "num" then
 		return V.numberValue(b, e.value :: number)
 	elseif e.kind == "sym" then
@@ -748,13 +685,8 @@ compileNode = function(
 
 	return fn
 end
-
 -- The port that the expression `e` evaluates to, built into `b`, and the position of `e` for any error.
-compile = function(
-	e: Expr,
-	scope: Scope,
-	b: Builder
-): Port
+compile = function(e: Expr, scope: Scope, b: Builder): Port
 	const saved = currentAt
 
 	if e.at ~= nil then
@@ -768,9 +700,7 @@ compile = function(
 end
 
 -- The name and expression of a top-level definition, or nil for any other form.
-const function asDefinition(
-	form: Expr
-): (string?, Expr?)
+const function asDefinition(form: Expr): (string?, Expr?)
 	if form.kind ~= "list" then
 		return nil, nil
 	end
@@ -796,11 +726,7 @@ end
 
 -- Rewrites every call of the local recursive function `f` so that it passes the variables `caps` it captures first. Those names are parameters of the function, so it is closed and can be built with recursion.luau like a top-level function.
 -- A use of `f` that is not a call is an error: a local function can only be called.
-local function passCaptures(
-	e: Expr,
-	f: string,
-	caps: { string }
-): Expr
+local function passCaptures(e: Expr, f: string, caps: { string }): Expr
 	if e.kind == "num" then
 		return e
 	elseif e.kind == "sym" then
@@ -835,10 +761,7 @@ end
 
 -- Rewrites `(letrec f (lambda (params) body) expression)` into `(local-define f (lambda (captures... params) body') expression')`, where the captures are the names bound by enclosing lambdas that the function's body uses free. The calls of f pass those captures first.
 -- `enclosing` is the list of names bound by the lambdas around `e`.
-local function lowerLocal(
-	e: Expr,
-	enclosing: { string }
-): Expr
+local function lowerLocal(e: Expr, enclosing: { string }): Expr
 	if e.kind ~= "list" then
 		return e
 	end
@@ -866,7 +789,6 @@ local function lowerLocal(
 		end
 
 		table.sort(caps)
-
 		const params: { Expr } = {}
 
 		for _, name in caps do
@@ -877,18 +799,18 @@ local function lowerLocal(
 			table.insert(params, Reader.sym(name))
 		end
 
-		const wrapped = Reader.list({
-			Reader.sym("lambda"),
+		const wrapped = Reader.list {
+			Reader.sym "lambda",
 			Reader.list(params),
 			passCaptures(lambda.body, f, caps),
-		})
+		}
 
-		return Reader.list({
-			Reader.sym("local-define"),
+		return Reader.list {
+			Reader.sym "local-define",
 			items[2],
 			lowerLocal(wrapped, enclosing),
 			lowerLocal(passCaptures(items[4], f, caps), enclosing),
-		})
+		}
 	end
 
 	if lambdaParts(e) then
@@ -899,11 +821,11 @@ local function lowerLocal(
 			table.insert(inner, name)
 		end
 
-		return Reader.list({
+		return Reader.list {
 			items[1],
 			items[2],
 			lowerLocal(lambda.body, inner),
-		})
+		}
 	end
 
 	const out: { Expr } = {}
@@ -916,18 +838,16 @@ local function lowerLocal(
 end
 
 -- A top-level form with its local recursive functions lowered.
-local function lowerForm(
-	form: Expr
-): Expr
+local function lowerForm(form: Expr): Expr
 	if form.kind == "list" then
 		const items = form.items :: { Expr }
 
 		if isSym(items[1], "define") and #items == 3 then
-			return Reader.list({
+			return Reader.list {
 				items[1],
 				items[2],
 				lowerLocal(items[3], {}),
-			})
+			}
 		end
 	end
 
@@ -935,11 +855,7 @@ local function lowerForm(
 end
 
 -- Adds a definition (already lowered) to a scope, or says why it cannot be one.
-local function addDefinition(
-	scope: Scope,
-	form: Expr,
-	last: boolean
-)
+local function addDefinition(scope: Scope, form: Expr, last: boolean)
 	const name, expr = asDefinition(form)
 
 	if name == nil or expr == nil then
@@ -966,10 +882,7 @@ local function addDefinition(
 end
 
 -- The port that the whole program evaluates to, built into `b`. The forms are definitions, followed by the one expression whose value it is.
-const function program(
-	forms: { Expr },
-	b: Builder
-): Port
+const function program(forms: { Expr }, b: Builder): Port
 	const scope: Scope = {}
 	const lowered: { Expr } = {}
 
@@ -1004,30 +917,20 @@ const function newSession(): Session
 end
 
 -- Adds a top-level definition to the session.
-const function define(
-	session: Session,
-	form: Expr
-)
+const function define(session: Session, form: Expr)
 	addDefinition(session.scope, lowerForm(form), false)
 end
 
 -- Whether a top-level form is a definition.
-const function isDefinition(
-	form: Expr
-): boolean
+const function isDefinition(form: Expr): boolean
 	return asDefinition(form) ~= nil
 end
 
 -- The expression as a value to build, in the session's scope. The expression is lowered once, here, so building it again is cheap.
-const function expression(
-	session: Session,
-	form: Expr
-): (Builder) -> Port
+const function expression(session: Session, form: Expr): (Builder) -> Port
 	const lowered = lowerForm(form)
 
-	return function(
-		b: Builder
-	): Port
+	return function(b: Builder): Port
 		return compile(lowered, session.scope, b)
 	end
 end
@@ -1041,10 +944,7 @@ const function failedAt(): number?
 end
 
 -- Reads and compiles the source, then reduces the net under the budget. The program's value is the net's only free port.
-const function evaluate(
-	source: string,
-	budget: number?
-): (H.Report, Net)
+const function evaluate(source: string, budget: number?): (H.Report, Net)
 	const b = B.new()
 	program(Reader.read(source), b)
 	const net = b:finish()
@@ -1053,12 +953,8 @@ const function evaluate(
 end
 
 -- The program as a value to build into a net, so that it can be read back with any readback.
-const function build(
-	source: string
-): (Builder) -> Port
-	return function(
-		b: Builder
-	): Port
+const function build(source: string): (Builder) -> Port
+	return function(b: Builder): Port
 		return program(Reader.read(source), b)
 	end
 end

@@ -18,16 +18,14 @@
 --
 -- A program that is not well formed is not checked. The only type test in the language is @ (kind), and the interpreter does not use it to check programs.
 
+const Code = require "../../interpreter/code"
 const M = require "../../interpreter/vm"
 const Reader = require "../reader"
-const Code = require "../../interpreter/code"
 
 -- The environment representations. An environment is a lookup, which takes an index and an environment, and an extend, which takes a value and an environment and returns the new environment. Both are text, so an interpreter can be built with either.
-
 -- A linked list of values, indexed by tails.
 const LOOKUP_LIST = "(fix (fn find (fn n (fn e (if (= n 0) (head e) ((find (- n 1)) (tail e)))))))"
 const EXTEND_LIST = "(fn (x env) [x env])"
-
 -- A skew binary random-access list (Okasaki). Its entries are [size tree], and a tree is [size [value [left right]]], with leaves whose children are nil. The entries are ordered newest first, and two adjacent trees of the same size merge into one. An index is found by skipping whole entries, then descending one tree.
 const LOOKUP_TREE = "(fix (fn tl (fn t (fn i ((fn (x l r) (if (= i 0) x (if (< (- i 1) (head l)) ((tl l) (- i 1)) ((tl r) (- (- i 1) (head l)))))) (head (tail t)) (head (tail (tail t))) (tail (tail (tail t))))))))"
 const LOOKUP_SKEW = `(fix (fn look (fn i (fn env ((fn (e rest) (if (< i (head e)) (({LOOKUP_TREE} (tail e)) i) ((look (- i (head e))) rest))) (head env) (tail env))))))`
@@ -40,18 +38,14 @@ end
 
 -- Walks an address n from 2 up through the value v: the low bit of n is the last step, so walk n v is the step for n mod 2 applied to walk (n / 2) v. A 0 is head and a 1 is tail.
 const WALK = "(fix (fn w (fn n (fn v (if (= n 1) v (let s ((w (/ n 2)) v) (if (= (% n 2) 0) (head s) (tail s))))))))"
-
 const A = "(head args)"
 const B = "(head (tail args))"
 const C = "(head (tail (tail args)))"
 
 -- The interpreter for an environment with the given lookup and extend.
-const function build(
-	lookup: string,
-	extend: string
-): string
+const function build(lookup: string, extend: string): string
 	-- What each tag does, as the text of its branch. The branch for tag k is BRANCH[k].
-	const BRANCH: { [number]: string } = {
+	const BRANCH: { string } = {
 		[0] = A, -- a quoted value is stored as it is
 		[2] = `(({lookup} {A}) env)`,
 		[3] = `(fn v ((rec {A}) ({extend} v env)))`,
@@ -74,9 +68,9 @@ const function build(
 		[14] = `(/ {ev(A)} {ev(B)})`,
 		[15] = `(% {ev(A)} {ev(B)})`,
 	}
-
 	-- A chain of ifs on the tag, checking 0 first and falling through to the highest.
 	local chain = "(head ~)"
+
 	for tag = 21, 0, -1 do
 		if BRANCH[tag] ~= nil then
 			chain = `(if (= tag {tag}) {BRANCH[tag]} {chain})`
@@ -94,17 +88,12 @@ const function quote(e: M.Expr): M.Expr
 end
 
 -- The expression that runs a program through an interpreter, with an empty environment.
-const function interpretWith(
-	evaluator: string,
-	program: M.Expr
-): M.Expr
+const function interpretWith(evaluator: string, program: M.Expr): M.Expr
 	return M.app(Reader.parse(evaluator), quote(program), M.nilv())
 end
 
 -- The same, with the list representation.
-const function interpret(
-	program: M.Expr
-): M.Expr
+const function interpret(program: M.Expr): M.Expr
 	return interpretWith(EVAL, program)
 end
 

@@ -9,15 +9,14 @@
 --
 -- resolve takes a path from the top of the programs folder and gives the text of that file, or nil if there is none.
 
-const VM = require "../interpreter/vm"
 const Lifecycle = require "../interpreter/lifecycle"
-const Parser = require "./parser"
+const VM = require "../interpreter/vm"
 const Checker = require "./checker"
 const Desugar = require "./desugar"
+const Parser = require "./parser"
 const ProgramFile = require "./programfile"
 
-const VALUE_FUEL = 1000000
-
+const VALUE_FUEL = 1e6
 export type Compiled = {
 	expr: VM.Expr,
 	names: { string },
@@ -27,10 +26,7 @@ export type Compiled = {
 }
 
 -- An error from the parser or the desugarer counts lines from the start of the program section. This moves it to the line of the file.
-local function atFileLine(
-	err: unknown,
-	firstLine: number
-): string
+local function atFileLine(err: unknown, firstLine: number): string
 	-- A checker error can have several lines, one for each error, and each gets the file's line.
 	local out: { string } = {}
 
@@ -38,7 +34,7 @@ local function atFileLine(
 		const line, column, rest = string.match(piece, "^line (%d+), column (%d+): (.*)$")
 
 		if line ~= nil and column ~= nil and rest ~= nil then
-			table.insert(out, string.format("line %d, column %s: %s", (tonumber(line) :: number) + firstLine - 1, column, rest))
+			table.insert(out, string.format("line %d, column %s: %s", tonumber(line) :: number + firstLine - 1, column, rest))
 		else
 			table.insert(out, piece)
 		end
@@ -48,16 +44,9 @@ local function atFileLine(
 end
 
 local compileFile: (text: string, resolve: (string) -> string?, name: string, stack: { string }) -> Compiled
-
-compileFile = function(
-	text: string,
-	resolve: (string) -> string?,
-	name: string,
-	stack: { string }
-): Compiled
+compileFile = function(text: string, resolve: (string) -> string?, name: string, stack: { string }): Compiled
 	const file = ProgramFile.parse(text)
 	local parsed: Parser.Program? = nil
-
 	local ok, err = pcall(function()
 		parsed = Parser.parse(file.program)
 	end)
@@ -70,7 +59,7 @@ compileFile = function(
 	const ctors = Desugar.buildCtors(program.decls)
 	local names: { string } = {}
 	local values: { VM.Expr } = {}
-	local importSchemes: { { name: string, scheme: Checker.Scheme } } = {}
+	local importSchemes: { { name: string; scheme: Checker.Scheme } } = {}
 	const chain = table.clone(stack)
 	table.insert(chain, name)
 
@@ -88,11 +77,10 @@ compileFile = function(
 		const sub = compileFile(importText :: string, resolve, import.file, chain)
 		table.insert(names, import.name)
 		table.insert(values, sub.expr)
-		table.insert(importSchemes, { name = import.name, scheme = sub.scheme })
+		table.insert(importSchemes, { name = import.name; scheme = sub.scheme })
 	end
 
 	local checked: Checker.Result? = nil
-
 	ok, err = pcall(function()
 		checked = Checker.check(program, importSchemes, name)
 	end)
@@ -103,7 +91,6 @@ compileFile = function(
 
 	const result = checked :: Checker.Result
 	local expr: VM.Expr
-
 	ok, err = pcall(function()
 		expr = Desugar.boundary(Desugar.wrapImports(Desugar.desugarProgram(result.expr, names, ctors), values), result.input, result.inputExpect)
 	end)
@@ -121,35 +108,33 @@ compileFile = function(
 	}
 end
 
-local function compile(
-	text: string,
-	resolve: (string) -> string?,
-	name: string
-): Compiled
+local function compile(text: string, resolve: (string) -> string?, name: string): Compiled
 	return compileFile(text, resolve, name, {})
 end
 
-local function evalText(
-	compiled: Compiled,
-	text: string,
-	fuel: number
-): VM.Value
+local function evalText(compiled: Compiled, text: string, fuel: number): VM.Value
 	const parsed = Parser.parse(text)
 	const expr = Desugar.wrapImports(Desugar.desugarExpr(parsed.expr, compiled.names, compiled.ctors), compiled.values)
 	const result = VM.run(expr, fuel)
 
 	if result.status ~= "value" then
-		error(string.format("the expression %s %s", text, if result.status == "error" then "raises an error: " .. result.message else "runs out of fuel"), 0)
+		error(
+			string.format(
+				"the expression %s %s",
+				text,
+				if result.status == "error" then
+					"raises an error: " .. result.message
+				else
+					"runs out of fuel"
+			),
+			0
+		)
 	end
 
 	return result.value
 end
 
-local function run(
-	compiled: Compiled,
-	input: VM.Value,
-	fuel: number
-): Lifecycle.Result
+local function run(compiled: Compiled, input: VM.Value, fuel: number): Lifecycle.Result
 	return Lifecycle.run(compiled.expr, input, fuel)
 end
 

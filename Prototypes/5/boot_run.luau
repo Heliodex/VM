@@ -8,33 +8,29 @@
 --
 --   lute run boot_run.luau      (from Prototypes/5)
 
-const fs = require "@lute/fs"
+const Programs = require "./L1/examples/programs"
+const Text = require "./L1/examples/text"
+const ProgramFile = require "./L1/program_file"
+const Reader = require "./L1/reader"
 const Code = require "./interpreter/code"
 const Data = require "./interpreter/data"
 const Lifecycle = require "./interpreter/lifecycle"
-const ProgramFile = require "./L1/program_file"
-const Programs = require "./L1/examples/programs"
-const Reader = require "./L1/reader"
-const Text = require "./L1/examples/text"
 const VM = require "./interpreter/vm"
+const fs = require "@lute/fs"
 
-const FUEL = 1000000000
-
+const FUEL = 1e9
 local agree = 0
 local disagree = 0
 
-const function readFile(
-	path: string
-): string
+const function readFile(path: string): string
 	const handle = fs.open(path)
 	const text = fs.read(handle)
 	fs.close(handle)
+
 	return text
 end
 
-const function resolve(
-	name: string
-): string?
+const function resolve(name: string): string?
 	const ok, text = pcall(readFile, `L1/programs/{name}`)
 
 	if ok then
@@ -45,41 +41,32 @@ const function resolve(
 end
 
 -- The bytes of a string as the list a reader takes, and a list of values.
-const function bytesValue(
-	s: string
-): VM.Value
+const function bytesValue(s: string): VM.Value
 	local v: VM.Value = VM.NIL
 
 	for i = #s, 1, -1 do
-		v = ({ kind = "cell", head = string.byte(s, i), tail = v } :: VM.Cell)
+		v = { kind = "cell"; head = string.byte(s, i); tail = v } :: VM.Cell
 	end
 
 	return v
 end
 
-const function listValue(
-	items: { VM.Value }
-): VM.Value
+const function listValue(items: { VM.Value }): VM.Value
 	local v: VM.Value = VM.NIL
 
 	for i = #items, 1, -1 do
-		v = ({ kind = "cell", head = items[i], tail = v } :: VM.Cell)
+		v = { kind = "cell"; head = items[i]; tail = v } :: VM.Cell
 	end
 
 	return v
 end
 
-const function pairValue(
-	a: VM.Value,
-	b: VM.Value
-): VM.Value
-	return ({ kind = "cell", head = a, tail = b } :: VM.Cell)
+const function pairValue(a: VM.Value, b: VM.Value): VM.Value
+	return { kind = "cell"; head = a; tail = b } :: VM.Cell
 end
 
 -- The section of a program file between its second and third separators: the program.
-local function sectionsOf(
-	text: string
-): ({ string }, string, string)
+local function sectionsOf(text: string): ({ string }, string, string)
 	local lines: { string } = {}
 
 	for line in string.gmatch(text .. "\n", "([^\n]*)\n") do
@@ -106,12 +93,7 @@ local function sectionsOf(
 end
 
 -- Reads a source with a reader, given the names and values of its imports. A failed run is an error.
-const function readWith(
-	reader: VM.Expr,
-	source: string,
-	names: { string },
-	values: { VM.Value }
-): (string, VM.Value?)
+const function readWith(reader: VM.Expr, source: string, names: { string }, values: { VM.Value }): (string, VM.Value?)
 	local nameValues: { VM.Value } = {}
 
 	for _, n in names do
@@ -129,14 +111,11 @@ const function readWith(
 end
 
 -- Stage 0: the reader, compiled by the Luau reader, with its imports linked the usual way.
-const readerFile = ProgramFile.parse(readFile("L1/programs/boot/read.prog"), resolve, "boot/read.prog")
+const readerFile = ProgramFile.parse(readFile "L1/programs/boot/read.prog", resolve, "boot/read.prog")
 const stage0 = readerFile.program
 
 -- The payload of a stage's result: [0 value] gives value, and a refusal [1 message] is an error here.
-const function okOf(
-	status: string,
-	v: VM.Value?
-): VM.Value
+const function okOf(status: string, v: VM.Value?): VM.Value
 	if status ~= "value" or v == nil then
 		error("a stage gave " .. status .. ", not a value", 0)
 	end
@@ -151,10 +130,7 @@ const function okOf(
 end
 
 -- The tag of a stage's result, 0 for a success and 1 for a refusal, or nil if the result is not a tag.
-local function tagOf(
-	status: string,
-	v: VM.Value?
-): number?
+local function tagOf(status: string, v: VM.Value?): number?
 	if status ~= "value" or v == nil then
 		return nil
 	end
@@ -169,26 +145,20 @@ local function tagOf(
 end
 
 -- The quoted stage programs, from stage 0.
-const _, tokSection = sectionsOf(readFile("L1/programs/boot/tokenize.prog"))
-const _, parSection = sectionsOf(readFile("L1/programs/boot/parse.prog"))
-const _, comSection = sectionsOf(readFile("L1/programs/boot/compile.prog"))
-const _, readSection = sectionsOf(readFile("L1/programs/boot/read.prog"))
-
+const _, tokSection = sectionsOf(readFile "L1/programs/boot/tokenize.prog")
+const _, parSection = sectionsOf(readFile "L1/programs/boot/parse.prog")
+const _, comSection = sectionsOf(readFile "L1/programs/boot/compile.prog")
+const _, readSection = sectionsOf(readFile "L1/programs/boot/read.prog")
 const QTOK = okOf(readWith(stage0, tokSection, {}, {}))
 const QPAR = okOf(readWith(stage0, parSection, {}, {}))
 const QCOM = okOf(readWith(stage0, comSection, {}, {}))
-const STAGE_NAMES = { "tok", "par", "com" }
-const STAGE_VALUES = { QTOK, QPAR, QCOM }
+const STAGE_NAMES = { "tok"; "par"; "com" }
+const STAGE_VALUES = { QTOK; QPAR; QCOM }
 const QREAD = okOf(readWith(stage0, readSection, STAGE_NAMES, STAGE_VALUES))
-
 -- Stage 1: the reader that stage 0 compiled from its own source.
 const stage1 = Code.fromValue(QREAD)
 
-local function same(
-	label: string,
-	a: VM.Value,
-	b: VM.Value
-)
+local function same(label: string, a: VM.Value, b: VM.Value)
 	if Data.write(a) == Data.write(b) then
 		agree += 1
 	else
@@ -198,17 +168,14 @@ local function same(
 end
 
 -- 1. The fixed point: stage 1 gives the same quoted programs as stage 0.
-local _, tokSection1 = sectionsOf(readFile("L1/programs/boot/tokenize.prog"))
+local _, tokSection1 = sectionsOf(readFile "L1/programs/boot/tokenize.prog")
 same("fixed point: tokenize", okOf(readWith(stage1, tokSection1, {}, {})), QTOK)
 same("fixed point: parse", okOf(readWith(stage1, parSection, {}, {})), QPAR)
 same("fixed point: compile", okOf(readWith(stage1, comSection, {}, {})), QCOM)
 same("fixed point: read", okOf(readWith(stage1, readSection, STAGE_NAMES, STAGE_VALUES)), QREAD)
 
 -- 2. Stage 1 agrees with the Luau reader on the sources. A source is read with no imports, unless it has some.
-const function quotedOf(
-	reader: VM.Expr,
-	path: string
-): VM.Value
+const function quotedOf(reader: VM.Expr, path: string): VM.Value
 	const text = readFile(`L1/programs/{path}`)
 	const imports, section = sectionsOf(text)
 	local names: { string } = {}
@@ -228,18 +195,14 @@ const function quotedOf(
 	return okOf(readWith(reader, section, names, values))
 end
 
-const function luauQuoted(
-	path: string
-): VM.Value
+const function luauQuoted(path: string): VM.Value
 	const text = readFile(`L1/programs/{path}`)
 	const program = ProgramFile.parse(text, resolve, path).program
+
 	return Code.toValue(program)
 end
 
-local function check(
-	label: string,
-	source: string
-)
+local function check(label: string, source: string)
 	const refOk, ref = pcall(Reader.parse, source)
 	const status, out = readWith(stage1, source, {}, {})
 	const tag = tagOf(status, out)
@@ -251,6 +214,7 @@ local function check(
 			disagree += 1
 			print(`DISAGREE  {label}: the Luau reader refuses it, the L1 reader gives {status}`)
 		end
+
 		return
 	end
 
@@ -277,11 +241,7 @@ for _, source in Text.rejects do
 end
 
 -- Every program file, read by stage 1 with its imports, against the Luau loader.
-local function walk(
-	folder: string,
-	prefix: string,
-	out: { string }
-)
+local function walk(folder: string, prefix: string, out: { string })
 	for _, entry in fs.listdir(folder) do
 		if entry.type == "dir" then
 			walk(`{folder}/{entry.name}`, `{prefix}{entry.name}/`, out)
@@ -294,7 +254,6 @@ end
 local files: { string } = {}
 walk("L1/programs", "", files)
 table.sort(files)
-
 local withImports = 0
 
 for _, name in files do

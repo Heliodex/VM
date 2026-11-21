@@ -15,10 +15,7 @@ type Vec = G.Vec
 type Grid = G.Grid
 
 -- Fruchterman-Reingold on one part. The result is not drawn directly: it only suggests which way each wire should run, so that the grid placement below keeps wired cells on the side of each other that the springs prefer. It is deterministic (starts on a circle), so a given part always draws the same way.
-const function guidePart(
-	net: Net,
-	cells: { Cell }
-): {
+const function guidePart(net: Net, cells: { Cell }): {
 	[Cell]: G.Vec,
 }
 	const n = #cells
@@ -76,7 +73,8 @@ const function guidePart(
 				disp[a].y += uy * force
 				disp[b].x -= ux * force
 				disp[b].y -= uy * force
-		end end
+			end
+		end
 
 		for _, c in cells do
 			for slot = 1, Net.portCount(net.Tag[c]) do
@@ -95,7 +93,10 @@ const function guidePart(
 						disp[a].y -= uy * force
 						disp[b].x += ux * force
 						disp[b].y += uy * force
-		end end end end
+					end
+				end
+			end
+		end
 
 		for _, c in cells do
 			const dx, dy = disp[c].x, disp[c].y
@@ -134,7 +135,10 @@ const function freeNear(
 
 					if not occ[G.key(g)] then
 						return g
-		end end end end
+					end
+				end
+			end
+		end
 
 		r += 1
 	end
@@ -147,10 +151,7 @@ end
 
 -- Place one connected part on the integer grid. A breadth-first walk starts at a cell and puts every wired neighbour in a free slot beside the cell it grows from; the spring guide decides which side. Every choice of root, quarter-turn and reflection of the guide is tried and then folded onto nearby free slots.
 -- The candidate with the most page-aligned symmetry wins, with the most compact and shortest-wired layout breaking ties, so equivalent branches spread out evenly instead of the whole part lurching to one side.
-const function placePart(
-	net: Net,
-	cells: { Cell }
-): {
+const function placePart(net: Net, cells: { Cell }): {
 	[Cell]: G.Grid,
 }
 	if #cells == 1 then
@@ -171,9 +172,7 @@ const function placePart(
 		inPart[c] = true
 	end
 
-	const function wiredNeighbours(
-		c: Cell
-	): { Cell }
+	const function wiredNeighbours(c: Cell): { Cell }
 		const list: { Cell } = {}
 
 		for slot = 1, Net.portCount(net.Tag[c]) do
@@ -181,7 +180,8 @@ const function placePart(
 
 			if q ~= 0 and Net.owner(q) ~= c and inPart[Net.owner(q)] then
 				table.insert(list, Net.owner(q))
-		end end
+			end
+		end
 
 		return list
 	end
@@ -192,20 +192,19 @@ const function placePart(
 		for _, v in wiredNeighbours(c) do
 			if c < v then
 				table.insert(
-					edges, {
+					edges,
+					{
 						c,
 						v,
 					}
 				)
-	end end end
+			end
+		end
+	end
 
 	const colors = Canon.refineKinds(net, cells)
 
-	const function build(
-		root: Cell,
-		rot: number,
-		mirror: boolean
-	): {
+	const function build(root: Cell, rot: number, mirror: boolean): {
 		[Cell]: G.Grid,
 	}
 		const grid: {
@@ -225,10 +224,7 @@ const function placePart(
 		local head = 1
 
 		-- Direction from u towards v, after the guide's rotation and reflection.
-		const function lean(
-			u: Cell,
-			v: Cell
-		): (number, number)
+		const function lean(u: Cell, v: Cell): (number, number)
 			local dxf, dyf = guide[v].x - guide[u].x, guide[v].y - guide[u].y
 
 			if mirror then
@@ -242,9 +238,7 @@ const function placePart(
 			return dxf, dyf
 		end
 
-		const function freeAt(
-			u: Cell
-		): { G.Vec }
+		const function freeAt(u: Cell): { G.Vec }
 			const list: { G.Vec } = {}
 
 			for _, d in G.DIRS do
@@ -255,16 +249,13 @@ const function placePart(
 
 				if not occ[G.key(g)] then
 					table.insert(list, d)
-			end end
+				end
+			end
 
 			return list
 		end
 
-		const function put(
-			u: Cell,
-			v: Cell,
-			d: G.Vec
-		)
+		const function put(u: Cell, v: Cell, d: G.Vec)
 			const g = {
 				x = grid[u].x + d.x,
 				y = grid[u].y + d.y,
@@ -275,10 +266,7 @@ const function placePart(
 		end
 
 		-- Fall back to the free slot nearest the spring guide.
-		const function greedy(
-			u: Cell,
-			v: Cell
-		)
+		const function greedy(u: Cell, v: Cell)
 			local dxf, dyf = lean(u, v)
 			local best: G.Grid? = nil
 			local bestDot = -math.huge
@@ -295,7 +283,9 @@ const function placePart(
 					if dot > bestDot then
 						bestDot = dot
 						best = g
-			end end end
+					end
+				end
+			end
 
 			const slot = best or freeNear(grid[u], occ)
 			grid[v] = slot
@@ -304,11 +294,7 @@ const function placePart(
 		end
 
 		-- Lets two branches of u be recognised as a matching pair: same colour, and the same kind of port on u and on the partner.
-		const function branchKey(
-			u: Cell,
-			slot: number,
-			v: Cell
-		): string
+		const function branchKey(u: Cell, slot: number, v: Cell): string
 			const mine =
 				if slot == 1 then
 					"P"
@@ -342,12 +328,14 @@ const function placePart(
 
 				if q ~= 0 and v ~= u and inPart[v] and not grid[v] then
 					table.insert(
-						pending, {
+						pending,
+						{
 							v = v,
 							key = branchKey(u, slot, v),
 						}
 					)
-			end end
+				end
+			end
 
 			const done: { boolean } = {}
 
@@ -392,18 +380,24 @@ const function placePart(
 								bestScore = score
 								first, second = g1, g2
 								firstCell, secondCell = c1, c2
-					end end end
+							end
+						end
+					end
 
 					if first and second and firstCell and secondCell then
 						put(u, firstCell, first)
 						put(u, secondCell, second)
 						done[i], done[j] = true, true
-			end end end
+					end
+				end
+			end
 
 			for i = 1, #pending do
 				if not done[i] then
 					greedy(u, pending[i].v)
-		end end end
+				end
+			end
+		end
 
 		return grid
 	end
@@ -487,18 +481,21 @@ const function placePart(
 						end
 
 						start[c] = home
-				end end
+					end
+				end
 
 				if bestSlot ~= home then
 					occ[G.key(home)] = false
 					start[c] = bestSlot
 					occ[G.key(bestSlot)] = true
 					improved = true
-			end end
+				end
+			end
 
 			if not improved then
 				break
-		end end
+			end
+		end
 
 		return start
 	end
@@ -532,7 +529,10 @@ const function placePart(
 				if sym > bestSym or sym == bestSym and (span < bestSpan or span == bestSpan and wires < bestWires) then
 					bestSym, bestSpan, bestWires = sym, span, wires
 					best = candidate
-	end end end end
+				end
+			end
+		end
+	end
 
 	return best :: {
 		[Cell]: G.Grid,

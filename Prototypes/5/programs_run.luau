@@ -5,19 +5,15 @@
 --
 --   lute run programs_run.luau      (from Prototypes/5)
 
-const fs = require "@lute/fs"
+const ProgramFile = require "./L1/program_file"
 const Data = require "./interpreter/data"
 const Lifecycle = require "./interpreter/lifecycle"
-const ProgramFile = require "./L1/program_file"
+const fs = require "@lute/fs"
 
 local failures = 0
 local total = 0
 
-const function check(
-	name: string,
-	ok: boolean,
-	detail: string
-)
+const function check(name: string, ok: boolean, detail: string)
 	total += 1
 
 	if ok then
@@ -28,19 +24,16 @@ const function check(
 	end
 end
 
-const function readFile(
-	path: string
-): string
+const function readFile(path: string): string
 	const handle = fs.open(path)
 	const text = fs.read(handle)
 	fs.close(handle)
+
 	return text
 end
 
 -- The text of a program file in programs/, or nil if there is none. Imports are looked up here.
-const function resolve(
-	name: string
-): string?
+const function resolve(name: string): string?
 	const ok, text = pcall(readFile, `L1/programs/{name}`)
 
 	if ok then
@@ -51,7 +44,7 @@ const function resolve(
 end
 
 -- Malformed files, each with a fragment of the reason it should be refused.
-const MALFORMED: { { name: string, text: string, reason: string } } = {
+const MALFORMED: { { name: string; text: string; reason: string } } = {
 	{
 		name = "a file with one separator",
 		text = "header\n---\n(fn x x)\n1 => 1 fuel 10\n",
@@ -124,7 +117,10 @@ for _, case in MALFORMED do
 	check(
 		`refuses {case.name}`,
 		not ok and string.find(tostring(err), case.reason, 1, true) ~= nil,
-		if ok then "it parsed, but it should not" else tostring(err)
+		if ok then
+			"it parsed, but it should not"
+		else
+			tostring(err)
 	)
 end
 
@@ -141,11 +137,7 @@ do
 		end,
 		"top.prog"
 	)
-	check(
-		"refuses an import cycle",
-		not ok and string.find(tostring(err), "form a cycle through loop.prog", 1, true) ~= nil,
-		tostring(err)
-	)
+	check("refuses an import cycle", not ok and string.find(tostring(err), "form a cycle through loop.prog", 1, true) ~= nil, tostring(err))
 end
 
 -- A cycle through folders: lib/a.prog and extras/b.prog import each other by paths from the top of the folder.
@@ -162,19 +154,11 @@ do
 		end,
 		"top.prog"
 	)
-	check(
-		"refuses a cycle through folders",
-		not ok and string.find(tostring(err), "form a cycle through lib/a.prog", 1, true) ~= nil,
-		tostring(err)
-	)
+	check("refuses a cycle through folders", not ok and string.find(tostring(err), "form a cycle through lib/a.prog", 1, true) ~= nil, tostring(err))
 end
 
 -- Every .prog file in programs/, and in its folders, by its path from programs/. Each has its tests run, including the ones that are only imported elsewhere.
-local function listPrograms(
-	folder: string,
-	prefix: string,
-	out: { string }
-)
+local function listPrograms(folder: string, prefix: string, out: { string })
 	for _, entry in fs.listdir(folder) do
 		if entry.type == "dir" then
 			listPrograms(`{folder}/{entry.name}`, `{prefix}{entry.name}/`, out)
@@ -186,9 +170,7 @@ end
 
 local files: { string } = {}
 listPrograms("L1/programs", "", files)
-
 table.sort(files)
-
 local tests = 0
 
 for _, name in files do

@@ -11,29 +11,31 @@ const process = require "@std/process"
 local total = 0
 local failures = 0
 
-local function report(
-	ok: boolean,
-	label: string
-)
+local function report(ok: boolean, label: string)
 	total += 1
 
 	if not ok then
 		failures += 1
 	end
 
-	print(`{if ok then "PASS" else "FAIL"}  {label}`)
+	print(
+		`{
+			if ok then
+				"PASS"
+			else
+				"FAIL"
+		}  {label}`
+	)
 end
 
 -- Runs tools/lisp.luau with the given arguments, optionally feeding `input` to its standard input through the shell.
-local function lisp(
-	args: { string },
-	input: string?
-): (string, number)
+local function lisp(args: { string }, input: string?): (string, number)
 	local result
+
 	if input == nil then
-		result = process.run({ "lute", "run", "tools/lisp.luau", table.unpack(args) })
+		result = process.run { "lute"; "run"; "tools/lisp.luau"; table.unpack(args) }
 	else
-		result = process.run({ "/bin/sh", "-c", `printf '%s' '{input}' | lute run tools/lisp.luau` })
+		result = process.run { "/bin/sh"; "-c"; `printf '%s' '{input}' | lute run tools/lisp.luau` }
 	end
 
 	return result.stdout, result.exitcode
@@ -41,16 +43,13 @@ end
 
 -- The expression mode.
 do
-	const out, code = lisp({ "-e", "(+ 2 3)" })
+	const out, code = lisp { "-e"; "(+ 2 3)" }
 	report(out == "5\n" and code == 0, "-e prints the value of an expression")
-
-	const outErr, codeErr = lisp({ "-e", "(+ 'a 1)" })
+	const outErr, codeErr = lisp { "-e"; "(+ 'a 1)" }
 	report(outErr == "#error\n" and codeErr == 0, "-e prints #error for a wrong-kind value")
-
-	const outBad, codeBad = lisp({ "-e", "(car" })
+	const outBad, codeBad = lisp { "-e"; "(car" }
 	report(string.find(outBad, "never closed", 1, true) ~= nil and codeBad == 1, "-e exits with 1 on a reader error")
-
-	const outUnbound, codeUnbound = lisp({ "-e", "(nope 1)" })
+	const outUnbound, codeUnbound = lisp { "-e"; "(nope 1)" }
 	report(string.find(outUnbound, "unbound name nope", 1, true) ~= nil and codeUnbound == 1, "-e reports an unbound name and exits with 1")
 end
 
@@ -58,7 +57,7 @@ end
 do
 	const path = "lisp_test_program.lisp"
 	fs.writeStringToFile(path, "(define sq (lambda (n) (* n n)))\n(sq 4)\n(sq 5)\n")
-	const out, code = lisp({ path })
+	const out, code = lisp { path }
 	report(out == "16\n25\n" and code == 0, "a file prints the value of each expression")
 	fs.remove(path)
 end

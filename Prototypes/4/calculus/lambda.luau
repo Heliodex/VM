@@ -27,20 +27,13 @@ type Builder = B.Builder
 type Port = Types.Port
 
 -- Discard a port: an eraser on it lets the net it belongs to vanish once the port is used.
-const function erase(
-	b: Builder,
-	p: Port
-)
+const function erase(b: Builder, p: Port)
 	const e = b:epsilon()
 	b:wire(p, e.principal)
 end
 
 -- Make `n` copies of the port `p`, one for each use of a variable. A port used once is simply returned, and an unused one is erased.
-const function share(
-	b: Builder,
-	p: Port,
-	n: number
-): { Port }
+const function share(b: Builder, p: Port, n: number): { Port }
 	if n == 0 then
 		erase(b, p)
 
@@ -60,10 +53,7 @@ const function share(
 end
 
 -- An abstraction. `body` receives the variable's port and returns the root of the body. A variable the body never touches is erased here, so the caller never has to.
-const function lam(
-	b: Builder,
-	body: (Port) -> Port
-): Port
+const function lam(b: Builder, body: (Port) -> Port): Port
 	const h = b:gamma()
 	const x = h.aux1 :: Port
 	const root = body(x)
@@ -77,11 +67,7 @@ const function lam(
 end
 
 -- An application of `fn` to `arg`. Returns the port that carries the result.
-const function app(
-	b: Builder,
-	fn: Port,
-	arg: Port
-): Port
+const function app(b: Builder, fn: Port, arg: Port): Port
 	const g = b:gamma()
 	b:wire(g.principal, fn)
 	b:wire(g.aux2 :: Port, arg)

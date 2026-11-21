@@ -56,25 +56,22 @@ function BuilderClass.new(): Builder
 	return setmetatable(
 		{
 			net = Net.newNet(),
-		} :: Builder, BuilderClass
+		} :: Builder,
+		BuilderClass
 	)
 end
 
 -- A builder that adds to a net which already exists, so that a value can be applied to new ports without copying it.
-function BuilderClass.from(
-	net: Net
-): Builder
+function BuilderClass.from(net: Net): Builder
 	return setmetatable(
 		{
 			net = net,
-		} :: Builder, BuilderClass
+		} :: Builder,
+		BuilderClass
 	)
 end
 
-local function make(
-	self: Builder,
-	symbol: Symbol
-): Handle
+local function make(self: Builder, symbol: Symbol): Handle
 	local c = Net.alloc(self.net, symbol)
 	local binary = symbol ~= Net.EPSILON
 
@@ -93,41 +90,27 @@ local function make(
 	}
 end
 
-function BuilderClass.gamma(
-	self: Builder
-): Handle
+function BuilderClass.gamma(self: Builder): Handle
 	return make(self, Net.GAMMA)
 end
 
-function BuilderClass.delta(
-	self: Builder
-): Handle
+function BuilderClass.delta(self: Builder): Handle
 	return make(self, Net.DELTA)
 end
 
-function BuilderClass.epsilon(
-	self: Builder
-): Handle
+function BuilderClass.epsilon(self: Builder): Handle
 	return make(self, Net.EPSILON)
 end
 
 -- Join two principal ports.
 -- This is the only wire that can start a net reducing: everything else is a continuation waiting on one.
-function BuilderClass.meet(
-	self: Builder,
-	a: Handle,
-	b: Handle
-)
+function BuilderClass.meet(self: Builder, a: Handle, b: Handle)
 	Net.link(self.net, a.principal, b.principal)
 end
 
 -- Join any two ports.
 -- An eraser has no auxiliaries, so wiring to one is rejected here rather than silently producing a net no rule can match.
-function BuilderClass.wire(
-	self: Builder,
-	a: Port?,
-	b: Port?
-)
+function BuilderClass.wire(self: Builder, a: Port?, b: Port?)
 	if not a or not b then
 		error "cannot wire to a port that does not exist"
 	end
@@ -137,9 +120,7 @@ end
 
 -- The net as it stands.
 -- A builder is finished with once: cells made after this point belong to a net nothing else refers to.
-function BuilderClass.finish(
-	self: Builder
-): Net
+function BuilderClass.finish(self: Builder): Net
 	return self.net
 end
 

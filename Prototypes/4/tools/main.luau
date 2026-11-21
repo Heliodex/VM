@@ -55,6 +55,7 @@ for _, test in Cases.tests do
 
 	if not ok then
 		error "fail"
-end end
+	end
+end
 
 print "</body></html>"

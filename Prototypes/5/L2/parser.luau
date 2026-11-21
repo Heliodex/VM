@@ -18,68 +18,57 @@
 
 const Lexer = require "./lexer"
 
-export type Pos = { line: number, col: number }
-
+export type Pos = { line: number; col: number }
 export type Type =
-	{ k: "tname", name: string, at: Pos }
-	| { k: "tapp", name: string, args: { Type }, at: Pos }
-	| { k: "tpair", a: Type, b: Type, at: Pos }
-	| { k: "tlist", item: Type, at: Pos }
-	| { k: "tfun", a: Type, b: Type, at: Pos }
-
-export type Con = { name: string, payload: Type?, at: Pos }
-
-export type TypeDecl = { name: string, params: { string }, cons: { Con }, at: Pos }
-
+	| { k: "tname"; name: string; at: Pos }
+	| { k: "tapp"; name: string; args: { Type }; at: Pos }
+	| { k: "tpair"; a: Type; b: Type; at: Pos }
+	| { k: "tlist"; item: Type; at: Pos }
+	| { k: "tfun"; a: Type; b: Type; at: Pos }
+export type Con = { name: string; payload: Type?; at: Pos }
+export type TypeDecl = { name: string; params: { string }; cons: { Con }; at: Pos }
 export type Pattern =
-	{ k: "con", name: string, bind: string?, at: Pos }
-	| { k: "bind", name: string, at: Pos }
-	| { k: "wild", at: Pos }
-
+	| { k: "con"; name: string; bind: string?; at: Pos }
+	| { k: "bind"; name: string; at: Pos }
+	| { k: "wild"; at: Pos }
 export type Expr =
-	{ k: "int", n: number, at: Pos }
-	| { k: "str", bytes: { number }, at: Pos }
-	| { k: "nil", at: Pos }
-	| { k: "name", name: string, at: Pos }
-	| { k: "list", items: { Expr }, at: Pos }
-	| { k: "pair", a: Expr, b: Expr, at: Pos }
-	| { k: "app", f: Expr, args: { Expr }, at: Pos }
-	| { k: "fn", names: { string }, body: Expr, at: Pos }
-	| { k: "let", name: string, value: Expr, body: Expr, rec: boolean, at: Pos }
-	| { k: "mutual", bindings: { Binding }, body: Expr, at: Pos }
-	| { k: "if", c: Expr, t: Expr, e: Expr, at: Pos }
-	| { k: "match", scrut: Expr, arms: { Arm }, at: Pos }
-	| { k: "try", e: Expr, at: Pos }
-	| { k: "rawfix", value: Expr, at: Pos }
-	| { k: "check", e: Expr, test: Test?, expect: string, at: Pos }
-	| { k: "untyped", e: Expr, at: Pos }
-
-export type Arm = { pat: Pattern, body: Expr, at: Pos }
-
+	| { k: "int"; n: number; at: Pos }
+	| { k: "str"; bytes: { number }; at: Pos }
+	| { k: "nil"; at: Pos }
+	| { k: "name"; name: string; at: Pos }
+	| { k: "list"; items: { Expr }; at: Pos }
+	| { k: "pair"; a: Expr; b: Expr; at: Pos }
+	| { k: "app"; f: Expr; args: { Expr }; at: Pos }
+	| { k: "fn"; names: { string }; body: Expr; at: Pos }
+	| { k: "let"; name: string; value: Expr; body: Expr; rec: boolean; at: Pos }
+	| { k: "mutual"; bindings: { Binding }; body: Expr; at: Pos }
+	| { k: "if"; c: Expr; t: Expr; e: Expr; at: Pos }
+	| { k: "match"; scrut: Expr; arms: { Arm }; at: Pos }
+	| { k: "try"; e: Expr; at: Pos }
+	| { k: "rawfix"; value: Expr; at: Pos }
+	| { k: "check"; e: Expr; test: Test?; expect: string; at: Pos }
+	| { k: "untyped"; e: Expr; at: Pos }
+export type Arm = { pat: Pattern; body: Expr; at: Pos }
 -- What a run-time check looks for, made by the checker from a type. Each test is a shape of value: any accepts every value, and a list or sum that refers to itself uses rec, with its fixdef around the whole test.
 export type Test =
-	{ kind: "any" }
+	| { kind: "any" }
 	| { kind: "nil" }
 	| { kind: "int" }
 	| { kind: "fn" }
 	| { kind: "pin" }
-	| { kind: "pair", a: Test, b: Test }
-	| { kind: "list", item: Test, tail: Test }
-	| { kind: "sum", ctors: { SumTest } }
-	| { kind: "rec", key: string }
-	| { kind: "fixdef", key: string, body: Test }
-
-export type SumTest = { tag: number, payload: Test }
-
-export type Binding = { name: string, value: Expr, at: Pos }
-
-export type Program = { decls: { TypeDecl }, expr: Expr }
-
+	| { kind: "pair"; a: Test; b: Test }
+	| { kind: "list"; item: Test; tail: Test }
+	| { kind: "sum"; ctors: { SumTest } }
+	| { kind: "rec"; key: string }
+	| { kind: "fixdef"; key: string; body: Test }
+export type SumTest = { tag: number; payload: Test }
+export type Binding = { name: string; value: Expr; at: Pos }
+export type Program = { decls: { TypeDecl }; expr: Expr }
 const KEYWORDS: { [string]: boolean } = {
 	fn = true,
 	let = true,
 	letrec = true,
-	[ "if" ] = true,
+	["if"] = true,
 	match = true,
 	mutual = true,
 	check = true,
@@ -87,15 +76,11 @@ const KEYWORDS: { [string]: boolean } = {
 	type = true,
 }
 
-local function isCapital(
-	name: string
-): boolean
+local function isCapital(name: string): boolean
 	return string.match(name, "^%u") ~= nil
 end
 
-local function parse(
-	text: string
-): Program
+local function parse(text: string): Program
 	const toks = Lexer.tokenize(text)
 	local pos = 1
 	local sig = false
@@ -118,19 +103,15 @@ local function parse(
 	local function advance(): Lexer.Token
 		const t = cur()
 		pos += 1
+
 		return t
 	end
 
-	local function fail(
-		t: Lexer.Token,
-		msg: string
-	): never
+	local function fail(t: Lexer.Token, msg: string): never
 		error(string.format("line %d, column %d: %s", t.line, t.col, msg), 0)
 	end
 
-	local function expectKind(
-		kind: string
-	): Lexer.Token
+	local function expectKind(kind: string): Lexer.Token
 		const t = cur()
 
 		if t.kind ~= kind then
@@ -140,9 +121,7 @@ local function parse(
 		return advance()
 	end
 
-	local function expectSym(
-		value: string
-	): Lexer.Token
+	local function expectSym(value: string): Lexer.Token
 		const t = cur()
 
 		if t.kind ~= "sym" or t.value ~= value then
@@ -153,26 +132,19 @@ local function parse(
 	end
 
 	-- The text of a symbol or a string token. Only called where the kind has been checked.
-	local function word(
-		t: Lexer.Token
-	): string
+	local function word(t: Lexer.Token): string
 		return t.value :: string
 	end
 
-	local function at(
-		t: Lexer.Token
-	): Pos
-		return { line = t.line, col = t.col }
+	local function at(t: Lexer.Token): Pos
+		return { line = t.line; col = t.col }
 	end
 
 	-- TYPES
-
 	local parseType: () -> Type
 
-	local function typeAtomStart(
-		t: Lexer.Token
-	): boolean
-		return (t.kind == "sym" and t.value ~= "|") or t.kind == "(" or t.kind == "["
+	local function typeAtomStart(t: Lexer.Token): boolean
+		return t.kind == "sym" and t.value ~= "|" or t.kind == "(" or t.kind == "["
 	end
 
 	local function parseTypeAtom(): Type
@@ -180,7 +152,8 @@ local function parse(
 
 		if t.kind == "sym" then
 			advance()
-			return { k = "tname", name = word(t), at = at(t) }
+
+			return { k = "tname"; name = word(t); at = at(t) }
 		elseif t.kind == "(" then
 			advance()
 			const saved = sig
@@ -190,20 +163,22 @@ local function parse(
 
 			if cur().kind == "." then
 				advance()
-				result = { k = "tpair", a = first, b = parseType(), at = at(t) } :: Type
+				result = { k = "tpair"; a = first; b = parseType(); at = at(t) } :: Type
 			end
 
-			expectKind(")")
+			expectKind ")"
 			sig = saved
+
 			return result
 		elseif t.kind == "[" then
 			advance()
 			const saved = sig
 			sig = false
 			const item = parseType()
-			expectKind("]")
+			expectKind "]"
 			sig = saved
-			return { k = "tlist", item = item, at = at(t) }
+
+			return { k = "tlist"; item = item; at = at(t) }
 		end
 
 		return fail(t, "expected a type")
@@ -220,7 +195,7 @@ local function parse(
 			end
 
 			if #args > 0 then
-				return { k = "tapp", name = first.name, args = args, at = first.at }
+				return { k = "tapp"; name = first.name; args = args; at = first.at }
 			end
 		end
 
@@ -232,7 +207,8 @@ local function parse(
 
 		if cur().kind == "->" then
 			const arrow = advance()
-			return { k = "tfun", a = base, b = parseType(), at = at(arrow) }
+
+			return { k = "tfun"; a = base; b = parseType(); at = at(arrow) }
 		end
 
 		return base
@@ -241,7 +217,7 @@ local function parse(
 	-- A declaration: type Name params = Con payload | Con payload. The payload is one type atom, if there is one.
 	local function parseTypeDecl(): TypeDecl
 		const start = advance()
-		const nameTok = expectKind("sym")
+		const nameTok = expectKind "sym"
 
 		if not isCapital(word(nameTok)) then
 			fail(nameTok, "a type's name starts with a capital letter")
@@ -253,11 +229,11 @@ local function parse(
 			table.insert(params, word(advance()))
 		end
 
-		expectSym("=")
+		expectSym "="
 		local cons: { Con } = {}
 
 		while true do
-			const conTok = expectKind("sym")
+			const conTok = expectKind "sym"
 
 			if not isCapital(word(conTok)) then
 				fail(conTok, "a constructor's name starts with a capital letter")
@@ -269,7 +245,7 @@ local function parse(
 				payload = parseTypeAtom()
 			end
 
-			table.insert(cons, { name = word(conTok), payload = payload, at = at(conTok) })
+			table.insert(cons, { name = word(conTok); payload = payload; at = at(conTok) })
 
 			if cur().kind == "sym" and word(cur()) == "|" then
 				advance()
@@ -278,16 +254,13 @@ local function parse(
 			end
 		end
 
-		return { name = word(nameTok), params = params, cons = cons, at = at(start) }
+		return { name = word(nameTok); params = params; cons = cons; at = at(start) }
 	end
 
 	-- EXPRESSIONS
-
 	local parseExpr: () -> Expr
 
-	local function atomStart(
-		t: Lexer.Token
-	): boolean
+	local function atomStart(t: Lexer.Token): boolean
 		if t.kind == "int" or t.kind == "str" or t.kind == "(" or t.kind == "[" then
 			return true
 		end
@@ -300,10 +273,12 @@ local function parse(
 
 		if t.kind == "int" then
 			advance()
-			return { k = "int", n = t.value :: number, at = at(t) }
+
+			return { k = "int"; n = t.value :: number; at = at(t) }
 		elseif t.kind == "str" then
 			advance()
-			return { k = "str", bytes = t.value :: { number }, at = at(t) }
+
+			return { k = "str"; bytes = t.value :: { number }; at = at(t) }
 		elseif t.kind == "(" then
 			advance()
 			const saved = sig
@@ -313,11 +288,12 @@ local function parse(
 
 			if cur().kind == "." then
 				advance()
-				result = { k = "pair", a = first, b = parseExpr(), at = at(t) } :: Expr
+				result = { k = "pair"; a = first; b = parseExpr(); at = at(t) } :: Expr
 			end
 
-			expectKind(")")
+			expectKind ")"
 			sig = saved
+
 			return result
 		elseif t.kind == "[" then
 			advance()
@@ -335,11 +311,13 @@ local function parse(
 
 			advance()
 			sig = saved
-			return { k = "list", items = items, at = at(t) }
+
+			return { k = "list"; items = items; at = at(t) }
 		elseif t.kind == "sym" then
 			if word(t) == "~" then
 				advance()
-				return { k = "nil", at = at(t) }
+
+				return { k = "nil"; at = at(t) }
 			end
 
 			if KEYWORDS[word(t)] then
@@ -351,7 +329,8 @@ local function parse(
 			end
 
 			advance()
-			return { k = "name", name = word(t), at = at(t) }
+
+			return { k = "name"; name = word(t); at = at(t) }
 		end
 
 		return fail(t, "expected a value here")
@@ -369,7 +348,7 @@ local function parse(
 			return head
 		end
 
-		return { k = "app", f = head, args = args, at = head.at }
+		return { k = "app"; f = head; args = args; at = head.at }
 	end
 
 	local function parseFn(): Expr
@@ -382,13 +361,13 @@ local function parse(
 			sig = false
 
 			while cur().kind ~= ")" do
-				table.insert(names, word(expectKind("sym")))
+				table.insert(names, word(expectKind "sym"))
 			end
 
 			advance()
 			sig = saved
 		else
-			table.insert(names, word(expectKind("sym")))
+			table.insert(names, word(expectKind "sym"))
 		end
 
 		if #names == 0 then
@@ -404,18 +383,18 @@ local function parse(
 			pos += 1
 		end
 
-		return { k = "fn", names = names, body = parseExpr(), at = at(start) }
+		return { k = "fn"; names = names; body = parseExpr(); at = at(start) }
 	end
 
 	local function parseLet(): Expr
 		const start = advance()
-		const nameTok = expectKind("sym")
+		const nameTok = expectKind "sym"
 
 		if KEYWORDS[word(nameTok)] or word(nameTok) == "_" or isCapital(word(nameTok)) then
 			fail(nameTok, string.format("%s cannot be bound by let", word(nameTok)))
 		end
 
-		expectSym("=")
+		expectSym "="
 
 		-- Inside a match arm a newline ends the arm, so a let there would have no body to read. It needs parentheses.
 		if sig then
@@ -450,7 +429,8 @@ local function parse(
 		const c = parseAtom()
 		const t = parseAtom()
 		const e = parseAtom()
-		return { k = "if", c = c, t = t, e = e, at = at(start) }
+
+		return { k = "if"; c = c; t = t; e = e; at = at(start) }
 	end
 
 	local function parsePattern(): Pattern
@@ -462,7 +442,8 @@ local function parse(
 
 		if word(t) == "_" then
 			advance()
-			return { k = "wild", at = at(t) }
+
+			return { k = "wild"; at = at(t) }
 		end
 
 		if isCapital(word(t)) then
@@ -477,17 +458,18 @@ local function parse(
 				bind = word(nxt)
 			end
 
-			return { k = "con", name = word(t), bind = bind, at = at(t) }
+			return { k = "con"; name = word(t); bind = bind; at = at(t) }
 		end
 
 		advance()
-		return { k = "bind", name = word(t), at = at(t) }
+
+		return { k = "bind"; name = word(t); at = at(t) }
 	end
 
 	local function parseMatch(): Expr
 		const start = advance()
 		const scrut = parseExpr()
-		expectKind("{")
+		expectKind "{"
 
 		if toks[pos].kind ~= "NL" then
 			fail(toks[pos], "a match needs a newline after {, before its first arm")
@@ -508,9 +490,9 @@ local function parse(
 
 			const armStart = toks[pos]
 			const pat = parsePattern()
-			expectKind("->")
+			expectKind "->"
 			const body = parseExpr()
-			table.insert(arms, { pat = pat, body = body, at = at(armStart) })
+			table.insert(arms, { pat = pat; body = body; at = at(armStart) })
 
 			if toks[pos].kind ~= "NL" and toks[pos].kind ~= "}" then
 				fail(toks[pos], "an arm ends at the end of its line; wrap a longer body in parentheses")
@@ -523,42 +505,46 @@ local function parse(
 
 		pos += 1
 		sig = saved
-		return { k = "match", scrut = scrut, arms = arms, at = at(start) }
+
+		return { k = "match"; scrut = scrut; arms = arms; at = at(start) }
 	end
 
 	local function parseMutual(): Expr
 		const start = advance()
 		const saved = sig
 		sig = false
-		expectKind("(")
+		expectKind "("
 		local bindings: { Binding } = {}
 
 		while cur().kind == "(" do
 			advance()
-			const nameTok = expectKind("sym")
+			const nameTok = expectKind "sym"
 			const value = parseExpr()
-			expectKind(")")
-			table.insert(bindings, { name = word(nameTok), value = value, at = at(nameTok) })
+			expectKind ")"
+			table.insert(bindings, { name = word(nameTok); value = value; at = at(nameTok) })
 		end
 
-		expectKind(")")
+		expectKind ")"
 		const body = parseExpr()
 		sig = saved
-		return { k = "mutual", bindings = bindings, body = body, at = at(start) }
+
+		return { k = "mutual"; bindings = bindings; body = body; at = at(start) }
 	end
 
 	-- check e: the value of e, tested when it is used at a type. The operand is an atom, so an application needs parentheses.
 	local function parseCheck(): Expr
 		const start = advance()
 		const e = parseAtom()
-		return { k = "check", e = e, test = nil, expect = "", at = at(start) }
+
+		return { k = "check"; e = e; test = nil; expect = ""; at = at(start) }
 	end
 
 	-- untyped e: the value of e, given the type Dyn. A Dyn value is used at a type only through check.
 	local function parseUntyped(): Expr
 		const start = advance()
 		const e = parseAtom()
-		return { k = "untyped", e = e, at = at(start) }
+
+		return { k = "untyped"; e = e; at = at(start) }
 	end
 
 	parseExpr = function(): Expr
@@ -586,16 +572,14 @@ local function parse(
 
 		if cur().kind == "?" then
 			const q = advance()
-			return { k = "try", e = e, at = at(q) }
+
+			return { k = "try"; e = e; at = at(q) }
 		end
 
 		return e
 	end
-
 	-- PROGRAM
-
 	local decls: { TypeDecl } = {}
-
 	sig = true
 
 	while true do
@@ -621,7 +605,7 @@ local function parse(
 		fail(cur(), string.format("unexpected %s after the expression", tostring(cur().value or cur().kind)))
 	end
 
-	return { decls = decls, expr = expr }
+	return { decls = decls; expr = expr }
 end
 
 return {

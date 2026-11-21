@@ -15,7 +15,6 @@
 -- The form is canonical. The writer produces exactly one text for each value, and the reader accepts only that text: no leading zeros, no -0, no plus signs, one space between tokens and none at the ends, and nothing after the value. So reading a text and writing the value back gives the same text, and two values are equal exactly when their texts are.
 --
 -- A constructor is written con followed by its tag and its payload, and its tag is a whole number from 0 up. The text uses the tag, which is not a name: names are for the surface language.
-
 -- Functions and pins have no written form. Writing one is an error.
 --
 --   Data.write(value): string      raises an error for a function or a pin
@@ -23,12 +22,10 @@
 
 const M = require "./vm"
 
-type Stack = { { head: M.Value?, con: boolean } }
+type Stack = { { head: M.Value?; con: boolean } }
 
 -- Writes a value. The cells are walked with an explicit stack, so a long list does not nest the Luau call stack.
-const function write(
-	v: M.Value
-): string
+const function write(v: M.Value): string
 	local out: { string } = {}
 	local pending: { M.Value } = { v }
 	local count = 1
@@ -44,7 +41,6 @@ const function write(
 			table.insert(out, "nil")
 		elseif cur.kind == "con" then
 			table.insert(out, "con")
-
 			-- The tag is written before the payload, so the payload goes on the stack first.
 			count += 1
 			pending[count] = cur.payload
@@ -52,7 +48,6 @@ const function write(
 			pending[count] = cur.tag
 		elseif cur.kind == "cell" then
 			table.insert(out, "cons")
-
 			-- The head is written before the tail, so the tail goes on the stack first.
 			count += 1
 			pending[count] = cur.tail
@@ -69,9 +64,7 @@ const function write(
 end
 
 -- Reads one token that is not cons: nil, or an integer in canonical form and range.
-const function leaf(
-	token: string
-): M.Value
+const function leaf(token: string): M.Value
 	if token == "nil" then
 		return M.NIL
 	end
@@ -96,9 +89,7 @@ const function leaf(
 end
 
 -- Reads a whole text as one value. Each token either is a value, which completes the innermost cell still waiting for its tail, or starts a cell, which waits for its head and then its tail. The stack holds the cells waiting for a part.
-const function read(
-	text: string
-): M.Value
+const function read(text: string): M.Value
 	if text == "" then
 		error("data: the text is empty", 0)
 	end
@@ -117,9 +108,9 @@ const function read(
 		end
 
 		if token == "cons" then
-			table.insert(stack, { head = nil, con = false })
+			table.insert(stack, { head = nil; con = false })
 		elseif token == "con" then
-			table.insert(stack, { head = nil, con = true })
+			table.insert(stack, { head = nil; con = true })
 		else
 			local v = leaf(token)
 

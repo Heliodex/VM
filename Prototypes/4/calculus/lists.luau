@@ -10,28 +10,24 @@
 --
 -- A list is read back one cell at a time: `isNil` says whether it is empty, and `head` and `tail` take it apart. Lists have no whole-value readback yet.
 
-const Bo = require "./booleans"
 const B = require "../engine/builder"
+const Types = require "../engine/types"
+const Bo = require "./booleans"
 const L = require "./lambda"
 const Rec = require "./recursion"
 const S = require "./scott"
-const Types = require "../engine/types"
 
 type Builder = B.Builder
 type Port = Types.Port
 
 -- λc.λn. n
-const function nilValue(
-	b: Builder
-): Port
+const function nilValue(b: Builder): Port
 	return L.lam(
-		b, function(
-			_c: Port
-		): Port
+		b,
+		function(_c: Port): Port
 			return L.lam(
-				b, function(
-					n: Port
-				): Port
+				b,
+				function(n: Port): Port
 					return n
 				end
 			)
@@ -40,25 +36,19 @@ const function nilValue(
 end
 
 -- λh.λt.λc.λn. c h t
-const function cons(
-	b: Builder
-): Port
+const function cons(b: Builder): Port
 	return L.lam(
-		b, function(
-			h: Port
-		): Port
+		b,
+		function(h: Port): Port
 			return L.lam(
-				b, function(
-					t: Port
-				): Port
+				b,
+				function(t: Port): Port
 					return L.lam(
-						b, function(
-							c: Port
-						): Port
+						b,
+						function(c: Port): Port
 							return L.lam(
-								b, function(
-									_n: Port
-								): Port
+								b,
+								function(_n: Port): Port
 									return L.app(b, L.app(b, c, h), t)
 								end
 							)
@@ -71,25 +61,19 @@ const function cons(
 end
 
 -- λl.λd. l (λh.λt. h) d: the head of a list, or `d` for the empty list.
-const function head(
-	b: Builder
-): Port
+const function head(b: Builder): Port
 	return L.lam(
-		b, function(
-			l: Port
-		): Port
+		b,
+		function(l: Port): Port
 			return L.lam(
-				b, function(
-					d: Port
-				): Port
+				b,
+				function(d: Port): Port
 					const first = L.lam(
-						b, function(
-							h: Port
-						): Port
+						b,
+						function(h: Port): Port
 							return L.lam(
-								b, function(
-									_t: Port
-								): Port
+								b,
+								function(_t: Port): Port
 									return h
 								end
 							)
@@ -104,25 +88,19 @@ const function head(
 end
 
 -- λl.λd. l (λh.λt. t) d: the tail of a list, or `d` for the empty list.
-const function tail(
-	b: Builder
-): Port
+const function tail(b: Builder): Port
 	return L.lam(
-		b, function(
-			l: Port
-		): Port
+		b,
+		function(l: Port): Port
 			return L.lam(
-				b, function(
-					d: Port
-				): Port
+				b,
+				function(d: Port): Port
 					const rest = L.lam(
-						b, function(
-							_h: Port
-						): Port
+						b,
+						function(_h: Port): Port
 							return L.lam(
-								b, function(
-									t: Port
-								): Port
+								b,
+								function(t: Port): Port
 									return t
 								end
 							)
@@ -137,21 +115,16 @@ const function tail(
 end
 
 -- λl. l (λh.λt. false) true
-const function isNil(
-	b: Builder
-): Port
+const function isNil(b: Builder): Port
 	return L.lam(
-		b, function(
-			l: Port
-		): Port
+		b,
+		function(l: Port): Port
 			const notEmpty = L.lam(
-				b, function(
-					_h: Port
-				): Port
+				b,
+				function(_h: Port): Port
 					return L.lam(
-						b, function(
-							_t: Port
-						): Port
+						b,
+						function(_t: Port): Port
 							return Bo.boolean(b, false)
 						end
 					)
@@ -164,39 +137,31 @@ const function isNil(
 end
 
 -- The length of a list, as a Scott numeral: each head is dropped and the folded tail is incremented.
-const function length(
-	b: Builder
-): Port
+const function length(b: Builder): Port
 	return Rec.tie(
-		b, Rec.fold(S.zero, function(
-			own: Builder
-		): Port
-			return L.lam(
-				own, function(
-					_h: Port
-				): Port
-					return S.successor(own)
-				end
-			)
-		end)
+		b,
+		Rec.fold(
+			S.zero,
+			function(own: Builder): Port
+				return L.lam(
+					own,
+					function(_h: Port): Port
+						return S.successor(own)
+					end
+				)
+			end
+		)
 	)
 end
 
 -- The sum of a list of Scott numerals.
-const function sum(
-	b: Builder
-): Port
+const function sum(b: Builder): Port
 	return Rec.tie(b, Rec.fold(S.zero, S.addition))
 end
 
 -- The value of element i (counting from 0) of the list that `build` makes: the head of its i-th tail, or zero past the end, which readback never asks for.
-local function elementOf(
-	build: (Builder) -> Port,
-	i: number
-): (Builder) -> Port
-	return function(
-		b: Builder
-	): Port
+local function elementOf(build: (Builder) -> Port, i: number): (Builder) -> Port
+	return function(b: Builder): Port
 		local rest = build(b)
 
 		for _ = 1, i do
@@ -209,15 +174,13 @@ end
 
 -- The whole list that `build` makes, as a Lua table of the numbers in it, from the start. The length is read first, then each element, so the cost is quadratic in the length.
 -- It is nil if the value is not a list of numerals: either its length does not read back, or an element does not.
-const function readback(
-	build: (Builder) -> Port,
-	budget: number?
-): { number }?
-	const _, count = S.readback(function(
-		b: Builder
-	): Port
-		return L.app(b, length(b), build(b))
-	end, budget)
+const function readback(build: (Builder) -> Port, budget: number?): { number }?
+	const _, count = S.readback(
+		function(b: Builder): Port
+			return L.app(b, length(b), build(b))
+		end,
+		budget
+	)
 
 	if count == nil then
 		return nil

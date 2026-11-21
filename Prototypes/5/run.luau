@@ -5,13 +5,13 @@
 --
 --   luau run.luau      (from Prototypes/5)
 
-const Examples = require "./examples/examples"
-const Constructors = require "./examples/constructors"
 const Programs = require "./L1/examples/programs"
-const Reader = require "./L1/reader"
 const Text = require "./L1/examples/text"
-const VM = require "./interpreter/vm"
+const Reader = require "./L1/reader"
+const Constructors = require "./examples/constructors"
+const Examples = require "./examples/examples"
 const Primitives = require "./interpreter/primitives"
+const VM = require "./interpreter/vm"
 
 local failures = 0
 local total = 0
@@ -28,7 +28,6 @@ const function report(
 	const result = VM.run(ex.program, ex.fuel)
 	local got: string
 	local pass: boolean
-
 	total += 1
 
 	if result.status == "value" then
@@ -48,7 +47,11 @@ const function report(
 		failures += 1
 		print(
 			string.format(
-				"FAIL  %s  -> %s  (%d steps), expected %s", ex.name, got, result.steps, if ex.outcome == "value" then
+				"FAIL  %s  -> %s  (%d steps), expected %s",
+				ex.name,
+				got,
+				result.steps,
+				if ex.outcome == "value" then
 					tostring(ex.expect)
 				else
 					ex.outcome
@@ -75,7 +78,6 @@ end
 
 for _, source in Text.rejects do
 	total += 1
-
 	const ok, err = pcall(Reader.parse, source)
 
 	if ok then
@@ -98,7 +100,7 @@ const builderRejects: { [string]: () -> VM.Expr } = {
 		return VM.prim(Primitives.TAG.kind, VM.int(1), VM.int(2))
 	end,
 	["an integer past the range"] = function()
-		return VM.int(9007199254740992)
+		return VM.int(0x20000000000000)
 	end,
 	["a constructor with a negative tag"] = function()
 		return VM.construct(-1, VM.int(1))
@@ -110,7 +112,6 @@ const builderRejects: { [string]: () -> VM.Expr } = {
 
 for name, build in builderRejects do
 	total += 1
-
 	const ok, err = pcall(build)
 
 	if ok then

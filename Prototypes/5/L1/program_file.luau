@@ -24,14 +24,12 @@
 -- resolve takes a file name and gives the text of that file, or nil if there is none. It is needed only when the file has imports. name is the name of this file, which is used to detect cycles.
 
 const Data = require "../interpreter/data"
-const Reader = require "./reader"
 const VM = require "../interpreter/vm"
+const Reader = require "./reader"
 
 -- The budget for evaluating a test's input or expected output. These are literal values, so the budget only has to be generous.
-const VALUE_FUEL = 1000000
-
+const VALUE_FUEL = 1e6
 export type Resolve = (name: string) -> string?
-
 export type Test = {
 	line: number,
 	input: VM.Value,
@@ -39,13 +37,11 @@ export type Test = {
 	output: string?,
 	fuel: number,
 }
-
 export type Import = {
 	line: number,
 	name: string,
 	file: string,
 }
-
 export type File = {
 	header: string,
 	imports: { Import },
@@ -54,16 +50,12 @@ export type File = {
 	tests: { Test },
 }
 
-const function trim(
-	s: string
-): string
-	return (string.match(s, "^%s*(.-)%s*$") :: string)
+const function trim(s: string): string
+	return string.match(s, "^%s*(.-)%s*$") :: string
 end
 
 -- The lines of a text. The last line may be empty, if the text ends with a newline.
-const function splitLines(
-	text: string
-): { string }
+const function splitLines(text: string): { string }
 	local lines: { string } = {}
 
 	for line in string.gmatch(text .. "\n", "([^\n]*)\n") do
@@ -74,17 +66,11 @@ const function splitLines(
 end
 
 -- The value that a source text gives in the reader's language. It must give a value, not an error or an out of fuel, and the error for a text that does not read or run is given the line of the test. what says which part of the test it is, for the message.
-const function evalValue(
-	text: string,
-	lineNo: number,
-	what: string,
-	names: { string },
-	values: { VM.Expr }
-): VM.Value
+const function evalValue(text: string, lineNo: number, what: string, names: { string }, values: { VM.Expr }): VM.Value
 	const ok, expr = pcall(Reader.parseWith, text, names, values)
 
 	if not ok then
-		error(`line {lineNo}: the {what}: {(string.gsub(tostring(expr), "^line %d+: ", ""))}`, 0)
+		error(`line {lineNo}: the {what}: {string.gsub(tostring(expr), "^line %d+: ", "")}`, 0)
 	end
 
 	const result = VM.run(expr :: VM.Expr, VALUE_FUEL)
@@ -99,12 +85,7 @@ const function evalValue(
 end
 
 -- Reads one test line, which is on line lineNo of the file.
-const function parseTest(
-	text: string,
-	lineNo: number,
-	names: { string },
-	values: { VM.Expr }
-): Test
+const function parseTest(text: string, lineNo: number, names: { string }, values: { VM.Expr }): Test
 	const arrow = string.find(text, " => ", 1, true)
 
 	if arrow == nil then
@@ -127,7 +108,6 @@ const function parseTest(
 	end
 
 	const input = evalValue(inputText, lineNo, "input", names, values)
-
 	local outcome: string
 	local output: string? = nil
 
@@ -155,10 +135,7 @@ const function parseTest(
 end
 
 -- Reads one import line, name = file, which is on line lineNo of the file. The name must be a name the reader accepts as a variable.
-const function parseImport(
-	text: string,
-	lineNo: number
-): Import
+const function parseImport(text: string, lineNo: number): Import
 	const name, file = string.match(text, "^(%S+)%s*=%s*(%S+)$")
 
 	if name == nil or file == nil then
@@ -177,9 +154,7 @@ const function parseImport(
 end
 
 -- A path with its . and .. parts worked out, so that two paths to one file are equal. It is nil if the path climbs above the top of the folder.
-const function normalize(
-	path: string
-): string?
+const function normalize(path: string): string?
 	local parts: { string } = {}
 
 	for part in string.gmatch(path, "[^/]+") do
@@ -201,13 +176,7 @@ end
 
 -- Loads the program of one file. stack holds the names of the files that are being loaded around this one, so an import of one of them is a cycle.
 local parseFile: (text: string, resolve: Resolve?, name: string?, stack: { string }) -> File
-
-parseFile = function(
-	text: string,
-	resolve: Resolve?,
-	name: string?,
-	stack: { string }
-): File
+parseFile = function(text: string, resolve: Resolve?, name: string?, stack: { string }): File
 	const lines = splitLines(text)
 	local separators: { number } = {}
 
@@ -225,7 +194,6 @@ parseFile = function(
 	const second = separators[2]
 	const third = separators[3]
 	const header = table.concat(lines, "\n", 1, first - 1)
-
 	local imports: { Import } = {}
 	local seen: { [string]: boolean } = {}
 
@@ -287,7 +255,6 @@ parseFile = function(
 	end
 
 	const programText = table.concat(lines, "\n", second + 1, third - 1)
-
 	local program: VM.Expr
 	local ok, err = pcall(function()
 		program = Reader.parseWith(programText, names, values)
@@ -328,11 +295,7 @@ parseFile = function(
 end
 
 -- Reads a program file. See the top of this file for resolve and name.
-const function parse(
-	text: string,
-	resolve: Resolve?,
-	name: string?
-): File
+const function parse(text: string, resolve: Resolve?, name: string?): File
 	return parseFile(text, resolve, name, {})
 end
 

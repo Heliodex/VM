@@ -10,7 +10,6 @@ type List = {
 	read type: "$",
 	read things: { Thing },
 }
-
 local NUM: "@" = "@"
 local LIST: "$" = "$"
 
@@ -19,13 +18,16 @@ local function serialise(t: Thing, useOps: boolean): string
 		if useOps and t.op then
 			return t.op
 		end
+
 		return tostring(t.value)
 	end
 
 	local elements: { string } = {}
+
 	for i, elem in t.things do
 		elements[i] = serialise(elem, useOps)
 	end
+
 	-- table.sort(elements)
 	return "{" .. table.concat(elements, " ") .. "}"
 end
@@ -34,10 +36,12 @@ local function num(value: number, op: string?): Num
 	if value < 0 then
 		error "Negative numbers are not supported at the moment"
 	end
+
 	if value % 1 ~= 0 then
 		error "Non-integer numbers are not supported at the moment"
 	end
-	return table.freeze { type = NUM, value = value, op = op }
+
+	return table.freeze { type = NUM; value = value; op = op }
 end
 
 local function list(things: { Thing }): List
@@ -53,24 +57,28 @@ local empty = list {}
 local function deserialise(s: string): Thing
 	if string.sub(s, 1, 1) ~= "{" then
 		local n = tonumber(s)
+
 		if n == nil then
 			error(`Invalid number: {s}`)
 		end
+
 		return num(n)
 	end
 
 	local news = string.sub(s, 2, -2)
 	local elements = {}
-
 	local lastElem: { string } = {}
 	local braceLevel = 0
+
 	for i = 1, #news do
 		local c = string.sub(news, i, i)
+
 		if c == " " and braceLevel == 0 then
 			if #lastElem > 0 then
 				table.insert(elements, deserialise(table.concat(lastElem)))
 				lastElem = {}
 			end
+
 			continue
 		end
 
@@ -79,8 +87,10 @@ local function deserialise(s: string): Thing
 		elseif c == "}" then
 			braceLevel -= 1
 		end
+
 		table.insert(lastElem, c)
 	end
+
 	if #lastElem > 0 then
 		table.insert(elements, deserialise(table.concat(lastElem)))
 	end
@@ -109,10 +119,13 @@ local function equalList(a: List, b: List): boolean
 end
 
 function equal(a: Thing, b: Thing): boolean
-	return if a.type == NUM and b.type == NUM
-		then equalNum(a, b)
-		elseif a.type == LIST and b.type == LIST then equalList(a, b)
-		else false
+	return
+		if a.type == NUM and b.type == NUM then
+			equalNum(a, b)
+		elseif a.type == LIST and b.type == LIST then
+			equalList(a, b)
+		else
+			false
 end
 
 local function len(s: List): number
@@ -120,26 +133,14 @@ local function len(s: List): number
 end
 
 local TRUE, FALSE = num(0, "TRUE"), num(1, "FALSE") -- imagine loobeans but if they were loobeans
+local TAKE, PART, SIZE, SUM, CHECK, TYPE, CHANGE, SPLIT, IF, COMP, EXT, CALL = num(0, "TAKE"), num(1, "PART"), num(2, "SIZE"), num(3, "SUM"), num(4, "CHECK"), num(5, "TYPE"), num(6, "CHANGE"), num(7, "SPLIT"), num(8, "IF"), num(9, "COMP"), num(10, "EXT"), num(11, "CALL")
 
-local TAKE, PART, SIZE, SUM, CHECK, TYPE, CHANGE, SPLIT, IF, COMP, EXT, CALL =
-	num(0, "TAKE"),
-	num(1, "PART"),
-	num(2, "SIZE"),
-	num(3, "SUM"),
-	num(4, "CHECK"),
-	num(5, "TYPE"),
-	num(6, "CHANGE"),
-	num(7, "SPLIT"),
-	-- macros
-	num(8, "IF"),
-	num(9, "COMP"),
-	num(10, "EXT"),
-	num(11, "CALL")
-
+-- macros
 local function h_size(t: Thing): Num?
 	if t.type ~= LIST then
 		return nil
 	end
+
 	return num(len(t))
 end
 
@@ -191,11 +192,16 @@ local function h_check(t: Thing): Num?
 
 		prev = e
 	end
+
 	return TRUE
 end
 
 local function h_type(t: Thing): Num?
-	return if t.type == NUM then TRUE else FALSE
+	return
+		if t.type == NUM then
+			TRUE
+		else
+			FALSE
 end
 
 local function h_change(x: Thing, y: Thing, z: Thing): Thing?
@@ -217,39 +223,39 @@ local function h_change(x: Thing, y: Thing, z: Thing): Thing?
 end
 
 local function a_take(a: Thing, b: Thing): Thing
-	return list { a, list { TAKE, b } }
+	return list { a; list { TAKE; b } }
 end
 
 local function a_size(a: Thing, b: Thing): Thing
-	return list { a, list { SIZE, b } }
+	return list { a; list { SIZE; b } }
 end
 
 local function a_part(a: Thing, b: Thing): Thing
-	return list { a, list { PART, b } }
+	return list { a; list { PART; b } }
 end
 
 local function a_sum(a: Thing, b: Thing): Thing
-	return list { a, list { SUM, b } }
+	return list { a; list { SUM; b } }
 end
 
 local function a_check(a: Thing, b: Thing): Thing
-	return list { a, list { CHECK, b } }
+	return list { a; list { CHECK; b } }
 end
 
 local function a_type(a: Thing, b: Thing): Thing
-	return list { a, list { TYPE, b } }
+	return list { a; list { TYPE; b } }
 end
 
 local function a_change(a: Thing, b: Thing, c: Thing, d: Thing): Thing
-	return list { a, list { CHANGE, list { b, c, d } } }
+	return list { a; list { CHANGE; list { b; c; d } } }
 end
 
 local function a_split(a: Thing, b: Thing): Thing
-	return list { a, list { SPLIT, b } }
+	return list { a; list { SPLIT; b } }
 end
 
 local function a_if(a: Thing, b: Thing, c: Thing, d: Thing): Thing
-	return list { a, list { IF, list { b, c, d } } }
+	return list { a; list { IF; list { b; c; d } } }
 end
 
 local function a_ifog(a: Thing, b: Thing, c: Thing, d: Thing): Thing
@@ -262,15 +268,15 @@ local function a_ifog(a: Thing, b: Thing, c: Thing, d: Thing): Thing
 	return a_split(
 		a,
 		a_split(
-			list { PART, num(0) },
+			list { PART; num(0) },
 			list {
-				list { TAKE, list { c, d } },
+				list { TAKE; list { c; d } },
 				a_sum(
-					list { TAKE, PART },
+					list { TAKE; PART },
 					list {
 						list {
 							TAKE,
-							num(1) --[[X]],
+							num(1), --[[X]]
 						},
 						b,
 					}
@@ -291,19 +297,19 @@ local function a_ifc(a: Thing, b: Thing, c: Thing, d: Thing): Thing
 	return a_split(
 		a,
 		a_split(
-			list { PART, num(0) },
+			list { PART; num(0) },
 			list {
-				list { TAKE, list { c, d } },
+				list { TAKE; list { c; d } },
 				a_split(
-					list { TAKE, PART },
+					list { TAKE; PART },
 					list {
-						list { TAKE, list { num(1), num(2) } }, -- constraint not really required
+						list { TAKE; list { num(1); num(2) } }, -- constraint not really required
 						a_sum(
-							list { TAKE, PART },
+							list { TAKE; PART },
 							list {
 								list {
 									TAKE,
-									num(1) --[[X]],
+									num(1), --[[X]]
 								},
 								b,
 							}
@@ -333,7 +339,7 @@ local function a_compog(a: Thing, b: Thing, c: Thing): Thing
 end
 
 local function a_comp(a: Thing, b: Thing, c: Thing): Thing
-	return list { a, list { COMP, list { b, c } } }
+	return list { a; list { COMP; list { b; c } } }
 end
 
 local function a_extog(a: Thing, b: Thing, c: Thing): Thing
@@ -343,7 +349,7 @@ local function a_extog(a: Thing, b: Thing, c: Thing): Thing
 			COMP,
 			list {
 				list {
-					list { COMP, list { list { PART, num(0) }, b } },
+					list { COMP; list { list { PART; num(0) }; b } },
 					list {
 						PART,
 						num(0),
@@ -356,7 +362,7 @@ local function a_extog(a: Thing, b: Thing, c: Thing): Thing
 end
 
 local function a_ext(a: Thing, b: Thing, c: Thing): Thing
-	return list { a, list { EXT, list { b, c } } }
+	return list { a; list { EXT; list { b; c } } }
 end
 
 local function a_callog(a: Thing, b: Thing, c: Thing): Thing
@@ -366,103 +372,103 @@ local function a_callog(a: Thing, b: Thing, c: Thing): Thing
 			COMP,
 			list {
 				c,
-				list { num(2), list { list { PART, num(1) }, list { PART, b } } },
+				list { num(2); list { list { PART; num(1) }; list { PART; b } } },
 			},
 		},
 	}
 end
 
 local function a_call(a: Thing, b: Thing, c: Thing): Thing
-	return list { a, list { CALL, list { b, c } } }
+	return list { a; list { CALL; list { b; c } } }
 end
 
 -- *a
 local function reduce1(e: Thing, depth: number): Thing?
 	-- local function print()
-
 	-- end
-
 	if depth < 0 then
 		error "Invalid depth"
 	end
+
 	if depth > 10 then
 		error "Too deep!"
 	end
+
 	local start = string.rep("    ", depth)
 
 	local function printReturn(a: Thing?)
 		if a then
 			print(start .. serialise(a, true))
 		end
+
 		return a
 	end
 
 	print(`{start}*{serialise(e, true)}`)
+
 	if e.type == NUM then
 		return printReturn(e) -- *a:@ -> a
 	end
 
-	local function print() end
+	local function print()
+	end
 
 	-- if len(e) == 0 then
 	-- 	return e -- *{} -> {}
 	-- end
-
 	-- if len(e) == 1 then
 	-- 	-- extract the single element
 	-- 	-- kind of like a pin<>
 	-- 	local only = e.things[1]
 	-- 	return reduce1(only, depth + 1) -- *{a} -> *a
 	-- end
-
 	if len(e) ~= 2 then
 		print(`{start}! Element not length 2`)
+
 		return nil
 	end
 
 	-- now we're talking
 	-- the list needs to be {a {n:@ b}}
 	local a, l = e.things[1], e.things[2]
+
 	if l.type ~= LIST then
 		print(`{start}! 2nd element not list`)
+
 		return nil
 	end
 
 	if len(l) ~= 2 then
 		print(`{start}! 2nd element not length 2`)
+
 		return nil
 	end
 
 	local n, b = l.things[1], l.things[2]
+
 	if n.type == LIST and len(n) == 2 then
 		-- autocons
 		local b2, c2 = n.things[1], n.things[2]
-
 		local sera = serialise(a, true)
-		print(
-			`{start}\{*\{{sera} \{{serialise(b2, true)} {serialise(c2, true)}}} *\{{sera} {serialise(
-				b,
-				true
-			)}}}`
-		)
+		print(`{start}\{*\{{sera} \{{serialise(b2, true)} {serialise(c2, true)}}} *\{{sera} {serialise(b, true)}}}`)
+		local rabc = reduce1(list { a; list { b2; c2 } }, depth + 1)
 
-		local rabc = reduce1(list { a, list { b2, c2 } }, depth + 1)
 		if rabc == nil then
 			print(`{start}! autocons: reduce abc failed`)
+
 			return nil
 		end
 
-		print(
-			`{start}\{{serialise(rabc, true)} *\{{sera} {serialise(b, true)}}}`
-		)
+		print(`{start}\{{serialise(rabc, true)} *\{{sera} {serialise(b, true)}}}`)
+		local rad = reduce1(list { a; b }, depth + 1)
 
-		local rad = reduce1(list { a, b }, depth + 1)
 		if rad == nil then
 			print(`{start}! autocons: reduce ad failed`)
+
 			return nil
 		end
 
-		return printReturn(list { rabc, rad }) -- *{a {{b c} d}} -> {*{a {b c}} *{a d}} (no *)
+		return printReturn(list { rabc; rad }) -- *{a {{b c} d}} -> {*{a {b c}} *{a d}} (no *)
 	end
 
 	if n.type ~= NUM then
@@ -470,7 +476,6 @@ local function reduce1(e: Thing, depth: number): Thing?
 	end
 
 	-- opcodes
-
 	-- *{a {TAKE b}} -> b
 	if equal(n, TAKE) then
 		return printReturn(b)
@@ -479,54 +484,71 @@ local function reduce1(e: Thing, depth: number): Thing?
 	-- *{a {PART b}} -> part(a, b)
 	if equal(n, PART) then
 		print(`{start}part({serialise(a, true)}, {serialise(b, true)})`)
+
 		return printReturn(h_part(a, b))
 	end
 
 	-- *{a {SIZE b}} -> size(*{a b})
 	if equal(n, SIZE) then
 		print(`{start}size(*\{{serialise(a, true)} {serialise(b, true)}})`)
-		local rab = reduce1(list { a, b }, depth + 1)
+		local rab = reduce1(list { a; b }, depth + 1)
+
 		if rab == nil then
 			print(`{start}! size: reduce ab failed`)
+
 			return nil
 		end
+
 		print(`{start}size({serialise(rab, true)})`)
+
 		return printReturn(h_size(rab))
 	end
 
 	-- *{a {SUM b}} -> sum(*{a b})
 	if equal(n, SUM) then
 		print(`{start}sum(*\{{serialise(a, true)} {serialise(b, true)}})`)
-		local rab = reduce1(list { a, b }, depth + 1)
+		local rab = reduce1(list { a; b }, depth + 1)
+
 		if rab == nil then
 			print(`{start}! sum: reduce ab failed`)
+
 			return nil
 		end
+
 		print(`{start}sum({serialise(rab, true)})`)
+
 		return printReturn(h_sum(rab))
 	end
 
 	-- *{a {CHECK b}} -> check(*{a b})
 	if equal(n, CHECK) then
 		print(`{start}check(*\{{serialise(a, true)} {serialise(b, true)}})`)
-		local rab = reduce1(list { a, b }, depth + 1)
+		local rab = reduce1(list { a; b }, depth + 1)
+
 		if rab == nil then
 			print(`{start}! check: reduce ab failed`)
+
 			return nil
 		end
+
 		print(`{start}check({serialise(rab, true)})`)
+
 		return printReturn(h_check(rab))
 	end
 
 	-- *{a {TYPE b}} -> type(*{a b})
 	if equal(n, TYPE) then
 		print(`{start}type(*\{{serialise(a, true)} {serialise(b, true)}})`)
-		local rab = reduce1(list { a, b }, depth + 1)
+		local rab = reduce1(list { a; b }, depth + 1)
+
 		if rab == nil then
 			print(`{start}! type: reduce ab failed`)
+
 			return nil
 		end
+
 		print(`{start}type({serialise(rab, true)})`)
+
 		return printReturn(h_type(rab))
 	end
 
@@ -534,37 +556,36 @@ local function reduce1(e: Thing, depth: number): Thing?
 	if equal(n, CHANGE) then
 		if b.type ~= LIST then
 			print(`{start}! change: 2nd parameter not list`)
+
 			return nil
 		end
 
 		if len(b) ~= 3 then
 			print(`{start}! change: 2nd parameter not length 3`)
+
 			return nil
 		end
 
 		local b2, c2, d2 = b.things[1], b.things[2], b.things[3]
-
 		local sera = serialise(a, true)
 		local serb = serialise(b2, true)
 		local serd = serialise(d2, true)
+		print(`{start}change({serb}, *\{{sera} {serialise(c2, true)}}, *\{{sera} {serd}}})`)
+		local rac = reduce1(list { a; c2 }, depth + 1)
 
-		print(
-			`{start}change({serb}, *\{{sera} {serialise(c2, true)}}, *\{{sera} {serd}}})`
-		)
-
-		local rac = reduce1(list { a, c2 }, depth + 1)
 		if rac == nil then
 			print(`{start}! change: reduce ac failed`)
+
 			return nil
 		end
 
 		local serrac = serialise(rac, true)
-
 		print(`{start}change({serb}, {serrac}, *\{{sera} {serd}}})`)
+		local rad = reduce1(list { a; d2 }, depth + 1)
 
-		local rad = reduce1(list { a, d2 }, depth + 1)
 		if rad == nil then
 			print(`{start}! change: reduce ad failed`)
+
 			return nil
 		end
 
@@ -577,40 +598,41 @@ local function reduce1(e: Thing, depth: number): Thing?
 	if equal(n, SPLIT) then
 		if b.type ~= LIST then
 			print(`{start}! split: 2nd parameter not list`)
+
 			return nil
 		end
 
 		if len(b) ~= 2 then
 			print(`{start}! split: 2nd parameter not length 2`)
+
 			return nil
 		end
 
 		local b2, c2 = b.things[1], b.things[2]
-
 		local sera = serialise(a, true)
 		local serc = serialise(c2, true)
-
 		print(`{start}*\{*\{{sera} {serialise(b2, true)}} *\{{sera} {serc}}}`)
+		local rab = reduce1(list { a; b2 }, depth + 1)
 
-		local rab = reduce1(list { a, b2 }, depth + 1)
 		if rab == nil then
 			print(`{start}! split: reduce ab failed`)
+
 			return nil
 		end
 
 		print(`{start}*\{{serialise(rab, true)} *\{{sera} {serc}}}`)
+		local rac = reduce1(list { a; c2 }, depth + 1)
 
-		local rac = reduce1(list { a, c2 }, depth + 1)
 		if rac == nil then
 			print(`{start}! split: reduce ac failed`)
+
 			return nil
 		end
 
-		return reduce1(list { rab, rac }, depth)
+		return reduce1(list { rab; rac }, depth)
 	end
 
 	-- macro time
-
 	-- *{a {IF {b c d}}} -> *{a {SPLIT {{PART 0} {SPLIT {{TAKE {c d}} {{TAKE PART} {SUM {{TAKE 1} b}}}}}}}}
 	--[[
 		*{a {SPLIT {{PART 0} {SPLIT {{TAKE {c d}} {{TAKE PART} {SUM {{TAKE 1} b}}}}}}}}
@@ -628,50 +650,43 @@ local function reduce1(e: Thing, depth: number): Thing?
 	if equal(n, IF) then
 		if b.type ~= LIST then
 			print(`{start}! if: 2nd parameter not list`)
+
 			return nil
 		end
 
 		if len(b) ~= 3 then
 			print(`{start}! if: 2nd parameter not length 3`)
+
 			return nil
 		end
 
 		-- to put some clarification in this document for once, this opcode does if-then-else. Just like Nock 6, it's written in the first definition as a funky-looking macro just because we can. The ones after that are a "demacrotisation" of that. While useful for VM implementation, the most interesting thing is that they *can* be written in terms of the other opcodes (note the first definition has only 1 eval operator)
-
 		local b2, c2, d2 = b.things[1], b.things[2], b.things[3]
 		-- return printReturn(reduce1(a_ifog(a, b2, c2, d2), depth + 1))
 		local sera = serialise(a, true)
 		local serc = serialise(c2, true)
 		local serd = serialise(d2, true)
+		print(`{start}*\{{sera} *\{part(\{{serc} {serd}}, sum(\{1 *\{{sera} {serialise(b2, true)}}}))}}`)
+		local rab = reduce1(list { a; b2 }, depth + 1)
 
-		print(
-			`{start}*\{{sera} *\{part(\{{serc} {serd}}, sum(\{1 *\{{sera} {serialise(
-				b2,
-				true
-			)}}}))}}`
-		)
-
-		local rab = reduce1(list { a, b2 }, depth + 1)
 		if rab == nil then
 			print(`{start}! if: reduce ab failed`)
+
 			return nil
 		end
 
-		print(
-			`{start}*\{{sera} *\{part(\{{serc} {serd}}, sum(\{1 {serialise(
-				rab,
-				true
-			)}}))}}`
-		)
+		print(`{start}*\{{sera} *\{part(\{{serc} {serd}}, sum(\{1 {serialise(rab, true)}}))}}`)
 
 		if equal(rab, TRUE) then
-			return printReturn(reduce1(list { a, c2 }, depth + 1))
+			return printReturn(reduce1(list { a; c2 }, depth + 1))
 		end
+
 		if equal(rab, FALSE) then
-			return printReturn(reduce1(list { a, d2 }, depth + 1))
+			return printReturn(reduce1(list { a; d2 }, depth + 1))
 		end
 
 		print(`{start}! if: condition not boolean (got {serialise(rab, true)})`)
+
 		return nil
 	end
 
@@ -684,29 +699,29 @@ local function reduce1(e: Thing, depth: number): Thing?
 	if equal(n, COMP) then
 		if b.type ~= LIST then
 			print(`{start}! comp: 2nd parameter not list`)
+
 			return nil
 		end
 
 		if len(b) ~= 2 then
 			print(`{start}! comp: 2nd parameter not length 2`)
+
 			return nil
 		end
 
 		local b2, c2 = b.things[1], b.things[2]
 		-- return printReturn(reduce1(a_compog(a, b2, c2), depth + 1))
 		local serc = serialise(c2, true)
+		print(`{start}*\{*\{{serialise(a, true)} {serialise(b2, true)}} {serc}}`)
+		local rab = reduce1(list { a; b2 }, depth + 1)
 
-		print(
-			`{start}*\{*\{{serialise(a, true)} {serialise(b2, true)}} {serc}}`
-		)
-
-		local rab = reduce1(list { a, b2 }, depth + 1)
 		if rab == nil then
 			print(`{start}! comp: reduce ab failed`)
+
 			return nil
 		end
 
-		return reduce1(list { rab, c2 }, depth)
+		return reduce1(list { rab; c2 }, depth)
 	end
 
 	-- *{a {EXT {b c}}} -> *{a {COMP {{{COMP {{PART 0} b}} {PART 0}} c}}}
@@ -721,11 +736,13 @@ local function reduce1(e: Thing, depth: number): Thing?
 	if equal(n, EXT) then
 		if b.type ~= LIST then
 			print(`{start}! ext: 2nd parameter not list`)
+
 			return nil
 		end
 
 		if len(b) ~= 2 then
 			print(`{start}! ext: 2nd parameter not length 2`)
+
 			return nil
 		end
 
@@ -733,16 +750,16 @@ local function reduce1(e: Thing, depth: number): Thing?
 		-- return printReturn(reduce1(a_extog(a, b2, c2), depth + 1))
 		local sera = serialise(a, true)
 		local serc = serialise(c2, true)
-
 		print(`{start}*\{\{*\{{sera} {serialise(b2, true)}} {sera}} {serc}}`)
+		local rab = reduce1(list { a; b2 }, depth + 1)
 
-		local rab = reduce1(list { a, b2 }, depth + 1)
 		if rab == nil then
 			print(`{start}! ext: reduce ab failed`)
+
 			return nil
 		end
 
-		return reduce1(list { list { rab, a }, c2 }, depth)
+		return reduce1(list { list { rab; a }; c2 }, depth)
 	end
 
 	-- *{a {CALL {b c}}} -> *{a {COMP {c {2 {{PART 0} {PART b}}}}}}
@@ -761,50 +778,52 @@ local function reduce1(e: Thing, depth: number): Thing?
 	if equal(n, CALL) then
 		if b.type ~= LIST then
 			print(`{start}! call: 2nd parameter not list`)
+
 			return nil
 		end
 
 		if len(b) ~= 2 then
 			print(`{start}! call: 2nd parameter not length 2`)
+
 			return nil
 		end
 
 		local b2, c2 = b.things[1], b.things[2]
 		-- return printReturn(reduce1(a_callog(a, b2, c2), depth + 1))
-
 		local sera = serialise(a, true)
 		local serb = serialise(b2, true)
 		local serc = serialise(c2, true)
 		print(`{start}*\{*\{{sera} {serc}} part(*\{{sera} {serc}}, {serb})}`)
+		local rac = reduce1(list { a; c2 }, depth + 1)
 
-		local rac = reduce1(list { a, c2 }, depth + 1)
 		if rac == nil then
 			print(`{start}! call: reduce ac failed`)
+
 			return nil
 		end
 
 		local serrac = serialise(rac, true)
 		print(`{start}*\{{serrac} part({serrac}, {serb})}`)
-
 		local p = h_part(rac, b2)
+
 		if p == nil then
 			print(`{start}! call: part failed`)
+
 			return nil
 		end
 
-		return reduce1(list { a, p }, depth)
+		return reduce1(list { a; p }, depth)
 	end
 
 	print(`{start}! no reduction rule matched`)
+
 	return nil
 end
 
-local tests: {
-	{
-		read eval: Thing,
-		read res: Thing?,
-	}
-} = {
+local tests: { {
+	read eval: Thing,
+	read res: Thing?,
+} } = {
 	-- generic
 	{
 		eval = num(0),
@@ -817,18 +836,17 @@ local tests: {
 		eval = list { num(1) },
 	},
 	{
-		eval = list { empty, list { empty } },
+		eval = list { empty; list { empty } },
 	},
 	{
-		eval = list { empty, list { list { num(1) } } },
+		eval = list { empty; list { list { num(1) } } },
 	},
 	{
-		eval = list { list { num(0) }, num(0) },
+		eval = list { list { num(0) }; num(0) },
 	},
 	{
-		eval = list { list { num(0), num(0) } },
+		eval = list { list { num(0); num(0) } },
 	},
-
 	-- take
 	{
 		eval = a_take(empty, num(0)),
@@ -846,16 +864,14 @@ local tests: {
 		eval = a_take(num(1), list { num(0) }),
 		res = list { num(0) },
 	},
-
 	-- autocons
 	{
 		eval = list {
 			num(0),
-			list { list { TAKE, num(1) }, list { TAKE, num(2) } },
+			list { list { TAKE; num(1) }; list { TAKE; num(2) } },
 		},
-		res = list { num(1), num(2) },
+		res = list { num(1); num(2) },
 	},
-
 	-- part
 	{
 		eval = a_part(num(1), num(0)),
@@ -876,176 +892,161 @@ local tests: {
 		res = num(1),
 	},
 	{
-		eval = a_part(list { num(1), num(4), num(9), num(16) }, num(3)),
+		eval = a_part(list { num(1); num(4); num(9); num(16) }, num(3)),
 		res = num(9),
 	},
 	{
-		eval = a_part(list { empty, list { num(5) } }, num(2)),
+		eval = a_part(list { empty; list { num(5) } }, num(2)),
 		res = list { num(5) },
 	},
-
 	{
-		eval = a_part(list { num(1), num(2) }, TRUE),
-		res = list { num(1), num(2) },
+		eval = a_part(list { num(1); num(2) }, TRUE),
+		res = list { num(1); num(2) },
 	},
 	{
-		eval = a_part(list { num(1), num(2) }, FALSE),
+		eval = a_part(list { num(1); num(2) }, FALSE),
 		res = num(1),
 	},
 	{
-		eval = a_part(list { num(1), num(2) }, num(2)),
+		eval = a_part(list { num(1); num(2) }, num(2)),
 		res = num(2),
 	},
 	{
-		eval = a_part(list { num(1), num(2) }, num(3)),
+		eval = a_part(list { num(1); num(2) }, num(3)),
 	},
-
 	-- size
 	{
-		eval = a_size(num(1), list { TAKE, empty }),
+		eval = a_size(num(1), list { TAKE; empty }),
 		res = num(0),
 	},
 	{
-		eval = a_size(num(0), list { TAKE, list { num(0) } }),
+		eval = a_size(num(0), list { TAKE; list { num(0) } }),
 		res = num(1),
 	},
 	{
-		eval = a_size(num(0), list { TAKE, list { num(1), num(2), num(3) } }),
+		eval = a_size(num(0), list { TAKE; list { num(1); num(2); num(3) } }),
 		res = num(3),
 	},
 	{
-		eval = a_size(num(0), list { TAKE, list { empty, num(1), empty } }),
+		eval = a_size(num(0), list { TAKE; list { empty; num(1); empty } }),
 		res = num(3),
 	},
 	{
-		eval = a_size(num(0), list { TAKE, list { empty, empty } }),
+		eval = a_size(num(0), list { TAKE; list { empty; empty } }),
 		res = num(2),
 	},
-
 	-- sum
 	{
-		eval = a_sum(num(0), list { TAKE, num(0) }),
+		eval = a_sum(num(0), list { TAKE; num(0) }),
 	},
 	{
-		eval = a_sum(num(0), list { TAKE, empty }),
+		eval = a_sum(num(0), list { TAKE; empty }),
 		res = num(0),
 	},
 	{
-		eval = a_sum(num(0), list { TAKE, list { empty } }),
+		eval = a_sum(num(0), list { TAKE; list { empty } }),
 	},
 	{
-		eval = a_sum(num(0), list { TAKE, list { num(0) } }),
+		eval = a_sum(num(0), list { TAKE; list { num(0) } }),
 		res = num(0),
 	},
 	{
-		eval = a_sum(num(0), list { TAKE, list { num(0), num(0), num(0) } }),
+		eval = a_sum(num(0), list { TAKE; list { num(0); num(0); num(0) } }),
 		res = num(0),
 	},
 	{
-		eval = a_sum(num(0), list { TAKE, list { num(1), num(2), num(3) } }),
+		eval = a_sum(num(0), list { TAKE; list { num(1); num(2); num(3) } }),
 		res = num(6),
 	},
 	{
-		eval = a_sum(num(0), list { TAKE, list { num(1), num(2), empty } }),
+		eval = a_sum(num(0), list { TAKE; list { num(1); num(2); empty } }),
 	},
 	{
-		eval = a_sum(list { num(1), num(2), num(3) }, list { PART, num(0) }),
+		eval = a_sum(list { num(1); num(2); num(3) }, list { PART; num(0) }),
 		res = num(6),
 	},
 	{
 		eval = a_sum(
-			list { num(0), list { num(1), num(2) }, list { PART, num(0) } },
+			list { num(0); list { num(1); num(2) }; list { PART; num(0) } },
 			list {
 				SPLIT,
 				list {
-					list { PART, num(2) },
-					list { PART, num(3) },
+					list { PART; num(2) },
+					list { PART; num(3) },
 				},
 			}
 		),
 		res = num(3),
 	},
-
 	-- check
 	{
-		eval = a_check(num(0), list { TAKE, num(0) }),
+		eval = a_check(num(0), list { TAKE; num(0) }),
 	},
 	{
-		eval = a_check(num(0), list { TAKE, empty }),
+		eval = a_check(num(0), list { TAKE; empty }),
 		res = TRUE,
 	},
 	{
-		eval = a_check(num(0), list { TAKE, list { num(0) } }),
+		eval = a_check(num(0), list { TAKE; list { num(0) } }),
 		res = TRUE,
 	},
 	{
-		eval = a_check(num(0), list { TAKE, list { num(0), num(0) } }),
+		eval = a_check(num(0), list { TAKE; list { num(0); num(0) } }),
 		res = TRUE,
 	},
 	{
-		eval = a_check(num(0), list { TAKE, list { num(0), num(1) } }),
+		eval = a_check(num(0), list { TAKE; list { num(0); num(1) } }),
 		res = FALSE,
 	},
 	{
-		eval = a_check(num(0), list { TAKE, list { num(0), num(0), num(0) } }),
+		eval = a_check(num(0), list { TAKE; list { num(0); num(0); num(0) } }),
 		res = TRUE,
 	},
 	{
-		eval = a_check(num(0), list { TAKE, list { num(0), num(1), num(0) } }),
+		eval = a_check(num(0), list { TAKE; list { num(0); num(1); num(0) } }),
 		res = FALSE,
 	},
 	{
-		eval = a_check(num(0), list { TAKE, list { num(0), empty, num(0) } }),
+		eval = a_check(num(0), list { TAKE; list { num(0); empty; num(0) } }),
 		res = FALSE,
 	},
 	{
-		eval = a_check(num(0), list { TAKE, list { empty, list { empty } } }),
+		eval = a_check(num(0), list { TAKE; list { empty; list { empty } } }),
 		res = FALSE,
 	},
 	{
-		eval = a_check(num(0), list { TAKE, list { empty, empty } }),
+		eval = a_check(num(0), list { TAKE; list { empty; empty } }),
 		res = TRUE,
 	},
 	{
-		eval = a_check(
-			num(0),
-			list { TAKE, list { list { num(0) }, list { num(0) } } }
-		),
+		eval = a_check(num(0), list { TAKE; list { list { num(0) }; list { num(0) } } }),
 		res = TRUE,
 	},
 	{
-		eval = a_check(
-			num(0),
-			list { TAKE, list { list { num(0) }, list { num(0) } } }
-		),
+		eval = a_check(num(0), list { TAKE; list { list { num(0) }; list { num(0) } } }),
 		res = TRUE,
 	},
 	{
-		eval = a_check(
-			num(0),
-			list { TAKE, list { list { num(0) }, list { num(1) } } }
-		),
+		eval = a_check(num(0), list { TAKE; list { list { num(0) }; list { num(1) } } }),
 		res = FALSE,
 	},
-
 	-- type
 	{
-		eval = a_type(num(0), list { TAKE, num(0) }),
+		eval = a_type(num(0), list { TAKE; num(0) }),
 		res = TRUE,
 	},
 	{
-		eval = a_type(num(0), list { TAKE, num(1) }),
+		eval = a_type(num(0), list { TAKE; num(1) }),
 		res = TRUE,
 	},
 	{
-		eval = a_type(num(0), list { TAKE, empty }),
+		eval = a_type(num(0), list { TAKE; empty }),
 		res = FALSE,
 	},
 	{
-		eval = a_type(num(0), list { TAKE, list { num(1) } }),
+		eval = a_type(num(0), list { TAKE; list { num(1) } }),
 		res = FALSE,
 	},
-
 	-- change
 	--[=[
 		[a=[[42 43] 45 46] [10 [b=2 c=[1 47 48]] d=[0 1]]]
@@ -1079,41 +1080,25 @@ local tests: {
 		{{47 48} 45 46}
 	]=]
 	{
-		eval = a_change(
-			list { list { num(42), num(43) }, num(45), num(46) },
-			num(1),
-			list { TAKE, list { num(47), num(48) } },
-			list { PART, num(0) }
-		),
-		res = list { list { num(47), num(48) }, num(45), num(46) },
+		eval = a_change(list { list { num(42); num(43) }; num(45); num(46) }, num(1), list { TAKE; list { num(47); num(48) } }, list { PART; num(0) }),
+		res = list { list { num(47); num(48) }; num(45); num(46) },
 	},
 	{
-		eval = a_change(
-			list { list { num(42), num(43) }, num(45), num(46) },
-			num(2),
-			list { TAKE, list { num(47), num(48) } },
-			list { PART, num(0) }
-		),
+		eval = a_change(list { list { num(42); num(43) }; num(45); num(46) }, num(2), list { TAKE; list { num(47); num(48) } }, list { PART; num(0) }),
 		res = list {
-			list { num(42), num(43) },
-			list { num(47), num(48) },
+			list { num(42); num(43) },
+			list { num(47); num(48) },
 			num(46),
 		},
 	},
 	{
-		eval = a_change(
-			list { list { num(42), num(43) }, num(45), num(46) },
-			num(3),
-			list { TAKE, list { num(47), num(48) } },
-			list { PART, num(0) }
-		),
+		eval = a_change(list { list { num(42); num(43) }; num(45); num(46) }, num(3), list { TAKE; list { num(47); num(48) } }, list { PART; num(0) }),
 		res = list {
-			list { num(42), num(43) },
+			list { num(42); num(43) },
 			num(45),
-			list { num(47), num(48) },
+			list { num(47); num(48) },
 		},
 	},
-
 	-- split
 	-- ok moment of truth
 	{
@@ -1129,18 +1114,17 @@ local tests: {
 		eval = a_split(list { num(0) }, num(0)),
 	},
 	{
-		eval = a_split(list { num(0), num(0), num(0) }, num(0)),
+		eval = a_split(list { num(0); num(0); num(0) }, num(0)),
 	},
 	{
-		eval = a_split(list { TAKE, num(0) }, num(0)),
+		eval = a_split(list { TAKE; num(0) }, num(0)),
 	},
-
 	{
 		eval = a_split(
-			list { list { TAKE, num(2) }, num(0) },
+			list { list { TAKE; num(2) }; num(0) },
 			list {
-				list { PART, num(2) },
-				list { PART, num(1) },
+				list { PART; num(2) },
+				list { PART; num(1) },
 			}
 		),
 		res = num(2),
@@ -1173,37 +1157,36 @@ local tests: {
 	]=]
 	{
 		eval = a_split(
-			list { num(1), num(2) },
+			list { num(1); num(2) },
 			list {
-				list { PART, num(1) },
-				list { TAKE, list { PART, num(0) } },
+				list { PART; num(1) },
+				list { TAKE; list { PART; num(0) } },
 			}
 		),
 		res = num(1),
 	},
 	{
 		eval = a_split(
-			list { num(1), num(2) },
+			list { num(1); num(2) },
 			list {
-				list { PART, num(0) },
-				list { TAKE, list { PART, num(1) } },
+				list { PART; num(0) },
+				list { TAKE; list { PART; num(1) } },
 			}
 		),
 		res = num(1),
 	},
 	{
 		eval = a_split(
-			list { num(1), num(2) },
+			list { num(1); num(2) },
 			list {
-				list { PART, num(0) },
-				list { TAKE, list { PART, num(0) } },
+				list { PART; num(0) },
+				list { TAKE; list { PART; num(0) } },
 			}
 		),
-		res = list { num(1), num(2) },
+		res = list { num(1); num(2) },
 	},
-
 	-- if construction
-	--[=[
+	--[[
 		*{a {SPLIT {{PART 0} {SPLIT {{TAKE {c d}} {{TAKE PART} {SUM {{TAKE 1} {TAKE TRUE}}}}}}}}}
 		*{*{a {PART 0}} *{a {SPLIT {{TAKE {c d}} {{TAKE PART} {SUM {{TAKE 1} {TAKE TRUE}}}}}}}}
 			*{a {PART 0}}
@@ -1237,32 +1220,17 @@ local tests: {
 			part({c d}, 1)
 			c
 		*{a c}
-	]=]
+	]]
 	{
-		eval = a_ifog(
-			num(0),
-			list { TAKE, TRUE },
-			list { TAKE, num(30) },
-			list { TAKE, num(40) }
-		),
+		eval = a_ifog(num(0), list { TAKE; TRUE }, list { TAKE; num(30) }, list { TAKE; num(40) }),
 		res = num(30),
 	},
 	{
-		eval = a_ifog(
-			num(0),
-			list { TAKE, FALSE },
-			list { TAKE, num(30) },
-			list { TAKE, num(40) }
-		),
+		eval = a_ifog(num(0), list { TAKE; FALSE }, list { TAKE; num(30) }, list { TAKE; num(40) }),
 		res = num(40),
 	},
 	{
-		eval = a_ifog(
-			num(0),
-			list { TAKE, num(2) },
-			list { TAKE, num(30) },
-			list { TAKE, num(40) }
-		),
+		eval = a_ifog(num(0), list { TAKE; num(2) }, list { TAKE; num(30) }, list { TAKE; num(40) }),
 	},
 	--[=[
 		If *[a b] equals 0 return *[a c]
@@ -1383,80 +1351,46 @@ local tests: {
 		*{a c}
 	]=]
 	{
-		eval = a_ifc(
-			num(0),
-			list { TAKE, TRUE },
-			list { TAKE, num(30) },
-			list { TAKE, num(40) }
-		),
+		eval = a_ifc(num(0), list { TAKE; TRUE }, list { TAKE; num(30) }, list { TAKE; num(40) }),
 		res = num(30),
 	},
 	{
-		eval = a_ifc(
-			num(0),
-			list { TAKE, FALSE },
-			list { TAKE, num(30) },
-			list { TAKE, num(40) }
-		),
+		eval = a_ifc(num(0), list { TAKE; FALSE }, list { TAKE; num(30) }, list { TAKE; num(40) }),
 		res = num(40),
 	},
 	{
-		eval = a_ifc(
-			num(0),
-			list { TAKE, num(2) },
-			list { TAKE, num(30) },
-			list { TAKE, num(40) }
-		),
+		eval = a_ifc(num(0), list { TAKE; num(2) }, list { TAKE; num(30) }, list { TAKE; num(40) }),
 	},
-
 	-- if
 	{
-		eval = a_if(
-			num(0),
-			list { TAKE, TRUE },
-			list { TAKE, num(30) },
-			list { TAKE, num(40) }
-		),
+		eval = a_if(num(0), list { TAKE; TRUE }, list { TAKE; num(30) }, list { TAKE; num(40) }),
 		res = num(30),
 	},
 	{
-		eval = a_if(
-			num(0),
-			list { TAKE, FALSE },
-			list { TAKE, num(30) },
-			list { TAKE, num(40) }
-		),
+		eval = a_if(num(0), list { TAKE; FALSE }, list { TAKE; num(30) }, list { TAKE; num(40) }),
 		res = num(40),
 	},
 	{
-		eval = a_if(
-			num(0),
-			list { TAKE, num(2) },
-			list { TAKE, num(30) },
-			list { TAKE, num(40) }
-		),
+		eval = a_if(num(0), list { TAKE; num(2) }, list { TAKE; num(30) }, list { TAKE; num(40) }),
 	},
-
 	-- comp construction
 	{
-		eval = a_compog(num(3), list { TAKE, num(2) }, list { PART, num(0) }),
+		eval = a_compog(num(3), list { TAKE; num(2) }, list { PART; num(0) }),
 		res = num(2),
 	},
 	{
-		eval = a_compog(num(3), list { PART, num(0) }, list { PART, num(0) }),
+		eval = a_compog(num(3), list { PART; num(0) }, list { PART; num(0) }),
 		res = num(3),
 	},
-
 	-- comp
 	{
-		eval = a_comp(num(3), list { TAKE, num(2) }, list { PART, num(0) }),
+		eval = a_comp(num(3), list { TAKE; num(2) }, list { PART; num(0) }),
 		res = num(2),
 	},
 	{
-		eval = a_comp(num(3), list { PART, num(0) }, list { PART, num(0) }),
+		eval = a_comp(num(3), list { PART; num(0) }, list { PART; num(0) }),
 		res = num(3),
 	},
-
 	-- ext construction
 	--[=[
 		*[a 8 b c]		*[[*[a b] a] c]
@@ -1498,28 +1432,26 @@ local tests: {
 	{
 		eval = a_extog(
 			num(10),
-			list { TAKE, num(20) },
+			list { TAKE; num(20) },
 			list {
-				list { PART, num(1) },
-				list { PART, num(2) },
+				list { PART; num(1) },
+				list { PART; num(2) },
 			}
 		),
-		res = list { num(20), num(10) },
+		res = list { num(20); num(10) },
 	},
-
 	-- ext
 	{
 		eval = a_ext(
 			num(10),
-			list { TAKE, num(20) },
+			list { TAKE; num(20) },
 			list {
-				list { PART, num(1) },
-				list { PART, num(2) },
+				list { PART; num(1) },
+				list { PART; num(2) },
 			}
 		),
-		res = list { num(20), num(10) },
+		res = list { num(20); num(10) },
 	},
-
 	-- call construction
 	--[=[
 		*[a 9 b c]          *[*[a c] 2 [0 1] 0 b]
@@ -1601,32 +1533,22 @@ local tests: {
 		There we go
 	]=]
 	{
-		eval = a_callog(
-			list { num(1), list { SUM, list { TAKE, list { num(1), num(1) } } } },
-			num(0),
-			list { PART, num(2) }
-		),
+		eval = a_callog(list { num(1); list { SUM; list { TAKE; list { num(1); num(1) } } } }, num(0), list { PART; num(2) }),
 		res = num(2),
 	},
-
 	-- call
 	{
-		eval = a_call(
-			list { num(1), list { SUM, list { TAKE, list { num(1), num(1) } } } },
-			num(0),
-			list { PART, num(2) }
-		),
+		eval = a_call(list { num(1); list { SUM; list { TAKE; list { num(1); num(1) } } } }, num(0), list { PART; num(2) }),
 		res = num(2),
 	},
-
 	-- what's next?
 	{
 		eval = (function(): Thing
 			local start = num(1)
 
 			return list {
-				list { start, num(5) },
-				list { SUM, list { PART, num(0) } },
+				list { start; num(5) },
+				list { SUM; list { PART; num(0) } },
 			}
 		end)(),
 		res = num(6),
@@ -1634,11 +1556,11 @@ local tests: {
 	{
 		eval = (function(): Thing
 			local s = num(42)
-			local f = list { list { TAKE, num(0) }, list { PART, num(0) } }
+			local f = list { list { TAKE; num(0) }; list { PART; num(0) } }
 
-			return list { s, f }
+			return list { s; f }
 		end)(),
-		res = list { num(0), num(42) },
+		res = list { num(0); num(42) },
 	},
 	--[=[
 		[a %8 b=[%1 0] c=[%8 [%1 l] [%9 2 %0 1]]]
@@ -1665,7 +1587,6 @@ local tests: {
 	{
 		eval = (function(): Thing
 			local s = num(2, "s")
-
 			local lidx = num(1, "lidx")
 			local baidx = num(2, "baidx")
 			local bidx = num(1, "bidx")
@@ -1674,13 +1595,12 @@ local tests: {
 			local function idx(i: Num)
 				return list {
 					COMP,
-					list { list { PART, baidx }, list { PART, i } },
+					list { list { PART; baidx }; list { PART; i } },
 				}
 			end
 
 			local t2 = list {
 				-- list { PART, aidx },
-
 				-- like Nock Zero
 				idx(aidx),
 				--
@@ -1690,37 +1610,34 @@ local tests: {
 					-- list { num(1, "sum1-t"), idx(bidx) },
 					-- autocons here because better 4 sum
 					list {
-						list { TAKE, num(1, "st") },
+						list { TAKE; num(1, "st") },
 						idx(bidx),
 					},
 				},
 			}
 			-- local t2 = num(42, "t2")
-
 			local t = list {
 				CHECK,
 				t2,
 			}
 			-- local t = num(42, "t")
 			-- local t = list { TAKE, num(99, "z") }
-
 			local y = idx(bidx)
 			-- local y = num(42, "y")
-
 			-- hell
 			local n = list {
 				CALL,
 				list {
 					lidx,
 					list {
-						list { PART, lidx },
+						list { PART; lidx },
 						list {
 							-- list { SUM, list { num(1, "sum1-n"), idx(bidx) } },
 							-- again, autocons
 							list {
 								SUM,
 								list {
-									list { TAKE, num(5, "sn") },
+									list { TAKE; num(5, "sn") },
 									idx(bidx),
 								},
 							},
@@ -1733,22 +1650,21 @@ local tests: {
 				},
 			}
 			-- local n = num(42, "n")
-
-			local l = list { IF, list { t, y, n } }
+			local l = list { IF; list { t; y; n } }
 			-- local l = num(42, "l")
 			local g = list {
 				EXT,
 				list {
-					list { TAKE, l },
+					list { TAKE; l },
 					list {
 						CALL,
-						list { num(1, "call1"), list { PART, num(0) } },
+						list { num(1, "call1"); list { PART; num(0) } },
 					},
 				},
 			}
-			local f = list { EXT, list { list { TAKE, num(0) }, g } }
+			local f = list { EXT; list { list { TAKE; num(0) }; g } }
 
-			return list { s, f }
+			return list { s; f }
 		end)(),
 		-- res = list { num(0), num(42) },
 	},
@@ -1756,14 +1672,17 @@ local tests: {
 
 -- test serialise and deserialise
 for _, test in tests do
-	for _, thing in { test.eval, test.res } do
+	for _, thing in { test.eval; test.res } do
 		if thing == nil then
 			continue
 		end
+
 		local s = serialise(thing, false)
 		local d = deserialise(s)
+
 		if not equal(thing, d) then
 			print(`Serialization round-trip failed for {s}`)
+
 			return
 		end
 	end
@@ -1780,6 +1699,7 @@ for i, test in tests do
 
 	local rd = reduce(test.eval)
 	local out
+
 	if rd == nil then
 		print "~~"
 		print()
@@ -1790,6 +1710,7 @@ for i, test in tests do
 	end
 
 	local expected = test.res and serialise(test.res, true)
+
 	if out ~= expected then
 		print(`Test failed: expected {expected}, got {out}`)
 		break

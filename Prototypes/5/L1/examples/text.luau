@@ -5,8 +5,8 @@
 --
 -- rejects are sources that must not read. run.luau checks that each one raises an error.
 
-const Reader = require "../reader"
 const VM = require "../../interpreter/vm"
+const Reader = require "../reader"
 
 type Example = {
 	name: string,
@@ -16,15 +16,9 @@ type Example = {
 	outcome: string,
 	expect: string?,
 }
-
 const FUEL = 1e6
 
-const function value(
-	name: string,
-	source: string,
-	expect: string,
-	fuel: number?
-): Example
+const function value(name: string, source: string, expect: string, fuel: number?): Example
 	return {
 		name = name,
 		program = Reader.parse(source),
@@ -35,12 +29,7 @@ const function value(
 	}
 end
 
-const function failure(
-	name: string,
-	source: string,
-	outcome: string,
-	fuel: number?
-): Example
+const function failure(name: string, source: string, outcome: string, fuel: number?): Example
 	return {
 		name = name,
 		program = Reader.parse(source),
@@ -52,7 +41,6 @@ const function failure(
 end
 
 const OMEGA = "((fn x (x x)) (fn x (x x)))"
-
 -- The recursive functions of examples.luau, each written with fix.
 const LENGTH = "(fix (fn rec (fn l (if (? l) 0 (+ 1 (rec (tail l)))))))"
 const SUM = "(fix (fn rec (fn l (if (? l) 0 (+ (head l) (rec (tail l)))))))"
@@ -60,7 +48,6 @@ const FACTORIAL = "(fix (fn rec (fn n (if (= n 0) 1 (* n (rec (- n 1)))))))"
 const FIBONACCI = "(fix (fn rec (fn n (if (< n 2) n (+ (rec (- n 1)) (rec (- n 2)))))))"
 const DOUBLE = "(fix (fn rec (fn l (if (? l) ~ [(* (head l) 2) (rec (tail l))]))))"
 const RANGE = "(fix (fn rec (fn n (if (= n 0) ~ [n (rec (- n 1))]))))"
-
 const examples: { Example } = {
 	-- Values and primitives
 	value("a constant", "42", "42"),
@@ -87,11 +74,9 @@ const examples: { Example } = {
 	value("kind of a pin", "(@ (pin 1))", "4"),
 	value("less-than", "(< 2 3)", "1"),
 	value("comments are ignored", "; the answer\n(+ 40 2) ; trailing", "42"),
-
 	-- Conditionals evaluate only the branch taken
 	value("only the taken branch runs", "(if 1 7 (head 3))", "7"),
 	value("the other branch is taken on zero", "(if 0 (head 3) 8)", "8"),
-
 	-- Pairs and lists
 	value("head and tail", "(head (tail [1 [2 ~]]))", "2"),
 	value("a fn takes a parameter list", "((fn (x y) (- x y)) 10 3)", "7"),
@@ -103,17 +88,14 @@ const examples: { Example } = {
 	value("a list", "(list 1 2 3)", "(1 2 3)"),
 	value("an improper pair", "[1 2]", "(1 . 2)"),
 	value("nested lists", "(list (list 1) (list 2 3))", "((1) (2 3))"),
-
 	-- Closures and scope
 	value("application", "((fn x (+ x x)) 21)", "42"),
 	value("lexical scope", "((fn (x y) (- x y)) 10 3)", "7"),
 	value("a closure keeps its scope", "((fn x (fn _ x)) 4 9)", "4"),
-
 	-- Pins
 	value("a pin is not run when made", `((fn p 5) (pin {OMEGA}))`, "5", 1000),
 	value("a branch that forces an unrun pin is not taken", `(if 0 (force (pin {OMEGA})) 5)`, "5", 1000),
 	value("a forced pin gives its value twice", "((fn p [(force p) (force p)]) (pin (+ 1 2)))", "(3 . 3)"),
-
 	-- Recursion through fix
 	value("length of a list", `({LENGTH} (list 1 2 3))`, "3"),
 	value("length of nil", `({LENGTH} ~)`, "0"),
@@ -121,8 +103,7 @@ const examples: { Example } = {
 	value("factorial of 5", `({FACTORIAL} 5)`, "120"),
 	value("fibonacci of 15", `({FIBONACCI} 15)`, "610"),
 	value("map doubles each element", `({DOUBLE} (list 1 2 3))`, "(2 4 6)"),
-	value("a long loop, with no host recursion", `({SUM} ({RANGE} 10000))`, "50005000", 5000000),
-
+	value("a long loop, with no host recursion", `({SUM} ({RANGE} 10000))`, "50005000", 5e6),
 	-- Running out of fuel and errors
 	failure("omega runs out of fuel", OMEGA, "out_of_fuel", 10000),
 	failure("adding a list is an error", "(+ [1 ~] 1)", "error"),
@@ -145,13 +126,8 @@ const examples: { Example } = {
 	value("escapes for a newline, a tab and a zero byte", '"\\n\\t\\0"', "(10 9 0)"),
 	value("a string can be taken apart", '(head "hi")', "104"),
 	value("a string can hold a semicolon and parentheses", '"a;(b)"', "(97 59 40 98 41)"),
-	value(
-		"a recursive function over a string",
-		'(letrec len (fn s (if (? s) 0 (+ 1 (len (tail s))))) (len "hello"))',
-		"5"
-	),
+	value("a recursive function over a string", '(letrec len (fn s (if (? s) 0 (+ 1 (len (tail s))))) (len "hello"))', "5"),
 }
-
 const rejects: { string } = {
 	"",
 	"(fn x y x)",
@@ -160,7 +136,7 @@ const rejects: { string } = {
 	"[1]",
 	"[]",
 	'"a\\qb"',
-	"\"a\nb\"",
+	'"a\nb"',
 	"(mutual () 1)",
 	"(mutual ((f 1)) f)",
 	"(mutual ((f (fn x x) extra)) f)",

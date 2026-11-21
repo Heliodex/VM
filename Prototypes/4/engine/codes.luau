@@ -26,9 +26,7 @@ type Net = Types.Net
 type Port = Types.Port
 
 -- The free ports of a net, in port order. A port is free when its cell is alive and nothing is wired to it.
-const function freePorts(
-	net: Net
-): { Port }
+const function freePorts(net: Net): { Port }
 	const ports: { Port } = {}
 
 	for _, c in Net.liveCells(net) do
@@ -37,7 +35,9 @@ const function freePorts(
 
 			if net.Link[p] == 0 then
 				table.insert(ports, p)
-	end end end
+			end
+		end
+	end
 
 	table.sort(ports)
 
@@ -46,12 +46,7 @@ end
 
 -- A γ tree with n leaves hung from the port `root`, returning the leaves. Mirrored trees take their leaves in the opposite order, which is what a tree of the other orientation cancels against.
 -- With no leaves the tree is a lone eraser, which erases the decoder's δ cell. With one leaf there is no cell at all, and `root` is the leaf.
-const function tree(
-	b: Builder,
-	root: Port,
-	n: number,
-	mirrored: boolean
-): { Port }
+const function tree(b: Builder, root: Port, n: number, mirrored: boolean): { Port }
 	if n == 0 then
 		b:wire(root, b:epsilon().principal)
 
@@ -75,10 +70,7 @@ const function tree(
 end
 
 -- The code of `net`, built into `b`. Returns the code's root, its only free port.
-const function encode(
-	b: Builder,
-	net: Net
-): Port
+const function encode(b: Builder, net: Net): Port
 	const cells = Net.liveCells(net)
 	const free = freePorts(net)
 	const deltas = {}
@@ -96,7 +88,9 @@ const function encode(
 
 			if q ~= 0 and Net.isPrincipal(p) and Net.isPrincipal(q) then
 				error "only a cut-free net can be encoded"
-	end end end
+			end
+		end
+	end
 
 	const root = G.multiplexer(b, #free + 3)
 	const n = #deltas
@@ -125,7 +119,8 @@ const function encode(
 
 		for slot = 1, Net.portCount(tag) do
 			at[Net.port(c, slot)] = Net.port(copy, slot)
-	end end
+		end
+	end
 
 	for i, p in free do
 		b:wire(at[p], root.ports[i])
@@ -134,16 +129,14 @@ const function encode(
 	for p, q in net.Link do
 		if q ~= 0 and p < q and at[p] then
 			b:wire(at[p], at[q])
-	end end
+		end
+	end
 
 	return root.principal
 end
 
 -- The decoder for codes of nets with `arity` free ports. Its principal port is to meet a code's root, and its ports are where the decoded net's free ports come out.
-const function decoder(
-	b: Builder,
-	arity: number
-): Fragment
+const function decoder(b: Builder, arity: number): Fragment
 	const mux = G.dualMultiplexer(b, arity + 3)
 	const d = b:delta()
 	b:wire(mux.ports[arity + 1], d.principal)
@@ -162,13 +155,12 @@ const function decoder(
 end
 
 -- Whether a net has any δ cell in it.
-const function hasDelta(
-	net: Net
-): boolean
+const function hasDelta(net: Net): boolean
 	for _, c in Net.liveCells(net) do
 		if net.Tag[c] == Net.DELTA then
 			return true
-	end end
+		end
+	end
 
 	return false
 end

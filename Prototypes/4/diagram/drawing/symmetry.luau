@@ -75,9 +75,7 @@ const function symmetryCount(
 	end
 
 	-- Turn an isometry into a permutation of the cells, or nil when it does not map the placement onto itself.
-	const function permutation(
-		fn: (G.Grid) -> G.Grid
-	): {
+	const function permutation(fn: (G.Grid) -> G.Grid): {
 		[Cell]: Cell,
 	}?
 		const pi: {
@@ -112,7 +110,8 @@ const function symmetryCount(
 			if pi[c] ~= c then
 				moved = true
 				break
-		end end
+			end
+		end
 
 		if not moved then
 			return false
@@ -135,7 +134,8 @@ const function symmetryCount(
 
 			if table.concat(a, "|") ~= table.concat(b, "|") then
 				return false
-		end end
+			end
+		end
 
 		return true
 	end
@@ -152,25 +152,19 @@ const function symmetryCount(
 		return 0
 	end
 
-	const halfTurn = permutation(function(
-		g: G.Grid
-	): G.Grid
+	const halfTurn = permutation(function(g: G.Grid): G.Grid
 		return {
 			x = 2 * cx - g.x,
 			y = 2 * cy - g.y,
 		}
 	end)
-	const vertical = permutation(function(
-		g: G.Grid
-	): G.Grid
+	const vertical = permutation(function(g: G.Grid): G.Grid
 		return {
 			x = 2 * cx - g.x,
 			y = g.y,
 		}
 	end)
-	const horizontal = permutation(function(
-		g: G.Grid
-	): G.Grid
+	const horizontal = permutation(function(g: G.Grid): G.Grid
 		return {
 			x = g.x,
 			y = 2 * cy - g.y,

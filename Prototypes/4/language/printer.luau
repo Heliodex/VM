@@ -11,9 +11,7 @@
 const V = require "./values"
 
 -- Writes a value, which may be nil if a readback did not give one.
-const function show(
-	value: V.Value?
-): string
+const function show(value: V.Value?): string
 	if value == nil then
 		return "?"
 	elseif value.kind == "number" then
@@ -21,7 +19,11 @@ const function show(
 	elseif value.kind == "symbol" then
 		return value.name :: string
 	elseif value.kind == "boolean" then
-		return if value.truth then "#t" else "#f"
+		return
+			if value.truth then
+				"#t"
+			else
+				"#f"
 	elseif value.kind == "nil" then
 		return "()"
 	elseif value.kind == "error" then

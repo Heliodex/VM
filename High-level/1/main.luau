@@ -4,7 +4,6 @@ local parser = require "./parser"
 local types = require "./types"
 
 type ToParse = parser.ToParse
-
 local fn, app, num, name = types.fn, types.app, types.num, types.name
 local current, advance, toParse = parser.current, parser.advance, parser.toParse
 
@@ -20,16 +19,16 @@ local function isControl(c: string): boolean
 	return isWhitespace(c) or c == "(" or c == ")" or c == "[" or c == "]"
 end
 
-type Ok<T> = { ok: true, value: T }
-type Err = { ok: false, error: string }
+type Ok<T> = { ok: true; value: T }
+type Err = { ok: false; error: string }
 type Result<T> = Ok<T> | Err
 
 local function ok<T>(value: T): Result<T>
-	return { ok = true, value = value }
+	return { ok = true; value = value }
 end
 
 local function err(error: string): Err
-	return { ok = false, error = error }
+	return { ok = false; error = error }
 end
 
 local errExpectedName = err "Expected a name"
@@ -51,6 +50,7 @@ end
 local function skipWhitespace(p: ToParse)
 	while true do
 		local c = current(p)
+
 		if not c then
 			break
 		end
@@ -58,16 +58,20 @@ local function skipWhitespace(p: ToParse)
 		if not isWhitespace(c) then
 			break
 		end
+
 		advance(p)
 	end
 end
 
 local function expect(p: ToParse, expected: string): Result<nil>
 	local c = current(p)
+
 	if c ~= expected then
 		return errExpectedChar(expected, c or "EOF")
 	end
+
 	advance(p)
+
 	return ok(nil)
 end
 
@@ -75,30 +79,30 @@ local parseName, parseNum, parseExpr
 
 local function parseFn(p: ToParse, scope: { [string]: true }): Result<types.Fn>
 	skipWhitespace(p)
-
 	local expectResult1 = expect(p, "(")
+
 	if not expectResult1.ok then
 		return expectResult1
 	end
 
 	local paramResult = parseName(p)
+
 	if not paramResult.ok then
 		return wrapErr("parseFunction", paramResult)
 	end
 
 	local binding = paramResult.value
 	scope[binding] = true
-
 	skipWhitespace(p)
-
 	local exprResult = parseExpr(p, scope)
+
 	if not exprResult.ok then
 		return exprResult
 	end
 
 	local rexpr = exprResult.value
-
 	local expectResult2 = expect(p, ")")
+
 	if not expectResult2.ok then
 		return expectResult2
 	end
@@ -113,6 +117,7 @@ function parseName(p: ToParse): Result<string>
 
 	while true do
 		local c = current(p)
+
 		if not c then
 			break
 		end
@@ -134,30 +139,30 @@ end
 
 local function parseApp(p: ToParse, scope: { [string]: true }): Result<types.Expr>
 	skipWhitespace(p)
-
 	local expectResult1 = expect(p, "[")
+
 	if not expectResult1.ok then
 		return expectResult1
 	end
 
 	local fnResult = parseExpr(p, scope)
+
 	if not fnResult.ok then
 		return wrapErr("parseApp fn", fnResult)
 	end
 
 	local rfn = fnResult.value
 	scope[rfn] = true
-
 	skipWhitespace(p)
-
 	local argResult = parseExpr(p, scope)
+
 	if not argResult.ok then
 		return wrapErr("parseApp arg", argResult)
 	end
 
 	local rarg = argResult.value
-
 	local expectResult2 = expect(p, "]")
+
 	if not expectResult2.ok then
 		return expectResult2
 	end
@@ -172,6 +177,7 @@ function parseNum(p: ToParse): Result<types.Num>
 
 	while true do
 		local c = current(p)
+
 		if not c then
 			break
 		end
@@ -189,6 +195,7 @@ function parseNum(p: ToParse): Result<types.Num>
 	end
 
 	local value = tonumber(table.concat(digits))
+
 	if not value then
 		return errConvertNumber
 	end
@@ -199,6 +206,7 @@ end
 function parseExpr(p: ToParse, scope: { [string]: true }): Result<types.Expr>
 	if current(p) == "(" then
 		local fnResult = parseFn(p, scope)
+
 		if not fnResult.ok then
 			return fnResult
 		end
@@ -208,6 +216,7 @@ function parseExpr(p: ToParse, scope: { [string]: true }): Result<types.Expr>
 
 	if current(p) == "[" then
 		local appResult = parseApp(p, scope)
+
 		if not appResult.ok then
 			return appResult
 		end
@@ -217,6 +226,7 @@ function parseExpr(p: ToParse, scope: { [string]: true }): Result<types.Expr>
 
 	if isDigit(current(p) or "") then
 		local numResult = parseNum(p)
+
 		if not numResult.ok then
 			return numResult
 		end
@@ -225,6 +235,7 @@ function parseExpr(p: ToParse, scope: { [string]: true }): Result<types.Expr>
 	end
 
 	local nameResult = parseName(p)
+
 	if not nameResult.ok then
 		return wrapErr("parseExpr", nameResult)
 	end
@@ -281,6 +292,7 @@ local function printTable(t: any, i: number?)
 		if type(v) == "string" then
 			v = `"{v}"`
 		end
+
 		print(`{string.rep("  ", indent)}{k}: {v}`)
 	end
 end
@@ -289,7 +301,6 @@ type TestCase = {
 	read source: string,
 	read expected: Result<types.AST>,
 }
-
 local tests: { TestCase } = {
 	{
 		source = [[
@@ -297,7 +308,6 @@ local tests: { TestCase } = {
 		]],
 		expected = errExpectedChar("(", "b"),
 	},
-
 	-- fn, name
 	{
 		source = [[
@@ -323,7 +333,6 @@ local tests: { TestCase } = {
 		]],
 		expected = ok(fn("x", fn("y", name "x")) :: types.AST),
 	},
-
 	-- app
 	{
 		source = [[
@@ -331,7 +340,6 @@ local tests: { TestCase } = {
 		]],
 		expected = ok(fn("x", fn("y", app(name "y", name "x"))) :: types.AST),
 	},
-
 	-- num
 	{
 		source = [[
@@ -361,9 +369,7 @@ local tests: { TestCase } = {
 		source = [[
 			(x [(y [x y]) 123])
 		]],
-		expected = ok(
-			fn("x", app(fn("y", app(name "x", name "y")), num(123))) :: types.AST
-		),
+		expected = ok(fn("x", app(fn("y", app(name "x", name "y")), num(123))) :: types.AST),
 	},
 }
 
@@ -377,6 +383,7 @@ for _, test in tests do
 		printTable(test.expected)
 		print "\nGot:\n"
 		printTable(result)
+
 		return
 	end
 
@@ -385,6 +392,7 @@ for _, test in tests do
 	else
 		print(`Error: {result.error}`)
 	end
+
 	print()
 end
 

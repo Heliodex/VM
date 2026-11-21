@@ -12,26 +12,22 @@
 
 const B = require "../engine/builder"
 const Canon = require "../engine/canon"
-const L = require "./lambda"
 const Observe = require "../engine/observe"
 const Types = require "../engine/types"
+const L = require "./lambda"
 
 type Builder = B.Builder
 type Net = Types.Net
 type Port = Types.Port
 
 -- λa.λb. a
-const function truth(
-	b: Builder
-): Port
+const function truth(b: Builder): Port
 	return L.lam(
-		b, function(
-			a: Port
-		): Port
+		b,
+		function(a: Port): Port
 			return L.lam(
-				b, function(
-					_unused: Port
-				): Port
+				b,
+				function(_unused: Port): Port
 					return a
 				end
 			)
@@ -40,17 +36,13 @@ const function truth(
 end
 
 -- λa.λb. b
-const function falsity(
-	b: Builder
-): Port
+const function falsity(b: Builder): Port
 	return L.lam(
-		b, function(
-			_unused: Port
-		): Port
+		b,
+		function(_unused: Port): Port
 			return L.lam(
-				b, function(
-					second: Port
-				): Port
+				b,
+				function(second: Port): Port
 					return second
 				end
 			)
@@ -59,10 +51,7 @@ const function falsity(
 end
 
 -- The boolean `value`, built into `b`.
-const function boolean(
-	b: Builder,
-	value: boolean
-): Port
+const function boolean(b: Builder, value: boolean): Port
 	if value then
 		return truth(b)
 	end
@@ -71,21 +60,16 @@ const function boolean(
 end
 
 -- λc.λt.λe. c t e
-const function conditional(
-	b: Builder
-): Port
+const function conditional(b: Builder): Port
 	return L.lam(
-		b, function(
-			c: Port
-		): Port
+		b,
+		function(c: Port): Port
 			return L.lam(
-				b, function(
-					t: Port
-				): Port
+				b,
+				function(t: Port): Port
 					return L.lam(
-						b, function(
-							e: Port
-						): Port
+						b,
+						function(e: Port): Port
 							return L.app(b, L.app(b, c, t), e)
 						end
 					)
@@ -96,9 +80,7 @@ const function conditional(
 end
 
 -- A boolean as a net of its own, with its root free.
-const function booleanNet(
-	value: boolean
-): Net
+const function booleanNet(value: boolean): Net
 	const b = B.new()
 	boolean(b, value)
 
@@ -110,9 +92,7 @@ local observedTrue: Net? = nil
 local observedFalse: Net? = nil
 
 -- The boolean that a closed value stands for, or nil if it is neither.
-const function readback(
-	original: Net
-): boolean?
+const function readback(original: Net): boolean?
 	const seen = Observe.observe(original)
 
 	if not seen then

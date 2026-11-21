@@ -27,12 +27,11 @@
 --   Binary.encodeProgram(e): string      the program as bytes, with header 2
 --   Binary.decodeProgram(s): expr        the expression, checked
 
-const M = require "./vm"
 const Code = require "./code"
+const M = require "./vm"
 
 const VALUE_HEADER = 1
 const PROGRAM_HEADER = 2
-
 -- A growing buffer of bytes. The capacity is at least the length, and grows by doubling when a write would pass it.
 type Writer = {
 	buf: buffer,
@@ -48,10 +47,7 @@ const function newWriter(): Writer
 	}
 end
 
-const function reserve(
-	w: Writer,
-	extra: number
-)
+const function reserve(w: Writer, extra: number)
 	if w.len + extra <= w.cap then
 		return
 	end
@@ -68,20 +64,14 @@ const function reserve(
 	w.cap = cap
 end
 
-const function putByte(
-	w: Writer,
-	b: number
-)
+const function putByte(w: Writer, b: number)
 	reserve(w, 1)
 	buffer.writeu8(w.buf, w.len, b)
 	w.len += 1
 end
 
 -- Writes the unsigned LEB128 of n, a whole number that is not negative.
-const function putLeb(
-	w: Writer,
-	n: number
-)
+const function putLeb(w: Writer, n: number)
 	local m = n
 
 	while true do
@@ -101,10 +91,7 @@ const function putLeb(
 end
 
 -- Writes the body of a value, with no header. The cells are walked with an explicit stack, so a long list does not nest the Luau call stack.
-const function writeBody(
-	w: Writer,
-	v: M.Value
-)
+const function writeBody(w: Writer, v: M.Value)
 	local pending: { M.Value } = { v }
 	local count = 1
 
@@ -125,7 +112,6 @@ const function writeBody(
 			putByte(w, 0)
 		elseif cur.kind == "con" then
 			putByte(w, 4)
-
 			-- The tag is written before the payload, so the payload goes on the stack first.
 			count += 1
 			pending[count] = cur.payload
@@ -133,7 +119,6 @@ const function writeBody(
 			pending[count] = cur.tag
 		elseif cur.kind == "cell" then
 			putByte(w, 1)
-
 			-- The head is written before the tail, so the tail goes on the stack first.
 			count += 1
 			pending[count] = cur.tail
@@ -148,17 +133,12 @@ const function writeBody(
 end
 
 -- The bytes written to w, as a string.
-const function finish(
-	w: Writer
-): string
+const function finish(w: Writer): string
 	return buffer.readstring(w.buf, 0, w.len)
 end
 
 -- Reads one magnitude from b at position p, and returns it with the position after it. Positions count from zero.
-const function readMagnitude(
-	b: buffer,
-	p: number
-): (number, number)
+const function readMagnitude(b: buffer, p: number): (number, number)
 	local n = 0
 	local scale = 1
 	local pos = p
@@ -177,7 +157,7 @@ const function readMagnitude(
 			error("binary: a number is too long to be in range", 0)
 		end
 
-		n += (byte % 128) * scale
+		n += byte % 128 * scale
 		scale *= 128
 
 		if n > M.MAX_INTEGER then
@@ -196,10 +176,7 @@ const function readMagnitude(
 end
 
 -- Reads one leaf, which is nil or an integer, from b at position p. Returns the value and the position after it. Cells are not leaves.
-const function readLeaf(
-	b: buffer,
-	p: number
-): (M.Value, number)
+const function readLeaf(b: buffer, p: number): (M.Value, number)
 	const tag = buffer.readu8(b, p)
 
 	if tag == 0 then
@@ -222,11 +199,8 @@ const function readLeaf(
 end
 
 -- Reads the body of a value from b at position p, and returns it with the position after it. A cell waits on the stack for its head and then its tail, as in data.luau.
-const function readBody(
-	b: buffer,
-	p: number
-): (M.Value, number)
-	local stack: { { head: M.Value?, con: boolean } } = {}
+const function readBody(b: buffer, p: number): (M.Value, number)
+	local stack: { { head: M.Value?; con: boolean } } = {}
 	local pos = p
 
 	while true do
@@ -235,10 +209,10 @@ const function readBody(
 		end
 
 		if buffer.readu8(b, pos) == 1 then
-			table.insert(stack, { head = nil, con = false })
+			table.insert(stack, { head = nil; con = false })
 			pos += 1
 		elseif buffer.readu8(b, pos) == 4 then
-			table.insert(stack, { head = nil, con = true })
+			table.insert(stack, { head = nil; con = true })
 			pos += 1
 		else
 			local v: M.Value
@@ -282,10 +256,7 @@ const function readBody(
 end
 
 -- Reads bytes that hold one value, after a header that has been checked. The bytes must end with the value.
-const function decodeBody(
-	s: string,
-	what: string
-): M.Value
+const function decodeBody(s: string, what: string): M.Value
 	if #s < 2 then
 		error(`binary: the bytes end before the {what} is complete`, 0)
 	end
@@ -301,19 +272,16 @@ const function decodeBody(
 end
 
 -- Encodes a data value, with the value header.
-const function encodeValue(
-	v: M.Value
-): string
+const function encodeValue(v: M.Value): string
 	local w = newWriter()
 	putByte(w, VALUE_HEADER)
 	writeBody(w, v)
+
 	return finish(w)
 end
 
 -- Decodes bytes that must be exactly one data value.
-const function decodeValue(
-	s: string
-): M.Value
+const function decodeValue(s: string): M.Value
 	if #s < 1 or string.byte(s, 1) ~= VALUE_HEADER then
 		error("binary: the bytes are not a data value", 0)
 	end
@@ -322,19 +290,16 @@ const function decodeValue(
 end
 
 -- Encodes a program as the quoted value of its expression, with the program header.
-const function encodeProgram(
-	e: M.Expr
-): string
+const function encodeProgram(e: M.Expr): string
 	local w = newWriter()
 	putByte(w, PROGRAM_HEADER)
 	writeBody(w, Code.toValue(e))
+
 	return finish(w)
 end
 
 -- Decodes bytes that must be exactly one program, and checks its shape.
-const function decodeProgram(
-	s: string
-): M.Expr
+const function decodeProgram(s: string): M.Expr
 	if #s < 1 or string.byte(s, 1) ~= PROGRAM_HEADER then
 		error("binary: the bytes are not a program", 0)
 	end

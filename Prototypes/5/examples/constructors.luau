@@ -3,8 +3,8 @@
 --
 -- Examples of the constructor forms: a constructor, its tag and its payload. The L1 text syntax has no constructors, so these are built directly, and only run.luau checks them. The self-interpreters and the printer cannot take them, since neither can write a constructor.
 
-const M = require "../interpreter/vm"
 const Primitives = require "../interpreter/primitives"
+const M = require "../interpreter/vm"
 
 type Example = {
 	name: string,
@@ -15,11 +15,7 @@ type Example = {
 }
 const FUEL = 1e6
 
-const function value(
-	name: string,
-	program: M.Expr,
-	expect: string
-): Example
+const function value(name: string, program: M.Expr, expect: string): Example
 	return {
 		name = name,
 		program = program,
@@ -29,11 +25,7 @@ const function value(
 	}
 end
 
-const function failure(
-	name: string,
-	program: M.Expr,
-	outcome: string
-): Example
+const function failure(name: string, program: M.Expr, outcome: string): Example
 	return {
 		name = name,
 		program = program,
@@ -44,11 +36,8 @@ const function failure(
 end
 
 const I = M.int
-const prim = function(
-	name: string,
-	a: M.Expr,
-	b: M.Expr?
-): M.Expr
+
+const function prim(name: string, a: M.Expr, b: M.Expr?): M.Expr
 	return M.prim(Primitives.TAG[name], a, b)
 end
 

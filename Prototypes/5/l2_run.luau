@@ -21,7 +21,8 @@ const function check(name: string, ok: boolean, detail: string)
 	else
 		failures += 1
 		print(string.format("FAIL  %s  -> %s", name, detail))
-end end
+	end
+end
 
 const function readFile(path: string): string
 	const handle = fs.open(path)
@@ -192,7 +193,6 @@ local function listPrograms(folder: string, prefix: string, out: { string })
 end
 
 listPrograms("L2/programs", "", files)
-
 table.sort(files)
 local tests = 0
 
@@ -241,7 +241,10 @@ for _, name in files do
 
 				-- The step count is shown so a test that is close to its fuel can be seen.
 				check(`{name}:{test.line}`, pass, `{got} in {result.steps} steps (fuel {test.fuel})`)
-end end end end
+			end
+		end
+	end
+end
 
 print(string.format("%d of %d checks passed (%d program files, %d tests)", total - failures, total, #files, tests))
 

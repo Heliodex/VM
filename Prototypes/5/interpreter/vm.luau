@@ -10,7 +10,6 @@
 -- Integers are Luau numbers. They are exact from -MAX_INTEGER to MAX_INTEGER, and a result or a literal outside that range is an error.
 --
 -- Expressions, values, frames and outcomes are each a union of tables tagged by one field (op, kind, k and status). The builders at the bottom of this file are the only intended way to make expressions.
-
 -- EXPRESSIONS
 
 export type Expr =
@@ -27,77 +26,64 @@ export type Expr =
 	| ConstructExpr
 	| TagofExpr
 	| PayloadExpr
-
 -- A quoted value is data: an integer, or nil. nil is quoted, so there is no expression for it of its own.
-export type QuoteExpr = { op: "quote", value: Value }
+export type QuoteExpr = { op: "quote"; value: Value }
 -- index counts the binders between the variable and its binder, so 0 is the innermost.
-export type VarExpr = { op: "var", index: number }
-export type LamExpr = { op: "lam", body: Expr }
-export type PinExpr = { op: "pin", e: Expr }
-export type CellExpr = { op: "cell", head: Expr, tail: Expr }
+export type VarExpr = { op: "var"; index: number }
+export type LamExpr = { op: "lam"; body: Expr }
+export type PinExpr = { op: "pin"; e: Expr }
+export type CellExpr = { op: "cell"; head: Expr; tail: Expr }
 -- The part of e that an address names. n is at least 2: its binary digits after the leading 1 are the steps, from the first step to the last, with 0 for head and 1 for tail. So 2 is head, 3 is tail, 4 is head of head, and 5 is tail of head.
-export type IndexExpr = { op: "index", n: number, e: Expr }
-export type ForceExpr = { op: "force", e: Expr }
-export type IfExpr = { op: "if", c: Expr, t: Expr, e: Expr }
-export type ApplyExpr = { op: "apply", f: Expr, arg: Expr }
+export type IndexExpr = { op: "index"; n: number; e: Expr }
+export type ForceExpr = { op: "force"; e: Expr }
+export type IfExpr = { op: "if"; c: Expr; t: Expr; e: Expr }
+export type ApplyExpr = { op: "apply"; f: Expr; arg: Expr }
 -- The primitive is its tag, from primitives.luau. b is absent for the unary primitive kind
-export type PrimExpr = { op: "prim", tag: number, a: Expr, b: Expr? }
+export type PrimExpr = { op: "prim"; tag: number; a: Expr; b: Expr? }
 -- A constructor is a tag, a whole number from 0 up, with one payload. tagof gives the tag of a constructor, or -1 for any other value. payload gives the payload of a constructor, and is an error for any other value. A match is a tagof test, then a payload.
-export type ConstructExpr = { op: "construct", tag: number, e: Expr }
-export type TagofExpr = { op: "tagof", e: Expr }
-export type PayloadExpr = { op: "payload", e: Expr }
-
+export type ConstructExpr = { op: "construct"; tag: number; e: Expr }
+export type TagofExpr = { op: "tagof"; e: Expr }
+export type PayloadExpr = { op: "payload"; e: Expr }
 -- VALUES
-
 export type Nil = { kind: "nil" }
-export type Cell = { kind: "cell", head: Value, tail: Value }
-export type Closure = { kind: "closure", body: Expr, env: Binding? }
+export type Cell = { kind: "cell"; head: Value; tail: Value }
+export type Closure = { kind: "closure"; body: Expr; env: Binding? }
 -- result is set once the pin has been forced. busy is set while it is being forced, so a pin that forces itself is caught.
-export type Pin = { kind: "pin", expr: Expr, env: Binding?, busy: boolean, result: Value? }
-export type Con = { kind: "con", tag: number, payload: Value }
+export type Pin = { kind: "pin"; expr: Expr; env: Binding?; busy: boolean; result: Value? }
+export type Con = { kind: "con"; tag: number; payload: Value }
 export type Value = number | Nil | Cell | Closure | Pin | Con
-
 -- A linked list of variable bindings, innermost first.
-export type Binding = { value: Value, rest: Binding? }
-
+export type Binding = { value: Value; rest: Binding? }
 -- OUTCOMES
-
 export type Outcome =
-	| { status: "value", value: Value, steps: number }
-	| { status: "error", message: string, steps: number }
-	| { status: "out_of_fuel", steps: number }
-
+	| { status: "value"; value: Value; steps: number }
+	| { status: "error"; message: string; steps: number }
+	| { status: "out_of_fuel"; steps: number }
 -- The pending work of the machine. Each frame says what to do with the next value.
 type Frame =
-	| { k: "cell", expr: Expr, env: Binding? }
-	| { k: "cellhead", head: Value }
+	| { k: "cell"; expr: Expr; env: Binding? }
+	| { k: "cellhead"; head: Value }
 	| { k: "force" }
-	| { k: "construct", tag: number }
+	| { k: "construct"; tag: number }
 	| { k: "tagof" }
 	| { k: "payload" }
-	| { k: "index", n: number }
-	| { k: "if", t: Expr, e: Expr, env: Binding? }
-	| { k: "apply", arg: Expr, env: Binding? }
-	| { k: "argument", arg: Expr, env: Binding?, fn: Closure }
-	| { k: "update", pin: Pin }
-	| { k: "binary", tag: number, b: Expr, env: Binding? }
-	| { k: "second", tag: number, first: Value }
-	| { k: "unary", tag: number }
-
+	| { k: "index"; n: number }
+	| { k: "if"; t: Expr; e: Expr; env: Binding? }
+	| { k: "apply"; arg: Expr; env: Binding? }
+	| { k: "argument"; arg: Expr; env: Binding?; fn: Closure }
+	| { k: "update"; pin: Pin }
+	| { k: "binary"; tag: number; b: Expr; env: Binding? }
+	| { k: "second"; tag: number; first: Value }
+	| { k: "unary"; tag: number }
 const Primitives = require "./primitives"
-
 const NIL: Nil = {
 	kind = "nil",
 }
-
 -- The largest magnitude an integer may have: 2^53 - 1. Below 2^53 every integer is exact as a double, so a result at or past 2^53 may already have rounded (2^53 - 1 plus 1 gives 2^53 exactly), and it is an error rather than a wrong answer.
 const MAX_INTEGER = 9007199254740991
 
 -- A failure ends the run with an error outcome. It is returned, not thrown, so the loop returns it like any other outcome.
-const function failed(
-	message: string,
-	steps: number
-): Outcome
+const function failed(message: string, steps: number): Outcome
 	return {
 		status = "error",
 		message = message,
@@ -105,10 +91,7 @@ const function failed(
 	}
 end
 
-const function lookup(
-	env: Binding?,
-	index: number
-): Value?
+const function lookup(env: Binding?, index: number): Value?
 	local e = env
 	local i = index
 
@@ -124,11 +107,7 @@ const function lookup(
 	return nil
 end
 
-const function binary(
-	tag: number,
-	a: Value,
-	b: Value
-): (number?, string?)
+const function binary(tag: number, a: Value, b: Value): (number?, string?)
 	const row = Primitives.BY_TAG[tag]
 
 	if row == nil or row.operation == nil then
@@ -163,9 +142,7 @@ const function binary(
 end
 
 -- The kind of a value: 0 integer, 1 nil, 2 cell, 3 function, 4 pin.
-const function kindOf(
-	v: Value
-): number
+const function kindOf(v: Value): number
 	if type(v) == "number" then
 		return 0
 	end
@@ -191,18 +168,12 @@ end
 
 -- Runs a program with a budget of steps. The result is always one of the outcomes above.
 -- initialEnv is the environment the program starts in, which is empty unless given. It lets a host pass in a value that has no expression form, such as a function, as a variable.
-const function run(
-	program: Expr,
-	fuel: number,
-	initialEnv: Binding?
-): Outcome
+const function run(program: Expr, fuel: number, initialEnv: Binding?): Outcome
 	local stack: { Frame } = {}
 	local depth = 0
 	local steps = 0
 
-	const function push(
-		frame: Frame
-	)
+	const function push(frame: Frame)
 		depth += 1
 		stack[depth] = frame
 	end
@@ -304,10 +275,12 @@ const function run(
 				else
 					-- The only expression left is a primitive.
 					if expr.b == nil then
-						push({
-							k = "unary",
-							tag = expr.tag,
-						} :: Frame)
+						push(
+							{
+								k = "unary",
+								tag = expr.tag,
+							} :: Frame
+						)
 					else
 						push {
 							k = "binary",
@@ -359,7 +332,12 @@ const function run(
 
 					for i = #path, 1, -1 do
 						if type(value) ~= "table" or value.kind ~= "cell" then
-							local side = if path[i] == 0 then "head" else "tail"
+							local side =
+								if path[i] == 0 then
+									"head"
+								else
+									"tail"
+
 							return failed(side .. " of a non-cell", steps)
 						end
 
@@ -476,9 +454,7 @@ const function run(
 end
 
 -- Prints a value the way the examples write expected results: integers as numbers, lists as (1 2 3), improper pairs as (1 . 2).
-const function show(
-	v: Value
-): string
+const function show(v: Value): string
 	if type(v) == "number" then
 		return tostring(v)
 	end
@@ -516,16 +492,13 @@ const function show(
 end
 
 -- BUILDERS
-
 local M = {}
 M.run = run
 M.show = show
 M.NIL = NIL
 M.MAX_INTEGER = MAX_INTEGER
 
-function M.int(
-	n: number
-): Expr
+function M.int(n: number): Expr
 	if n > MAX_INTEGER or n < -MAX_INTEGER then
 		error(string.format("integer %s is out of range", tostring(n)), 0)
 	end
@@ -545,9 +518,7 @@ function M.nilv(): Expr
 end
 
 -- A variable, by its index: 0 is the innermost binder, 1 the one outside it, and so on.
-function M.var(
-	index: number
-): Expr
+function M.var(index: number): Expr
 	return {
 		op = "var",
 		index = index,
@@ -555,9 +526,7 @@ function M.var(
 end
 
 -- A function of one parameter. The parameter is not named: variables refer to it by index.
-function M.lam(
-	body: Expr
-): Expr
+function M.lam(body: Expr): Expr
 	return {
 		op = "lam",
 		body = body,
@@ -565,10 +534,7 @@ function M.lam(
 end
 
 -- Curried application: app(f, a, b) is app(app(f, a), b).
-function M.app(
-	f: Expr,
-	...: Expr
-): Expr
+function M.app(f: Expr, ...: Expr): Expr
 	local e = f
 
 	for _, arg in {
@@ -584,10 +550,7 @@ function M.app(
 	return e
 end
 
-function M.cell(
-	head: Expr,
-	tail: Expr
-): Expr
+function M.cell(head: Expr, tail: Expr): Expr
 	return {
 		op = "cell",
 		head = head,
@@ -596,10 +559,7 @@ function M.cell(
 end
 
 -- The part of e that the address n names. See IndexExpr.
-function M.index(
-	n: number,
-	e: Expr
-): Expr
+function M.index(n: number, e: Expr): Expr
 	if n < 2 or n > MAX_INTEGER or n ~= math.floor(n) then
 		error(string.format("an index is a whole number from 2 up, not %s", tostring(n)), 0)
 	end
@@ -612,10 +572,7 @@ function M.index(
 end
 
 -- The head (side 0) or tail (side 1) of e. The head or tail of an index is the same index with one more step, so a chain of them is one step, as long as the address stays in range.
-local function step(
-	side: number,
-	e: Expr
-): Expr
+local function step(side: number, e: Expr): Expr
 	if e.op == "index" and e.n < 2 ^ 50 then
 		return M.index(2 * e.n + side, e.e)
 	end
@@ -623,24 +580,16 @@ local function step(
 	return M.index(2 + side, e)
 end
 
-function M.head(
-	e: Expr
-): Expr
+function M.head(e: Expr): Expr
 	return step(0, e)
 end
 
-function M.tail(
-	e: Expr
-): Expr
+function M.tail(e: Expr): Expr
 	return step(1, e)
 end
 
 -- Evaluates t if c is nonzero, otherwise e. Only the branch taken is evaluated.
-function M.ite(
-	c: Expr,
-	t: Expr,
-	e: Expr
-): Expr
+function M.ite(c: Expr, t: Expr, e: Expr): Expr
 	return {
 		op = "if",
 		c = c,
@@ -650,18 +599,14 @@ function M.ite(
 end
 
 -- Suspends e. It is not evaluated until forced, and is evaluated at most once.
-function M.pin(
-	e: Expr
-): Expr
+function M.pin(e: Expr): Expr
 	return {
 		op = "pin",
 		e = e,
 	}
 end
 
-function M.force(
-	e: Expr
-): Expr
+function M.force(e: Expr): Expr
 	return {
 		op = "force",
 		e = e,
@@ -669,10 +614,7 @@ function M.force(
 end
 
 -- A constructor with the given tag, from 0 up, and payload e.
-function M.construct(
-	tag: number,
-	e: Expr
-): Expr
+function M.construct(tag: number, e: Expr): Expr
 	if tag < 0 or tag > MAX_INTEGER or tag ~= math.floor(tag) then
 		error(string.format("a constructor tag is a whole number from 0 up, not %s", tostring(tag)), 0)
 	end
@@ -685,9 +627,7 @@ function M.construct(
 end
 
 -- The tag of the constructor e gives, or -1 for any other value.
-function M.tagof(
-	e: Expr
-): Expr
+function M.tagof(e: Expr): Expr
 	return {
 		op = "tagof",
 		e = e,
@@ -695,9 +635,7 @@ function M.tagof(
 end
 
 -- The payload of the constructor e gives. It is an error for any other value.
-function M.payload(
-	e: Expr
-): Expr
+function M.payload(e: Expr): Expr
 	return {
 		op = "payload",
 		e = e,
@@ -706,11 +644,7 @@ end
 
 -- A primitive, by its tag, from the table in primitives.luau. The binary ones are the integer operations: div and mod are floored, and dividing by zero is an error. The unary primitive kind takes no b, and works on any value.
 -- The tag and the number of arguments are checked here, so a bad primitive fails when it is built, not when the machine reaches it.
-function M.prim(
-	tag: number,
-	a: Expr,
-	b: Expr?
-): Expr
+function M.prim(tag: number, a: Expr, b: Expr?): Expr
 	const row = Primitives.BY_TAG[tag]
 
 	if row == nil then
@@ -734,9 +668,7 @@ function M.prim(
 end
 
 -- A proper list of expressions, ending in nil.
-function M.list(
-	items: { Expr }
-): Expr
+function M.list(items: { Expr }): Expr
 	local e = M.nilv()
 
 	for i = #items, 1, -1 do

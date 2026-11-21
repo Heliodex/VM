@@ -53,7 +53,6 @@ local function num(value: number): Num
 end
 
 export type Expr = Fn | Name | App | Num
-
 export type AST = Fn
 
 return {

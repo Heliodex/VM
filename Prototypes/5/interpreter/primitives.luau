@@ -10,7 +10,6 @@
 --   Primitives.BY_SYMBOL["+"].tag == 11       the row for a symbol
 
 export type Operation = (number, number) -> (number?, string?)
-
 export type Primitive = {
 	tag: number,
 	name: string,
@@ -20,10 +19,7 @@ export type Primitive = {
 }
 
 -- The remainder of a divided by b, taking the sign of b, so that a = b * div + mod. Only for integers in range.
-const function floored_mod(
-	a: number,
-	b: number
-): number
+const function floored_mod(a: number, b: number): number
 	-- math.fmod is exact on doubles, and its result takes the sign of a. It is shifted by b when the signs differ.
 	local r = math.fmod(a, b)
 
@@ -40,10 +36,7 @@ const ROWS: { Primitive } = {
 		name = "add",
 		symbol = "+",
 		arity = 2,
-		operation = function(
-			a: number,
-			b: number
-		): (number?, string?)
+		operation = function(a: number, b: number): (number?, string?)
 			return a + b, nil
 		end,
 	},
@@ -52,10 +45,7 @@ const ROWS: { Primitive } = {
 		name = "sub",
 		symbol = "-",
 		arity = 2,
-		operation = function(
-			a: number,
-			b: number
-		): (number?, string?)
+		operation = function(a: number, b: number): (number?, string?)
 			return a - b, nil
 		end,
 	},
@@ -64,10 +54,7 @@ const ROWS: { Primitive } = {
 		name = "mul",
 		symbol = "*",
 		arity = 2,
-		operation = function(
-			a: number,
-			b: number
-		): (number?, string?)
+		operation = function(a: number, b: number): (number?, string?)
 			return a * b, nil
 		end,
 	},
@@ -76,10 +63,7 @@ const ROWS: { Primitive } = {
 		name = "div",
 		symbol = "/",
 		arity = 2,
-		operation = function(
-			a: number,
-			b: number
-		): (number?, string?)
+		operation = function(a: number, b: number): (number?, string?)
 			if b == 0 then
 				return nil, "div by zero"
 			end
@@ -100,10 +84,7 @@ const ROWS: { Primitive } = {
 		name = "mod",
 		symbol = "%",
 		arity = 2,
-		operation = function(
-			a: number,
-			b: number
-		): (number?, string?)
+		operation = function(a: number, b: number): (number?, string?)
 			if b == 0 then
 				return nil, "mod by zero"
 			end
@@ -116,10 +97,7 @@ const ROWS: { Primitive } = {
 		name = "lt",
 		symbol = "<",
 		arity = 2,
-		operation = function(
-			a: number,
-			b: number
-		): (number?, string?)
+		operation = function(a: number, b: number): (number?, string?)
 			if a < b then
 				return 1, nil
 			end
@@ -132,10 +110,7 @@ const ROWS: { Primitive } = {
 		name = "eq",
 		symbol = "=",
 		arity = 2,
-		operation = function(
-			a: number,
-			b: number
-		): (number?, string?)
+		operation = function(a: number, b: number): (number?, string?)
 			if a == b then
 				return 1, nil
 			end
@@ -151,9 +126,8 @@ const ROWS: { Primitive } = {
 		operation = nil,
 	},
 }
-
 const TAG: { [string]: number } = {}
-const BY_TAG: { [number]: Primitive } = {}
+const BY_TAG: { Primitive } = {}
 const BY_SYMBOL: { [string]: Primitive } = {}
 
 for _, row in ROWS do

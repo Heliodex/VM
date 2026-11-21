@@ -12,31 +12,25 @@
 --
 -- The outcomes are value, error, out_of_fuel, and not_data, which is a run whose output holds a function.
 
-const Binary = require "./binary"
 const Reader = require "../L1/reader"
+const Binary = require "./binary"
 const VM = require "./vm"
 
 export type Result =
-	| { status: "value", value: VM.Value, steps: number }
-	| { status: "error", message: string, steps: number }
-	| { status: "out_of_fuel", steps: number }
-	| { status: "not_data", steps: number }
-
+	| { status: "value"; value: VM.Value; steps: number }
+	| { status: "error"; message: string; steps: number }
+	| { status: "out_of_fuel"; steps: number }
+	| { status: "not_data"; steps: number }
 export type ByteResult =
-	| { status: "value", bytes: string, steps: number }
-	| { status: "error", message: string, steps: number }
-	| { status: "out_of_fuel", steps: number }
-	| { status: "not_data", steps: number }
-
+	| { status: "value"; bytes: string; steps: number }
+	| { status: "error"; message: string; steps: number }
+	| { status: "out_of_fuel"; steps: number }
+	| { status: "not_data"; steps: number }
 -- The output check, as a program. Its tags are 0 for data and 1 for a function. The check forces the pins in cells, and it gives a constructor back as it is, since a program written in L1 cannot take a constructor apart. A pin or a function left under a constructor is refused below, by a walk in Luau.
-const CHECK = Reader.parse(
-	"(fix (fn rec (fn v (if (= (@ v) 4) (rec (force v)) (if (= (@ v) 2) (let h (rec (head v)) (if (= (head h) 1) h (let t (rec (tail v)) (if (= (head t) 1) t [0 [(tail h) (tail t)]])))) (if (= (@ v) 3) [1 ~] [0 v]))))))"
-)
+const CHECK = Reader.parse "(fix (fn rec (fn v (if (= (@ v) 4) (rec (force v)) (if (= (@ v) 2) (let h (rec (head v)) (if (= (head h) 1) h (let t (rec (tail v)) (if (= (head t) 1) t [0 [(tail h) (tail t)]])))) (if (= (@ v) 3) [1 ~] [0 v]))))))"
 
 -- Whether a pin or a function is left in a value. The output check forces the pins in cells, so what is left is under a constructor, whose payload the check does not enter.
-const function hasPinOrFunction(
-	v: VM.Value
-): boolean
+const function hasPinOrFunction(v: VM.Value): boolean
 	local pending: { VM.Value } = { v }
 
 	while #pending > 0 do
@@ -58,14 +52,10 @@ const function hasPinOrFunction(
 end
 
 -- Runs the program on the input, and checks the output. The outcome is a Result.
-const function run(
-	program: VM.Expr,
-	input: VM.Value,
-	fuel: number
-): Result
+const function run(program: VM.Expr, input: VM.Value, fuel: number): Result
 	-- The input is the variable 0, in an environment that holds it. So an input does not need an expression form, and a function can be an input.
 	const checked = VM.app(CHECK, VM.app(program, VM.var(0)))
-	const outcome = VM.run(checked, fuel, { value = input, rest = nil })
+	const outcome = VM.run(checked, fuel, { value = input; rest = nil })
 
 	if outcome.status == "out_of_fuel" then
 		return {
@@ -106,14 +96,9 @@ const function run(
 end
 
 -- The same run with the program and input as binary, and the output as binary. A program or input that does not decode is an error, and the program is not run.
-const function runBytes(
-	programBytes: string,
-	inputBytes: string,
-	fuel: number
-): ByteResult
+const function runBytes(programBytes: string, inputBytes: string, fuel: number): ByteResult
 	local program: VM.Expr
 	local input: VM.Value
-
 	local ok, err = pcall(function()
 		program = Binary.decodeProgram(programBytes)
 		input = Binary.decodeValue(inputBytes)

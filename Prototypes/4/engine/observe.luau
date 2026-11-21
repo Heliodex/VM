@@ -5,8 +5,8 @@
 -- This is needed because the normal form of a value can depend on how its copies were arranged, so comparing a value's net directly is not sound (see scott.luau).
 -- Scott numerals and booleans are both read this way. Each has its own readback, which compares an observation with the observations of the canonical values.
 
-const B = require "./builder"
 const L = require "../calculus/lambda"
+const B = require "./builder"
 const Net = require "./net"
 const Rules = require "./rules"
 const Types = require "./types"
@@ -16,17 +16,13 @@ type Net = Types.Net
 type Port = Types.Port
 
 -- The probe that observation applies a value to: T = λy.λz. G, where G is a gamma cell with y on its aux1 and z on its aux2. Each application of T adds one G cell, so the normal form of a value applied to T and an eraser is a chain whose length is the number of applications.
-const function probe(
-	b: Builder
-): Port
+const function probe(b: Builder): Port
 	return L.lam(
-		b, function(
-			y: Port
-		): Port
+		b,
+		function(y: Port): Port
 			return L.lam(
-				b, function(
-					z: Port
-				): Port
+				b,
+				function(z: Port): Port
 					const g = b:gamma()
 					b:wire(g.aux1 :: Port, y)
 					b:wire(g.aux2 :: Port, z)
@@ -42,9 +38,7 @@ end
 const OBSERVE_BUDGET = 5000
 
 -- The normal form of `original` applied to the probe and then to an eraser, or nil if it does not finish or has no single free root.
-const function observe(
-	original: Net
-): Net?
+const function observe(original: Net): Net?
 	local root: Port? = nil
 	local free = 0
 
@@ -57,7 +51,10 @@ const function observe(
 
 				if Net.isPrincipal(p) then
 					root = p
-	end end end end
+				end
+			end
+		end
+	end
 
 	if free ~= 1 then
 		return nil
@@ -86,7 +83,8 @@ const function observe(
 
 		if steps > OBSERVE_BUDGET then
 			return nil
-	end end
+		end
+	end
 
 	return net
 end

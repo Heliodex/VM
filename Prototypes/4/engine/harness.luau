@@ -45,9 +45,7 @@ const DEFAULT_BUDGET = 1000
 const MAX_TRACKED = 0x1000
 
 -- Which port of a cell a port id refers to, as it is written in a dump.
-const function portName(
-	p: Types.Port
-): string
+const function portName(p: Types.Port): string
 	return
 		if (p - 1) % 3 == 0 then
 			"P"
@@ -60,12 +58,12 @@ end
 -- A summary of a net that does not depend on how its cells happen to be numbered.
 -- Colours start as symbols and are refined against the colours of whatever each port is wired to, so two nets that differ only by a renaming settle on the same summary.
 -- This is not a canonical form: two different nets can share a summary, which is why a repeat is only believed once Canon.isomorphic agrees.
-const function fingerprint(
-	net: Net
-): string
+const function fingerprint(net: Net): string
 	const cells = Net.liveCells(net)
 	const colour = Canon.refine(
-		net, cells, function(
+		net,
+		cells,
+		function(
 			c: Cell,
 			colour: {
 				[Cell]: string,
@@ -80,7 +78,8 @@ const function fingerprint(
 					table.insert(parts, `{slot}f`)
 				else
 					table.insert(parts, `{slot}{portName(q)}{colour[Net.owner(q)]}`)
-			end end
+				end
+			end
 
 			table.sort(parts)
 
@@ -99,9 +98,7 @@ const function fingerprint(
 end
 
 -- A net holds arrays, and no cell or port, so a shallow clone of each is a snapshot.
-const function snapshot(
-	net: Net
-): Net
+const function snapshot(net: Net): Net
 	return {
 		Tag = table.clone(net.Tag),
 		Link = table.clone(net.Link),
@@ -111,9 +108,7 @@ const function snapshot(
 end
 
 -- Rendered as one line, for messages that have to fit in a sentence.
-const function describe(
-	report: Report
-): string
+const function describe(report: Report): string
 	const steps =
 		if report.steps == 1 then
 			"1 step"
@@ -136,10 +131,7 @@ const function describe(
 end
 
 -- Make `dst` hold the same contents as `src`, in place, so that the caller's net is restored without replacing any of its fields.
-local function restore(
-	dst: { any },
-	src: { any }
-)
+local function restore(dst: { any }, src: { any })
 	table.clear(dst)
 
 	for k, v in src do
@@ -149,10 +141,7 @@ end
 
 -- Steps the net, fingerprinting it after every step, until it reaches a normal form, repeats a state, or uses up the budget.
 -- This is the only way to tell a cycle from a long reduction, but it costs a fingerprint per step, so reduce only calls it once the plain run has used its whole budget.
-local function detectCycle(
-	net: Net,
-	limit: number
-): Report
+local function detectCycle(net: Net, limit: number): Report
 	const seen: {
 		[string]: {
 			step: number,
@@ -216,13 +205,13 @@ end
 -- The net is mutated in place, so pass a net you do not need again.
 -- A net that reaches its normal form within the budget is reduced by plain stepping, which is cheap. Only a net that uses up the budget is then reduced again from its start, with cycle detection, to tell a cycle from a long run.
 -- With `plain`, a net that uses up the budget is reported as `exhausted` straight away, with no second pass. That is what a user's program wants: the cycle pass fingerprints the net at every step, so a long run costs far more than the budget it was given.
-const function reduce(
-	net: Net,
-	budget: number?,
-	plain: boolean?
-): Report
+const function reduce(net: Net, budget: number?, plain: boolean?): Report
 	const limit = budget or DEFAULT_BUDGET
-	const start = if plain then nil else snapshot(net)
+	const start =
+		if plain then
+			nil
+		else
+			snapshot(net)
 	local steps = 0
 	local cells = Net.liveCount(net)
 	local peak = cells
@@ -261,9 +250,7 @@ end
 
 -- A net as text, one cell per line, with every port either free or naming the cell and port it is wired to.
 -- Cells keep their ids so that two dumps can be compared by eye.
-const function dump(
-	net: Net
-): string
+const function dump(net: Net): string
 	const lines: { string } = {}
 
 	for _, c in Net.liveCells(net) do
@@ -277,7 +264,8 @@ const function dump(
 				table.insert(parts, `{name}=free`)
 			else
 				table.insert(parts, `{name}={Net.owner(q)}.{portName(q)}`)
-		end end
+			end
+		end
 
 		table.insert(lines, `  {c} {net.Tag[c]}  {table.concat(parts, "  ")}`)
 	end
@@ -291,11 +279,7 @@ end
 
 -- Reduce `start` and insist that what is left is `expect`, up to a renaming of cells.
 -- The message carries both dumps and the report, because a bare "FAIL" is no help when a gadget is wrong.
-const function assertReducesTo(
-	start: Net,
-	expect: Net,
-	budget: number?
-)
+const function assertReducesTo(start: Net, expect: Net, budget: number?)
 	const report = reduce(start, budget)
 
 	if report.outcome ~= "reduced" then
@@ -308,7 +292,8 @@ const function assertReducesTo(
 
 	if not Canon.isomorphic(start, expect) then
 		error(`the net reduced to something other than expected\n  reduced:\n{dump(start)}\n  expected:\n{dump(expect)}`)
-end end
+	end
+end
 
 return {
 	DEFAULT_BUDGET = DEFAULT_BUDGET,

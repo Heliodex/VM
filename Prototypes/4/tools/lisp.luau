@@ -14,17 +14,15 @@
 const Printer = require "../language/printer"
 const Reader = require "../language/reader"
 const Session = require "../language/session"
-const io = require "@std/io"
 const fs = require "@std/fs"
+const io = require "@std/io"
 const process = require "@std/process"
 
 -- How many steps one expression may take.
 const BUDGET = 400000
 
 -- Where an error is, as text, if the compiler could say.
-local function locationOf(
-	at: number?
-): string
+local function locationOf(at: number?): string
 	if at == nil then
 		return ""
 	end
@@ -33,11 +31,7 @@ local function locationOf(
 end
 
 -- Prints the results of a source in the session, and returns how many of its forms were errors. Definitions are printed only if `showDefinitions` is set.
-local function run(
-	session: Session.Session,
-	source: string,
-	showDefinitions: boolean
-): number
+local function run(session: Session.Session, source: string, showDefinitions: boolean): number
 	local errors = 0
 
 	for _, result in Session.evaluate(session, source, BUDGET, true) do
@@ -50,7 +44,7 @@ local function run(
 				print(`;; did not finish within {BUDGET} steps ({result.outcome})`)
 				errors += 1
 			elseif result.value == nil then
-				print(";; a value that cannot be printed")
+				print ";; a value that cannot be printed"
 			else
 				print(Printer.show(result.value))
 			end
@@ -64,9 +58,7 @@ local function run(
 end
 
 -- Splits text into its lines, without the newlines. A last line with no newline is kept.
-local function linesOf(
-	text: string
-): { string }
+local function linesOf(text: string): { string }
 	const lines: { string } = {}
 	local start = 1
 
@@ -89,9 +81,7 @@ local function linesOf(
 end
 
 -- Whether the source ends inside a form, so that more lines are needed before it can be read.
-local function isIncomplete(
-	source: string
-): boolean
+local function isIncomplete(source: string): boolean
 	const ok, err = pcall(Reader.read, source)
 
 	if ok then
@@ -109,9 +99,7 @@ local function repl()
 	local pending: { string } = {}
 	local buffer = ""
 
-	local function nextLine(
-		prompt: string
-	): string?
+	local function nextLine(prompt: string): string?
 		if #pending > 0 then
 			return table.remove(pending, 1)
 		end
@@ -132,7 +120,12 @@ local function repl()
 	end
 
 	while true do
-		const line = nextLine(if buffer == "" then "lisp> " else "  ... ")
+		const line = nextLine(
+			if buffer == "" then
+				"lisp> "
+			else
+				"  ... "
+		)
 
 		if line == nil then
 			break
@@ -144,11 +137,15 @@ local function repl()
 
 		if buffer == "" and string.match(line, "^%s*:reset%s*$") then
 			session = Session.new()
-			print(";; session cleared")
+			print ";; session cleared"
 			continue
 		end
 
-		buffer = if buffer == "" then line else `{buffer}\n{line}`
+		buffer =
+			if buffer == "" then
+				line
+			else
+				`{buffer}\n{line}`
 
 		if string.match(buffer, "^%s*$") then
 			buffer = ""
@@ -179,12 +176,17 @@ elseif userArgs[1] == "-e" then
 	const source = userArgs[2]
 
 	if source == nil then
-		print "usage: lute run tools/lisp.luau -e \"expression\""
+		print 'usage: lute run tools/lisp.luau -e "expression"'
 		process.exit(2)
 	end
 
 	const errors = run(Session.new(), source, false)
-	process.exit(if errors > 0 then 1 else 0)
+	process.exit(
+		if errors > 0 then
+			1
+		else
+			0
+	)
 else
 	const ok, source = pcall(fs.readFileToString, userArgs[1])
 
@@ -194,5 +196,10 @@ else
 	end
 
 	const errors = run(Session.new(), source, false)
-	process.exit(if errors > 0 then 1 else 0)
+	process.exit(
+		if errors > 0 then
+			1
+		else
+			0
+	)
 end

@@ -1,5 +1,4 @@
 --!strict
-
 -- Welcome back
 
 type Num = {
@@ -12,7 +11,6 @@ type List = {
 	read type: "$",
 	read things: { Thing },
 }
-
 local NUM: "@" = "@"
 local LIST: "$" = "$"
 
@@ -21,10 +19,12 @@ local function serialise(t: Thing, noOps: boolean?): string
 		if not noOps and t.op then
 			return t.op
 		end
+
 		return tostring(t.value)
 	end
 
 	local elements: { string } = {}
+
 	for i, elem in t.things do
 		elements[i] = serialise(elem, noOps)
 	end
@@ -36,10 +36,12 @@ local function num(value: number, op: string?): Num
 	if value < 0 then
 		error "Negative numbers are not supported at the moment"
 	end
+
 	if value % 1 ~= 0 then
 		error "Non-integer numbers are not supported at the moment"
 	end
-	return table.freeze { type = NUM, value = value, op = op }
+
+	return table.freeze { type = NUM; value = value; op = op }
 end
 
 local function list(things: { Thing }): List
@@ -73,10 +75,13 @@ local function equalList(a: List, b: List): boolean
 end
 
 function equal(a: Thing, b: Thing): boolean
-	return if a.type == NUM and b.type == NUM
-		then equalNum(a, b)
-		elseif a.type == LIST and b.type == LIST then equalList(a, b)
-		else false
+	return
+		if a.type == NUM and b.type == NUM then
+			equalNum(a, b)
+		elseif a.type == LIST and b.type == LIST then
+			equalList(a, b)
+		else
+			false
 end
 
 local function len(s: List): number
@@ -84,25 +89,13 @@ local function len(s: List): number
 end
 
 local TRUE, FALSE = num(0, "TRUE"), num(1, "FALSE") -- imagine loobeans but if they were loobeans
-
-local TAKE, SUM, REST, PART, START, END, TYPE, CHECK, LEN, SPLIT, IF, EXEC =
-	num(0, "TAKE"),
-	num(1, "SUM"),
-	num(2, "REST"),
-	num(3, "PART"),
-	num(4, "START"),
-	num(5, "END"),
-	num(6, "TYPE"),
-	num(7, "CHECK"),
-	num(8, "LEN"),
-	num(9, "SPLIT"),
-	num(10, "IF"),
-	num(11, "EXEC")
+local TAKE, SUM, REST, PART, START, END, TYPE, CHECK, LEN, SPLIT, IF, EXEC = num(0, "TAKE"), num(1, "SUM"), num(2, "REST"), num(3, "PART"), num(4, "START"), num(5, "END"), num(6, "TYPE"), num(7, "CHECK"), num(8, "LEN"), num(9, "SPLIT"), num(10, "IF"), num(11, "EXEC")
 
 local function firstrest(s: List): (Thing, List)
 	if #s.things == 0 then
 		error "Cannot take first/rest of an empty list"
 	end
+
 	return s.things[1], list { unpack(s.things, 2) }
 end
 
@@ -110,46 +103,54 @@ local function firstsecondrest(s: List): (Thing, Thing, List)
 	if #s.things == 0 then
 		error "Cannot take first/second/rest of an empty list"
 	end
+
 	if #s.things == 1 then
 		error "Cannot take second/rest of a list with only one element"
 	end
+
 	return s.things[1], s.things[2], list { unpack(s.things, 3) }
 end
 
 local function addStart(x: Thing, y: List): List
-	return list { x, unpack(y.things) }
+	return list { x; unpack(y.things) }
 end
 
 local function addEnd(y: List, x: Thing): List
-	return list { unpack(y.things), x }
+	return list { unpack(y.things); x }
 end
 
 local function reduce1(e: Thing, depth: number): Thing?
 	if depth < 0 then
 		error "Invalid depth"
 	end
+
 	if depth > 10 then
 		error "Too deep!"
 	end
+
 	local start = string.rep("    ", depth)
 
 	local function printReturn(a: Thing?)
 		if a then
 			print(start .. serialise(a))
 		end
+
 		return a
 	end
 
 	print(`{start}*{serialise(e)}`)
+
 	if e.type == NUM then
 		-- *x -> *x
 		print(`{start}! evaluate number`)
+
 		return nil
 	end
 
 	if len(e) <= 1 then
 		-- *x -> *x
 		print(`{start}! not enough elements to match any rules`)
+
 		return nil
 	end
 
@@ -159,6 +160,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 	if b.type == LIST and len(b) == 2 and equal(b.things[1], TAKE) then
 		-- *[x [TAKE y]] -> y
 		local y = b.things[2]
+
 		return printReturn(y)
 	end
 
@@ -178,8 +180,8 @@ local function reduce1(e: Thing, depth: number): Thing?
 
 		-- *[[x .y] SUM] -> x + *[y SUM]
 		print(`{start}{serialise(x)} + *[{serialise(y)} SUM]`)
+		local ysum = reduce1(list { y; SUM }, depth + 1)
 
-		local ysum = reduce1(list { y, SUM }, depth + 1)
 		if ysum == nil then
 			return nil
 		end
@@ -201,6 +203,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 		end
 
 		local _, y = firstrest(a)
+
 		return printReturn(y)
 	end
 
@@ -230,7 +233,7 @@ local function reduce1(e: Thing, depth: number): Thing?
 			return reduce1(
 				list {
 					y,
-					list { PART, num(b2.value - 1) },
+					list { PART; num(b2.value - 1) },
 				},
 				depth
 			)
@@ -282,10 +285,9 @@ local function reduce1(e: Thing, depth: number): Thing?
 
 		-- *[[x x .y] CHECK] -> *[[x .y] CHECK]
 		local p1, p2, rest = firstsecondrest(a)
+
 		if equal(p1, p2) then
-			return printReturn(
-				reduce1(list { addStart(p1, rest), CHECK }, depth + 1)
-			)
+			return printReturn(reduce1(list { addStart(p1, rest); CHECK }, depth + 1))
 		end
 
 		-- *[[x y .z] CHECK] -> 1
@@ -306,10 +308,9 @@ local function reduce1(e: Thing, depth: number): Thing?
 
 		-- *[[x .y] LEN] -> 1 + *[y LEN]
 		local _, y = firstrest(a)
-
 		print(`{start}1 + *[{serialise(y)} LEN]`)
+		local ylen = reduce1(list { y; LEN }, depth + 1)
 
-		local ylen = reduce1(list { y, LEN }, depth + 1)
 		if ylen == nil then
 			return nil
 		end
@@ -328,27 +329,22 @@ local function reduce1(e: Thing, depth: number): Thing?
 	-- *[[x y z] SPLIT] -> *[*[x y] *[x z]]
 	if b.type == LIST and len(b) == 3 and equal(b.things[1], SPLIT) then
 		local x, y, z = a, b.things[2], b.things[3]
-
 		-- *[x [SPLIT y z]] -> *[*[x y] *[x z]]
-		print(
-			`{start}*[*[{serialise(x)} {serialise(y)}] *[{serialise(x)} {serialise(
-				z
-			)}]]`
-		)
+		print(`{start}*[*[{serialise(x)} {serialise(y)}] *[{serialise(x)} {serialise(z)}]]`)
+		local rxy = reduce1(list { x; y }, depth + 1)
 
-		local rxy = reduce1(list { x, y }, depth + 1)
 		if rxy == nil then
 			return nil
 		end
 
 		print(`{start}*[{serialise(rxy)} *[{serialise(x)} {serialise(z)}]]`)
+		local rxz = reduce1(list { x; z }, depth + 1)
 
-		local rxz = reduce1(list { x, z }, depth + 1)
 		if rxz == nil then
 			return nil
 		end
 
-		return reduce1(list { rxy, rxz }, depth)
+		return reduce1(list { rxy; rxz }, depth)
 	end
 
 	-- IF
@@ -370,16 +366,15 @@ local function reduce1(e: Thing, depth: number): Thing?
 	if b.type == LIST and len(b) == 3 and equal(b.things[1], EXEC) then
 		-- *[x [EXEC y z]] -> *[[*[x y] x] z]
 		local x, y, z = a, b.things[2], b.things[3]
-
 		local sx = serialise(x)
 		print(`{start}*[[*[{sx} {serialise(y)}] {sx}] {serialise(z)}]`)
+		local rxy = reduce1(list { x; y }, depth + 1)
 
-		local rxy = reduce1(list { x, y }, depth + 1)
 		if rxy == nil then
 			return nil
 		end
 
-		return reduce1(list { list { rxy, x }, z }, depth)
+		return reduce1(list { list { rxy; x }; z }, depth)
 	end
 
 	-- *[x y] -> *[x y]
@@ -390,7 +385,8 @@ local function reduce1(e: Thing, depth: number): Thing?
 	-- *[x y .z] -> *[*[x y] .z]
 	if len(e) > 2 then
 		local x, y, z = firstsecondrest(e)
-		local rxy = reduce1(list { x, y }, depth + 1)
+		local rxy = reduce1(list { x; y }, depth + 1)
+
 		if rxy == nil then
 			return nil
 		end
@@ -400,192 +396,179 @@ local function reduce1(e: Thing, depth: number): Thing?
 
 	-- *x -> *x
 	print(`{start}! no reduction rule matched`)
+
 	return nil
 end
 
-local tests: {
-	{
-		read eval: Thing,
-		read res: Thing?,
-	}
-} = {
+local tests: { {
+	read eval: Thing,
+	read res: Thing?,
+} } = {
 	{
 		eval = list {},
 	},
 	{
 		eval = num(1),
 	},
-
 	-- SUM
 	{
-		eval = list { list {}, SUM },
+		eval = list { list {}; SUM },
 		res = num(0),
 	},
 	{
-		eval = list { list { num(1) }, SUM },
+		eval = list { list { num(1) }; SUM },
 		res = num(1),
 	},
 	{
-		eval = list { list { num(1), num(2) }, SUM },
+		eval = list { list { num(1); num(2) }; SUM },
 		res = num(3),
 	},
-
 	-- REST
 	{
-		eval = list { list {}, REST },
+		eval = list { list {}; REST },
 	},
 	{
-		eval = list { num(1), REST },
+		eval = list { num(1); REST },
 	},
 	{
-		eval = list { list { num(1), num(2), num(3) }, REST },
-		res = list { num(2), num(3) },
+		eval = list { list { num(1); num(2); num(3) }; REST },
+		res = list { num(2); num(3) },
 	},
-
 	-- PART
 	{
-		eval = list { list { num(1), num(2), num(3) }, PART },
+		eval = list { list { num(1); num(2); num(3) }; PART },
 	},
 	{
-		eval = list { list { num(1), num(2), num(3) }, list { PART } },
+		eval = list { list { num(1); num(2); num(3) }; list { PART } },
 	},
 	{
-		eval = list { list { num(1), num(2), num(3) }, list { PART, num(0) } },
-		res = list { num(1), num(2), num(3) },
+		eval = list { list { num(1); num(2); num(3) }; list { PART; num(0) } },
+		res = list { num(1); num(2); num(3) },
 	},
 	{
-		eval = list { list { num(1), num(2), num(3) }, list { PART, num(1) } },
+		eval = list { list { num(1); num(2); num(3) }; list { PART; num(1) } },
 		res = num(1),
 	},
 	{
-		eval = list { list { num(1), num(2), num(3) }, list { PART, num(2) } },
+		eval = list { list { num(1); num(2); num(3) }; list { PART; num(2) } },
 		res = num(2),
 	},
 	{
-		eval = list { list { num(1), num(2), num(3) }, list { PART, num(3) } },
+		eval = list { list { num(1); num(2); num(3) }; list { PART; num(3) } },
 		res = num(3),
 	},
 	{
-		eval = list { list { num(1), num(2), num(3) }, list { PART, num(4) } },
+		eval = list { list { num(1); num(2); num(3) }; list { PART; num(4) } },
 	},
-
 	-- START
 	{
-		eval = list { list { num(1) }, START },
+		eval = list { list { num(1) }; START },
 	},
 	{
-		eval = list { list { num(1) }, list { START } },
+		eval = list { list { num(1) }; list { START } },
 	},
 	{
-		eval = list { list { num(1) }, list { START, num(2) } },
-		res = list { num(2), num(1) },
+		eval = list { list { num(1) }; list { START; num(2) } },
+		res = list { num(2); num(1) },
 	},
-
 	-- END
 	{
-		eval = list { list { num(1) }, END },
+		eval = list { list { num(1) }; END },
 	},
 	{
-		eval = list { list { num(1) }, list { END } },
+		eval = list { list { num(1) }; list { END } },
 	},
 	{
-		eval = list { list { num(1) }, list { END, num(2) } },
-		res = list { num(1), num(2) },
+		eval = list { list { num(1) }; list { END; num(2) } },
+		res = list { num(1); num(2) },
 	},
-
 	-- TYPE
 	{
-		eval = list { list {}, TYPE },
+		eval = list { list {}; TYPE },
 		res = TRUE,
 	},
 	{
-		eval = list { num(0), TYPE },
+		eval = list { num(0); TYPE },
 		res = FALSE,
 	},
-
 	-- CHECK
 	{
-		eval = list { list {}, CHECK },
+		eval = list { list {}; CHECK },
 		res = TRUE,
 	},
 	{
-		eval = list { list { num(1) }, CHECK },
+		eval = list { list { num(1) }; CHECK },
 		res = TRUE,
 	},
 	{
-		eval = list { list { num(1), num(1) }, CHECK },
+		eval = list { list { num(1); num(1) }; CHECK },
 		res = TRUE,
 	},
 	{
-		eval = list { list { num(1), num(2) }, CHECK },
+		eval = list { list { num(1); num(2) }; CHECK },
 		res = FALSE,
 	},
-
 	-- LEN
 	{
-		eval = list { list {}, LEN },
+		eval = list { list {}; LEN },
 		res = num(0),
 	},
 	{
-		eval = list { num(1), LEN },
+		eval = list { num(1); LEN },
 	},
 	{
-		eval = list { list { num(1) }, LEN },
+		eval = list { list { num(1) }; LEN },
 		res = num(1),
 	},
 	{
-		eval = list { list { num(1), num(2) }, LEN },
+		eval = list { list { num(1); num(2) }; LEN },
 		res = num(2),
 	},
 	{
-		eval = list { list { num(1), num(2), num(3) }, LEN },
+		eval = list { list { num(1); num(2); num(3) }; LEN },
 		res = num(3),
 	},
-
 	-- SPLIT
 	{
 		eval = list {
 			num(1, "x"),
-			list { SPLIT, num(2, "y"), num(3, "z") },
+			list { SPLIT; num(2, "y"); num(3, "z") },
 		},
 	},
 	-- lifecycle test ig
 	{
 		eval = list {
-			list { num(1, "x"), num(2, "y") },
-			list { SPLIT, list { PART, num(2) }, list { PART, num(1) } },
+			list { num(1, "x"); num(2, "y") },
+			list { SPLIT; list { PART; num(2) }; list { PART; num(1) } },
 		},
 	},
 	{
 		eval = list {
-			list { LEN, list { num(1), num(2) } },
-			list { SPLIT, list { PART, num(2) }, list { PART, num(1) } },
+			list { LEN; list { num(1); num(2) } },
+			list { SPLIT; list { PART; num(2) }; list { PART; num(1) } },
 		},
 		res = num(2),
 	},
-
 	-- IF
 	{
-		eval = list { TRUE, list { IF, num(1), num(2) } },
+		eval = list { TRUE; list { IF; num(1); num(2) } },
 		res = num(1),
 	},
 	{
-		eval = list { FALSE, list { IF, num(1), num(2) } },
+		eval = list { FALSE; list { IF; num(1); num(2) } },
 		res = num(2),
 	},
 	{
-		eval = list { num(3), list { IF, num(1), num(2) } },
+		eval = list { num(3); list { IF; num(1); num(2) } },
 	},
-
 	-- EXEC
 	{
 		eval = list {
 			num(1),
-			list { EXEC, list { TAKE, num(0) }, list { PART, num(0) } },
+			list { EXEC; list { TAKE; num(0) }; list { PART; num(0) } },
 		},
-		res = list { num(0), num(1) },
+		res = list { num(0); num(1) },
 	},
-
 	-- loop
 	--[=[
 		[%8
@@ -604,19 +587,17 @@ local tests: {
 	  ]=]
 	{
 		eval = (function()
-			local x = list { PART, num(0, "x0") }
+			local x = list { PART; num(0, "x0") }
 			local y = list {
 				TAKE,
-				list { SPLIT, list { PART, num(0, "y0") }, list { PART, num(0, "z0") } },
+				list { SPLIT; list { PART; num(0, "y0") }; list { PART; num(0, "z0") } },
 			}
-
 			-- lifecycle
-			local z =
-				list { SPLIT, list { PART, num(2) }, list { PART, num(1) } }
+			local z = list { SPLIT; list { PART; num(2) }; list { PART; num(1) } }
 
 			return list {
 				x,
-				list { EXEC, y, z },
+				list { EXEC; y; z },
 			}
 		end)(),
 	},
@@ -625,6 +606,7 @@ local tests: {
 for i, test in tests do
 	local rd = reduce1(test.eval, 0)
 	local out
+
 	if rd == nil then
 		print "~~"
 		print()
@@ -635,6 +617,7 @@ for i, test in tests do
 	end
 
 	local expected = test.res and serialise(test.res, true)
+
 	if out ~= expected then
 		print(`Test failed: expected {expected}, got {out}`)
 		break

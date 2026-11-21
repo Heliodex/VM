@@ -7,8 +7,8 @@
 --
 -- The program and the test expressions are not compiled here: that is l2.luau's job, so this module only splits the file.
 
-export type Import = { line: number, name: string, file: string }
-export type Test = { line: number, input: string, outcome: string, output: string?, fuel: number }
+export type Import = { line: number; name: string; file: string }
+export type Test = { line: number; input: string; outcome: string; output: string?; fuel: number }
 export type File = {
 	header: string,
 	imports: { Import },
@@ -17,15 +17,11 @@ export type File = {
 	tests: { Test },
 }
 
-local function trim(
-	s: string
-): string
-	return (string.match(s, "^%s*(.-)%s*$") :: string)
+local function trim(s: string): string
+	return string.match(s, "^%s*(.-)%s*$") :: string
 end
 
-local function splitLines(
-	text: string
-): { string }
+local function splitLines(text: string): { string }
 	local lines: { string } = {}
 
 	for line in string.gmatch(text .. "\n", "([^\n]*)\n") do
@@ -35,23 +31,17 @@ local function splitLines(
 	return lines
 end
 
-local function parseImport(
-	text: string,
-	lineNo: number
-): Import
+local function parseImport(text: string, lineNo: number): Import
 	const name, file = string.match(text, "^(%S+)%s*=%s*(%S+)$")
 
 	if name == nil or file == nil then
 		error(string.format("line %d: an import is name = path, but this is %s", lineNo, text), 0)
 	end
 
-	return { line = lineNo, name = name :: string, file = file :: string }
+	return { line = lineNo; name = name :: string; file = file :: string }
 end
 
-local function parseTest(
-	text: string,
-	lineNo: number
-): Test
+local function parseTest(text: string, lineNo: number): Test
 	const arrow = string.find(text, " => ", 1, true)
 
 	if arrow == nil then
@@ -90,9 +80,7 @@ local function parseTest(
 	}
 end
 
-local function parse(
-	text: string
-): File
+local function parse(text: string): File
 	const lines = splitLines(text)
 	local separators: { number } = {}
 
@@ -109,7 +97,6 @@ local function parse(
 	const first = separators[1]
 	const second = separators[2]
 	const third = separators[3]
-
 	local imports: { Import } = {}
 	local seen: { [string]: boolean } = {}
 

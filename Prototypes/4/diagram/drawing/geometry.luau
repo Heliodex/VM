@@ -49,19 +49,12 @@ const DIRS: { Vec } = {
 	},
 }
 
-const function fmt(
-	v: number
-): string
+const function fmt(v: number): string
 	return string.format("%.1f", v)
 end
 
 -- Unit vector, falling back to (fx, fy) when the input is degenerate.
-const function unit(
-	x: number,
-	y: number,
-	fx: number,
-	fy: number
-): (number, number)
+const function unit(x: number, y: number, fx: number, fy: number): (number, number)
 	const d = math.sqrt(x * x + y * y)
 
 	if d < 0.01 then
@@ -72,11 +65,7 @@ const function unit(
 end
 
 -- Point a fraction t of the way from a to b.
-const function lerp(
-	a: Vec,
-	b: Vec,
-	t: number
-): Vec
+const function lerp(a: Vec, b: Vec, t: number): Vec
 	return {
 		x = a.x + (b.x - a.x) * t,
 		y = a.y + (b.y - a.y) * t,
@@ -84,14 +73,7 @@ const function lerp(
 end
 
 -- Distance from a point to a line segment.
-const function segDist(
-	px: number,
-	py: number,
-	ax: number,
-	ay: number,
-	bx: number,
-	by: number
-): number
+const function segDist(px: number, py: number, ax: number, ay: number, bx: number, by: number): number
 	const dx, dy = bx - ax, by - ay
 	const l2 = dx * dx + dy * dy
 
@@ -106,16 +88,7 @@ const function segDist(
 end
 
 -- Whether two open segments cross: shared endpoints and touching do not count.
-const function segmentsCross(
-	ax: number,
-	ay: number,
-	bx: number,
-	by: number,
-	cx: number,
-	cy: number,
-	dx: number,
-	dy: number
-): boolean
+const function segmentsCross(ax: number, ay: number, bx: number, by: number, cx: number, cy: number, dx: number, dy: number): boolean
 	const d1 = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax)
 	const d2 = (bx - ax) * (dy - ay) - (by - ay) * (dx - ax)
 	const d3 = (dx - cx) * (ay - cy) - (dy - cy) * (ax - cx)
@@ -124,13 +97,7 @@ const function segmentsCross(
 	return (d1 > 0 and d2 < 0 or d1 < 0 and d2 > 0) and (d3 > 0 and d4 < 0 or d3 < 0 and d4 > 0)
 end
 
-const function pointInTri(
-	px: number,
-	py: number,
-	a: Vec,
-	b: Vec,
-	c: Vec
-): boolean
+const function pointInTri(px: number, py: number, a: Vec, b: Vec, c: Vec): boolean
 	const d1 = (b.x - a.x) * (py - a.y) - (b.y - a.y) * (px - a.x)
 	const d2 = (c.x - b.x) * (py - b.y) - (c.y - b.y) * (px - b.x)
 	const d3 = (a.x - c.x) * (py - c.y) - (a.y - c.y) * (px - c.x)
@@ -142,10 +109,7 @@ end
 
 -- The direction (one of the four quarter turns) that points most nearly from
 -- `a` towards `b`.
-const function dirToward(
-	a: Vec,
-	b: Vec
-): number
+const function dirToward(a: Vec, b: Vec): number
 	local best, bestDot = 0, -math.huge
 
 	for i, d in DIRS do
@@ -154,16 +118,14 @@ const function dirToward(
 		if dot > bestDot then
 			bestDot = dot
 			best = i - 1
-	end end
+		end
+	end
 
 	return best
 end
 
 -- The quarter-turn index of a vector: 0 = +x, 1 = -x, 2 = +y, 3 = -y.
-const function dirIndexOf(
-	vx: number,
-	vy: number
-): number
+const function dirIndexOf(vx: number, vy: number): number
 	if math.abs(vx) >= math.abs(vy) then
 		return
 			if vx >= 0 then
@@ -180,12 +142,7 @@ const function dirIndexOf(
 end
 
 -- The position of a port, for a cell centred at `center` and turned to face `d`.
-const function anchorOf(
-	center: Vec,
-	d: Vec,
-	symbol: Symbol,
-	slot: number
-): Vec
+const function anchorOf(center: Vec, d: Vec, symbol: Symbol, slot: number): Vec
 	if symbol == "Epsilon" then
 		return {
 			x = center.x + d.x * CIRCLE_RADIUS,
@@ -214,7 +171,9 @@ const function anchorOf(
 	}
 
 	return lerp(
-		a, b, if slot == 2 then
+		a,
+		b,
+		if slot == 2 then
 			1 / 3
 		else
 			2 / 3
@@ -222,10 +181,7 @@ const function anchorOf(
 end
 
 -- The outward normal of a port: principal points along the tip, auxiliary ports point back out of the base.
-const function normalOf(
-	d: Vec,
-	slot: number
-): Vec
+const function normalOf(d: Vec, slot: number): Vec
 	if slot == 1 then
 		return d
 	end
@@ -236,9 +192,7 @@ const function normalOf(
 	}
 end
 
-const function key(
-	g: Grid
-): string
+const function key(g: Grid): string
 	return `{g.x},{g.y}`
 end
 

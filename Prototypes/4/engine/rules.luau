@@ -22,43 +22,27 @@ const RULES: {
 	[EPSILON] = {},
 }
 -- Annihilation: gamma-gamma exchanges the auxiliary ports.
-RULES[GAMMA][GAMMA] = function(
-	net,
-	a,
-	b
-)
+RULES[GAMMA][GAMMA] = function(net, a, b)
 	Net.splice(net, Net.aux1(a), Net.aux2(b))
 	Net.splice(net, Net.aux2(a), Net.aux1(b))
 	Net.release(net, a)
 	Net.release(net, b)
 end
 -- Annihilation: delta-delta connects them straight.
-RULES[DELTA][DELTA] = function(
-	net,
-	a,
-	b
-)
+RULES[DELTA][DELTA] = function(net, a, b)
 	Net.splice(net, Net.aux1(a), Net.aux1(b))
 	Net.splice(net, Net.aux2(a), Net.aux2(b))
 	Net.release(net, a)
 	Net.release(net, b)
 end
 -- Annihilation: two erasers simply vanish.
-RULES[EPSILON][EPSILON] = function(
-	net,
-	a,
-	b
-)
+RULES[EPSILON][EPSILON] = function(net, a, b)
 	Net.release(net, a)
 	Net.release(net, b)
 end
 
 -- Commutation of two different binary cells: each becomes two copies, wired into the square of Fig. 2. a and b must carry different symbols.
-const function commute(
-	net: Net,
-	a: Cell,
-	b: Cell
-)
+const function commute(net: Net, a: Cell, b: Cell)
 	const atag = net.Tag[a]
 	const btag = net.Tag[b]
 	const a1, a2 = Net.alloc(net, atag), Net.alloc(net, atag)
@@ -82,11 +66,7 @@ RULES[DELTA][GAMMA] = commute
 
 -- Commutation with an eraser: every auxiliary port gets its own eraser.
 -- Exactly one of a, b is the eraser, so the binary cell is found regardless of the order in which the active pair happened to be discovered.
-const function erase(
-	net: Net,
-	a: Cell,
-	b: Cell
-)
+const function erase(net: Net, a: Cell, b: Cell)
 	local x, e = a, b
 
 	if net.Tag[x] == EPSILON then
@@ -106,9 +86,7 @@ RULES[DELTA][EPSILON] = erase
 RULES[EPSILON][DELTA] = erase
 
 -- Perform a single interaction, if any. Returns whether one happened.
-const function step(
-	net: Net
-): boolean
+const function step(net: Net): boolean
 	-- Pop the *oldest* redex, not the newest. With a LIFO stack, freshly created redexes keep landing on top of older ones, so an older pair can be starved forever; delta(epsilon, x) = gamma(x, epsilon) then grows without bound instead of cycling. FIFO is fair: every enqueued pair is eventually taken.
 	const active = net.Active
 

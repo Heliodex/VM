@@ -1,6 +1,6 @@
 --!strict
-
 -- A program is a list of functions.
+
 export type ToParse = {
 	read src: { string },
 	pos: number,

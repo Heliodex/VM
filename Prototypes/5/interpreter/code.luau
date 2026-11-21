@@ -32,24 +32,19 @@
 --
 -- Both are recursive on the depth of the program, not on the length of a list, since a list is a chain of tails walked one step at a time.
 
-const M = require "./vm"
 const Primitives = require "./primitives"
+const M = require "./vm"
 
-const function cell(
-	head: M.Value,
-	tail: M.Value
-): M.Value
-	return ({
+const function cell(head: M.Value, tail: M.Value): M.Value
+	return {
 		kind = "cell",
 		head = head,
 		tail = tail,
-	} :: M.Cell)
+	} :: M.Cell
 end
 
 -- A proper list of values, ending in nil.
-const function list(
-	items: { M.Value }
-): M.Value
+const function list(items: { M.Value }): M.Value
 	local v: M.Value = M.NIL
 
 	for i = #items, 1, -1 do
@@ -59,19 +54,13 @@ const function list(
 	return v
 end
 
-const function node(
-	tag: number,
-	args: { M.Value }
-): M.Value
+const function node(tag: number, args: { M.Value }): M.Value
 	return cell(tag, list(args))
 end
 
 -- Quotes an expression as a data value.
 local toValue: (e: M.Expr) -> M.Value
-
-toValue = function(
-	e: M.Expr
-): M.Value
+toValue = function(e: M.Expr): M.Value
 	if e.op == "quote" then
 		return node(0, { e.value })
 	elseif e.op == "var" then
@@ -81,11 +70,11 @@ toValue = function(
 	elseif e.op == "pin" then
 		return node(4, { toValue(e.e) })
 	elseif e.op == "cell" then
-		return node(5, { toValue(e.head), toValue(e.tail) })
+		return node(5, { toValue(e.head); toValue(e.tail) })
 	elseif e.op == "index" then
-		return node(6, { e.n, toValue(e.e) })
+		return node(6, { e.n; toValue(e.e) })
 	elseif e.op == "construct" then
-		return node(19, { e.tag, toValue(e.e) })
+		return node(19, { e.tag; toValue(e.e) })
 	elseif e.op == "tagof" then
 		return node(20, { toValue(e.e) })
 	elseif e.op == "payload" then
@@ -93,9 +82,9 @@ toValue = function(
 	elseif e.op == "force" then
 		return node(8, { toValue(e.e) })
 	elseif e.op == "if" then
-		return node(9, { toValue(e.c), toValue(e.t), toValue(e.e) })
+		return node(9, { toValue(e.c); toValue(e.t); toValue(e.e) })
 	elseif e.op == "apply" then
-		return node(10, { toValue(e.f), toValue(e.arg) })
+		return node(10, { toValue(e.f); toValue(e.arg) })
 	end
 
 	const tag = e.tag
@@ -104,14 +93,11 @@ toValue = function(
 		return node(tag, { toValue(e.a) })
 	end
 
-	return node(tag, { toValue(e.a), toValue((e.b :: M.Expr)) })
+	return node(tag, { toValue(e.a); toValue(e.b :: M.Expr) })
 end
 
 -- The items of a proper list of exactly n values.
-const function items(
-	v: M.Value,
-	n: number
-): { M.Value }
+const function items(v: M.Value, n: number): { M.Value }
 	local out: { M.Value } = {}
 	local cur = v
 
@@ -131,25 +117,20 @@ const function items(
 	return out
 end
 
-const function isInteger(
-	v: M.Value
-): boolean
+const function isInteger(v: M.Value): boolean
 	return type(v) == "number" and v == math.floor(v)
 end
 
 -- Reads a quoted program back as an expression. The builders check the primitive names and the integers they are given, and this checks the shape of everything else.
 local fromValue: (v: M.Value) -> M.Expr
-
-fromValue = function(
-	v: M.Value
-): M.Expr
+fromValue = function(v: M.Value): M.Expr
 	if type(v) ~= "table" or v.kind ~= "cell" then
 		error("a program is a pair [tag args]", 0)
 	end
 
 	const tag = v.head
 
-	if not isInteger(tag) or (tag :: number) < 0 or (tag :: number) > 21 then
+	if not isInteger(tag) or (tag :: number) < 0 or tag :: number > 21 then
 		error(`a program has no form with tag {tostring(tag)}`, 0)
 	end
 
@@ -182,6 +163,7 @@ fromValue = function(
 		return M.pin(fromValue(items(parts, 1)[1]))
 	elseif n == 5 then
 		const pair = items(parts, 2)
+
 		return M.cell(fromValue(pair[1]), fromValue(pair[2]))
 	elseif n == 6 then
 		const pair = items(parts, 2)
@@ -195,9 +177,11 @@ fromValue = function(
 		return M.force(fromValue(items(parts, 1)[1]))
 	elseif n == 9 then
 		const three = items(parts, 3)
+
 		return M.ite(fromValue(three[1]), fromValue(three[2]), fromValue(three[3]))
 	elseif n == 10 then
 		const pair = items(parts, 2)
+
 		return M.app(fromValue(pair[1]), fromValue(pair[2]))
 	elseif n == 18 then
 		return M.prim(Primitives.TAG.kind, fromValue(items(parts, 1)[1]))
@@ -220,13 +204,12 @@ fromValue = function(
 	end
 
 	const pair = items(parts, 2)
+
 	return M.prim(n, fromValue(pair[1]), fromValue(pair[2]))
 end
 
 -- An expression that evaluates to the data value v. Integers and nil are literals, and a cell is a cell built at run time, so the expression is the same shape as v.
-const function toExpr(
-	v: M.Value
-): M.Expr
+const function toExpr(v: M.Value): M.Expr
 	if type(v) == "number" then
 		return M.int(v)
 	end

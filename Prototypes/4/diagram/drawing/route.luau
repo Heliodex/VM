@@ -14,12 +14,7 @@ type Scene = Orient.Scene
 
 -- Routing ---------------------------------------------------------------------
 -- How far a point lies outside a cell body (0 when inside it). A wire that would otherwise cut through a cell is re-routed along the free lanes, so a curve never crosses a cell unless it starts or ends on it.
-const function bodyDist(
-	scene: Scene,
-	x: number,
-	y: number,
-	c: Cell
-): number
+const function bodyDist(scene: Scene, x: number, y: number, c: Cell): number
 	if scene.net.Tag[c] == "Epsilon" then
 		return math.max(0, math.sqrt((x - scene.hub[c].x) ^ 2 + (y - scene.hub[c].y) ^ 2) - G.CIRCLE_RADIUS)
 	end
@@ -48,27 +43,18 @@ const ROUTE_DY = {
 	-1,
 }
 
-const function blockedAt(
-	scene: Scene,
-	x: number,
-	y: number
-): boolean
+const function blockedAt(scene: Scene, x: number, y: number): boolean
 	for _, c in scene.cells do
 		if bodyDist(scene, x, y, c) < ROUTE_CLEAR then
 			return true
-	end end
+		end
+	end
 
 	return false
 end
 
 -- A* over a fine lattice of the free space, preferring long straights (a turn costs extra). Returns the polyline P, A, ..., B, Q, or nil when the ports are boxed in.
-const function route(
-	scene: Scene,
-	P: G.Vec,
-	np: G.Vec,
-	Q: G.Vec,
-	nq: G.Vec
-): { G.Vec }?
+const function route(scene: Scene, P: G.Vec, np: G.Vec, Q: G.Vec, nq: G.Vec): { G.Vec }?
 	const A = {
 		x = P.x + np.x * ROUTE_LEAD,
 		y = P.y + np.y * ROUTE_LEAD,
@@ -91,7 +77,8 @@ const function route(
 			loY = math.min(loY, scene.tip[c].y, scene.e1[c].y, scene.e2[c].y)
 			hiX = math.max(hiX, scene.tip[c].x, scene.e1[c].x, scene.e2[c].x)
 			hiY = math.max(hiY, scene.tip[c].y, scene.e1[c].y, scene.e2[c].y)
-	end end
+		end
+	end
 
 	loX = math.min(loX, P.x, Q.x, A.x, B.x) - 2 * G.PITCH
 	loY = math.min(loY, P.y, Q.y, A.y, B.y) - 2 * G.PITCH
@@ -101,22 +88,15 @@ const function route(
 	const cols = math.floor((hiX - loX) / step) + 1
 	const rows = math.floor((hiY - loY) / step) + 1
 
-	const function ix(
-		x: number
-	): number
+	const function ix(x: number): number
 		return math.floor((x - loX) / step + 0.5)
 	end
 
-	const function iy(
-		y: number
-	): number
+	const function iy(y: number): number
 		return math.floor((y - loY) / step + 0.5)
 	end
 
-	const function freeNode(
-		ax: number,
-		ay: number
-	): G.Vec?
+	const function freeNode(ax: number, ay: number): G.Vec?
 		const si, sj = ix(ax), iy(ay)
 
 		for r = 0, 5 do
@@ -133,7 +113,12 @@ const function route(
 									x = x,
 									y = y,
 								}
-		end end end end end end
+							end
+						end
+					end
+				end
+			end
+		end
 
 		return nil
 	end
@@ -157,13 +142,10 @@ const function route(
 		s: number,
 	} } = {}
 
-	const function push(
-		f: number,
-		g: number,
-		s: number
-	)
+	const function push(f: number, g: number, s: number)
 		table.insert(
-			heap, {
+			heap,
+			{
 				f = f,
 				g = g,
 				s = s,
@@ -180,7 +162,8 @@ const function route(
 
 			heap[par], heap[i] = heap[i], heap[par]
 			i = par
-	end end
+		end
+	end
 
 	const function pop(): {
 		f: number,
@@ -216,7 +199,8 @@ const function route(
 
 				heap[i], heap[m] = heap[m], heap[i]
 				i = m
-		end end
+			end
+		end
 
 		return top
 	end
@@ -268,7 +252,9 @@ const function route(
 				back[ns + 1] = top.s
 				const h = (math.abs(ni - gi) + math.abs(nj - gj)) * step
 				push(ng + h, ng, ns)
-	end end end
+			end
+		end
+	end
 
 	if goalState < 0 then
 		return nil
@@ -282,7 +268,8 @@ const function route(
 		const i = pos % cols
 		const j = pos // cols
 		table.insert(
-			nodes, {
+			nodes,
+			{
 				x = loX + i * step,
 				y = loY + j * step,
 			}
@@ -322,14 +309,13 @@ const function route(
 			table.remove(poly, k)
 		else
 			k += 1
-	end end
+		end
+	end
 
 	return poly
 end
 
-const function roundedPath(
-	pts: { G.Vec }
-): string
+const function roundedPath(pts: { G.Vec }): string
 	const r = ROUTE_STEP * 0.9
 	local d = `M {G.fmt(pts[1].x)} {G.fmt(pts[1].y)}`
 
@@ -347,7 +333,8 @@ const function roundedPath(
 			const ax, ay = cur.x - inx * rr, cur.y - iny * rr
 			const bx, by = cur.x + outx * rr, cur.y + outy * rr
 			d ..= ` L {G.fmt(ax)} {G.fmt(ay)} Q {G.fmt(cur.x)} {G.fmt(cur.y)} {G.fmt(bx)} {G.fmt(by)}`
-	end end
+		end
+	end
 
 	d ..= ` L {G.fmt(pts[#pts].x)} {G.fmt(pts[#pts].y)}`
 
@@ -356,15 +343,7 @@ end
 
 -- Does a bend cut through a cell? The bend leaves `skipA` at P and arrives at
 -- `skipB` at Q, so it may touch those two cells at the ports, but it must not cut through any cell body -- including those two, which it still clips when it doubles back on itself.
-const function cubicHits(
-	scene: Scene,
-	P: G.Vec,
-	c1: G.Vec,
-	c2: G.Vec,
-	Q: G.Vec,
-	skipA: Cell,
-	skipB: Cell
-): boolean
+const function cubicHits(scene: Scene, P: G.Vec, c1: G.Vec, c2: G.Vec, Q: G.Vec, skipA: Cell, skipB: Cell): boolean
 	for k = 2, 23 do
 		const t = k / 25
 		const mt = 1 - t
@@ -378,7 +357,10 @@ const function cubicHits(
 
 				if not atPort then
 					return true
-	end end end end
+				end
+			end
+		end
+	end
 
 	return false
 end

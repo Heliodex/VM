@@ -8,23 +8,23 @@
 --   run from Prototypes/4, so the relative paths resolve
 
 const Bo = require "../calculus/booleans"
-const B = require "../engine/builder"
-const Canon = require "../engine/canon"
-const Cases = require "./cases"
-const Codes = require "../engine/codes"
-const Compile = require "../language/compile"
-const F = require "../research/fix"
-const G = require "../engine/gadgets"
-const H = require "../engine/harness"
 const L = require "../calculus/lambda"
 const Li = require "../calculus/lists"
-const Printer = require "../language/printer"
-const Session = require "../language/session"
-const Reader = require "../language/reader"
-const V = require "../language/values"
 const S = require "../calculus/scott"
+const B = require "../engine/builder"
+const Canon = require "../engine/canon"
+const Codes = require "../engine/codes"
+const G = require "../engine/gadgets"
+const H = require "../engine/harness"
 const Rules = require "../engine/rules"
 const Types = require "../engine/types"
+const Compile = require "../language/compile"
+const Printer = require "../language/printer"
+const Reader = require "../language/reader"
+const Session = require "../language/session"
+const V = require "../language/values"
+const F = require "../research/fix"
+const Cases = require "./cases"
 
 type Builder = B.Builder
 type Net = Types.Net
@@ -32,9 +32,7 @@ type Port = Types.Port
 const ARITH_BUDGET = 20000
 
 -- The number that a net stands for, if it is a Scott numeral; nil otherwise.
-local function numeralOf(
-	net: Net
-): number?
+local function numeralOf(net: Net): number?
 	const _, got = S.readNet(net)
 
 	return got
@@ -44,25 +42,17 @@ end
 const PROGRAM_BUDGET = 400000
 
 -- Whether a program's value is the number n.
-local function numberIs(
-	value: V.Value?,
-	n: number
-): boolean
+local function numberIs(value: V.Value?, n: number): boolean
 	return value ~= nil and value.kind == "number" and value.value == n
 end
 
 -- Whether a program's value is the symbol called `name`.
-local function symbolIs(
-	value: V.Value?,
-	name: string
-): boolean
+local function symbolIs(value: V.Value?, name: string): boolean
 	return value ~= nil and value.kind == "symbol" and value.name == name
 end
 
 -- The numbers of a program's value, if it is a list of numbers, from its start.
-local function listOfProgram(
-	src: string
-): { number }?
+local function listOfProgram(src: string): { number }?
 	local _, value = V.read(Compile.build(src), PROGRAM_BUDGET)
 	const values: { number } = {}
 
@@ -85,9 +75,7 @@ local function listOfProgram(
 end
 
 -- The normal form of the Scott numeral n, which is cut-free and so can be encoded.
-local function numeralNet(
-	n: number
-): Net
+local function numeralNet(n: number): Net
 	const b = B.new()
 	S.numeral(b, n)
 	const net = b:finish()
@@ -95,13 +83,11 @@ local function numeralNet(
 
 	return net
 end
+
 local failures = 0
 local total = 0
 
-const function report(
-	ok: boolean,
-	label: string
-)
+const function report(ok: boolean, label: string)
 	total += 1
 
 	if not ok then
@@ -164,13 +150,11 @@ for _, c in {
 		const net = b:finish()
 		const result = H.reduce(net, H.DEFAULT_BUDGET)
 		report(result.outcome == "reduced" and Bo.readback(net) == c, `if {c} then true else false is {c}  ({H.describe(result)})`)
-end end
+	end
+end
 
 -- Lists: build a list of numerals, take it apart, and read the parts back.
-local function listOf(
-	b: Builder,
-	elements: { number }
-): Port
+local function listOf(b: Builder, elements: { number }): Port
 	local list = Li.nilValue(b)
 
 	for i = #elements, 1, -1 do
@@ -181,9 +165,7 @@ local function listOf(
 end
 
 -- Build a term with `build`, reduce it, and return the report and the net.
-local function evaluate(
-	build: (Builder) -> Port
-): (H.Report, Net)
+local function evaluate(build: (Builder) -> Port): (H.Report, Net)
 	const b = B.new()
 	build(b)
 	const net = b:finish()
@@ -204,45 +186,49 @@ for _, elements in {
 	},
 } do
 	const want = #elements == 0
-	const result, net = evaluate(function(
-		b
-	)
+	const result, net = evaluate(function(b)
 		return L.app(b, Li.isNil(b), listOf(b, elements))
 	end)
 	report(result.outcome == "reduced" and Bo.readback(net) == want, `isNil of {#elements} elements is {want}  ({H.describe(result)})`)
 end
 
 do
-	const result, net = evaluate(function(
-		b
-	)
+	const result, net = evaluate(function(b)
 		return L.app(
-			b, L.app(
-				b, Li.head(b), listOf(
-					b, {
+			b,
+			L.app(
+				b,
+				Li.head(b),
+				listOf(
+					b,
+					{
 						2,
 						3,
 					}
 				)
-			), S.numeral(b, DEFAULT)
+			),
+			S.numeral(b, DEFAULT)
 		)
 	end)
 	report(result.outcome == "reduced" and numeralOf(net) == 2, `head of [2, 3] is 2  ({H.describe(result)})`)
 end
 
 do
-	const result, net = evaluate(function(
-		b
-	)
+	const result, net = evaluate(function(b)
 		const rest = L.app(
-			b, L.app(
-				b, Li.tail(b), listOf(
-					b, {
+			b,
+			L.app(
+				b,
+				Li.tail(b),
+				listOf(
+					b,
+					{
 						2,
 						3,
 					}
 				)
-			), S.numeral(b, DEFAULT)
+			),
+			S.numeral(b, DEFAULT)
 		)
 
 		return L.app(b, L.app(b, Li.head(b), rest), S.numeral(b, DEFAULT))
@@ -251,27 +237,30 @@ do
 end
 
 do
-	const result, net = evaluate(function(
-		b
-	)
+	const result, net = evaluate(function(b)
 		return L.app(b, L.app(b, Li.head(b), Li.nilValue(b)), S.numeral(b, DEFAULT))
 	end)
 	report(result.outcome == "reduced" and numeralOf(net) == DEFAULT, `head of [] is the default {DEFAULT}  ({H.describe(result)})`)
 end
 
 do
-	const result, net = evaluate(function(
-		b
-	)
+	const result, net = evaluate(function(b)
 		return L.app(
-			b, Li.isNil(b), L.app(
-				b, L.app(
-					b, Li.tail(b), listOf(
-						b, {
+			b,
+			Li.isNil(b),
+			L.app(
+				b,
+				L.app(
+					b,
+					Li.tail(b),
+					listOf(
+						b,
+						{
 							2,
 						}
 					)
-				), Bo.boolean(b, false)
+				),
+				Bo.boolean(b, false)
 			)
 		)
 	end)
@@ -282,9 +271,8 @@ end
 do
 	const b = B.new()
 	L.lam(
-		b, function(
-			x: Port
-		): Port
+		b,
+		function(x: Port): Port
 			return x
 		end
 	)
@@ -295,17 +283,14 @@ end
 do
 	const b = B.new()
 	L.lam(
-		b, function(
-			_f
-		)
+		b,
+		function(_f)
 			return L.lam(
-				b, function(
-					x
-				)
+				b,
+				function(x)
 					return L.lam(
-						b, function(
-							_y
-						)
+						b,
+						function(_y)
 							return x
 						end
 					)
@@ -318,9 +303,7 @@ do
 end
 
 -- Codes: a code has no δ in it, decoding it gives back the net it was made from, and a δ fan copies it so that each copy decodes to the same net.
-const function steps(
-	net: Net
-): number
+const function steps(net: Net): number
 	local count = 0
 
 	while count < ARITH_BUDGET and Rules.step(net) do
@@ -436,23 +419,20 @@ for _, elements in {
 		const net = b:finish()
 		const taken = steps(net)
 		report(taken < ARITH_BUDGET and numeralOf(net) == case.want, `{case.name} of {#elements} elements is {case.want}  ({taken} steps)`)
-end end
+	end
+end
 
 -- Scott numerals ---------------------------------------------------------------
 -- Each numeral reads back as the number it was built from, and the arithmetic gives the right answers.
 for k = 0, 4 do
-	const result, got = S.readback(function(
-		b
-	)
+	const result, got = S.readback(function(b)
 		return S.numeral(b, k)
 	end)
 	report(got == k, `Scott numeral {k} reads back as {k}  ({H.describe(result)})`)
 end
 
 do
-	const result, got = S.readback(function(
-		b
-	)
+	const result, got = S.readback(function(b)
 		return L.app(b, S.successor(b), S.numeral(b, 3))
 	end)
 	report(got == 4, `successor of 3 is 4  ({H.describe(result)})`)
@@ -468,9 +448,7 @@ for _, case in {
 		want = 0,
 	},
 } do
-	const result, got = S.readback(function(
-		b
-	)
+	const result, got = S.readback(function(b)
 		return L.app(b, S.predecessor(b), S.numeral(b, case.m))
 	end)
 	report(got == case.want, `predecessor of {case.m} is {case.want}  ({H.describe(result)})`)
@@ -486,9 +464,7 @@ for _, case in {
 		want = false,
 	},
 } do
-	const result, net = S.evaluate(function(
-		b
-	)
+	const result, net = S.evaluate(function(b)
 		return L.app(b, S.isZero(b), S.numeral(b, case.n))
 	end)
 	report(result.outcome == "reduced" and Bo.readback(net) == case.want, `{case.n} is zero is {case.want}  ({H.describe(result)})`)
@@ -511,11 +487,12 @@ for _, case in {
 		want = 3,
 	},
 } do
-	const result, got = S.readback(function(
-		b
+	const result, got = S.readback(
+		function(b)
+			return L.app(b, L.app(b, S.addition(b), S.numeral(b, case.m)), S.numeral(b, case.n))
+		end,
+		ARITH_BUDGET
 	)
-		return L.app(b, L.app(b, S.addition(b), S.numeral(b, case.m)), S.numeral(b, case.n))
-	end, ARITH_BUDGET)
 	report(got == case.want, `{case.m} + {case.n} = {case.want}  ({H.describe(result)})`)
 end
 
@@ -536,32 +513,31 @@ for _, case in {
 		want = 0,
 	},
 } do
-	const result, got = S.readback(function(
-		b
+	const result, got = S.readback(
+		function(b)
+			return L.app(b, L.app(b, S.multiplication(b), S.numeral(b, case.m)), S.numeral(b, case.n))
+		end,
+		ARITH_BUDGET * 4
 	)
-		return L.app(b, L.app(b, S.multiplication(b), S.numeral(b, case.m)), S.numeral(b, case.n))
-	end, ARITH_BUDGET * 4)
 	report(got == case.want, `{case.m} * {case.n} = {case.want}  ({H.describe(result)})`)
 end
 
 -- Copies of a numeral are sound now: a value with three uses, and a list used two different ways, are both right.
 do
-	const result, got = S.readback(function(
-		b
+	const result, got = S.readback(
+		function(b)
+			const xs = L.share(b, S.numeral(b, 2), 2)
+
+			return L.app(b, L.app(b, S.addition(b), xs[1]), xs[2])
+		end,
+		ARITH_BUDGET
 	)
-		const xs = L.share(b, S.numeral(b, 2), 2)
-		return L.app(b, L.app(b, S.addition(b), xs[1]), xs[2])
-	end, ARITH_BUDGET)
 	report(got == 4, `a numeral copied in two and added to itself is 4  ({H.describe(result)})`)
 end
 
 -- Whole lists: a list reads back as the Lua table of its numbers, from the start.
-local function listBuilder(
-	values: { number }
-): (Builder) -> Port
-	return function(
-		b: Builder
-	): Port
+local function listBuilder(values: { number }): (Builder) -> Port
+	return function(b: Builder): Port
 		local list = Li.nilValue(b)
 
 		for i = #values, 1, -1 do
@@ -572,10 +548,7 @@ local function listBuilder(
 	end
 end
 
-local function sameList(
-	got: { number }?,
-	want: { number }
-): boolean
+local function sameList(got: { number }?, want: { number }): boolean
 	if got == nil or #got ~= #want then
 		return false
 	end
@@ -610,30 +583,31 @@ for _, values in {
 end
 
 -- A list made by a program, and one whose elements are computed.
-report(sameList(listOfProgram("(cons 1 (cons 2 nil))"), { 1, 2 }), "a list made by a program reads back whole")
-report(sameList(listOfProgram("(define inc (lambda (n) (+ n 10))) (cons (inc 1) (cons (inc 2) nil))"), { 11, 12 }), "a list of computed numbers reads back whole")
-
+report(sameList(listOfProgram "(cons 1 (cons 2 nil))", { 1; 2 }), "a list made by a program reads back whole")
+report(sameList(listOfProgram "(define inc (lambda (n) (+ n 10))) (cons (inc 1) (cons (inc 2) nil))", { 11; 12 }), "a list of computed numbers reads back whole")
 -- A number is not a list, so it does not read back as one.
-report(Li.readback(function(
-	b: Builder
-): Port
-	return S.numeral(b, 3)
-end) == nil, "a number does not read back as a list")
+report(
+	Li.readback(function(b: Builder): Port
+		return S.numeral(b, 3)
+	end) == nil,
+	"a number does not read back as a list"
+)
 
 -- Numerals past 64 read back too, as numerals and as the result of a program.
 for _, k in {
 	81,
 	150,
 } do
-	const result, got = S.readback(function(
-		b: Builder
-	): Port
-		return S.numeral(b, k)
-	end, PROGRAM_BUDGET)
+	const result, got = S.readback(
+		function(b: Builder): Port
+			return S.numeral(b, k)
+		end,
+		PROGRAM_BUDGET
+	)
 	report(got == k, `Scott numeral {k} reads back as {k}  ({H.describe(result)})`)
 end
 
-report(numberIs(select(2, V.read(Compile.build("(* 9 9)"), PROGRAM_BUDGET)), 81), "(* 9 9) is 81")
+report(numberIs(select(2, V.read(Compile.build "(* 9 9)", PROGRAM_BUDGET)), 81), "(* 9 9) is 81")
 
 -- Subtraction and comparison, as programs: each result is a number or a branch taken.
 for _, case in {
@@ -730,15 +704,18 @@ for _, case in {
 end
 
 do
-	const result, value = V.read(Compile.build("(car '(a b))"), PROGRAM_BUDGET)
+	const result, value = V.read(Compile.build "(car '(a b))", PROGRAM_BUDGET)
 	report(symbolIs(value, "a"), `(car '(a b)) is the symbol a  ({H.describe(result)})`)
 end
 
-report(sameList(listOfProgram("'(1 2)"), { 1, 2 }), "a quoted list of numbers reads back whole")
-report(sameList(listOfProgram("'()"), {}), "the empty quoted list is the empty list")
-report(not pcall(function()
-	Compile.evaluate("(define quote 1) 0")
-end), "quote cannot be defined")
+report(sameList(listOfProgram "'(1 2)", { 1; 2 }), "a quoted list of numbers reads back whole")
+report(sameList(listOfProgram "'()", {}), "the empty quoted list is the empty list")
+report(
+	not pcall(function()
+		Compile.evaluate "(define quote 1) 0"
+	end),
+	"quote cannot be defined"
+)
 
 -- Tagged values: each program's value, written out, and the errors for values of the wrong kind.
 -- A value is written as Lisp would write it, so a test compares its shape as well as its numbers.
@@ -801,22 +778,16 @@ do
 	const session = Session.new()
 	const first = Session.evaluate(session, "(define double (lambda (n) (+ n n)))", PROGRAM_BUDGET)
 	report(#first == 1 and first[1].kind == "defined" and first[1].name == "double", "a definition is reported as defined")
-
 	const second = Session.evaluate(session, "(double 4)", PROGRAM_BUDGET)
 	report(#second == 1 and second[1].kind == "value" and numberIs(second[1].value, 8), "a later input uses the definition")
-
 	const third = Session.evaluate(session, "(double x)", PROGRAM_BUDGET)
 	report(#third == 1 and third[1].kind == "error" and third[1].at == 9 and third[1].message == "unbound name x", "an unbound name is an error at its byte offset")
-
 	const fourth = Session.evaluate(session, "(double 1) (car 5) (double 2)", PROGRAM_BUDGET)
 	report(#fourth == 3 and numberIs(fourth[1].value, 2) and Printer.show(fourth[2].value) == "#error" and numberIs(fourth[3].value, 4), "forms after a wrong-kind value are still evaluated")
-
 	const fifth = Session.evaluate(session, "(double 2", PROGRAM_BUDGET)
 	report(#fifth == 1 and fifth[1].kind == "error" and string.find(fifth[1].message or "", "never closed", 1, true) ~= nil, "an unclosed form is a reader error")
-
 	const sixth = Session.evaluate(Session.new(), "(double 2)", PROGRAM_BUDGET)
 	report(#sixth == 1 and sixth[1].kind == "error", "a new session does not have the old definitions")
-
 	const seventh = Session.evaluate(Session.new(), "(define loop (lambda (n) (loop n)))", PROGRAM_BUDGET)
 	report(#seventh == 1 and seventh[1].kind == "defined", "a definition that never runs is still accepted")
 end
@@ -1003,18 +974,18 @@ for _, src in {
 	-- a recursive function given a function argument is not a value on its own
 	"(define rep (lambda (k l) (if (null? l) 0 (+ (k (car l)) (rep k (cdr l)))))) (rep (lambda (n) (+ n 10)) rep)",
 } do
-	report(not pcall(function()
-		Compile.evaluate(src)
-	end), `rejects {src}`)
+	report(
+		not pcall(function()
+			Compile.evaluate(src)
+		end),
+		`rejects {src}`
+	)
 end
 
 -- Known limitations ----------------------------------------------------------
 -- These nets should loop, but they stop with no active pair left and no cycle seen while stepping. The harness reports them as `reduced`, the same as a real normal form, and nothing in the final net separates them from a value (the identity is also a net with a loop in it).
 -- They are printed as KNOWN, not counted as checks. Each still has to be reported as `reduced`: if the harness changes that, it is a failure, so this list gets revisited.
-const function limitation(
-	label: string,
-	net: Net
-)
+const function limitation(label: string, net: Net)
 	const result = H.reduce(net, H.DEFAULT_BUDGET)
 
 	if result.outcome == "reduced" then
@@ -1025,13 +996,10 @@ const function limitation(
 end
 
 -- λx. x x
-const function selfApply(
-	b: Builder
-): Port
+const function selfApply(b: Builder): Port
 	return L.lam(
-		b, function(
-			x: Port
-		): Port
+		b,
+		function(x: Port): Port
 			const xs = L.share(b, x, 2)
 
 			return L.app(b, xs[1], xs[2])
@@ -1040,31 +1008,31 @@ const function selfApply(
 end
 
 -- Ω = (λx. x x)(λx. x x)
-const function omega(
-	b: Builder
-): Port
+const function omega(b: Builder): Port
 	return L.app(b, selfApply(b), selfApply(b))
 end
 
-limitation("Z applied to the identity", Cases.build(function(
-	b: Builder
-)
-	L.app(
-		b, F.fixpoint(b), L.lam(
-			b, function(
-				x: Port
-			): Port
-				return x
-			end
+limitation(
+	"Z applied to the identity",
+	Cases.build(function(b: Builder)
+		L.app(
+			b,
+			F.fixpoint(b),
+			L.lam(
+				b,
+				function(x: Port): Port
+					return x
+				end
+			)
 		)
-	)
-end))
-limitation("omega, (λx.x x)(λx.x x)", Cases.build(function(
-	b: Builder
+	end)
 )
-	omega(b)
-end))
-
+limitation(
+	"omega, (λx.x x)(λx.x x)",
+	Cases.build(function(b: Builder)
+		omega(b)
+	end)
+)
 
 if failures > 0 then
 	error(`{failures} of {total} checks failed`)

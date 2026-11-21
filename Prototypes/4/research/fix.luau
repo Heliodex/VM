@@ -15,28 +15,23 @@
 --   const b = B.new()
 --   const fix = F.fixpoint(b)
 
-const B = require "../engine/builder"
 const L = require "../calculus/lambda"
+const B = require "../engine/builder"
 const Types = require "../engine/types"
 
 type Builder = B.Builder
 type Port = Types.Port
 
 -- λx. f (λv. x x v), where `f` is the port given. Built once for each copy of `f` that Z needs.
-const function selfApply(
-	b: Builder,
-	f: Port
-): Port
+const function selfApply(b: Builder, f: Port): Port
 	return L.lam(
-		b, function(
-			x: Port
-		): Port
+		b,
+		function(x: Port): Port
 			-- x appears twice inside the inner abstraction, so it is shared first
 			const xs = L.share(b, x, 2)
 			const inner = L.lam(
-				b, function(
-					v: Port
-				): Port
+				b,
+				function(v: Port): Port
 					return L.app(b, L.app(b, xs[1], xs[2]), v)
 				end
 			)
@@ -47,13 +42,10 @@ const function selfApply(
 end
 
 -- λf. (λx. f (λv. x x v)) (λx. f (λv. x x v))
-const function fixpoint(
-	b: Builder
-): Port
+const function fixpoint(b: Builder): Port
 	return L.lam(
-		b, function(
-			f: Port
-		): Port
+		b,
+		function(f: Port): Port
 			-- f is needed by both copies of the self-application
 			const fs = L.share(b, f, 2)
 

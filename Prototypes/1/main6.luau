@@ -1,5 +1,4 @@
 --!strict
-
 -- this prototype sucks less, but still hasn't captured the elusive macros
 
 type Num = {
@@ -11,7 +10,6 @@ type List = {
 	read type: "$",
 	read things: { Thing },
 }
-
 local NUM: "@" = "@"
 local LIST: "$" = "$"
 
@@ -21,9 +19,11 @@ local function serialise(t: Thing): string
 	end
 
 	local elements: { string } = {}
+
 	for i, elem in t.things do
 		elements[i] = serialise(elem)
 	end
+
 	-- table.sort(elements)
 	return "{" .. table.concat(elements, " ") .. "}"
 end
@@ -32,14 +32,16 @@ local function num(value: number): Num
 	if value < 0 then
 		error "Negative numbers are not supported at the moment"
 	end
+
 	if value % 1 ~= 0 then
 		error "Non-integer numbers are not supported at the moment"
 	end
-	return table.freeze { type = NUM, value = value } :: Num
+
+	return table.freeze { type = NUM; value = value } :: Num
 end
 
 local function list(things: { Thing }): List
-	return table.freeze { type = LIST, things = table.freeze(things) } :: List
+	return table.freeze { type = LIST; things = table.freeze(things) } :: List
 end
 
 local empty = list {}
@@ -47,24 +49,28 @@ local empty = list {}
 local function deserialise(s: string): Thing
 	if string.sub(s, 1, 1) ~= "{" then
 		local n = tonumber(s)
+
 		if n == nil then
 			error(`Invalid number: {s}`)
 		end
+
 		return num(n)
 	end
 
 	local news = string.sub(s, 2, -2)
 	local elements = {}
-
 	local lastElem: { string } = {}
 	local braceLevel = 0
+
 	for i = 1, #news do
 		local c = string.sub(news, i, i)
+
 		if c == " " and braceLevel == 0 then
 			if #lastElem > 0 then
 				table.insert(elements, deserialise(table.concat(lastElem)))
 				lastElem = {}
 			end
+
 			continue
 		end
 
@@ -73,8 +79,10 @@ local function deserialise(s: string): Thing
 		elseif c == "}" then
 			braceLevel -= 1
 		end
+
 		table.insert(lastElem, c)
 	end
+
 	if #lastElem > 0 then
 		table.insert(elements, deserialise(table.concat(lastElem)))
 	end
@@ -103,10 +111,13 @@ local function equalList(a: List, b: List): boolean
 end
 
 function equal(a: Thing, b: Thing): boolean
-	return if a.type == NUM and b.type == NUM
-		then equalNum(a, b)
-		elseif a.type == LIST and b.type == LIST then equalList(a, b)
-		else false
+	return
+		if a.type == NUM and b.type == NUM then
+			equalNum(a, b)
+		elseif a.type == LIST and b.type == LIST then
+			equalList(a, b)
+		else
+			false
 end
 
 local function len(s: List): number
@@ -114,14 +125,15 @@ local function len(s: List): number
 end
 
 local TRUE, FALSE = num(0), num(1) -- loobeans
-
 local TAKE, PART, SIZE, SUM, CHECK, TYPE, SPLIT = 0, 1, 2, 3, 4, 5, 6
 
 local function h_size(t: Thing): Num?
 	print(`size({serialise(t)})`)
+
 	if t.type ~= LIST then
 		return nil
 	end
+
 	return num(len(t))
 end
 
@@ -139,6 +151,7 @@ end
 
 local function h_sum(t: Thing): Num?
 	print(`sum({serialise(t)})`)
+
 	if t.type ~= LIST then
 		return nil
 	end
@@ -158,6 +171,7 @@ end
 
 local function h_check(t: Thing): Num?
 	print(`check({serialise(t)})`)
+
 	if t.type ~= LIST then
 		return nil
 	end
@@ -171,17 +185,24 @@ local function h_check(t: Thing): Num?
 
 		prev = e
 	end
+
 	return TRUE
 end
 
 local function h_type(t: Thing): Num?
 	print(`type({serialise(t)})`)
-	return if t.type == NUM then TRUE else FALSE
+
+	return
+		if t.type == NUM then
+			TRUE
+		else
+			FALSE
 end
 
 -- *a
 local function reduce1(e: Thing, depth: number): Thing?
 	print(string.rep(" ", depth) .. "-", serialise(e))
+
 	if e.type == NUM then
 		return e -- *a:@ -> a
 	end
@@ -189,14 +210,12 @@ local function reduce1(e: Thing, depth: number): Thing?
 	-- if len(e) == 0 then
 	-- 	return e -- *{} -> {}
 	-- end
-
 	-- if len(e) == 1 then
 	-- 	-- extract the single element
 	-- 	-- kind of like a pin<>
 	-- 	local only = e.things[1]
 	-- 	return reduce1(only, depth + 1) -- *{a} -> *a
 	-- end
-
 	if len(e) ~= 2 then
 		return nil
 	end
@@ -204,22 +223,21 @@ local function reduce1(e: Thing, depth: number): Thing?
 	-- now we're talking
 	-- the list needs to be {l:$ a2:$}
 	local l, a2 = e.things[1], e.things[2]
+
 	if l.type ~= LIST or len(l) ~= 2 then
 		return nil
 	end
 
 	-- l needs to be {n:@ a}
 	local n, a = l.things[1], l.things[2]
+
 	if n.type ~= NUM then
 		return nil
 	end
 
 	-- so the list is {{n:@ a} a2}
-
 	-- print("Found num and list:", serialise(n), serialise(l))
-
 	-- opcodes
-
 	-- *{{TAKE a} b} -> b
 	if n.value == TAKE then
 		return a2
@@ -232,37 +250,45 @@ local function reduce1(e: Thing, depth: number): Thing?
 
 	-- *{{SIZE a} b} -> size(*{b a})
 	if n.value == SIZE then
-		local rab = reduce1(list { a2, a }, depth + 1)
+		local rab = reduce1(list { a2; a }, depth + 1)
+
 		if rab == nil then
 			return nil
 		end
+
 		return h_size(rab)
 	end
 
 	-- *{{SUM a} b} -> sum(*{b a})
 	if n.value == SUM then
-		local rab = reduce1(list { a2, a }, depth + 1)
+		local rab = reduce1(list { a2; a }, depth + 1)
+
 		if rab == nil then
 			return nil
 		end
+
 		return h_sum(rab)
 	end
 
 	-- *{{CHECK a} b} -> check(*{b a})
 	if n.value == CHECK then
-		local rab = reduce1(list { a2, a }, depth + 1)
+		local rab = reduce1(list { a2; a }, depth + 1)
+
 		if rab == nil then
 			return nil
 		end
+
 		return h_check(rab)
 	end
 
 	-- *{{TYPE a} b} -> type(*{b a})
 	if n.value == TYPE then
-		local rab = reduce1(list { a2, a }, depth + 1)
+		local rab = reduce1(list { a2; a }, depth + 1)
+
 		if rab == nil then
 			return nil
 		end
+
 		return h_type(rab)
 	end
 
@@ -273,18 +299,19 @@ local function reduce1(e: Thing, depth: number): Thing?
 		end
 
 		local b, c = a2.things[1], a2.things[2]
+		local rba = reduce1(list { b; a }, depth + 1)
 
-		local rba = reduce1(list { b, a }, depth + 1)
 		if rba == nil then
 			return nil
 		end
 
-		local rca = reduce1(list { c, a }, depth + 1)
+		local rca = reduce1(list { c; a }, depth + 1)
+
 		if rca == nil then
 			return nil
 		end
 
-		return reduce1(list { rba, rca }, depth + 1)
+		return reduce1(list { rba; rca }, depth + 1)
 	end
 
 	--[[
@@ -298,44 +325,41 @@ local function reduce1(e: Thing, depth: number): Thing?
 		
 		Still doesn't really get us anywhere, since {*{a c} *{a d}} (I think) can't be represented with an existing opcode, so this doesn't count as a macro. Again, the same problem as the previous prototype test, where a bad opcode structure caused problems later down the line. Only this time, it's with *all* the opcodes, not just one. Redesign time!
 	]]
-
 	return nil
 end
 
 local function a_take(a: Thing, b: Thing): Thing
-	return list { list { num(TAKE), a }, b }
+	return list { list { num(TAKE); a }; b }
 end
 
 local function a_size(a: Thing, b: Thing): Thing
-	return list { list { num(SIZE), a }, b }
+	return list { list { num(SIZE); a }; b }
 end
 
 local function a_part(a: Thing, b: Thing): Thing
-	return list { list { num(PART), a }, b }
+	return list { list { num(PART); a }; b }
 end
 
 local function a_sum(a: Thing, b: Thing): Thing
-	return list { list { num(SUM), a }, b }
+	return list { list { num(SUM); a }; b }
 end
 
 local function a_check(a: Thing, b: Thing): Thing
-	return list { list { num(CHECK), a }, b }
+	return list { list { num(CHECK); a }; b }
 end
 
 local function a_type(a: Thing, b: Thing): Thing
-	return list { list { num(TYPE), a }, b }
+	return list { list { num(TYPE); a }; b }
 end
 
 local function a_split(a: Thing, b: Thing): Thing
-	return list { list { num(SPLIT), a }, b }
+	return list { list { num(SPLIT); a }; b }
 end
 
-local tests: {
-	{
-		eval: Thing,
-		res: Thing?,
-	}
-} = {
+local tests: { {
+	eval: Thing,
+	res: Thing?,
+} } = {
 	-- generic
 	{
 		eval = num(0),
@@ -348,18 +372,17 @@ local tests: {
 		eval = list { num(1) },
 	},
 	{
-		eval = list { empty, list { empty } },
+		eval = list { empty; list { empty } },
 	},
 	{
-		eval = list { empty, list { list { num(1) } } },
+		eval = list { empty; list { list { num(1) } } },
 	},
 	{
-		eval = list { list { num(0) }, num(0) },
+		eval = list { list { num(0) }; num(0) },
 	},
 	{
-		eval = list { list { num(0), num(0) } },
+		eval = list { list { num(0); num(0) } },
 	},
-
 	-- take
 	{
 		eval = a_take(empty, num(0)),
@@ -377,7 +400,6 @@ local tests: {
 		eval = a_take(num(1), list { num(0) }),
 		res = list { num(0) },
 	},
-
 	-- part
 	{
 		eval = a_part(num(0), empty),
@@ -387,183 +409,141 @@ local tests: {
 		res = num(1),
 	},
 	{
-		eval = a_part(num(2), list { num(1), num(4), num(9), num(16) }),
+		eval = a_part(num(2), list { num(1); num(4); num(9); num(16) }),
 		res = num(9),
 	},
 	{
-		eval = a_part(num(1), list { empty, list { num(5) } }),
+		eval = a_part(num(1), list { empty; list { num(5) } }),
 		res = list { num(5) },
 	},
-
 	-- the basis of if else, I guess
 	{
-		eval = a_part(TRUE, list{ num(1), num(2) }),
+		eval = a_part(TRUE, list { num(1); num(2) }),
 		res = num(1),
 	},
 	{
-		eval = a_part(FALSE, list{ num(1), num(2) }),
+		eval = a_part(FALSE, list { num(1); num(2) }),
 		res = num(2),
 	},
 	{
-		eval = a_part(num(2), list{ num(1), num(2) }),
+		eval = a_part(num(2), list { num(1); num(2) }),
 	},
-
 	-- size
 	{
-		eval = a_size(empty, list { num(TAKE), num(0) }),
+		eval = a_size(empty, list { num(TAKE); num(0) }),
 		res = num(0),
 	},
 	{
-		eval = a_size(list { num(0) }, list { num(TAKE), num(0) }),
+		eval = a_size(list { num(0) }, list { num(TAKE); num(0) }),
 		res = num(1),
 	},
 	{
-		eval = a_size(
-			list { num(1), num(2), num(3) },
-			list { num(TAKE), num(0) }
-		),
+		eval = a_size(list { num(1); num(2); num(3) }, list { num(TAKE); num(0) }),
 		res = num(3),
 	},
 	{
-		eval = a_size(
-			list { empty, num(1), empty },
-			list { num(TAKE), num(0) }
-		),
+		eval = a_size(list { empty; num(1); empty }, list { num(TAKE); num(0) }),
 		res = num(3),
 	},
 	{
-		eval = a_size(list { empty, empty }, list { num(TAKE), num(0) }),
+		eval = a_size(list { empty; empty }, list { num(TAKE); num(0) }),
 		res = num(2),
 	},
-
 	-- sum
 	{
-		eval = a_sum(num(0), list { num(TAKE), num(0) }),
+		eval = a_sum(num(0), list { num(TAKE); num(0) }),
 	},
 	{
-		eval = a_sum(empty, list { num(TAKE), num(0) }),
+		eval = a_sum(empty, list { num(TAKE); num(0) }),
 		res = num(0),
 	},
 	{
-		eval = a_sum(list { empty }, list { num(TAKE), num(0) }),
+		eval = a_sum(list { empty }, list { num(TAKE); num(0) }),
 	},
 	{
-		eval = a_sum(list { num(0) }, list { num(TAKE), num(0) }),
+		eval = a_sum(list { num(0) }, list { num(TAKE); num(0) }),
 		res = num(0),
 	},
 	{
-		eval = a_sum(
-			list { num(0), num(0), num(0) },
-			list { num(TAKE), num(0) }
-		),
+		eval = a_sum(list { num(0); num(0); num(0) }, list { num(TAKE); num(0) }),
 		res = num(0),
 	},
 	{
-		eval = a_sum(
-			list { num(1), num(2), num(3) },
-			list { num(TAKE), num(0) }
-		),
+		eval = a_sum(list { num(1); num(2); num(3) }, list { num(TAKE); num(0) }),
 		res = num(6),
 	},
 	{
-		eval = a_sum(
-			list { num(1), num(2), empty },
-			list { num(TAKE), num(0) }
-		),
+		eval = a_sum(list { num(1); num(2); empty }, list { num(TAKE); num(0) }),
 	},
-
 	-- check
 	{
-		eval = a_check(num(0), list { num(TAKE), num(0) }),
+		eval = a_check(num(0), list { num(TAKE); num(0) }),
 	},
 	{
-		eval = a_check(empty, list { num(TAKE), num(0) }),
+		eval = a_check(empty, list { num(TAKE); num(0) }),
 		res = TRUE,
 	},
 	{
-		eval = a_check(list { num(0) }, list { num(TAKE), num(0) }),
+		eval = a_check(list { num(0) }, list { num(TAKE); num(0) }),
 		res = TRUE,
 	},
 	{
-		eval = a_check(list { num(0), num(0) }, list { num(TAKE), num(0) }),
+		eval = a_check(list { num(0); num(0) }, list { num(TAKE); num(0) }),
 		res = TRUE,
 	},
 	{
-		eval = a_check(list { num(0), num(1) }, list { num(TAKE), num(0) }),
+		eval = a_check(list { num(0); num(1) }, list { num(TAKE); num(0) }),
 		res = FALSE,
 	},
 	{
-		eval = a_check(
-			list { num(0), num(0), num(0) },
-			list { num(TAKE), num(0) }
-		),
+		eval = a_check(list { num(0); num(0); num(0) }, list { num(TAKE); num(0) }),
 		res = TRUE,
 	},
 	{
-		eval = a_check(
-			list { num(0), num(1), num(0) },
-			list { num(TAKE), num(0) }
-		),
+		eval = a_check(list { num(0); num(1); num(0) }, list { num(TAKE); num(0) }),
 		res = FALSE,
 	},
 	{
-		eval = a_check(
-			list { num(0), empty, num(0) },
-			list { num(TAKE), num(0) }
-		),
+		eval = a_check(list { num(0); empty; num(0) }, list { num(TAKE); num(0) }),
 		res = FALSE,
 	},
 	{
-		eval = a_check(
-			list { empty, list { empty } },
-			list { num(TAKE), num(0) }
-		),
+		eval = a_check(list { empty; list { empty } }, list { num(TAKE); num(0) }),
 		res = FALSE,
 	},
 	{
-		eval = a_check(list { empty, empty }, list { num(TAKE), num(0) }),
+		eval = a_check(list { empty; empty }, list { num(TAKE); num(0) }),
 		res = TRUE,
 	},
 	{
-		eval = a_check(
-			list { list { num(0) }, list { num(0) } },
-			list { num(TAKE), num(0) }
-		),
+		eval = a_check(list { list { num(0) }; list { num(0) } }, list { num(TAKE); num(0) }),
 		res = TRUE,
 	},
 	{
-		eval = a_check(
-			list { list { num(0) }, list { num(0) } },
-			list { num(TAKE), num(0) }
-		),
+		eval = a_check(list { list { num(0) }; list { num(0) } }, list { num(TAKE); num(0) }),
 		res = TRUE,
 	},
 	{
-		eval = a_check(
-			list { list { num(0) }, list { num(1) } },
-			list { num(TAKE), num(0) }
-		),
+		eval = a_check(list { list { num(0) }; list { num(1) } }, list { num(TAKE); num(0) }),
 		res = FALSE,
 	},
-
 	-- type
 	{
-		eval = a_type(num(0), list { num(TAKE), num(0) }),
+		eval = a_type(num(0), list { num(TAKE); num(0) }),
 		res = TRUE,
 	},
 	{
-		eval = a_type(num(1), list { num(TAKE), num(0) }),
+		eval = a_type(num(1), list { num(TAKE); num(0) }),
 		res = TRUE,
 	},
 	{
-		eval = a_type(empty, list { num(TAKE), num(0) }),
+		eval = a_type(empty, list { num(TAKE); num(0) }),
 		res = FALSE,
 	},
 	{
-		eval = a_type(list { num(1) }, list { num(TAKE), num(0) }),
+		eval = a_type(list { num(1) }, list { num(TAKE); num(0) }),
 		res = FALSE,
 	},
-
 	-- split
 	-- ok moment of truth
 	{
@@ -576,64 +556,66 @@ local tests: {
 		eval = a_split(num(0), list { num(0) }),
 	},
 	{
-		eval = a_split(num(0), list { num(0), num(0), num(0) }),
+		eval = a_split(num(0), list { num(0); num(0); num(0) }),
 	},
 	{
-		eval = a_split(num(0), list { num(TAKE), num(0) }),
+		eval = a_split(num(0), list { num(TAKE); num(0) }),
 	},
-
 	{
 		eval = a_split(
-			list { num(1), list { num(TAKE), num(0) } },
+			list { num(1); list { num(TAKE); num(0) } },
 			list {
-				list { num(PART), num(1) },
-				list { num(PART), num(0) },
+				list { num(PART); num(1) },
+				list { num(PART); num(0) },
 			}
 		),
 		res = num(1),
 	},
 	{
 		eval = a_split(
-			list { list { num(TAKE), num(1) }, list { num(TAKE), num(2) } },
+			list { list { num(TAKE); num(1) }; list { num(TAKE); num(2) } },
 			list {
-				list { num(SPLIT), list { num(TAKE), num(3) } },
-				list { num(SPLIT), list { num(TAKE), num(4) } },
+				list { num(SPLIT); list { num(TAKE); num(3) } },
+				list { num(SPLIT); list { num(TAKE); num(4) } },
 			}
 		),
-		res = list { num(TAKE), num(4) },
+		res = list { num(TAKE); num(4) },
 	},
 	{
 		eval = a_split(
-			list { list { num(TAKE), num(1) }, list { num(TAKE), num(2) } },
+			list { list { num(TAKE); num(1) }; list { num(TAKE); num(2) } },
 			list {
-				list { num(SPLIT), list { num(TAKE), num(3) } },
-				list { num(TAKE), num(0) },
+				list { num(SPLIT); list { num(TAKE); num(3) } },
+				list { num(TAKE); num(0) },
 			}
 		),
-		res = list { list { num(TAKE), num(1) }, list { num(TAKE), num(2) } },
+		res = list { list { num(TAKE); num(1) }; list { num(TAKE); num(2) } },
 	},
 	{
 		eval = a_split(
-			list { list { num(TAKE), num(1) }, list { num(TAKE), num(2) } },
+			list { list { num(TAKE); num(1) }; list { num(TAKE); num(2) } },
 			list {
-				list { num(PART), num(0) },
-				list { num(PART), num(0) },
+				list { num(PART); num(0) },
+				list { num(PART); num(0) },
 			}
 		),
-		res = list { num(TAKE), num(1) },
+		res = list { num(TAKE); num(1) },
 	},
 }
 
 -- test serialise and deserialise
 for _, test in tests do
-	for _, thing in { test.eval, test.res } do
+	for _, thing in { test.eval; test.res } do
 		if thing == nil then
 			continue
 		end
+
 		local s = serialise(thing)
 		local d = deserialise(s)
+
 		if not equal(thing, d) then
 			print(`Serialization round-trip failed for {s}`)
+
 			return
 		end
 	end
@@ -646,6 +628,7 @@ end
 for _, test in tests do
 	local rd = reduce(test.eval)
 	local out
+
 	if rd == nil then
 		print "~~"
 		print()
@@ -656,6 +639,7 @@ for _, test in tests do
 	end
 
 	local expected = test.res and serialise(test.res)
+
 	if out ~= expected then
 		print(`Test failed: expected {expected}, got {out}`)
 		break

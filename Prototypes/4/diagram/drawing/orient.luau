@@ -79,7 +79,8 @@ const function orient(
 		if q ~= 0 and Net.owner(q) ~= c and Net.isPrincipal(q) then
 			ppPartner[c] = Net.owner(q)
 			paired[c] = true
-	end end
+		end
+	end
 
 	const ori: {
 		[Cell]: number,
@@ -96,7 +97,10 @@ const function orient(
 					ori[c] = G.dirToward(pos[c], pos[Net.owner(q)])
 				else
 					ori[c] = G.dirToward(pos[c], centroid)
-	end end end end
+				end
+			end
+		end
+	end
 
 	resetOrientations()
 	local point: {
@@ -159,13 +163,12 @@ const function orient(
 					x = -d.x,
 					y = -d.y,
 				}
-	end end end
+			end
+		end
+	end
 
 	-- Cost of turning a cell to face `idx`: how far each of its wired ports has to swing from its outward normal to point at the partner. A wire is drawn leaving along that normal, so a smaller cost means a straighter wire. A principal-to-principal wire is weighted up, so an active pair stays facing each other even if an auxiliary wire would prefer otherwise.
-	const function orientationCost(
-		c: Cell,
-		idx: number
-	): number
+	const function orientationCost(c: Cell, idx: number): number
 		const d = G.DIRS[idx + 1]
 		local total = 0
 
@@ -194,9 +197,7 @@ const function orient(
 
 	-- Swing each free cell through the four quarter turns and keep the cheapest.
 	-- Ties keep the current direction, which keeps the result deterministic and stops it oscillating.
-	const function chooseOrientation(
-		c: Cell
-	)
+	const function chooseOrientation(c: Cell)
 		local best = orientationCost(c, ori[c])
 		local bestIdx = ori[c]
 
@@ -206,7 +207,8 @@ const function orient(
 			if cost < best - 1e-9 then
 				best = cost
 				bestIdx = idx
-		end end
+			end
+		end
 
 		ori[c] = bestIdx
 	end
@@ -220,7 +222,9 @@ const function orient(
 				if not paired[c] then
 					chooseOrientation(c)
 					computePorts()
-		end end end
+				end
+			end
+		end
 
 		computePorts()
 	end
@@ -238,12 +242,15 @@ const function orient(
 
 				if q ~= 0 and p < q and Net.owner(q) ~= c then
 					table.insert(
-						segs, {
+						segs,
+						{
 							point[p],
 							point[q],
 						}
 					)
-		end end end
+				end
+			end
+		end
 
 		local count = 0
 
@@ -253,7 +260,9 @@ const function orient(
 
 				if G.segmentsCross(a[1].x, a[1].y, a[2].x, a[2].y, b[1].x, b[1].y, b[2].x, b[2].y) then
 					count += 1
-		end end end
+				end
+			end
+		end
 
 		return count
 	end
@@ -280,16 +289,16 @@ const function orient(
 				if q ~= 0 and Net.owner(q) ~= c then
 					wired[c][Net.owner(q)] = true
 					wired[Net.owner(q)][c] = true
-		end end end
+				end
+			end
+		end
 
-		const function siblings(
-			u: Cell,
-			v: Cell
-		): boolean
+		const function siblings(u: Cell, v: Cell): boolean
 			for w, _ in wired[u] do
 				if wired[v][w] then
 					return true
-			end end
+				end
+			end
 
 			return false
 		end
@@ -317,11 +326,15 @@ const function orient(
 						pos[u], pos[v] = pos[v], pos[u]
 						resetOrientations()
 						settleOrientations()
-			end end end
+					end
+				end
+			end
 
 			if not improved then
 				break
-	end end end
+			end
+		end
+	end
 
 	return {
 		net = net,

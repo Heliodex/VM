@@ -30,12 +30,7 @@ type Symbol = Types.Symbol
 -- It comes down to how each binary cell annihilates against itself.
 -- Gamma meets gamma across its auxiliaries, so a gamma chain and a plain copy of it wired at the principals come out with their ports joined in the opposite order, and a multiplexer can only cancel against a backward one.
 -- Delta meets delta straight across, so a delta chain is its own dual and cancels against a plain copy of itself.
-const function chain(
-	b: Builder,
-	symbol: Symbol,
-	mirrored: boolean,
-	n: number
-): Fragment
+const function chain(b: Builder, symbol: Symbol, mirrored: boolean, n: number): Fragment
 	if n < 2 then
 		error(`a multiplexer needs an arity of at least 2, got {n}`)
 	end
@@ -68,7 +63,8 @@ const function chain(
 
 		for _, p in tail.ports do
 			table.insert(ports, p)
-	end end
+		end
+	end
 
 	return {
 		principal = top.principal,
@@ -78,27 +74,18 @@ end
 
 -- Fig. 4: M(n), built from gamma and epsilon alone, with the port added at each level on the first auxiliary.
 -- Requires an arity of at least 2, since M(1) is a bare wire and a wire has no cell to build.
-const function multiplexer(
-	b: Builder,
-	n: number
-): Fragment
+const function multiplexer(b: Builder, n: number): Fragment
 	return chain(b, Net.GAMMA, false, n)
 end
 
 -- Fig. 4: M(n)*, the same net with its ports taken in the opposite order, which is what M(n) cancels against to leave an identity wiring.
-const function dualMultiplexer(
-	b: Builder,
-	n: number
-): Fragment
+const function dualMultiplexer(b: Builder, n: number): Fragment
 	return chain(b, Net.GAMMA, true, n)
 end
 
 -- Fig. 5: T(n), the autodual multiplexer, built from delta and epsilon alone.
 -- It needs no separate dual, since T(n) cancels against another plain T(n) to leave an identity wiring.
-const function autodualMultiplexer(
-	b: Builder,
-	n: number
-): Fragment
+const function autodualMultiplexer(b: Builder, n: number): Fragment
 	return chain(b, Net.DELTA, false, n)
 end
 
@@ -106,11 +93,7 @@ end
 -- That involution swaps each of the first p pairs of ports, 1 with 2 and so on, and leaves the last q ports alone.
 -- Built as Fig. 5 shows it: the p pairs go through gammas, whose principals reach the same delta chain as the q ports that pass straight through.
 -- A port that passes straight through needs no cell at all, so it is simply the tail port itself and the fragment hands that port back.
-const function transpositor(
-	b: Builder,
-	p: number,
-	q: number
-): Fragment
+const function transpositor(b: Builder, p: number, q: number): Fragment
 	if p + q < 1 then
 		error(`a transpositor needs p + q of at least 1, got {p} + {q}`)
 	end
@@ -155,10 +138,7 @@ end
 -- T(sigma), the permutation net of arity n for an involutive permutation sigma, which cancels against a plain copy of itself to leave the wiring sigma.
 -- Any involution is a product of disjoint transpositions, so it is t(p, q) seen under a relabelling: send each pair to the front and each fixed point to the back and a transpositor does the rest.
 -- The relabelling itself costs no cells, because it is only a wiring: the fragment hands back the transpositor's ports in a different order.
-const function permutation(
-	b: Builder,
-	sigma: { number }
-): Fragment
+const function permutation(b: Builder, sigma: { number }): Fragment
 	const n = #sigma
 
 	for i = 1, n do
@@ -170,14 +150,16 @@ const function permutation(
 
 		if sigma[image] ~= i then
 			error(`port {i} goes to {image}, which goes to {sigma[image]}, so this is not an involution`)
-	end end
+		end
+	end
 
 	local swaps = 0
 
 	for i = 1, n do
 		if sigma[i] ~= i then
 			swaps += 1
-	end end
+		end
+	end
 
 	swaps //= 2
 	const transposed = transpositor(b, swaps, n - 2 * swaps)
@@ -194,7 +176,8 @@ const function permutation(
 			where[i] = pair
 			where[sigma[i]] = pair + 1
 			pair += 2
-	end end
+		end
+	end
 
 	const ports: { Port } = {}
 

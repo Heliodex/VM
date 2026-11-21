@@ -15,10 +15,7 @@ type Vec = G.Vec
 type Grid = G.Grid
 
 -- Group cells into connected parts: two cells belong to the same part when a wire joins one of their ports. Different parts have no wires, cells or ports in common, so they can be laid out independently and then packed.
-const function components(
-	net: Net,
-	cells: { Cell }
-): { { Cell } }
+const function components(net: Net, cells: { Cell }): { { Cell } }
 	const parent: {
 		[Cell]: Cell,
 	} = {}
@@ -27,9 +24,7 @@ const function components(
 		parent[c] = c
 	end
 
-	const function find(
-		c: Cell
-	): Cell
+	const function find(c: Cell): Cell
 		local root = c
 
 		while parent[root] ~= root do
@@ -52,7 +47,10 @@ const function components(
 
 				if a ~= b then
 					parent[a] = b
-	end end end end
+				end
+			end
+		end
+	end
 
 	const byRoot: {
 		[Cell]: { Cell },
@@ -95,10 +93,7 @@ type PartBox = {
 const PART_MARGIN = 1
 const PART_GAP = 2
 
-const function layout(
-	net: Net,
-	cells: { Cell }
-): {
+const function layout(net: Net, cells: { Cell }): {
 	[Cell]: G.Vec,
 }
 	if #cells == 0 then
@@ -153,7 +148,8 @@ const function layout(
 		area += w * h
 		widest = math.max(widest, w)
 		table.insert(
-			boxes, {
+			boxes,
+			{
 				grid = g,
 				minX = minX,
 				minY = minY,

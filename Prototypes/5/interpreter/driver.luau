@@ -14,11 +14,10 @@ const Lifecycle = require "./lifecycle"
 const VM = require "./vm"
 
 export type StepResult =
-	| { status: "value", state: VM.Value, output: VM.Value, steps: number }
-	| { status: "error", message: string, steps: number }
-	| { status: "out_of_fuel", steps: number }
-	| { status: "not_data", steps: number }
-
+	| { status: "value"; state: VM.Value; output: VM.Value; steps: number }
+	| { status: "error"; message: string; steps: number }
+	| { status: "out_of_fuel"; steps: number }
+	| { status: "not_data"; steps: number }
 -- A session runs the inputs in order, and stops at the first step that does not give a value. state is the state after the last step that did.
 export type Session = {
 	status: string,
@@ -28,7 +27,6 @@ export type Session = {
 	failedAt: number?,
 	message: string?,
 }
-
 export type ByteStep = {
 	status: string,
 	state: string?,
@@ -38,21 +36,16 @@ export type ByteStep = {
 }
 
 -- Runs one step on a state and an input.
-const function step(
-	stepProgram: VM.Expr,
-	state: VM.Value,
-	input: VM.Value,
-	fuel: number
-): StepResult
-	const pair: VM.Value = { kind = "cell", head = state, tail = input } :: VM.Cell
+const function step(stepProgram: VM.Expr, state: VM.Value, input: VM.Value, fuel: number): StepResult
+	const pair: VM.Value = { kind = "cell"; head = state; tail = input } :: VM.Cell
 	const r = Lifecycle.run(stepProgram, pair, fuel)
 
 	if r.status == "out_of_fuel" then
-		return { status = "out_of_fuel", steps = r.steps }
+		return { status = "out_of_fuel"; steps = r.steps }
 	elseif r.status == "error" then
-		return { status = "error", message = r.message, steps = r.steps }
+		return { status = "error"; message = r.message; steps = r.steps }
 	elseif r.status == "not_data" then
-		return { status = "not_data", steps = r.steps }
+		return { status = "not_data"; steps = r.steps }
 	end
 
 	const result = r.value
@@ -74,12 +67,7 @@ const function step(
 end
 
 -- Runs the inputs in order, carrying the state from each step to the next.
-const function session(
-	stepProgram: VM.Expr,
-	initial: VM.Value,
-	inputs: { VM.Value },
-	fuel: number
-): Session
+const function session(stepProgram: VM.Expr, initial: VM.Value, inputs: { VM.Value }, fuel: number): Session
 	local state = initial
 	local outputs: { VM.Value } = {}
 	local steps = 0
@@ -118,16 +106,10 @@ const function session(
 end
 
 -- The same step, with the program, state and input as bytes, and the state and output as bytes. A program, state or input that does not decode is an error, and the step does not run.
-const function stepBytes(
-	stepBytesProgram: string,
-	stateBytes: string,
-	inputBytes: string,
-	fuel: number
-): ByteStep
+const function stepBytes(stepBytesProgram: string, stateBytes: string, inputBytes: string, fuel: number): ByteStep
 	local program: VM.Expr
 	local state: VM.Value
 	local input: VM.Value
-
 	local ok, err = pcall(function()
 		program = Binary.decodeProgram(stepBytesProgram)
 		state = Binary.decodeValue(stateBytes)

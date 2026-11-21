@@ -5,21 +5,17 @@
 --
 --   luau data_run.luau      (from Prototypes/5)
 
-const Data = require "./interpreter/data"
-const Examples = require "./examples/examples"
 const Programs = require "./L1/examples/programs"
-const Reader = require "./L1/reader"
 const Text = require "./L1/examples/text"
+const Reader = require "./L1/reader"
+const Examples = require "./examples/examples"
+const Data = require "./interpreter/data"
 const VM = require "./interpreter/vm"
 
 local failures = 0
 local total = 0
 
-const function check(
-	name: string,
-	ok: boolean,
-	detail: string
-)
+const function check(name: string, ok: boolean, detail: string)
 	total += 1
 
 	if ok then
@@ -31,26 +27,25 @@ const function check(
 end
 
 -- The value a program gives, for the cases below. Their programs are simple, so they are run directly.
-const function valueOf(
-	source: string
-): VM.Value
+const function valueOf(source: string): VM.Value
 	const result = VM.run(Reader.parse(source), 1e6)
 	assert(result.status == "value", `{source} did not give a value`)
+
 	return result.value :: VM.Value
 end
 
 -- A value and the text it should be written as.
-const WRITES: { { source: string, text: string } } = {
-	{ source = "0", text = "0" },
-	{ source = "-3", text = "-3" },
-	{ source = "9007199254740991", text = "9007199254740991" },
-	{ source = "-9007199254740991", text = "-9007199254740991" },
-	{ source = "~", text = "nil" },
-	{ source = "[1 ~]", text = "cons 1 nil" },
-	{ source = "[1 -3]", text = "cons 1 -3" },
-	{ source = "[[1 ~] ~]", text = "cons cons 1 nil nil" },
-	{ source = "[~ [~ ~]]", text = "cons nil cons nil nil" },
-	{ source = "(list 1 2 3)", text = "cons 1 cons 2 cons 3 nil" },
+const WRITES: { { source: string; text: string } } = {
+	{ source = "0"; text = "0" },
+	{ source = "-3"; text = "-3" },
+	{ source = "9007199254740991"; text = "9007199254740991" },
+	{ source = "-9007199254740991"; text = "-9007199254740991" },
+	{ source = "~"; text = "nil" },
+	{ source = "[1 ~]"; text = "cons 1 nil" },
+	{ source = "[1 -3]"; text = "cons 1 -3" },
+	{ source = "[[1 ~] ~]"; text = "cons cons 1 nil nil" },
+	{ source = "[~ [~ ~]]"; text = "cons nil cons nil nil" },
+	{ source = "(list 1 2 3)"; text = "cons 1 cons 2 cons 3 nil" },
 }
 
 for _, case in WRITES do
@@ -59,8 +54,14 @@ for _, case in WRITES do
 	local ok, err = pcall(function()
 		text = Data.write(v)
 	end)
-
-	check(`writes {case.source}`, ok and text == case.text, if ok then text else tostring(err))
+	check(
+		`writes {case.source}`,
+		ok and text == case.text,
+		if ok then
+			text
+		else
+			tostring(err)
+	)
 end
 
 -- A text that should be read as a value, and the text it should be written back as. These are the canonical forms, so the second is the first.
@@ -77,8 +78,19 @@ const READS: { string } = {
 
 for _, text in READS do
 	local ok, back = pcall(Data.read, text)
-	local again = if ok then Data.write(back) else ""
-	check(`reads {text}`, ok and again == text, if ok then `back as {again}` else tostring(back))
+	local again =
+		if ok then
+			Data.write(back)
+		else
+			""
+	check(
+		`reads {text}`,
+		ok and again == text,
+		if ok then
+			`back as {again}`
+		else
+			tostring(back)
+	)
 end
 
 -- Texts that are not canonical, or not a value. Each should be refused, so the format has one text per value.
@@ -111,34 +123,33 @@ const REJECTS: { string } = {
 for _, text in REJECTS do
 	local ok, err = pcall(Data.read, text)
 	const shown = string.gsub(string.format("%q", text), "\n", "\\n")
-	check(`rejects {shown}`, not ok, if ok then "it read, but it should not" else tostring(err))
+	check(
+		`rejects {shown}`,
+		not ok,
+		if ok then
+			"it read, but it should not"
+		else
+			tostring(err)
+	)
 end
 
 -- Writing a function or a pin is an error, and so is writing a cell that holds one.
-const NO_FORM: { { source: string, what: string } } = {
-	{ source = "(fn x x)", what = "a function" },
-	{ source = "(pin 1)", what = "a pin" },
-	{ source = "[1 (fn x x)]", what = "a function" },
-	{ source = "[(pin 1) ~]", what = "a pin" },
+const NO_FORM: { { source: string; what: string } } = {
+	{ source = "(fn x x)"; what = "a function" },
+	{ source = "(pin 1)"; what = "a pin" },
+	{ source = "[1 (fn x x)]"; what = "a function" },
+	{ source = "[(pin 1) ~]"; what = "a pin" },
 }
 
 for _, case in NO_FORM do
 	local ok, err = pcall(Data.write, valueOf(case.source))
-	check(
-		`refuses {case.source}`,
-		not ok and string.find(tostring(err), case.what .. " has no written form", 1, true) ~= nil,
-		tostring(err)
-	)
+	check(`refuses {case.source}`, not ok and string.find(tostring(err), case.what .. " has no written form", 1, true) ~= nil, tostring(err))
 end
 
 -- Every example that gives a value: a function or a pin is refused, and any other value must come back the same. Examples that do not give a value have nothing to write.
 local roundTrips = 0
-const function roundTrip(
-	name: string,
-	program: VM.Expr,
-	fuel: number,
-	outcome: string
-)
+
+const function roundTrip(name: string, program: VM.Expr, fuel: number, outcome: string)
 	const result = VM.run(program, fuel)
 
 	if result.status ~= "value" or outcome ~= "value" then
@@ -149,14 +160,25 @@ const function roundTrip(
 
 	if not ok then
 		check(`writer refuses {name}`, string.find(tostring(text), "has no written form", 1, true) ~= nil, tostring(text))
+
 		return
 	end
 
 	roundTrips += 1
 	local readOk, readValue = pcall(Data.read, text)
-	local rewritten = if readOk then Data.write(readValue :: VM.Value) else ""
-
-	check(`round trip {name}`, readOk and rewritten == text, if readOk then text else tostring(readValue))
+	local rewritten =
+		if readOk then
+			Data.write(readValue :: VM.Value)
+		else
+			""
+	check(
+		`round trip {name}`,
+		readOk and rewritten == text,
+		if readOk then
+			text
+		else
+			tostring(readValue)
+	)
 end
 
 for _, ex in Examples do
@@ -174,12 +196,14 @@ end
 -- A long list, so the iterative paths are exercised far past any nesting limit.
 do
 	local list: VM.Value = VM.NIL
+
 	for i = 1, 100000 do
-		list = { kind = "cell", head = i, tail = list } :: VM.Cell
+		list = { kind = "cell"; head = i; tail = list } :: VM.Cell
 	end
 
 	const ok, text = pcall(Data.write, list)
 	local readOk, back = false, nil
+
 	if ok then
 		readOk, back = pcall(Data.read, text)
 	end
@@ -187,15 +211,18 @@ do
 	check(
 		"round trip a list of 100000",
 		ok and readOk and Data.write(back :: VM.Value) == text,
-		if ok then `{#text} characters` else tostring(text)
+		if ok then
+			`{#text} characters`
+		else
+			tostring(text)
 	)
 end
 
 -- Constructors: written with con, a tag and a payload, and read back to the same value.
 do
-	const c: VM.Value = { kind = "con", tag = 2, payload = { kind = "cell", head = 1, tail = VM.NIL } } :: VM.Con
+	const c: VM.Value = { kind = "con"; tag = 2; payload = { kind = "cell"; head = 1; tail = VM.NIL } } :: VM.Con
 	check("a constructor is written con, its tag, then its payload", Data.write(c) == "con 2 cons 1 nil", Data.write(c))
-	check("a constructor reads back", Data.write(Data.read("con 2 cons 1 nil")) == "con 2 cons 1 nil", "")
+	check("a constructor reads back", Data.write(Data.read "con 2 cons 1 nil") == "con 2 cons 1 nil", "")
 	local rejected, _ = pcall(Data.read, "con -1 5")
 	check("a negative constructor tag is refused", not rejected, "")
 	rejected, _ = pcall(Data.read, "con cons 1 nil 5")

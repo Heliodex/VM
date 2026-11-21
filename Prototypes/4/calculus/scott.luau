@@ -16,14 +16,14 @@
 --   -- value is 5
 
 const B = require "../engine/builder"
-const Bo = require "./booleans"
 const Canon = require "../engine/canon"
 const H = require "../engine/harness"
-const L = require "./lambda"
 const Net = require "../engine/net"
 const Observe = require "../engine/observe"
-const Rec = require "./recursion"
 const Types = require "../engine/types"
+const Bo = require "./booleans"
+const L = require "./lambda"
+const Rec = require "./recursion"
 
 type Builder = B.Builder
 type Port = Types.Port
@@ -32,31 +32,24 @@ type Net = Types.Net
 const BUDGET = 200000
 
 -- λp.p
-const function identity(
-	b: Builder
-): Port
+const function identity(b: Builder): Port
 	return L.lam(
-		b, function(
-			p: Port
-		): Port
+		b,
+		function(p: Port): Port
 			return p
 		end
 	)
 end
 
 -- λz.λs. z
-const function zero(
-	b: Builder
-): Port
+const function zero(b: Builder): Port
 	return L.lam(
-		b, function(
-			z: Port
-		): Port
+		b,
+		function(z: Port): Port
 			-- s is never used, so the lambda over it erases it
 			return L.lam(
-				b, function(
-					_s: Port
-				): Port
+				b,
+				function(_s: Port): Port
 					return z
 				end
 			)
@@ -65,21 +58,16 @@ const function zero(
 end
 
 -- λn.λz.λs. s n
-const function successor(
-	b: Builder
-): Port
+const function successor(b: Builder): Port
 	return L.lam(
-		b, function(
-			n: Port
-		): Port
+		b,
+		function(n: Port): Port
 			return L.lam(
-				b, function(
-					_z: Port
-				): Port
+				b,
+				function(_z: Port): Port
 					return L.lam(
-						b, function(
-							s: Port
-						): Port
+						b,
+						function(s: Port): Port
 							return L.app(b, s, n)
 						end
 					)
@@ -90,10 +78,7 @@ const function successor(
 end
 
 -- The numeral k, built into b.
-const function numeral(
-	b: Builder,
-	k: number
-): Port
+const function numeral(b: Builder, k: number): Port
 	if k < 0 or k ~= math.floor(k) then
 		error(`a numeral is a natural number, not {k}`)
 	end
@@ -108,70 +93,59 @@ const function numeral(
 end
 
 -- λn. n zero (λp.p): the predecessor of zero is zero.
-const function predecessor(
-	b: Builder
-): Port
+const function predecessor(b: Builder): Port
 	return L.lam(
-		b, function(
-			n: Port
-		): Port
+		b,
+		function(n: Port): Port
 			return L.app(b, L.app(b, n, zero(b)), identity(b))
 		end
 	)
 end
 
 -- λn. n true (λp. false)
-const function isZero(
-	b: Builder
-): Port
+const function isZero(b: Builder): Port
 	return L.lam(
-		b, function(
-			n: Port
-		): Port
-			return L.app(b, L.app(b, n, Bo.truth(b)), L.lam(
-				b, function(
-					_p: Port
-				): Port
-					return Bo.falsity(b)
-				end
-			))
+		b,
+		function(n: Port): Port
+			return L.app(
+				b,
+				L.app(b, n, Bo.truth(b)),
+				L.lam(
+					b,
+					function(_p: Port): Port
+						return Bo.falsity(b)
+					end
+				)
+			)
 		end
 	)
 end
 
 -- R = λc.λm.λn. m (λc'. n) (λp.λc''. succ (c'' p n)) c. Addition is add 0 n = n and add (p+1) n = succ (add p n).
 -- n is used by both cases, so it is copied first.
-local function additionDefine(
-	b: Builder
-): Port
+local function additionDefine(b: Builder): Port
 	return L.lam(
-		b, function(
-			c: Port
-		): Port
+		b,
+		function(c: Port): Port
 			return L.lam(
-				b, function(
-					m: Port
-				): Port
+				b,
+				function(m: Port): Port
 					return L.lam(
-						b, function(
-							n: Port
-						): Port
+						b,
+						function(n: Port): Port
 							const ns = L.share(b, n, 2)
 							const zeroCase = L.lam(
-								b, function(
-									_c1: Port
-								): Port
+								b,
+								function(_c1: Port): Port
 									return ns[1]
 								end
 							)
 							const succCase = L.lam(
-								b, function(
-									p: Port
-								): Port
+								b,
+								function(p: Port): Port
 									return L.lam(
-										b, function(
-											c2: Port
-										): Port
+										b,
+										function(c2: Port): Port
 											return L.app(b, successor(b), L.app(b, L.app(b, Rec.recall(b, c2), p), ns[2]))
 										end
 									)
@@ -188,44 +162,34 @@ local function additionDefine(
 end
 
 -- Addition, built into b.
-const function addition(
-	b: Builder
-): Port
+const function addition(b: Builder): Port
 	return Rec.tie(b, additionDefine)
 end
 
 -- R = λc.λm.λn. m (λc'. zero) (λp.λc''. add n (c'' p n)) c. Multiplication is 0*n = 0 and (p+1)*n = n + p*n.
-local function multiplicationDefine(
-	b: Builder
-): Port
+local function multiplicationDefine(b: Builder): Port
 	return L.lam(
-		b, function(
-			c: Port
-		): Port
+		b,
+		function(c: Port): Port
 			return L.lam(
-				b, function(
-					m: Port
-				): Port
+				b,
+				function(m: Port): Port
 					return L.lam(
-						b, function(
-							n: Port
-						): Port
+						b,
+						function(n: Port): Port
 							const ns = L.share(b, n, 2)
 							const zeroCase = L.lam(
-								b, function(
-									_c1: Port
-								): Port
+								b,
+								function(_c1: Port): Port
 									return zero(b)
 								end
 							)
 							const succCase = L.lam(
-								b, function(
-									p: Port
-								): Port
+								b,
+								function(p: Port): Port
 									return L.lam(
-										b, function(
-											c2: Port
-										): Port
+										b,
+										function(c2: Port): Port
 											const rest = L.app(b, L.app(b, Rec.recall(b, c2), p), ns[2])
 
 											return L.app(b, L.app(b, addition(b), ns[1]), rest)
@@ -244,44 +208,34 @@ local function multiplicationDefine(
 end
 
 -- Multiplication, built into b.
-const function multiplication(
-	b: Builder
-): Port
+const function multiplication(b: Builder): Port
 	return Rec.tie(b, multiplicationDefine)
 end
 
 -- R = λc.λm.λn. n (λc'. m) (λp.λc''. c'' (m - 1) p) c. Truncated subtraction: m - 0 = m, and m - (p+1) = (m - 1) - p, with 1 taken as the predecessor. The numeral to subtract is the scrutinee, so m is the one that is copied.
-local function subtractionDefine(
-	b: Builder
-): Port
+local function subtractionDefine(b: Builder): Port
 	return L.lam(
-		b, function(
-			c: Port
-		): Port
+		b,
+		function(c: Port): Port
 			return L.lam(
-				b, function(
-					m: Port
-				): Port
+				b,
+				function(m: Port): Port
 					return L.lam(
-						b, function(
-							n: Port
-						): Port
+						b,
+						function(n: Port): Port
 							const ms = L.share(b, m, 2)
 							const zeroCase = L.lam(
-								b, function(
-									_c1: Port
-								): Port
+								b,
+								function(_c1: Port): Port
 									return ms[1]
 								end
 							)
 							const succCase = L.lam(
-								b, function(
-									p: Port
-								): Port
+								b,
+								function(p: Port): Port
 									return L.lam(
-										b, function(
-											c2: Port
-										): Port
+										b,
+										function(c2: Port): Port
 											const smaller = L.app(b, predecessor(b), ms[2])
 
 											return L.app(b, L.app(b, Rec.recall(b, c2), smaller), p)
@@ -300,24 +254,18 @@ local function subtractionDefine(
 end
 
 -- Truncated subtraction, built into b: m - n, which is 0 when n is larger.
-const function subtraction(
-	b: Builder
-): Port
+const function subtraction(b: Builder): Port
 	return Rec.tie(b, subtractionDefine)
 end
 
 -- λm.λn. zero? (m - n): m is at most n.
-const function lessEqual(
-	b: Builder
-): Port
+const function lessEqual(b: Builder): Port
 	return L.lam(
-		b, function(
-			m: Port
-		): Port
+		b,
+		function(m: Port): Port
 			return L.lam(
-				b, function(
-					n: Port
-				): Port
+				b,
+				function(n: Port): Port
 					return L.app(b, isZero(b), L.app(b, L.app(b, subtraction(b), m), n))
 				end
 			)
@@ -326,17 +274,13 @@ const function lessEqual(
 end
 
 -- λm.λn. m ≤ n and n ≤ m, written as (m ≤ n) (n ≤ m) false, so that each of the two tests is used once.
-const function equal(
-	b: Builder
-): Port
+const function equal(b: Builder): Port
 	return L.lam(
-		b, function(
-			m: Port
-		): Port
+		b,
+		function(m: Port): Port
 			return L.lam(
-				b, function(
-					n: Port
-				): Port
+				b,
+				function(n: Port): Port
 					const ms = L.share(b, m, 2)
 					const ns = L.share(b, n, 2)
 					const first = L.app(b, L.app(b, lessEqual(b), ms[1]), ns[1])
@@ -350,17 +294,13 @@ const function equal(
 end
 
 -- λm.λn. m < n, which is (m + 1) ≤ n.
-const function less(
-	b: Builder
-): Port
+const function less(b: Builder): Port
 	return L.lam(
-		b, function(
-			m: Port
-		): Port
+		b,
+		function(m: Port): Port
 			return L.lam(
-				b, function(
-					n: Port
-				): Port
+				b,
+				function(n: Port): Port
 					return L.app(b, L.app(b, lessEqual(b), L.app(b, successor(b), m)), n)
 				end
 			)
@@ -369,42 +309,33 @@ const function less(
 end
 
 -- R = λc.λm.λf.λx. m (λc'. x) (λp.λc''. f (c'' p f x)) c. Applied to a Scott numeral m, this gives the Church numeral with the same value.
-local function toChurchDefine(
-	b: Builder
-): Port
+local function toChurchDefine(b: Builder): Port
 	return L.lam(
-		b, function(
-			c: Port
-		): Port
+		b,
+		function(c: Port): Port
 			return L.lam(
-				b, function(
-					m: Port
-				): Port
+				b,
+				function(m: Port): Port
 					return L.lam(
-						b, function(
-							f: Port
-						): Port
+						b,
+						function(f: Port): Port
 							return L.lam(
-								b, function(
-									x: Port
-								): Port
+								b,
+								function(x: Port): Port
 									const fs = L.share(b, f, 2)
 									const xs = L.share(b, x, 2)
 									const zeroCase = L.lam(
-										b, function(
-											_c1: Port
-										): Port
+										b,
+										function(_c1: Port): Port
 											return xs[1]
 										end
 									)
 									const succCase = L.lam(
-										b, function(
-											p: Port
-										): Port
+										b,
+										function(p: Port): Port
 											return L.lam(
-												b, function(
-													c2: Port
-												): Port
+												b,
+												function(c2: Port): Port
 													const rest = L.app(b, L.app(b, L.app(b, Rec.recall(b, c2), p), fs[2]), xs[2])
 
 													return L.app(b, fs[1], rest)
@@ -425,17 +356,12 @@ local function toChurchDefine(
 end
 
 -- The Church numeral with the same value as the Scott numeral `m`, built into b.
-const function toChurch(
-	b: Builder
-): Port
+const function toChurch(b: Builder): Port
 	return Rec.tie(b, toChurchDefine)
 end
 
 -- Builds a value into a fresh builder, reduces it under the budget, and returns the report and the net.
-const function evaluate(
-	build: (Builder) -> Port,
-	budget: number?
-): (H.Report, Net)
+const function evaluate(build: (Builder) -> Port, budget: number?): (H.Report, Net)
 	const b = B.new()
 	build(b)
 	const net = b:finish()
@@ -444,9 +370,7 @@ const function evaluate(
 end
 
 -- The one free port of a net, if it has exactly one and it is a principal port.
-const function freeRoot(
-	net: Net
-): Port?
+const function freeRoot(net: Net): Port?
 	local root: Port? = nil
 	local free = 0
 
@@ -473,11 +397,7 @@ end
 
 -- The observation of the Scott value in `original` once it is converted to a Church numeral, or nil if the value or the conversion does not finish.
 -- The value is reduced first, on a copy, so that its root is the principal port of its normal form. The original net is not changed.
-const function observeChurch(
-	original: Net,
-	budget: number?,
-	plain: boolean?
-): (H.Report, Net?)
+const function observeChurch(original: Net, budget: number?, plain: boolean?): (H.Report, Net?)
 	const net: Net = {
 		Tag = table.clone(original.Tag),
 		Link = table.clone(original.Link),
@@ -508,13 +428,9 @@ const function observeChurch(
 end
 
 -- What each numeral observes as, computed once for each numeral that is needed.
-local references: {
-	[number]: Net?,
-} = {}
+local references: { Net? } = {}
 
-const function referenceFor(
-	k: number
-): Net?
+const function referenceFor(k: number): Net?
 	if references[k] == nil then
 		const b = B.new()
 		numeral(b, k)
@@ -527,11 +443,7 @@ end
 
 -- The number that a Scott value stands for, from its net, or nil if it stands for no numeral. The report is the reduction of the conversion, which is what a failure needs to explain itself.
 -- A value is read by its observation, and a numeral is the one whose observation is the same, as in numerals of Church encoding. So a value that is not a numeral can only read back as one if it observes the same way.
-const function readNet(
-	original: Net,
-	budget: number?,
-	plain: boolean?
-): (H.Report, number?)
+const function readNet(original: Net, budget: number?, plain: boolean?): (H.Report, number?)
 	const report, seen = observeChurch(original, budget, plain)
 
 	if not seen then
@@ -562,11 +474,7 @@ const function readNet(
 end
 
 -- The number that the Scott value built by `build` stands for, or nil if it stands for no numeral.
-const function readback(
-	build: (Builder) -> Port,
-	budget: number?,
-	plain: boolean?
-): (H.Report, number?)
+const function readback(build: (Builder) -> Port, budget: number?, plain: boolean?): (H.Report, number?)
 	const b = B.new()
 	build(b)
 

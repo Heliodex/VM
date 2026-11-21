@@ -31,47 +31,32 @@ const EPSILON: Epsilon = "Epsilon"
 const STRIDE = 3
 
 -- The port in a given slot of a cell: 1 is the principal port, 2 and 3 the auxiliaries.
-const function port(
-	c: Cell,
-	slot: number
-): Port
+const function port(c: Cell, slot: number): Port
 	return (c - 1) * STRIDE + slot
 end
 
-const function principal(
-	a: Cell
-): Port
+const function principal(a: Cell): Port
 	return (a - 1) * STRIDE + 1
 end
 
-const function aux1(
-	a: Cell
-): Port
+const function aux1(a: Cell): Port
 	return (a - 1) * STRIDE + 2
 end
 
-const function aux2(
-	a: Cell
-): Port
+const function aux2(a: Cell): Port
 	return aux1(a) + 1
 end
 
-const function owner(
-	p: Port
-): Cell
+const function owner(p: Port): Cell
 	return (p - 1) // STRIDE + 1
 end
 
-const function isPrincipal(
-	p: Port
-): boolean
+const function isPrincipal(p: Port): boolean
 	return (p - 1) % STRIDE == 0
 end
 
 -- How many ports a cell with this symbol has, principal included.
-const function portCount(
-	symbol: Symbol
-): number
+const function portCount(symbol: Symbol): number
 	return
 		if symbol == EPSILON then
 			1
@@ -96,10 +81,7 @@ const function newNet(): Net
 	}
 end
 
-const function alloc(
-	net: Net,
-	symbol: Symbol
-): Cell
+const function alloc(net: Net, symbol: Symbol): Cell
 	-- 1. pick a slot: reuse a freed cell id, else grow by one
 	const c = table.remove(net.Free) or #net.Tag + 1
 	-- 2. record the symbol l(c)
@@ -112,32 +94,22 @@ const function alloc(
 	return c
 end
 
-const function release(
-	net: Net,
-	c: Cell
-)
+const function release(net: Net, c: Cell)
 	const p = principal(c)
 	net.Link[p], net.Link[p + 1], net.Link[p + 2] = 0, 0, 0
 	table.insert(net.Free, c)
 end
 
 -- Wire two ports. 0 is safe as the "free" sentinel because port ids start at 1.
-const function link(
-	net: Net,
-	p: Port,
-	q: Port
-)
+const function link(net: Net, p: Port, q: Port)
 	net.Link[p], net.Link[q] = q, p
 
 	if isPrincipal(p) and isPrincipal(q) then
 		table.insert(net.Active, p)
-end end
+	end
+end
 
-const function splice(
-	net: Net,
-	p: Port,
-	q: Port
-)
+const function splice(net: Net, p: Port, q: Port)
 	-- remember what p and q were wired to
 	local r, s = net.Link[p], net.Link[q]
 
@@ -165,14 +137,11 @@ const function splice(
 	-- joining two continuations may have created a fresh redex
 	if r ~= 0 and s ~= 0 and isPrincipal(r) and isPrincipal(s) then
 		table.insert(net.Active, r)
-end end
+	end
+end
 
 -- Redirect p's wire onto q, leaving p free. Used when a cell dissolves but its continuations must stay connected. q must be a fresh (unwired) port.
-const function move(
-	net: Net,
-	p: Port,
-	q: Port
-)
+const function move(net: Net, p: Port, q: Port)
 	const r = net.Link[p]
 	net.Link[p] = 0
 	net.Link[q] = r
@@ -185,31 +154,27 @@ const function move(
 
 	if isPrincipal(q) and isPrincipal(r) then
 		table.insert(net.Active, q)
-end end
+	end
+end
 
 -- queries ------------------------------------------------------------------
-const function wellFormed(
-	net: Net
-): boolean
+const function wellFormed(net: Net): boolean
 	for p, q in net.Link do
 		if q ~= 0 and net.Link[q] ~= p then
 			return false
-	end end
+		end
+	end
 
 	return true
 end
 
 -- How many cells are still alive. Every cell ever made keeps its slot in Tag, and a released one is on Free until it is reused, so this is a subtraction rather than a scan.
-const function liveCount(
-	net: Net
-): number
+const function liveCount(net: Net): number
 	return #net.Tag - #net.Free
 end
 
 -- The cells that are still alive (release() keeps Tag around for slot reuse).
-const function liveCells(
-	net: Net
-): { Cell }
+const function liveCells(net: Net): { Cell }
 	const freed: {
 		[Cell]: boolean,
 	} = {}
@@ -223,7 +188,8 @@ const function liveCells(
 	for c = 1, #net.Tag do
 		if net.Tag[c] ~= nil and not freed[c] then
 			table.insert(live, c)
-	end end
+		end
+	end
 
 	return live
 end
