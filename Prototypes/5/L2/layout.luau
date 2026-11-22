@@ -130,6 +130,9 @@ local function armLines(children: { Node }): string
 
 			if pat == nil then
 				pat = string.match(c.text, "^(.-) %->$")
+				if pat ~= nil then
+					pat = string.gsub(pat :: string, " +$", "")
+				end
 
 				if pat == nil then
 					fail(c.line, "an arm is written pat -> body")

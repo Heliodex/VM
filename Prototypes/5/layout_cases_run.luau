@@ -7,6 +7,65 @@
 
 const Parser = require "./L2/parser"
 const Layout = require "./L2/layout"
+const L2 = require "./L2/l2"
+const VM = require "./interpreter/vm"
+const fs = require "@lute/fs"
+
+local function readFile(path: string): string
+	const handle = fs.open(path)
+	const text = fs.read(handle)
+	fs.close(handle)
+	return text
+end
+
+-- The layer in L2, from boot/layout.l2, which is itself indented: the Luau layer lays it out when it is read.
+const layerProgram = L2.compile(readFile("L2/programs/boot/layout.l2"), function(_name: string): string? return nil end, "boot/layout.l2")
+
+local function bytesValue(s: string): VM.Value
+	local v: VM.Value = VM.NIL
+
+	for i = #s, 1, -1 do
+		v = { kind = "cell", head = string.byte(s, i) :: number, tail = v } :: VM.Cell
+	end
+
+	return v
+end
+
+local function textOf(v: VM.Value): string
+	local out: { string } = {}
+	local cur = v
+
+	while type(cur) == "table" and cur.kind == "cell" do
+		table.insert(out, string.char((cur :: VM.Cell).head :: number))
+		cur = (cur :: VM.Cell).tail
+	end
+
+	return table.concat(out)
+end
+
+-- The L2 layer's outcome for a source: Ok of the text, or Err of the message, as the Luau layer raises it.
+local function layerInL2(src: string): string
+	const outcome = L2.run(layerProgram, bytesValue(src), 1000000000)
+
+	if outcome.status ~= "value" then
+		return "the L2 layer " .. outcome.status
+	end
+
+	const con = outcome.value :: VM.Con
+
+	if con.tag == 0 then
+		return textOf(con.payload)
+	end
+
+	return "error " .. textOf(con.payload)
+end
+
+local ERRORS: { { name: string; l2: string } } = {
+	{ name = "an empty file", l2 = "" },
+	{ name = "a space at the start of a line", l2 = " fn x" },
+	{ name = "a let with no body", l2 = "let a = 1" },
+	{ name = "an arm with no ->", l2 = "fn m\n\tmatch m\n\t\tOk v" },
+}
 
 -- Whether two trees are the same, ignoring the position of each node.
 local function same(a: any, b: any, path: string): string?
@@ -147,6 +206,15 @@ for _, case in CASES do
 		result = if diff == nil then "" else "the trees differ at " .. diff
 	end
 
+	if result == "" and okA then
+		const text = Layout.layout(case.l2)
+		const inL2 = layerInL2(case.l2)
+
+		if inL2 ~= text then
+			result = "the L2 layer gives a different text: " .. inL2 .. " against " .. text
+		end
+	end
+
 	if result == "" then
 		print("PASS  " .. case.name)
 	else
@@ -155,4 +223,26 @@ for _, case in CASES do
 	end
 end
 
-print(string.format("%d of %d layout cases give the same tree as the bracketed form", #CASES - failures, #CASES))
+for _, case in ERRORS do
+	const okA, msg = pcall(Layout.layout, case.l2)
+	const want = if okA then "no error" else tostring(msg)
+	const got = layerInL2(case.l2)
+	local result: string
+
+	if okA then
+		result = "the Luau layer gave no error"
+	elseif got ~= "error " .. want then
+		result = "the L2 layer gives " .. got .. " against " .. want
+	else
+		result = ""
+	end
+
+	if result == "" then
+		print("PASS  error: " .. case.name)
+	else
+		failures += 1
+		print("FAIL  error: " .. case.name .. ": " .. result)
+	end
+end
+
+print(string.format("%d of %d layout checks pass (the tree, the L2 text, and the errors)", #CASES + #ERRORS - failures, #CASES + #ERRORS))
