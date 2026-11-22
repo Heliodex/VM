@@ -323,8 +323,24 @@ emit = function(e: Expr, ind: number, out: { string })
 
 		line(out, ind, `if {c :: string}`)
 		emit(e.t, ind + 1, out)
+
+		-- An else branch that is itself an if is written as an elseif, at the same level.
+		local rest = e.e
+
+		while rest.k == "if" do
+			const rc = flat(rest.c)
+
+			if rc == nil then
+				fail(rest.c.at, "an if condition is written on one line")
+			end
+
+			line(out, ind, `elseif {rc :: string}`)
+			emit(rest.t, ind + 1, out)
+			rest = rest.e
+		end
+
 		line(out, ind, "else")
-		emit(e.e, ind + 1, out)
+		emit(rest, ind + 1, out)
 	elseif e.k == "match" then
 		const s = flat(e.scrut)
 
