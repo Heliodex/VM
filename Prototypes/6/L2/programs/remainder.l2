@@ -1,0 +1,11 @@
+Remainder gives an Err for a zero divisor, as division does. The remainder is floored, so it takes the sign of the divisor.
+---
+
+---
+fn x
+	(% 10 x)
+---
+3 => Ok 1 fuel 1000
+-3 => Ok -2 fuel 1000
+0 => Err [114 101 109 97 105 110 100 101 114 32 98 121 32 122 101 114 111] fuel 1000
+

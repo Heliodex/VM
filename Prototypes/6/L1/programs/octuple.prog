@@ -1,0 +1,9 @@
+Multiplies an integer by eight: double of quadruple. It imports two programs, and one of them, quadruple.prog, imports double.prog in turn, so the import chain is three files deep.
+---
+double = double.prog
+quad = quadruple.prog
+---
+(fn x (double (quad x)))
+---
+1 => 8 fuel 10000
+10 => 80 fuel 10000

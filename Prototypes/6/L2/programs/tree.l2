@@ -1,0 +1,16 @@
+A tree is a leaf, or a node with a pair of subtrees. The check on the input is deep, so a node whose subtree is not a tree is refused.
+---
+
+---
+type Tree = Leaf | Node (Tree . Tree)
+fn t
+	match t
+		Leaf -> 0
+		Node p -> 1
+---
+Leaf => 0 fuel 1000
+Node (Leaf . Leaf) => 1 fuel 1000
+Node (Leaf . (Node (Leaf . Leaf))) => 1 fuel 1000
+Node (Leaf . 5) => Err [101 120 112 101 99 116 101 100 32 84 114 101 101] fuel 1000
+~ => Err [101 120 112 101 99 116 101 100 32 84 114 101 101] fuel 1000
+

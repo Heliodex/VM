@@ -1,0 +1,20 @@
+Whether a string is a palindrome, which the program decides by reversing it and comparing the two. The output is 1 for a palindrome and 0 otherwise. Case matters, so Aba is not one.
+The probe is two lists walked together: the comparison stops as soon as one runs out, and checks both are empty together.
+---
+---
+(fn s
+	(letrec rev
+		(fn (l acc) (if (? l) acc (rev (tail l) [(head l) acc])))
+		(letrec same
+			(fn (a b)
+				(if (? a) (? b) (if (? b) 0 (if (= (head a) (head b)) (same (tail a) (tail b)) 0))))
+			(same s (rev s ~)))))
+---
+"" => 1 fuel 200000
+"a" => 1 fuel 200000
+"abba" => 1 fuel 200000
+"abc" => 0 fuel 200000
+"Aba" => 0 fuel 200000
+"racecar" => 1 fuel 200000
+"ab" => 0 fuel 200000
+"noon" => 1 fuel 200000

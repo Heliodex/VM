@@ -1,0 +1,13 @@
+A user sum, and match on it. The arms are on their own lines, and the first arm starts on the line after {.
+---
+
+---
+type Option a = None | Some a
+fn o
+	match o
+		None -> 0
+		Some v -> v
+---
+None => 0 fuel 1000
+Some 7 => 7 fuel 1000
+

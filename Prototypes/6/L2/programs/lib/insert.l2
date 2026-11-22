@@ -1,0 +1,24 @@
+Puts an integer into a sorted list, before the first item that is larger. The input is the pair (x . xs), where xs is sorted; the output is Ok of the sorted list.
+---
+
+---
+fn p
+	let x = (fst p)
+	letrec ins = fn l
+		if (= (@ l) 1)
+			(Ok (cons x ~))
+		else
+			let h = ((head l)?)
+			if (< x h)
+				(Ok (cons x l))
+			else
+				let t = ((tail l)?)
+				let r = ((ins t)?)
+				(Ok (cons h r))
+	(ins (snd p))
+---
+(3 . [1 2 5]) => Ok [1 2 3 5] fuel 1000
+(0 . ~) => Ok [0] fuel 1000
+(9 . [1 2]) => Ok [1 2 9] fuel 1000
+(2 . [2 3]) => Ok [2 2 3] fuel 1000
+

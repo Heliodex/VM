@@ -1,0 +1,12 @@
+Whether a number is even, with even and odd defined in terms of each other. The mutual form binds both names at once, so each function can call the other.
+The probe is mutual recursion. It was the one probe the language could not express: with letrec alone, odd is not in scope where even is defined.
+---
+---
+(fn n
+	(mutual ((even (fn k (if (= k 0) 1 (odd (- k 1)))))
+					(odd (fn k (if (= k 0) 0 (even (- k 1))))))
+		(even n)))
+---
+0 => 1 fuel 10000
+4 => 1 fuel 10000
+7 => 0 fuel 10000

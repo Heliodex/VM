@@ -1,0 +1,9 @@
+Puts a pin inside a cell. The lifecycle forces it, so the output is the value the pin gives, not the pin.
+An error inside a pin is an error of the whole run.
+---
+---
+(fn x [1 (pin (+ x 1))])
+---
+5 => [1 6] fuel 1000
+0 => [1 1] fuel 1000
+~ => error fuel 1000

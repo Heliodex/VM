@@ -1,0 +1,15 @@
+A record constructor that is not the last constructor of its type: its fields are the block below its | line, and reading the field back gives the value.
+---
+
+---
+type Tr =
+	| TNode
+		value: Int
+	| TEmpty
+fn x
+	value
+		TNode
+			value = x
+---
+3 => 3 fuel 1000
+0 => 0 fuel 1000

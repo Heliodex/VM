@@ -1,0 +1,23 @@
+Applies a function to every item of a list. The input is the pair (f . xs): f is a function of one argument, and the output is Ok of the list of its results.
+---
+
+---
+fn p
+	let f = (fst p)
+	letrec m = fn l
+		if (= (@ l) 1)
+			(Ok ~)
+		else
+			let h = ((head l)?)
+			let t = ((tail l)?)
+			let r = ((m t)?)
+			(Ok (cons (f h) r))
+	(m (snd p))
+---
+((fn x
+	(+ x 1)) . [1 2 3]) => Ok [2 3 4] fuel 1000
+((fn x
+	x) . ~) => Ok ~ fuel 1000
+((fn x
+	(* x x)) . [3 -4]) => Ok [9 16] fuel 1000
+

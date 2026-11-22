@@ -1,0 +1,9 @@
+Multiplies an integer by four, by doubling it twice. The first import is the double program from double.prog, which the name double refers to.
+---
+double = double.prog
+---
+(fn x (double (double x)))
+---
+0 => 0 fuel 10000
+3 => 12 fuel 10000
+-1 => -4 fuel 10000

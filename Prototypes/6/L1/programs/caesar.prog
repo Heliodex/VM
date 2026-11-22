@@ -1,0 +1,21 @@
+A Caesar cipher: each letter moves three places on, wrapping from z to a and Z to A. Other bytes are copied unchanged.
+The probe is string in, string out: the input and the output are both strings, and the output is built one byte at a time with a cell per byte.
+---
+---
+(fn s
+	(let shift (fn c
+			(if (< c 65) c
+					(if (< 90 c)
+							(if (< c 97) c
+									(if (< 122 c) c (+ 97 (% (+ (- c 97) 3) 26))))
+							(+ 65 (% (+ (- c 65) 3) 26)))))
+		(letrec go (fn l
+				(if (? l) ~ [(shift (head l)) (go (tail l))]))
+			(go s))))
+---
+"" => "" fuel 200000
+"abc" => "def" fuel 200000
+"Hello, World!" => "Khoor, Zruog!" fuel 200000
+"xyz XYZ" => "abc ABC" fuel 200000
+"a1 b2 z" => "d1 e2 c" fuel 200000
+"~ ok" => "~ rn" fuel 200000

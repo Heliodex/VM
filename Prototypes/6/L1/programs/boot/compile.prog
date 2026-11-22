@@ -1,0 +1,151 @@
+The third stage of the L1 reader, written in L1. It takes the syntax tree from parse.prog and builds the quoted form of the expression: the same value that Code.toValue gives for the Expr that the Luau reader builds. A quoted node is [tag args], with the tags of code.luau.
+The names are resolved to indices, the forms are read as the Luau reader reads them, and the mutual desugaring is the same, so the output of this stage is the same expression for every program the Luau reader accepts.
+The result is [0 quoted] or [1 message]. A stage never raises: every compile step returns a result, and bind passes a success on and a failure through.
+---
+
+---
+(fn input
+	(let node (head input)
+	(let scope (tail input)
+	(let bind (fn (r f) (if (= (head r) 0) (f (tail r)) r))
+	(let qInt (fn n [0 n ~])
+	(let qVar (fn i [2 i ~])
+	(let qLam (fn b [3 b ~])
+	(let qCell (fn (h t) [5 h t ~])
+	(let qUn (fn (tag e) [tag e ~])
+	(let qBin (fn (tag a b) [tag a b ~])
+	(let qIf (fn (c t e) [9 c t e ~])
+	(let qApp (fn (f a) [10 f a ~])
+	(let qNil [0 ~ ~]
+	(let qInner (qLam (qApp (qVar 1) (qLam (qApp (qApp (qVar 1) (qVar 1)) (qVar 0)))))
+	(let qFixE (qLam (qApp qInner qInner))
+	(let qSel (fn (side q) (if (= (head q) 6) (if (< (head (tail q)) 1125899906842624) [6 (+ (* 2 (head (tail q))) side) (head (tail (tail q))) ~] [6 (+ 2 side) q ~]) [6 (+ 2 side) q ~]))
+	(let payOf (fn x (tail (tail x)))
+	(let RESERVED (list "fn" "if" "let" "letrec" "mutual" "list" "~" "+" "-" "*" "<" "=" "/" "%" "@" "?" "head" "tail" "pin" "force" "fix")
+	(let PRIMS (list "+" "-" "*" "<" "=" "/" "%")
+	(let UNARYS (list "head" "tail" "pin" "force" "fix")
+	(letrec rev
+		(fn (l acc) (if (? l) acc (rev (tail l) [(head l) acc])))
+	(letrec same
+		(fn (a b) (if (? a) (? b) (if (? b) 0 (if (= (head a) (head b)) (same (tail a) (tail b)) 0))))
+	(letrec member
+		(fn (x xs) (if (? xs) 0 (if (same x (head xs)) 1 (member x (tail xs)))))
+	(letrec isReserved
+		(fn s (member s RESERVED))
+	(letrec lenOf
+		(fn l (if (? l) 0 (+ 1 (lenOf (tail l)))))
+	(letrec lastOf
+		(fn l (if (? (tail l)) (head l) (lastOf (tail l))))
+	(letrec initOf
+		(fn l (if (? (tail l)) ~ [(head l) (initOf (tail l))]))
+	(letrec nthOf
+		(fn (l i) (if (= i 1) (head l) (nthOf (tail l) (- i 1))))
+	(letrec idxOf
+		(fn (s n i)
+			(if (? s) [1 "name is not bound"]
+					(if (same (head s) n) [0 i] (idxOf (tail s) n (+ i 1)))))
+	(letrec qList
+		(fn xs (if (? xs) qNil (qCell (head xs) (qList (tail xs)))))
+	(letrec strQ
+		(fn cs (if (? cs) qNil (qCell (qInt (head cs)) (strQ (tail cs)))))
+	(letrec wrapLams
+		(fn (k e) (if (= k 0) e (qLam (wrapLams (- k 1) e))))
+	(letrec addNames
+		(fn (ns s) (if (? ns) s (addNames (tail ns) [(head ns) s])))
+	(letrec symsOf
+		(fn (items acc)
+			(if (? items) [0 acc]
+					(if (= (head (head items)) 1)
+							(if (isReserved (payOf (head items))) [1 "a reserved word cannot be a variable"] (symsOf (tail items) [(payOf (head items)) acc]))
+							[1 "a fn parameter must be a name"])))
+	(letrec paramNames
+		(fn (ps acc)
+			(if (? ps) [0 acc]
+					(let p (head ps)
+						(if (= (head p) 1)
+								(if (isReserved (payOf p)) [1 "a reserved word cannot be a variable"] (paramNames (tail ps) [(payOf p) acc]))
+								(if (= (head p) 2)
+										(bind (symsOf (payOf p) acc)
+													(fn acc2 (paramNames (tail ps) acc2)))
+										[1 "a fn parameter must be a name"])))))
+	(letrec defOk
+		(fn d
+			(if (= (head d) 2)
+					(let di (payOf d)
+						(if (? di) 0
+								(if (= (head (head di)) 1) (same (payOf (head di)) "fn") 0)))
+					0))
+	(letrec nSym (fn s [1 0 s])
+	(letrec nInt (fn n [0 0 n])
+	(letrec nList (fn items [2 0 items])
+	(letrec callNode
+		(fn (g i)
+			(nList (list (nSym "fn") (nSym " y")
+									(nList (list (nList (list (nSym g) (nInt i))) (nSym " y"))))))
+	(letrec wrapAll
+		(fn (k ns g body)
+			(if (? ns) body
+					(nList (list (nSym "let") (nSym (head ns)) (callNode g (- k 1))
+											(wrapAll (+ k 1) (tail ns) g body)))))
+	(letrec chainOf
+		(fn (bs i)
+			(if (? (tail bs)) (head bs)
+					(nList (list (nSym "if")
+											(nList (list (nSym "=") (nSym " tag") (nInt (- i 1))))
+											(head bs)
+											(chainOf (tail bs) (+ i 1))))))
+	(letrec brsOf
+		(fn (ds names)
+			(if (? ds) ~
+					[(wrapAll 1 names " self" (nList (list (head ds) (nSym " x"))))
+					(brsOf (tail ds) names)]))
+	(letrec bnames
+		(fn (bs acc)
+			(if (? bs) [0 acc]
+					(if (= (head (head bs)) 2)
+							(let bi (payOf (head bs))
+								(if (= (lenOf bi) 2)
+										(if (= (head (head bi)) 1)
+												(bnames (tail bs) [(payOf (head bi)) acc])
+												[1 "each mutual binding is (name fn)"])
+										[1 "each mutual binding is (name fn)"]))
+							[1 "each mutual binding is (name fn)"])))
+	(letrec bdefs
+		(fn (bs acc)
+			(if (? bs) [0 acc]
+					(let bi (payOf (head bs))
+						(let def (nthOf bi 2)
+							(if (defOk def)
+									(bdefs (tail bs) [def acc])
+									[1 "mutual binds fns, so the functions can call each other"])))))
+	(letrec PRIM_TAG
+		(fn nm
+			(if (same nm "+") 11
+					(if (same nm "-") 12
+							(if (same nm "*") 13
+									(if (same nm "/") 14
+											(if (same nm "<") 16
+													(if (same nm "=") 17 15)))))))
+	(letrec UNARY_TAG
+		(fn nm
+			(if (same nm "pin") 4 8))
+	(mutual (
+		(compile (fn (node scope) (let k (head node) (if (= k 0) [0 (qInt (payOf node))] (if (= k 4) [0 (strQ (payOf node))] (if (= k 1) (let p (payOf node) (if (same p "~") [0 qNil] (if (isReserved p) [1 "a reserved word cannot be a variable"] (bind (idxOf scope p 0) (fn i [0 (qVar i)]))))) (if (= k 3) (let items (payOf node) (if (? items) [1 "a pair takes at least two items"] (if (? (tail items)) [1 "a pair takes at least two items"] (pairRight items scope)))) (let items (payOf node) (if (? items) [1 "() is not an expression, and nil is written ~"] (let h (head items) (if (= (head h) 1) (let hn (payOf h) (if (isReserved hn) (compileForm hn items scope) (compileForm ~ items scope))) (compileForm ~ items scope))))))))))))
+		(compileForm (fn (nm items scope) (let n (- (lenOf items) 1) (if (same nm "fn") (if (< n 2) [1 "fn needs a parameter and a body"] (if (< 2 n) [1 "fn takes a list of parameters, (fn (x y) body), or one name, (fn x body)"] (let ps (tail (initOf items)) (let body (lastOf items) (bind (paramNames ps ~) (fn ns (let names (rev ns ~) (if (? names) [1 "fn needs at least one parameter"] (bind (compile body (addNames names scope)) (fn b [0 (wrapLams (lenOf names) b)])))))))))) (if (same nm "let") (if (= n 3) (let binder (nthOf items 2) (if (= (head binder) 1) (bind (compile (nthOf items 3) scope) (fn v (bind (compile (nthOf items 4) [(payOf binder) scope]) (fn b [0 (qApp (qLam b) v)])))) [1 "let binds a name"])) [1 "let takes three parts"]) (if (same nm "letrec") (if (= n 3) (let binder (nthOf items 2) (let defn (nthOf items 3) (if (= (head binder) 1) (if (defOk defn) (let inner [(payOf binder) scope] (bind (compile defn inner) (fn d (bind (compile (nthOf items 4) inner) (fn b [0 (qApp (qLam b) (qApp qFixE (qLam d)))]))))) [1 "letrec binds a fn, so the function can call itself"]) [1 "letrec binds a name"]))) [1 "letrec takes three parts"]) (if (same nm "if") (if (= n 3) (bind (compile (nthOf items 2) scope) (fn c (bind (compile (nthOf items 3) scope) (fn t (bind (compile (nthOf items 4) scope) (fn e [0 (qIf c t e)])))))) [1 "if takes three parts"]) (if (same nm "mutual") (if (= n 2) (let bindings (nthOf items 2) (if (= (head bindings) 2) (let binds (payOf bindings) (if (? binds) [1 "mutual binds a list of (name fn) pairs"] (bind (bnames binds ~) (fn ns (bind (bdefs binds ~) (fn ds (let names (rev ns ~) (let defs (rev ds ~) (let chain (chainOf (brsOf defs names) 1) (let dispatch (nList (list (nSym "fn") (nSym " self") (nList (list (nSym "fn") (nSym " tag") (nList (list (nSym "fn") (nSym " x") chain)))))) (compile (nList (list (nSym "let") (nSym " group") (nList (list (nSym "fix") dispatch)) (wrapAll 1 names " group" (nthOf items 3)))) scope))))))))))) [1 "mutual binds a list of (name fn) pairs"])) [1 "mutual takes two parts"]) (if (same nm "list") (bind (compileAll (tail items) scope) (fn xs [0 (qList xs)])) (if (same nm "@") (if (= n 1) (bind (compile (nthOf items 2) scope) (fn e [0 (qUn 18 e)])) [1 "kind takes one part"]) (if (same nm "?") (if (= n 1) (bind (compile (nthOf items 2) scope) (fn e [0 (qBin 17 (qUn 18 e) (qInt 1))])) [1 "? takes one part"]) (if (member nm PRIMS) (if (= n 2) (bind (compile (nthOf items 2) scope) (fn a (bind (compile (nthOf items 3) scope) (fn b [0 (qBin (PRIM_TAG nm) a b)])))) [1 "a primitive takes two parts"]) (if (member nm UNARYS) (if (= n 1) (bind (compile (nthOf items 2) scope) (fn e (if (same nm "fix") [0 (qApp qFixE e)] (if (same nm "head") [0 (qSel 0 e)] (if (same nm "tail") [0 (qSel 1 e)] [0 (qUn (UNARY_TAG nm) e)]))))) [1 "this form takes one part"]) (if (= n 0) [1 "a call needs at least one argument"] (bind (compile (head items) scope) (fn f (appAll f (tail items) scope)))))))))))))))))
+		(pairRight (fn (items scope) (if (? (tail items)) (compile (head items) scope) (bind (compile (head items) scope) (fn h (bind (pairRight (tail items) scope) (fn t [0 (qCell h t)])))))))
+		(compileAll (fn (items scope) (if (? items) [0 ~] (bind (compile (head items) scope) (fn q (bind (compileAll (tail items) scope) (fn qs [0 [q qs]])))))))
+		(appAll (fn (f args scope) (if (? args) [0 f] (bind (compile (head args) scope) (fn a (appAll (qApp f a) (tail args) scope)))))))
+		(compile node scope)))))))))))))))))))))))))))))))))))))))))))))))))
+---
+[[0 1 42] ~] => [0 [0 42 ~]] fuel 100000
+[[1 1 "~"] ~] => [0 [0 ~ ~]] fuel 100000
+[[1 1 "x"] ~] => [1 "name is not bound"] fuel 100000
+[[1 1 "if"] ~] => [1 "a reserved word cannot be a variable"] fuel 100000
+[[2 1 (list [1 1 "fn"] [1 1 "x"] [1 1 "x"])] ~] => [0 [3 [2 0 ~] ~]] fuel 100000
+[[2 1 (list [1 1 "fn"] [2 1 (list [1 1 "x"])] [1 1 "x"])] ~] => [0 [3 [2 0 ~] ~]] fuel 100000
+[[2 1 (list [1 1 "fn"] [1 1 "x"])] ~] => [1 "fn needs a parameter and a body"] fuel 100000
+[[2 1 (list [0 1 4] [0 1 7])] ~] => [0 [10 [0 4 ~] [0 7 ~] ~]] fuel 100000
+[[2 1 ~] ~] => [1 "() is not an expression, and nil is written ~"] fuel 100000
+[[3 1 (list [0 1 1])] ~] => [1 "a pair takes at least two items"] fuel 100000
+[[1 1 "x"] (list "x")] => [0 [2 0 ~]] fuel 100000
+[[2 1 (list [1 1 "fn"] [1 1 "x"] [1 1 "y"] [1 1 "x"])] ~] => [1 "fn takes a list of parameters, (fn (x y) body), or one name, (fn x body)"] fuel 100000

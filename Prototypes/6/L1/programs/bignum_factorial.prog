@@ -1,0 +1,16 @@
+The factorial of n, as a list of decimal digits, least significant first. Each digit is multiplied and carried, so no number is ever bigger than a digit times n.
+The probe is the integer limit: 25! is far past 2^53, and this program computes it exactly, since no single integer ever gets near the limit.
+---
+---
+(fn n
+	(letrec mul
+		(fn (d m c)
+			(if (? d)
+				(if (= c 0) ~ [(% c 10) (mul ~ m (/ c 10))])
+				(let t (+ (* (head d) m) c) [(% t 10) (mul (tail d) m (/ t 10))])))
+		(letrec fact (fn k (if (= k 0) [1 ~] (mul (fact (- k 1)) k 0))) (fact n))))
+---
+0 => [1 ~] fuel 1000000
+5 => [0 2 1 ~] fuel 1000000
+20 => [0 0 0 0 4 6 6 7 1 8 0 0 2 0 9 2 3 4 2 ~] fuel 1000000
+25 => [0 0 0 0 0 0 4 8 9 5 8 9 0 3 3 3 4 0 0 1 2 1 1 5 5 1 ~] fuel 1000000

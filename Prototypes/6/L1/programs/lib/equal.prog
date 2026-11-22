@@ -1,0 +1,19 @@
+Whether two data values are the same, all the way down. The input is the pair [a b]; the output is 1 for equal and 0 otherwise. A function is never equal to anything.
+---
+
+---
+(fn p
+	(letrec eq
+		(fn (a b)
+			(if (= (@ a) (@ b))
+				(if (= (@ a) 2)
+					(if (eq (head a) (head b)) (eq (tail a) (tail b)) 0)
+					(if (= (@ a) 0) (= a b) (if (= (@ a) 1) 1 0)))
+				0))
+		(eq (head p) (tail p))))
+---
+[[1 2 ~] 1 2 ~] => 1 fuel 100000
+[[1 2 ~] 1 3 ~] => 0 fuel 100000
+[~ ~] => 1 fuel 100000
+[~ 0] => 0 fuel 100000
+[[1 ~] 1] => 0 fuel 100000

@@ -1,0 +1,9 @@
+Multiplies an integer by eighteen: double of ninefold. The import of ninefold.prog is a path into lib, and ninefold.prog imports lib/triple.prog in turn.
+---
+nine = lib/ninefold.prog
+double = double.prog
+---
+(fn x (double (nine x)))
+---
+1 => 18 fuel 100000
+2 => 36 fuel 100000

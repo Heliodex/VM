@@ -1,0 +1,6 @@
+Loops forever on any input. The fuel runs out, and the outcome is out_of_fuel, not a hang.
+---
+---
+(fn x ((fix (fn f (fn n (f n)))) x))
+---
+0 => out_of_fuel fuel 1000

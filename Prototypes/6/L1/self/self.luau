@@ -1,0 +1,110 @@
+--!strict
+-- THE SELF-INTERPRETER
+--
+-- An interpreter for the language, written in the language. It takes a program as data and evaluates it, and the result should match running the program directly.
+--
+-- A program is quoted as a pair [tag args], where tag is an integer for the form and args is a list of its parts:
+--
+--   0 quote, args (value), a value that is an integer or nil   2 var, args (index)
+--   3 lam, args (body)              4 pin, args (e)          5 cell, args (head tail)
+--   6 index, args (n e), an address n from 2 up, see vm.luau   8 force, args (e)
+--   1 and 7 are not forms: their tags are unused
+--   9 if, args (c t e)             10 apply, args (f arg)
+--   11 +, args (a b)               12 -, args (a b)         13 mul, args (a b)
+--   14 div, args (a b)             15 mod, args (a b)
+--   16 <, args (a b)               17 =, args (a b)         18 kind, args (a)
+--
+-- The interpreter does not build its own closures and pins. A quoted lam becomes a native lam, and a quoted pin becomes a native pin, so the machine's own errors and laziness apply to the object program. The only thing it has to work out is the environment, which is a list of values, indexed by tails.
+--
+-- A program that is not well formed is not checked. The only type test in the language is @ (kind), and the interpreter does not use it to check programs.
+
+const Code = require "../../interpreter/code"
+const M = require "../../interpreter/vm"
+const Reader = require "../reader"
+
+-- The environment representations. An environment is a lookup, which takes an index and an environment, and an extend, which takes a value and an environment and returns the new environment. Both are text, so an interpreter can be built with either.
+-- A linked list of values, indexed by tails.
+const LOOKUP_LIST = "(fix (fn find (fn n (fn e (if (= n 0) (head e) ((find (- n 1)) (tail e)))))))"
+const EXTEND_LIST = "(fn (x env) [x env])"
+-- A skew binary random-access list (Okasaki). Its entries are [size tree], and a tree is [size [value [left right]]], with leaves whose children are nil. The entries are ordered newest first, and two adjacent trees of the same size merge into one. An index is found by skipping whole entries, then descending one tree.
+const LOOKUP_TREE = "(fix (fn tl (fn t (fn i ((fn (x l r) (if (= i 0) x (if (< (- i 1) (head l)) ((tl l) (- i 1)) ((tl r) (- (- i 1) (head l)))))) (head (tail t)) (head (tail (tail t))) (tail (tail (tail t))))))))"
+const LOOKUP_SKEW = `(fix (fn look (fn i (fn env ((fn (e rest) (if (< i (head e)) (({LOOKUP_TREE} (tail e)) i) ((look (- i (head e))) rest))) (head env) (tail env))))))`
+const EXTEND_SKEW = "(fn (x env) (if (? env) [[1 [1 [x [~ ~]]]] ~] ((fn (e1 rest1) (if (? rest1) [[1 [1 [x [~ ~]]]] env] ((fn (e2 rest2) (if (= (head e1) (head e2)) [[(+ (* 2 (head e1)) 1) [(+ (* 2 (head e1)) 1) [x [(tail e1) (tail e2)]]]] rest2] [[1 [1 [x [~ ~]]]] env])) (head rest1) (tail rest1)))) (head env) (tail env))))"
+
+-- Evaluates the subexpression sub in the current environment.
+const function ev(sub: string): string
+	return `((rec {sub}) env)`
+end
+
+-- Walks an address n from 2 up through the value v: the low bit of n is the last step, so walk n v is the step for n mod 2 applied to walk (n / 2) v. A 0 is head and a 1 is tail.
+const WALK = "(fix (fn w (fn n (fn v (if (= n 1) v (let s ((w (/ n 2)) v) (if (= (% n 2) 0) (head s) (tail s))))))))"
+const A = "(head args)"
+const B = "(head (tail args))"
+const C = "(head (tail (tail args)))"
+
+-- The interpreter for an environment with the given lookup and extend.
+const function build(lookup: string, extend: string): string
+	-- What each tag does, as the text of its branch. The branch for tag k is BRANCH[k].
+	const BRANCH: { string } = {
+		[0] = A, -- a quoted value is stored as it is
+		[2] = `(({lookup} {A}) env)`,
+		[3] = `(fn v ((rec {A}) ({extend} v env)))`,
+		[4] = `(pin {ev(A)})`,
+		[5] = `[{ev(A)} {ev(B)}]`,
+		[6] = `(({WALK} {A}) {ev(B)})`,
+		[8] = `(force {ev(A)})`,
+		[9] = `(if {ev(A)} {ev(B)} {ev(C)})`,
+		[10] = `({ev(A)} {ev(B)})`,
+		[11] = `(+ {ev(A)} {ev(B)})`,
+		[12] = `(- {ev(A)} {ev(B)})`,
+		[13] = `(* {ev(A)} {ev(B)})`,
+		[16] = `(< {ev(A)} {ev(B)})`,
+		[17] = `(= {ev(A)} {ev(B)})`,
+		[18] = `(@ {ev(A)})`,
+		-- The constructor forms have no text syntax in L1, so the interpreter cannot build them: an interpreted program that uses one fails as an error, as a malformed form would.
+		[19] = "(head ~)",
+		[20] = "(head ~)",
+		[21] = "(head ~)",
+		[14] = `(/ {ev(A)} {ev(B)})`,
+		[15] = `(% {ev(A)} {ev(B)})`,
+	}
+	-- A chain of ifs on the tag, checking 0 first and falling through to the highest.
+	local chain = "(head ~)"
+
+	for tag = 21, 0, -1 do
+		if BRANCH[tag] ~= nil then
+			chain = `(if (= tag {tag}) {BRANCH[tag]} {chain})`
+		end
+	end
+
+	return `(fix (fn rec (fn node (fn env ((fn (tag args) {chain}) (head node) (tail node))))))`
+end
+
+const EVAL = build(LOOKUP_LIST, EXTEND_LIST)
+
+-- Builds an expression that evaluates to the quoted form of e. The tags are in code.luau.
+const function quote(e: M.Expr): M.Expr
+	return Code.toExpr(Code.toValue(e))
+end
+
+-- The expression that runs a program through an interpreter, with an empty environment.
+const function interpretWith(evaluator: string, program: M.Expr): M.Expr
+	return M.app(Reader.parse(evaluator), quote(program), M.nilv())
+end
+
+-- The same, with the list representation.
+const function interpret(program: M.Expr): M.Expr
+	return interpretWith(EVAL, program)
+end
+
+return {
+	interpret = interpret,
+	interpretWith = interpretWith,
+	build = build,
+	quote = quote,
+	EVAL = EVAL,
+	LOOKUP_LIST = LOOKUP_LIST,
+	EXTEND_LIST = EXTEND_LIST,
+	LOOKUP_SKEW = LOOKUP_SKEW,
+	EXTEND_SKEW = EXTEND_SKEW,
+}

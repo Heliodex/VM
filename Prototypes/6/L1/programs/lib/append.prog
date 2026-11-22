@@ -1,0 +1,12 @@
+Joins two lists. The input is the pair [xs ys]; the output is xs followed by ys.
+---
+
+---
+(fn p
+	(letrec app (fn l (if (? l) (tail p) [(head l) (app (tail l))]))
+		(app (head p))))
+---
+[~ ~] => ~ fuel 100000
+[[1 2 ~] 3 ~] => [1 2 3 ~] fuel 100000
+[~ 4 ~] => [4 ~] fuel 100000
+[[1 ~] ~] => [1 ~] fuel 100000

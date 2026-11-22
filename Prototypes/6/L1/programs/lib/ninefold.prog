@@ -1,0 +1,8 @@
+Multiplies an integer by nine, by tripling it twice. The import is a path from the top of the programs folder, so it names lib/triple.prog wherever the importing file is.
+---
+triple = lib/triple.prog
+---
+(fn x (triple (triple x)))
+---
+1 => 9 fuel 10000
+-3 => -27 fuel 10000

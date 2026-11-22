@@ -1,0 +1,9 @@
+Reverses a list. The input is a list; the output is the same items in the opposite order.
+---
+
+---
+(fn xs (letrec rev (fn (l acc) (if (? l) acc (rev (tail l) [(head l) acc]))) (rev xs ~)))
+---
+~ => ~ fuel 100000
+[1 2 3 ~] => [3 2 1 ~] fuel 100000
+[7 ~] => [7 ~] fuel 100000

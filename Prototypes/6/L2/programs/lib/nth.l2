@@ -1,0 +1,21 @@
+The item at index n of a list, counting from 0. The input is the pair (n . xs). The output is Ok of the item when there is one, and Err with a message past the end.
+---
+
+---
+fn p
+	letrec nth = fn (n l)
+		if (= (@ l) 1)
+			(Err "index out of range")
+		elseif (= n 0)
+			let h = ((head l)?)
+			(Ok h)
+		else
+			let t = ((tail l)?)
+			(nth (- n 1) t)
+	(nth (fst p) (snd p))
+---
+(0 . [7 8 9]) => Ok 7 fuel 1000
+(2 . [7 8 9]) => Ok 9 fuel 1000
+(3 . [7 8 9]) => Err "index out of range" fuel 1000
+(0 . ~) => Err "index out of range" fuel 1000
+

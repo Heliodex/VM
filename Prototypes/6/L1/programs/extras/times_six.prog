@@ -1,0 +1,9 @@
+Multiplies an integer by six: double of triple. Both imports are paths from the top of the programs folder, so one is in lib and the other is at the top.
+---
+triple = lib/triple.prog
+double = double.prog
+---
+(fn x (double (triple x)))
+---
+1 => 6 fuel 10000
+-2 => -12 fuel 10000
