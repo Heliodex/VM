@@ -159,6 +159,11 @@ local CASES: { { name: string; l2: string; prog: string } } = {
 		prog = "fn m\n\tmatch m {\n\t\tMS {\n\t\t\tfixed = f\n\t\t\tcatch = _\n\t\t} -> f\n\t\t_ -> 0\n\t}",
 	},
 	{
+		name = "if with elseif",
+		l2 = "fn c\n\tif (< c 0)\n\t\t-1\n\telseif (= c 0)\n\t\t0\n\telse\n\t\t1",
+		prog = "fn c\n\t(if (< c 0)\n\t(-1)\n\t(if (= c 0)\n\t(0)\n\t(1)))",
+	},
+	{
 		name = "cond",
 		l2 = "fn x\n\tcond\n\t\tx -> 1\n\t\t_ -> 2",
 		prog = "fn x\n\tcond {\n\t\tx -> 1\n\t\t_ -> 2\n\t}",

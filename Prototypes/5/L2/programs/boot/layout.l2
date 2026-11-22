@@ -86,38 +86,33 @@ let isDigitB = fn c
 let isWordB = fn c
 	if (isLowerB c)
 		1
+	elseif (isUpperB c)
+		1
 	else
-		if (isUpperB c)
-			1
-		else
-			isDigitB c
+		isDigitB c
 letrec wordLen = fn (l n)
 	if (= (@ l) 1)
 		n
+	elseif (isWordB (hd l))
+		wordLen (tlOf l) (+ n 1)
 	else
-		if (isWordB (hd l))
-			wordLen (tlOf l) (+ n 1)
-		else
-			n
+		n
 let identLen = fn l
 	if (= (@ l) 1)
 		0
+	elseif (isLowerB (hd l))
+		wordLen l 0
 	else
-		if (isLowerB (hd l))
-			wordLen l 0
-		else
-			0
+		0
 letrec startsWith = fn (p l)
 	if (= (@ p) 1)
 		1
+	elseif (= (@ l) 1)
+		0
+	elseif (= (hd p) (hd l))
+		startsWith (tlOf p) (tlOf l)
 	else
-		if (= (@ l) 1)
-			0
-		else
-			if (= (hd p) (hd l))
-				startsWith (tlOf p) (tlOf l)
-			else
-				0
+		0
 letrec dropN = fn (l n)
 	if (= n 0)
 		l
@@ -131,11 +126,10 @@ letrec takeN = fn (l n)
 letrec findFrom = fn (p l i)
 	if (startsWith p l)
 		i
+	elseif (= (@ l) 1)
+		- 0 1
 	else
-		if (= (@ l) 1)
-			- 0 1
-		else
-			findFrom p (tlOf l) (+ i 1)
+		findFrom p (tlOf l) (+ i 1)
 let findSub = fn (p l)
 	findFrom p l 0
 ; The name at the start of a line, and what follows " = " after it: 1 and the name and value, or 0.
@@ -155,21 +149,19 @@ let reverseL = fn l
 letrec dropSpaces = fn l
 	if (= (@ l) 1)
 		~
+	elseif (= (hd l) 32)
+		dropSpaces (tlOf l)
 	else
-		if (= (hd l) 32)
-			dropSpaces (tlOf l)
-		else
-			l
+		l
 let trimEnd = fn l
 	reverseL (dropSpaces (reverseL l))
 letrec tabsOf = fn l
 	if (= (@ l) 1)
 		0
+	elseif (= (hd l) 9)
+		+ 1 (tabsOf (tlOf l))
 	else
-		if (= (hd l) 9)
-			+ 1 (tabsOf (tlOf l))
-		else
-			0
+		0
 ; The lines of a source: each is the bytes before a newline.
 letrec linesOf = fn l
 	if (= (@ l) 1)
@@ -230,11 +222,10 @@ let dropSpace1 = fn l
 letrec joinLines = fn ls
 	if (= (@ ls) 1)
 		~
+	elseif (= (@ (tlOf ls)) 1)
+		hdL ls
 	else
-		if (= (@ (tlOf ls)) 1)
-			hdL ls
-		else
-			cat (hdL ls) (cat "\n" (joinLines (tlOf ls)))
+		cat (hdL ls) (cat "\n" (joinLines (tlOf ls)))
 let isCapB = fn t
 	if (< 64 (hd t))
 		< (hd t) 91
@@ -243,11 +234,10 @@ let isCapB = fn t
 letrec allFieldsOf = fn ks
 	if (= (@ ks) 1)
 		1
+	elseif (= (fst (nameEq (ntext (hdN ks)))) 0)
+		0
 	else
-		if (= (fst (nameEq (ntext (hdN ks)))) 0)
-			0
-		else
-			allFieldsOf (tlOf ks)
+		allFieldsOf (tlOf ks)
 let anyKids = fn ks
 	if (= (@ ks) 1)
 		0
@@ -284,14 +274,12 @@ letrec
 	armHasBlock = fn ch
 		if (= (@ ch) 1)
 			0
+		elseif (= (@ (kids (hdN ch))) 1)
+			0
+		elseif (= (@ (tlOf ch)) 1)
+			0
 		else
-			if (= (@ (kids (hdN ch))) 1)
-				0
-			else
-				if (= (@ (tlOf ch)) 1)
-					0
-				else
-					startsWith "->" (ntext (hdN (tlOf ch)))
+			startsWith "->" (ntext (hdN (tlOf ch)))
 	armOne = fn c
 		let t = ntext c
 		let i = findSub " -> " t
@@ -300,28 +288,26 @@ letrec
 				lineErr (nline c) "an arm with a body on its line has no lines below it"
 			else
 				Ok (cat (takeN t i) (cat " -> " (dropN t (+ i 4))))
-		else
-			if (endsArrow t)
-				let pat = trimEnd (takeN t (- (lenL t) 2))
-				if (= (@ (kids c)) 1)
-					lineErr (nline c) "an arm needs a body after its ->"
-				else
-					let s = (seq (kids c))?
-					Ok (cat pat (cat " -> (" (cat s ")")))
+		elseif (endsArrow t)
+			let pat = trimEnd (takeN t (- (lenL t) 2))
+			if (= (@ (kids c)) 1)
+				lineErr (nline c) "an arm needs a body after its ->"
 			else
-				lineErr (nline c) "an arm is written pat -> body"
+				let s = (seq (kids c))?
+				Ok (cat pat (cat " -> (" (cat s ")")))
+		else
+			lineErr (nline c) "an arm is written pat -> body"
 	armLines = fn ch
 		if (= (@ ch) 1)
 			Ok ~
+		elseif (armHasBlock ch)
+			let line = (armBlockLine (hdN ch) (hdN (tlOf ch)))?
+			let more = (armLines (tlOf (tlOf ch)))?
+			Ok (cons line more)
 		else
-			if (armHasBlock ch)
-				let line = (armBlockLine (hdN ch) (hdN (tlOf ch)))?
-				let more = (armLines (tlOf (tlOf ch)))?
-				Ok (cons line more)
-			else
-				let line = (armOne (hdN ch))?
-				let more = (armLines (tlOf ch))?
-				Ok (cons line more)
+			let line = (armOne (hdN ch))?
+			let more = (armLines (tlOf ch))?
+			Ok (cons line more)
 	matchText = fn n
 		if (= (@ (kids n)) 1)
 			lineErr (nline n) "a match needs arms below it"
@@ -359,26 +345,20 @@ letrec
 	expr = fn n
 		if (startsWith "match " (ntext n))
 			matchText n
+		elseif (eqL (ntext n) "cond")
+			condText n
+		elseif (startsWith "with " (ntext n))
+			withText n
+		elseif (if (isCapB (ntext n)) (allFieldsOf (kids n)) 0)
+			recordText n
+		elseif (= (@ (kids n)) 1)
+			Ok (ntext n)
+		elseif (startsWith "fn " (ntext n))
+			fnText n
+		elseif (if (startsWith "if " (ntext n)) 1 (startsWith "let " (ntext n)))
+			lineErr (nline n) "a let or an if takes its body on the lines after it, not as an argument"
 		else
-			if (eqL (ntext n) "cond")
-				condText n
-			else
-				if (startsWith "with " (ntext n))
-					withText n
-				else
-					if (if (isCapB (ntext n)) (allFieldsOf (kids n)) 0)
-						recordText n
-					else
-						if (= (@ (kids n)) 1)
-							Ok (ntext n)
-						else
-							if (startsWith "fn " (ntext n))
-								fnText n
-							else
-								if (if (startsWith "if " (ntext n)) 1 (startsWith "let " (ntext n)))
-									lineErr (nline n) "a let or an if takes its body on the lines after it, not as an argument"
-								else
-									appText n
+			appText n
 	letKw = fn n
 		if (startsWith "letrec " (ntext n))
 			"letrec"
@@ -416,26 +396,59 @@ letrec
 	blockLet = fn (n rest)
 		if (= (@ (kids n)) 1)
 			lineErr (nline n) (cat (ntext n) " needs its bindings below it")
+		elseif (= (@ rest) 1)
+			lineErr (nline n) (cat (ntext n) " needs its body on the lines after it, at the same level")
 		else
-			if (= (@ rest) 1)
-				lineErr (nline n) (cat (ntext n) " needs its body on the lines after it, at the same level")
-			else
-				let bs = (bindingLines (kids n))?
-				let s = (seq rest)?
-				Ok (cat (ntext n) (cat " {\n" (cat (joinLines bs) (cat "\n(" (cat s ")\n}")))))
+			let bs = (bindingLines (kids n))?
+			let s = (seq rest)?
+			Ok (cat (ntext n) (cat " {\n" (cat (joinLines bs) (cat "\n(" (cat s ")\n}")))))
+	elifCount = fn rs
+		if (= (@ rs) 1)
+			0
+		elseif (startsWith "elseif " (ntext (hdN rs)))
+			+ 1 (elifCount (tlOf rs))
+		else
+			0
+	takeNodes = fn (ns k)
+		if (= k 0)
+			~
+		else
+			cons (hdN ns) (takeNodes (tlOf ns) (- k 1))
+	elifsOk = fn ns
+		if (= (@ ns) 1)
+			Ok 1
+		elseif (= (@ (kids (hdN ns))) 1)
+			lineErr (nline (hdN ns)) "an elseif needs its branch below it"
+		else
+			elifsOk (tlOf ns)
+	condOf = fn b
+		if (startsWith "elseif " (ntext b))
+			dropN (ntext b) 7
+		else
+			dropN (ntext b) 3
+	chainText = fn (bs elseKids)
+		if (= (@ bs) 1)
+			let s = (seq elseKids)?
+			Ok (cat "(" (cat s ")"))
+		else
+			let b = hdN bs
+			let th = (seq (kids b))?
+			let rest = (chainText (tlOf bs) elseKids)?
+			Ok (cat "(if " (cat (condOf b) (cat "\n(" (cat th (cat ")\n" (cat rest ")"))))))
 	ifText = fn (n rest)
 		if (= (@ (kids n)) 1)
 			lineErr (nline n) "an if needs its then-branch below it"
 		else
-			if (if (= (@ rest) 1) 1 (if (eqL (ntext (hdN rest)) "else") (= (@ (kids (hdN rest))) 1) 1))
+			let k = elifCount rest
+			let elifs = takeNodes rest k
+			let after = dropN rest k
+			let checked = (elifsOk elifs)?
+			if (if (= (@ after) 1) 1 (if (eqL (ntext (hdN after)) "else") (= (@ (kids (hdN after))) 1) 1))
 				lineErr (nline n) "an if needs an else line at its own level, with the else-branch below it"
+			elseif (< 1 (lenL after))
+				lineErr (nline (hdN (tlOf after))) "an else ends the if, and more lines follow it"
 			else
-				if (< 1 (lenL rest))
-					lineErr (nline (hdN (tlOf rest))) "an else ends the if, and more lines follow it"
-				else
-					let th = (seq (kids n))?
-					let el = (seq (kids (hdN rest)))?
-					Ok (cat "(if " (cat (dropN (ntext n) 3) (cat "\n(" (cat th (cat ")\n(" (cat el "))"))))))
+				chainText (cons n elifs) (kids (hdN after))
 	seq = fn nodes
 		if (= (@ nodes) 1)
 			lineErr 0 "a block needs an expression"
@@ -444,20 +457,18 @@ letrec
 			let rest = tlOf nodes
 			if (if (eqL (ntext n) "let") 1 (eqL (ntext n) "letrec"))
 				blockLet n rest
+			elseif (if (startsWith "let " (ntext n)) 1 (startsWith "letrec " (ntext n)))
+				letText n rest
+			elseif (startsWith "if " (ntext n))
+				ifText n rest
+			elseif (eqL (ntext n) "else")
+				lineErr (nline n) "an else with no if before it"
+			elseif (startsWith "elseif " (ntext n))
+				lineErr (nline n) "an elseif with no if before it"
+			elseif (= (@ rest) 1)
+				expr n
 			else
-				if (if (startsWith "let " (ntext n)) 1 (startsWith "letrec " (ntext n)))
-					letText n rest
-				else
-					if (startsWith "if " (ntext n))
-						ifText n rest
-					else
-						if (eqL (ntext n) "else")
-							lineErr (nline n) "an else with no if before it"
-						else
-							if (= (@ rest) 1)
-								expr n
-							else
-								lineErr (nline (hdN rest)) "a line is followed by more lines, but it is not a let or an if"
+				lineErr (nline (hdN rest)) "a line is followed by more lines, but it is not a let or an if"
 letrec
 	declFields = fn ks
 		if (= (@ ks) 1)
@@ -478,13 +489,12 @@ letrec
 	declsOf = fn rs
 		if (= (@ rs) 1)
 			Ok (~ . rs)
+		elseif (startsWith "type " (ntext (hdN rs)))
+			let d = (declLine (hdN rs))?
+			let more = (declsOf (tlOf rs))?
+			Ok ((cons d (fst more)) . (snd more))
 		else
-			if (startsWith "type " (ntext (hdN rs)))
-				let d = (declLine (hdN rs))?
-				let more = (declsOf (tlOf rs))?
-				Ok ((cons d (fst more)) . (snd more))
-			else
-				Ok (~ . rs)
+			Ok (~ . rs)
 	appendL = fn (a b)
 		if (= (@ a) 1)
 			b

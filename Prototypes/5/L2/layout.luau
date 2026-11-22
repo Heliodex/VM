@@ -251,22 +251,41 @@ const function letText(n: Node, rest: { Node }): string
 end
 
 -- An if with its else line, as the branches of a bracketed if.
+-- An if, its elseif lines, and its else. Each elseif is a branch with its condition, and the chain is nested ifs in brackets.
 const function ifText(n: Node, rest: { Node }): string
-	local cond = string.match(n.text, "^if (.*)$") :: string
-
 	if #n.children == 0 then
 		fail(n.line, "an if needs its then-branch below it")
 	end
 
-	if #rest == 0 or rest[1].text ~= "else" or #rest[1].children == 0 then
+	local branches: { Node } = { n }
+	local i = 1
+
+	while i <= #rest and string.match(rest[i].text, "^elseif ") ~= nil do
+		if #rest[i].children == 0 then
+			fail(rest[i].line, "an elseif needs its branch below it")
+		end
+
+		table.insert(branches, rest[i])
+		i += 1
+	end
+
+	if i > #rest or rest[i].text ~= "else" or #rest[i].children == 0 then
 		fail(n.line, "an if needs an else line at its own level, with the else-branch below it")
 	end
 
-	if #rest > 1 then
-		fail(rest[2].line, "an else ends the if, and more lines follow it")
+	if i < #rest then
+		fail(rest[i + 1].line, "an else ends the if, and more lines follow it")
 	end
 
-	return "(if " .. cond .. "\n(" .. seq(n.children) .. ")\n(" .. seq(rest[1].children) .. "))"
+	local out = "(" .. seq(rest[i].children) .. ")"
+
+	for k = #branches, 1, -1 do
+		const b = branches[k]
+		const cond = string.match(b.text, "^if (.*)$") or string.match(b.text, "^elseif (.*)$")
+		out = "(if " .. (cond :: string) .. "\n(" .. seq(b.children) .. ")\n" .. out .. ")"
+	end
+
+	return out
 end
 
 -- A let or letrec block: its children are the bindings, name = value, and the lines after it at its own level are the body.
@@ -330,6 +349,10 @@ seq = function(nodes: { Node }): string
 
 	if n.text == "else" then
 		fail(n.line, "an else with no if before it")
+	end
+
+	if string.match(n.text, "^elseif ") ~= nil then
+		fail(n.line, "an elseif with no if before it")
 	end
 
 	if #rest > 0 then
