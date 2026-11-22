@@ -73,19 +73,19 @@ for i = #src, 1, -1 do
 end
 
 const tokenized = L2.run(tokenizer, v, 1e8)
-const parsed = L2.run(parser, (tokenized.value :: VM.Con).payload, 5e8)
-const request: VM.Value = { kind = "con"; tag = 3; payload = (parsed.value :: VM.Con).payload }
+const parsed = L2.run(parser, ((tokenized :: any).value :: VM.Con).payload, 5e8)
+const request: VM.Value = { kind = "con"; tag = 3; payload = ((parsed :: any).value :: VM.Con).payload }
 timed(
 	"checker on option.prog x 10",
 	function()
 		local total = 0
-		local last: VM.Outcome = { status = "value"; value = VM.NIL; steps = 0 }
+		local last: any = { status = "value"; value = VM.NIL; steps = 0 }
 
 		for _ = 1, 10 do
 			last = L2.run(checkerProgram, request, 1e10)
 			total += last.steps
 		end
 
-		return { status = last.status; value = VM.NIL; steps = total } :: VM.Outcome
+		return { status = last.status; value = VM.NIL; steps = total } :: any
 	end
 )
