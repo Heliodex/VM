@@ -83,7 +83,7 @@ Go ahead only if the indented form is clearly shorter, and the layer does not ne
 
 ## 9. Trial result
 
-The trial rewrote the record helpers of `types.prog` (`recLit` to `recPat`, 117 lines, `L2/trial/records.prog`) with indentation (`L2/trial/records.l2`), and `L2/layout.luau` turns the indented file into bracketed text. `layout_trial_run.luau` parses both versions and compares the trees, ignoring positions.
+The trial rewrote the record helpers of `types.prog` (`recLit` to `recPat`, 117 lines) with indentation, and `L2/layout.luau` turned the indented file into bracketed text. The two versions parsed to the same tree, ignoring positions. The trial files (`L2/trial/records.prog`, `L2/trial/records.l2`) and `layout_trial_run.luau` were removed afterwards; they are in git history up to commit 48a7bbd, and the same helpers now live in `boot/types.l2`.
 
 | | bracketed (.prog) | indented (.l2) |
 |---|---|---|
@@ -130,7 +130,7 @@ Decided after the trial:
 
 - **Block forms.** A `let` or `letrec` with the bindings indented below it is the block form (`let { }`, `letrec { }`). The body is at the same level as the `let`, after the bindings, so it is not indented under them. A `letrec` block is a mutual group, and its bindings are fns.
 
-Status: the layer covers every form in the table, including the block forms. `L2/layout_cases_run.luau` checks each form against its bracketed form (26 cases, all agreeing), and the trial file still lays out to the same tree.
+Status: the layer covers every form in the table, including the block forms. `L2/layout_cases_run.luau` checks each form against its bracketed form (26 cases, all agreeing), and the trial's helpers are covered by `boot/types.l2`, which `infer_run` checks.
 
 The tools read `.l2` now: `ProgramFile.parse` lays out the program section of a `.l2` file, and the lex, parse, infer and L2 runners list `.l2` files with `.prog` ones. `L2/programs/block_let.l2` and `L2/programs/mutual.l2` run through the whole pipeline.
 
