@@ -60,7 +60,6 @@ end
 const fibExpr = fibProgram(22)
 bench("fib 22, reference", VM.runReference, fibExpr, 1e9)
 bench("fib 22, fast", VM.run, fibExpr, 1e9)
-
 -- The checker on types.l2: the program is parsed once, then the checker's request is run on each machine.
 const tokenizer = L2.compile(readFile "L2/programs/boot/lex.l2", resolve, "boot/lex.l2")
 const parser = L2.compile(readFile "L2/programs/boot/parse.l2", resolve, "boot/parse.l2")
@@ -69,9 +68,9 @@ const src = ProgramFile.parse(readFile "L2/programs/boot/types.l2", "boot/types.
 const tokenized: any = L2.run(tokenizer, bytesValue(src), 1e8)
 const parsed: any = L2.run(parser, tokenized.value.payload, 5e8)
 const request: VM.Value = { kind = "con"; tag = 3; payload = parsed.value.payload }
-
 -- L2.run calls VM.run on the module when it runs, so the reference machine is put in its place for the reference timing, then the fast one is restored.
 const fastRun = VM.run
+
 const function timedChecker(label: string, machine: any): number
 	const vmModule: any = VM
 	vmModule.run = machine

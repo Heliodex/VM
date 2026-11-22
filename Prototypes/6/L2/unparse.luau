@@ -222,6 +222,7 @@ const function emitField(name: string, value: Expr, ind: number, out: { string }
 
 	if t ~= nil then
 		line(out, ind, `{name} = {t}`)
+
 		return
 	end
 
@@ -323,7 +324,6 @@ emit = function(e: Expr, ind: number, out: { string })
 
 		line(out, ind, `if {c :: string}`)
 		emit(e.t, ind + 1, out)
-
 		-- An else branch that is itself an if is written as an elseif, at the same level.
 		local rest = e.e
 
@@ -402,7 +402,6 @@ M.program = function(program: Parser.Program): string
 
 		local header = `type {d.name}{params}`
 		local oneLine = `{header} = {table.concat(texts, " | ")}`
-
 		-- A record constructor that is not the last one can only be written with its fields below its | line.
 		local middleRecord = false
 

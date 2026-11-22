@@ -5,9 +5,9 @@
 --
 --   lute run machine_parity_run.luau      (from Prototypes/6)
 
-const VM = require "./interpreter/vm"
-const Examples = require "./examples/examples"
 const Constructors = require "./examples/constructors"
+const Examples = require "./examples/examples"
+const VM = require "./interpreter/vm"
 
 local total = 0
 local failures = 0

@@ -283,7 +283,7 @@ const function ifText(n: Node, rest: { Node }): string
 	for k = #branches, 1, -1 do
 		const b = branches[k]
 		const cond = string.match(b.text, "^if (.*)$") or string.match(b.text, "^elseif (.*)$")
-		out = "(if " .. (cond :: string) .. "\n(" .. seq(b.children) .. ")\n" .. out .. ")"
+		out = "(if " .. cond :: string .. "\n(" .. seq(b.children) .. ")\n" .. out .. ")"
 	end
 
 	return out

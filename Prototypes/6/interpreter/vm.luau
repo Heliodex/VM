@@ -166,7 +166,6 @@ end
 -- THE FAST MACHINE
 --
 -- The same machine as runReference, with the same steps, fuel and outcomes, on a different layout. An expression is compiled once into an arena of integers: one opcode, and up to three child nodes, per node. The stack is parallel arrays (kind, node, environment, data), not a table per frame. A closure or a pin keeps the node of its body, so entering it is a read, not a lookup.
-
 const OP_QUOTE = 1
 const OP_VAR = 2
 const OP_LAM = 3
@@ -180,7 +179,6 @@ const OP_PRIM = 10
 const OP_CONSTRUCT = 11
 const OP_TAGOF = 12
 const OP_PAYLOAD = 13
-
 -- Frame kinds.
 const FR_CELL = 1
 const FR_INDEX = 2
@@ -191,7 +189,6 @@ const FR_TAGOF = 6
 const FR_PAYLOAD = 7
 const FR_FORCE = 8
 const FR_PRIM = 9
-
 -- The arena. Node 0 is not used, so a child of 0 means none. op, a, b and c are a node's opcode and children; n is a var index, a tag or an index; val is a quoted value, or the body or expression of a lam or pin.
 local arenaOp: { number } = {}
 local arenaA: { number } = {}
@@ -200,10 +197,8 @@ local arenaC: { number } = {}
 local arenaN: { number } = {}
 local arenaVal: { any } = {}
 local arenaCount = 0
-
 -- The node of each expression already compiled, so a shared expression, or a closure's body, is compiled once.
 local nodeOfExpr: { [any]: number } = setmetatable({}, { __mode = "k" })
-
 local nodeOf: (Expr) -> number
 
 local function newNode(): number
@@ -270,7 +265,11 @@ nodeOf = function(e: Expr): number
 		arenaOp[id] = OP_PRIM
 		arenaN[id] = (e :: PrimExpr).tag
 		arenaA[id] = nodeOf((e :: PrimExpr).a)
-		arenaB[id] = if (e :: PrimExpr).b ~= nil then nodeOf((e :: PrimExpr).b :: Expr) else 0
+		arenaB[id] =
+			if (e :: PrimExpr).b ~= nil then
+				nodeOf((e :: PrimExpr).b :: Expr)
+			else
+				0
 	end
 
 	nodeOfExpr[e] = id
@@ -530,7 +529,6 @@ const function run(program: Expr, fuel: number, initialEnv: Binding?): Outcome
 		end
 	end
 end
-
 
 const function runReference(program: Expr, fuel: number, initialEnv: Binding?): Outcome
 	local stack: { Frame } = {}

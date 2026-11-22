@@ -123,12 +123,13 @@ end
 
 local files: { { name: string; path: string } } = {}
 listPrograms("L2/programs", "", files)
-table.sort(files, function(a, b)
-	return a.name < b.name
-end)
-
+table.sort(
+	files,
+	function(a, b)
+		return a.name < b.name
+	end
+)
 local MAX_LINES = 40
-
 local inputs: { { name: string; src: string } } = {}
 
 for _, f in files do
@@ -139,7 +140,6 @@ for _, f in files do
 		print(`!!! {f.name}: its program section is not found`)
 	else
 		table.insert(inputs, { name = `{f.name} as written`; src = table.concat(lines, "\n") })
-
 		-- A long file is sampled: at most MAX_LINES lines are mutated, spread evenly through it, so every file is checked.
 		const stride = math.max(1, math.ceil(#lines / MAX_LINES))
 
