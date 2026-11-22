@@ -29,7 +29,8 @@ type Pattern = Parser.Pattern
 type Pos = Parser.Pos
 type Binding = Parser.Binding
 type Test = Parser.Test
-export type Ctor = { tag: number; payload: boolean; sum: string }
+-- A constructor. A record constructor has fields, in order. Each field of a record is also an entry under its own name, an accessor: index and count give its place in the record's pairs, and con names the record's constructor.
+export type Ctor = { tag: number; payload: boolean; sum: string; fields: { string }?; index: number?; count: number?; con: string? }
 -- A ? expression pulled out of a function body, to be bound before the body runs.
 type Hoist = { name: string; expr: Expr; at: Pos }
 local counter = 0
@@ -132,15 +133,70 @@ local function buildCtors(decls: { Parser.TypeDecl }): { [string]: Ctor }
 				fail(con.at, string.format("%s is already declared", con.name))
 			end
 
+			local names: { string }? = nil
+
+			if con.fields ~= nil then
+				names = {}
+
+				for _, f in con.fields :: { Parser.FieldDecl } do
+					table.insert(names :: { string }, f.name)
+				end
+			end
+
 			ctors[con.name] = {
 				tag = k - 1,
-				payload = con.payload ~= nil,
+				payload = con.payload ~= nil or con.fields ~= nil,
 				sum = decl.name,
+				fields = names,
 			}
+
+			-- Every field of a record is an accessor. A field name is lowercase, so it cannot clash with a constructor, but two records cannot share one.
+			local fieldDecls: { Parser.FieldDecl } = con.fields or {}
+
+			for i, f in fieldDecls do
+				if ctors[f.name] ~= nil then
+					fail(f.at, string.format("%s is already declared", f.name))
+				end
+
+				ctors[f.name] = {
+					tag = -1,
+					payload = true,
+					sum = decl.name,
+					index = i,
+					count = #fieldDecls,
+					con = con.name,
+				}
+			end
 		end
 	end
 
 	return ctors
+end
+
+-- The expression that takes field index (1 from the first) out of a record's pairs of count fields. A pair's last field is not wrapped, so the last field is the tail after the others.
+local function pathOf(e: M.Expr, index: number, count: number): M.Expr
+	local x = e
+
+	for _ = 1, index - 1 do
+		x = M.tail(x)
+	end
+
+	if index < count then
+		x = M.head(x)
+	end
+
+	return x
+end
+
+-- The pairs of a record's fields, in order: a single field is the field itself, and more are nested pairs with the last field unwrapped.
+local function pairsOf(values: { M.Expr }): M.Expr
+	local e = values[#values]
+
+	for i = #values - 1, 1, -1 do
+		e = M.cell(values[i], e)
+	end
+
+	return e
 end
 
 -- Position in the scope of a name, counting from 0 for the innermost binder. nil if the name is not in scope.
@@ -517,6 +573,14 @@ local function resolveName(name: string, at: Pos, scope: { string }, ctors: { [s
 	const c = ctors[name]
 
 	if c ~= nil then
+		if c.index ~= nil then
+			return M.lam(pathOf(M.payload(M.var(0)), c.index, c.count :: number))
+		end
+
+		if c.fields ~= nil then
+			return fail(at, string.format("%s is a record: write its fields in braces", name))
+		end
+
 		if c.payload then
 			return M.lam(M.construct(c.tag, M.var(0)))
 		end
@@ -572,7 +636,12 @@ local function desugarApp(head: Expr, args: { Expr }, scope: { string }, ctors: 
 
 		const c = ctors[head.name]
 
-		if c ~= nil and (not c.payload or #args >= 1) then
+		if c ~= nil and c.fields ~= nil then
+			return fail(head.at, string.format("%s is a record: write its fields in braces", head.name))
+		end
+
+		-- An accessor is an ordinary function, so it is applied like one, below.
+		if c ~= nil and c.index == nil and (not c.payload or #args >= 1) then
 			local e: M.Expr
 			local first = 1
 
@@ -600,7 +669,72 @@ local function desugarApp(head: Expr, args: { Expr }, scope: { string }, ctors: 
 	return e
 end
 
-local function buildArms(arms: { Arm }, i: number, scope: { string }, ctors: { [string]: Ctor }): M.Expr
+local buildArms: (arms: { Arm }, i: number, scope: { string }, ctors: { [string]: Ctor }) -> M.Expr
+
+-- A record pattern: the tag must match, then each field that is named is bound to its place in the payload. Every field is named, and _ binds nothing.
+local function recordArm(arms: { Arm }, i: number, scope: { string }, ctors: { [string]: Ctor }, pat: { name: string; fields: { Parser.FieldBind }; at: Pos }): M.Expr
+	const c = ctors[pat.name]
+
+	if c == nil or c.fields == nil then
+		fail(pat.at, string.format("%s is not a record", pat.name))
+	end
+
+	const names = c.fields :: { string }
+	local bound: { { name: string; index: number; at: Pos } } = {}
+	local seen: { [string]: boolean } = {}
+
+	for _, f in pat.fields do
+		local index: number? = nil
+
+		for j, n in names do
+			if n == f.name then
+				index = j
+			end
+		end
+
+		if index == nil then
+			fail(f.at, string.format("%s has no field %s", pat.name, f.name))
+		end
+
+		if seen[f.name] then
+			fail(f.at, string.format("%s is given twice", f.name))
+		end
+
+		seen[f.name] = true
+
+		if f.bind ~= nil then
+			checkBinder(f.bind :: string, f.at)
+			table.insert(bound, { name = f.bind :: string; index = index :: number; at = f.at })
+		end
+	end
+
+	for _, n in names do
+		if not seen[n] then
+			fail(pat.at, string.format("%s needs the field %s", pat.name, n))
+		end
+	end
+
+	-- The payload is bound once, under a name no program can write, and each bound field is then an application to its place.
+	const payloadName = fresh()
+	const count = #names
+
+	local function chain(j: number, sc: { string }): M.Expr
+		if j > #bound then
+			return desugar(arms[i].body, sc, ctors)
+		end
+
+		const b = bound[j]
+		const pidx = indexOf(sc, payloadName) :: number
+
+		return M.app(M.lam(chain(j + 1, withNames(sc, { b.name }))), pathOf(M.var(pidx), b.index, count))
+	end
+
+	const body = M.app(M.lam(chain(1, withNames(scope, { payloadName }))), M.payload(M.var(0)))
+
+	return M.ite(M.prim(Primitives.TAG.eq, M.tagof(M.var(0)), M.int(c.tag)), body, buildArms(arms, i + 1, scope, ctors))
+end
+
+buildArms = function(arms: { Arm }, i: number, scope: { string }, ctors: { [string]: Ctor }): M.Expr
 	if i > #arms then
 		-- A match with no arm that fits. The checker reports this before a program runs; until then it fails at run time.
 		return M.head(M.int(0))
@@ -626,13 +760,17 @@ local function buildArms(arms: { Arm }, i: number, scope: { string }, ctors: { [
 	end
 
 	if pat.k == "rec" then
-		return fail(pat.at, "record patterns are not desugared yet")
+		return recordArm(arms, i, scope, ctors, pat :: { name: string; fields: { Parser.FieldBind }; at: Pos })
 	end
 
 	const c = ctors[pat.name]
 
 	if c == nil then
 		fail(pat.at, string.format("%s is not a constructor", pat.name))
+	end
+
+	if c.fields ~= nil then
+		fail(pat.at, string.format("%s is a record: match its fields in braces", pat.name))
 	end
 
 	local body: M.Expr
@@ -649,6 +787,114 @@ local function buildArms(arms: { Arm }, i: number, scope: { string }, ctors: { [
 	end
 
 	return M.ite(M.prim(Primitives.TAG.eq, M.tagof(M.var(0)), M.int(c.tag)), body, buildArms(arms, i + 1, scope, ctors))
+end
+
+-- A record literal: its fields, in the order the declaration gives them, as pairs under the constructor.
+local function recordLit(node: Expr & { k: "record" }, scope: { string }, ctors: { [string]: Ctor }): M.Expr
+	const c = ctors[node.name]
+
+	if c == nil or c.fields == nil then
+		return fail(node.at, string.format("%s is not a record", node.name))
+	end
+
+	const names = c.fields :: { string }
+
+	for k, init in node.fields do
+		local known = false
+
+		for _, n in names do
+			if n == init.name then
+				known = true
+			end
+		end
+
+		if not known then
+			fail(init.at, string.format("%s has no field %s", node.name, init.name))
+		end
+
+		for j = 1, k - 1 do
+			if node.fields[j].name == init.name then
+				fail(init.at, string.format("%s is given twice", init.name))
+			end
+		end
+	end
+
+	local values: { M.Expr } = {}
+
+	for _, n in names do
+		local found: Parser.FieldInit? = nil
+
+		for _, init in node.fields do
+			if init.name == n then
+				found = init
+			end
+		end
+
+		if found == nil then
+			return fail(node.at, string.format("%s needs the field %s", node.name, n))
+		end
+
+		table.insert(values, desugar((found :: Parser.FieldInit).value, scope, ctors))
+	end
+
+	return M.construct(c.tag, pairsOf(values))
+end
+
+-- with base { field = value }: the record of base, with the fields named changed. The record is found by its first field, which is an accessor of one record.
+local function withExpr(node: Expr & { k: "with" }, scope: { string }, ctors: { [string]: Ctor }): M.Expr
+	const first = node.fields[1]
+	const acc = ctors[first.name]
+
+	if acc == nil or acc.index == nil then
+		return fail(first.at, string.format("%s is not a field of a record", first.name))
+	end
+
+	const recName = acc.con :: string
+	const rc = ctors[recName]
+	const names = (rc :: Ctor).fields :: { string }
+
+	for k, init in node.fields do
+		local known = false
+
+		for _, n in names do
+			if n == init.name then
+				known = true
+			end
+		end
+
+		if not known then
+			fail(init.at, string.format("%s is not a field of %s", init.name, recName))
+		end
+
+		for j = 1, k - 1 do
+			if node.fields[j].name == init.name then
+				fail(init.at, string.format("%s is given twice", init.name))
+			end
+		end
+	end
+
+	-- Inside the function that takes the old record, its name is index 0.
+	const oldName = fresh()
+	const inner = withNames(scope, { oldName })
+	local values: { M.Expr } = {}
+
+	for j, n in names do
+		local given: Parser.FieldInit? = nil
+
+		for _, init in node.fields do
+			if init.name == n then
+				given = init
+			end
+		end
+
+		if given ~= nil then
+			table.insert(values, desugar((given :: Parser.FieldInit).value, inner, ctors))
+		else
+			table.insert(values, pathOf(M.payload(M.var(0)), j, #names))
+		end
+	end
+
+	return M.app(M.lam(M.construct((rc :: Ctor).tag, pairsOf(values))), desugar(node.base, scope, ctors))
 end
 
 local function desugarMatch(scrut: Expr, arms: { Arm }, scope: { string }, ctors: { [string]: Ctor }): M.Expr
@@ -719,8 +965,10 @@ desugar = function(node: Expr, scope: { string }, ctors: { [string]: Ctor }): M.
 		return M.app(M.lam(desugar(node.body, inner, ctors)), desugar(node.value, scope, ctors))
 	elseif node.k == "mutual" then
 		return desugar(mutualSurface(node.bindings, node.body, node.at), scope, ctors)
-	elseif node.k == "record" or node.k == "with" then
-		return fail(node.at, "records are not desugared yet")
+	elseif node.k == "record" then
+		return recordLit(node, scope, ctors)
+	elseif node.k == "with" then
+		return withExpr(node, scope, ctors)
 	elseif node.k == "untyped" then
 		return desugar(node.e, scope, ctors)
 	elseif node.k == "check" then
