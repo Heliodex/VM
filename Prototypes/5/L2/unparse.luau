@@ -399,7 +399,18 @@ M.program = function(program: Parser.Program): string
 				` {table.concat(d.params, " ")}`
 			else
 				""
-		line(out, 0, `type {d.name}{params} = {table.concat(cons, " | ")}`)
+		const text = `type {d.name}{params} = {table.concat(cons, " | ")}`
+
+		-- A long sum with no record constructor is written with each constructor on a | line below the type line, as the layer reads it.
+		if fields == nil and #text > 80 then
+			line(out, 0, `type {d.name}{params} =`)
+
+			for _, c in cons do
+				line(out, 1, `| {c}`)
+			end
+		else
+			line(out, 0, text)
+		end
 
 		if fields ~= nil then
 			for _, f in fields :: { Parser.FieldDecl } do
