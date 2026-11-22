@@ -101,7 +101,8 @@ render = function(nodes: { Node }): string
 			fail(n.line, "a let needs a body after it")
 		end
 
-		return "(" .. kw .. " " .. (name :: string) .. " = " .. valueText .. "\n" .. render(rest) .. ")"
+		const keyword = kw :: string
+		return "(" .. keyword .. " " .. name .. " = " .. valueText .. "\n" .. render(rest) .. ")"
 	end
 
 	local cond = string.match(n.text, "^if (.*)$")
