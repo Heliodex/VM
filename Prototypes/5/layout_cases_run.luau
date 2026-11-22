@@ -71,7 +71,6 @@ local ERRORS: { { name: string; l2: string } } = {
 	{ name = "a sum with no constructors below"; l2 = "type T =\n\nfn x\n\tx" },
 	{ name = "a sum constructor with no |"; l2 = "type T =\n\tA\n\tB\n\nfn x\n\tx" },
 	{ name = "constructors below a type line with no ="; l2 = "type T = A\n\t| B\n\nfn x\n\tx" },
-	{ name = "a record constructor that is not the last"; l2 = "type Tr =\n\t| TNode\n\t\tvalue: Int\n\t| TEmpty\n\nfn x\n\tx" },
 	{ name = "a field under a sum constructor with no colon"; l2 = "type Tr =\n\t| TNode\n\t\tvalue\n\nfn x\n\tx" },
 	{ name = "an empty file"; l2 = "" },
 	{ name = "a space at the start of a line"; l2 = " fn x" },
@@ -207,6 +206,11 @@ local CASES: { { name: string; l2: string; prog: string } } = {
 		name = "a record constructor in a multiline sum",
 		l2 = "type Tr =\n\t| TEmpty\n\t| TNode\n\t\tvalue: Int\n\t\tleft: Int\n\nfn x\n\tx",
 		prog = "type Tr = TEmpty | TNode {\n\tvalue: Int\n\tleft: Int\n}\n\nfn x\n\tx",
+	},
+	{
+		name = "a record constructor before another constructor",
+		l2 = "type Tr =\n\t| TNode\n\t\tvalue: Int\n\t| TEmpty\n\nfn x\n\tx",
+		prog = "type Tr = TNode {\n\tvalue: Int\n} | TEmpty\n\nfn x\n\tx",
 	},
 	{
 		name = "a record literal in a let",

@@ -16,7 +16,7 @@
 --   with e                 children are the field lines: name = value
 --   C                      with children that are field lines: a record literal, or a record pattern in an arm
 --   type T = C             children are the field lines of a record declaration: name: Type
---   type T =             children are the constructors of a sum, each a line starting with |; the last may have its record fields below it
+--   type T =             children are the constructors of a sum, each a line starting with |; a record constructor may have its fields below it
 --   f                      any other line with children: an application, the children its arguments, one per line
 --
 -- Brackets, and the braces of match, cond, with and records, are added here. A block of one expression is bracketed.
@@ -377,18 +377,17 @@ const function program(roots: { Node }): string
 			end
 
 			local parts: { string } = {}
-			local fields: { string }? = nil
 
-			for k, c in d.children do
+			for _, c in d.children do
 				if string.sub(c.text, 1, 2) ~= "| " then
 					fail(c.line, "a constructor of a sum is a line starting with |")
 				end
 
-				if #c.children > 0 then
-					if k ~= #d.children then
-						fail(c.line, "a record constructor is the last constructor of its type")
-					end
+				const name = string.sub(c.text, 3)
 
+				if #c.children == 0 then
+					table.insert(parts, name)
+				else
 					local lines: { string } = {}
 
 					for _, f in c.children do
@@ -399,19 +398,11 @@ const function program(roots: { Node }): string
 						table.insert(lines, f.text)
 					end
 
-					fields = lines
+					table.insert(parts, name .. " {\n" .. table.concat(lines, "\n") .. "\n}")
 				end
-
-				table.insert(parts, string.sub(c.text, 3))
 			end
 
-			local line = d.text .. " " .. table.concat(parts, " | ")
-
-			if fields ~= nil then
-				line ..= " {\n" .. table.concat(fields, "\n") .. "\n}"
-			end
-
-			table.insert(out, line)
+			table.insert(out, d.text .. " " .. table.concat(parts, " | "))
 		elseif #d.children > 0 then
 			if string.sub(d.children[1].text, 1, 2) == "| " then
 				fail(d.children[1].line, "the constructors of a sum go below a type line that ends with =")
