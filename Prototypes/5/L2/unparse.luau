@@ -379,12 +379,8 @@ M.program = function(program: Parser.Program): string
 		-- Each constructor's text, and the fields of a record constructor, which is the last one.
 		local items: { { text: string; fields: { Parser.FieldDecl }? } } = {}
 
-		for k, c in d.cons do
+		for _, c in d.cons do
 			if c.fields ~= nil then
-				if k ~= #d.cons then
-					fail(c.at, "a record constructor is the last constructor of its type")
-				end
-
 				table.insert(items, { text = c.name; fields = c.fields })
 			elseif c.payload ~= nil then
 				table.insert(items, { text = `{c.name} {typeText(c.payload :: Parser.Type)}`; fields = nil })
@@ -407,8 +403,17 @@ M.program = function(program: Parser.Program): string
 		local header = `type {d.name}{params}`
 		local oneLine = `{header} = {table.concat(texts, " | ")}`
 
+		-- A record constructor that is not the last one can only be written with its fields below its | line.
+		local middleRecord = false
+
+		for k, it in items do
+			if it.fields ~= nil and k ~= #items then
+				middleRecord = true
+			end
+		end
+
 		-- A long sum is written with each constructor on a | line below the type line, and a record constructor's fields below its | line.
-		if #oneLine > 80 then
+		if #oneLine > 80 or middleRecord then
 			line(out, 0, `{header} =`)
 
 			for _, it in items do
