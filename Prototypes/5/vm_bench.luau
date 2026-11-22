@@ -60,7 +60,7 @@ print("  value " .. (if fib.status == "value" then VM.show(fib.value) else "-"))
 -- The checker, run on option.prog several times, with the program parsed once.
 const tokenizer = L2.compile(readFile("L2/programs/boot/lex.prog"), resolve, "boot/lex.prog")
 const parser = L2.compile(readFile("L2/programs/boot/parse.prog"), resolve, "boot/parse.prog")
-const checkerProgram = L2.compile(readFile("L2/programs/boot/types.prog"), resolve, "boot/types.prog")
+const checkerProgram = L2.compile(readFile("L2/programs/boot/types.l2"), resolve, "boot/types.l2")
 const src = ProgramFile.parse(readFile("L2/programs/option.prog")).program
 
 local v: VM.Value = VM.NIL

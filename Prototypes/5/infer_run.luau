@@ -1,7 +1,7 @@
 --!strict
 -- CHECKS THE PURE CHECKER, WRITTEN IN L2, AGAINST THE LUAU CHECKER
 --
--- L2/programs/boot/types.prog infers the type of a program from its syntax tree. Each input here is run through the L2 tokenizer and parser, then through the L2 checker, and through the Luau checker. The two must agree on the type of the program, or on its errors. Type variables are numbered by where they first appear, so the numbering of the two checkers does not matter.
+-- L2/programs/boot/types.l2 infers the type of a program from its syntax tree. Each input here is run through the L2 tokenizer and parser, then through the L2 checker, and through the Luau checker. The two must agree on the type of the program, or on its errors. Type variables are numbered by where they first appear, so the numbering of the two checkers does not matter.
 --
 -- An input that the parser refuses is skipped, since parse_run.luau checks the parser. So is an input that has a form the pure checker does not handle yet.
 --
@@ -40,7 +40,7 @@ end
 
 const tokenizer = L2.compile(readFile "L2/programs/boot/lex.prog", resolve, "boot/lex.prog")
 const parser = L2.compile(readFile "L2/programs/boot/parse.prog", resolve, "boot/parse.prog")
-const checkerProgram = L2.compile(readFile "L2/programs/boot/types.prog", resolve, "boot/types.prog")
+const checkerProgram = L2.compile(readFile "L2/programs/boot/types.l2", resolve, "boot/types.l2")
 
 -- The bytes of a string, and a string of the bytes of a list of values.
 const function bytesValue(s: string): VM.Value

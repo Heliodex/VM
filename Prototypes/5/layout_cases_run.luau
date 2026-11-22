@@ -11,7 +11,7 @@ const L2 = require "./L2/l2"
 const VM = require "./interpreter/vm"
 const fs = require "@lute/fs"
 
-local function readFile(path: string): string
+const function readFile(path: string): string
 	const handle = fs.open(path)
 	const text = fs.read(handle)
 	fs.close(handle)
@@ -21,7 +21,7 @@ end
 -- The layer in L2, from boot/layout.l2, which is itself indented: the Luau layer lays it out when it is read.
 const layerProgram = L2.compile(readFile("L2/programs/boot/layout.l2"), function(_name: string): string? return nil end, "boot/layout.l2")
 
-local function bytesValue(s: string): VM.Value
+const function bytesValue(s: string): VM.Value
 	local v: VM.Value = VM.NIL
 
 	for i = #s, 1, -1 do
@@ -31,7 +31,7 @@ local function bytesValue(s: string): VM.Value
 	return v
 end
 
-local function textOf(v: VM.Value): string
+const function textOf(v: VM.Value): string
 	local out: { string } = {}
 	local cur = v
 
@@ -44,7 +44,7 @@ local function textOf(v: VM.Value): string
 end
 
 -- The L2 layer's outcome for a source: Ok of the text, or Err of the message, as the Luau layer raises it.
-local function layerInL2(src: string): string
+const function layerInL2(src: string): string
 	const outcome = L2.run(layerProgram, bytesValue(src), 1000000000)
 
 	if outcome.status ~= "value" then
@@ -68,7 +68,7 @@ local ERRORS: { { name: string; l2: string } } = {
 }
 
 -- Whether two trees are the same, ignoring the position of each node.
-local function same(a: any, b: any, path: string): string?
+const function same(a: any, b: any, path: string): string?
 	if type(a) ~= type(b) then
 		return path .. ": " .. type(a) .. " against " .. type(b)
 	end
@@ -198,12 +198,12 @@ for _, case in CASES do
 
 	local result: string
 	if not okA then
-		result = "the layout failed: " .. tostring(treeA)
+		result = `the layout failed: {tostring(treeA)}`
 	elseif not okB then
-		result = "the bracketed text does not parse: " .. tostring(treeB)
+		result = `the bracketed text does not parse: {tostring(treeB)}`
 	else
 		const diff = same(treeA, treeB, "program")
-		result = if diff == nil then "" else "the trees differ at " .. diff
+		result = if diff == nil then "" else `the trees differ at {diff}`
 	end
 
 	if result == "" and okA then
@@ -211,7 +211,7 @@ for _, case in CASES do
 		const inL2 = layerInL2(case.l2)
 
 		if inL2 ~= text then
-			result = "the L2 layer gives a different text: " .. inL2 .. " against " .. text
+			result = `the L2 layer gives a different text: {inL2} against {text}`
 		end
 	end
 

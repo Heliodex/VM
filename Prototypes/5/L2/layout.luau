@@ -26,12 +26,12 @@ export type Node = { text: string; line: number; children: { Node } }
 
 local M = {}
 
-local function fail(line: number, msg: string)
+const function fail(line: number, msg: string)
 	error(string.format("line %d: %s", line, msg), 0)
 end
 
 -- The lines of the source as a tree: each line is a node, and the lines indented under it are its children.
-local function buildTree(text: string): { Node }
+const function buildTree(text: string): { Node }
 	local roots: { Node } = {}
 	local stack: { { indent: number; node: Node } } = {}
 	local lineNo = 0
@@ -72,7 +72,7 @@ local expr: (Node) -> string
 local seq: ({ Node }) -> string
 
 -- Whether every child is a field line, name = value.
-local function allFields(children: { Node }): boolean
+const function allFields(children: { Node }): boolean
 	if #children == 0 then
 		return false
 	end
@@ -87,7 +87,7 @@ local function allFields(children: { Node }): boolean
 end
 
 -- The field lines of a record, a with, or a record pattern, one to a line, inside its braces.
-local function fieldLines(children: { Node }): string
+const function fieldLines(children: { Node }): string
 	local out: { string } = {}
 
 	for _, c in children do
@@ -108,7 +108,7 @@ local function fieldLines(children: { Node }): string
 end
 
 -- The arms of a match or the clauses of a cond. An arm may be `pat -> body`, or `pat` with children (a record pattern) and a `->` line after it.
-local function armLines(children: { Node }): string
+const function armLines(children: { Node }): string
 	local out: { string } = {}
 	local i = 1
 
@@ -156,7 +156,7 @@ local function armLines(children: { Node }): string
 end
 
 -- A match, a cond or a with, as an expression: its own braces.
-local function braced(n: Node): string?
+const function braced(n: Node): string?
 	local scrut = string.match(n.text, "^match (.*)$")
 
 	if scrut ~= nil then
@@ -222,7 +222,7 @@ expr = function(n: Node): string
 end
 
 -- A let or letrec: its value, then the lines after it as its body.
-local function letText(n: Node, rest: { Node }): string
+const function letText(n: Node, rest: { Node }): string
 	local kw, body = string.match(n.text, "^(letrec) (.*)$")
 
 	if kw == nil then
@@ -251,7 +251,7 @@ local function letText(n: Node, rest: { Node }): string
 end
 
 -- An if with its else line, as the branches of a bracketed if.
-local function ifText(n: Node, rest: { Node }): string
+const function ifText(n: Node, rest: { Node }): string
 	local cond = string.match(n.text, "^if (.*)$") :: string
 
 	if #n.children == 0 then
@@ -270,7 +270,7 @@ local function ifText(n: Node, rest: { Node }): string
 end
 
 -- A let or letrec block: its children are the bindings, name = value, and the lines after it at its own level are the body.
-local function blockLet(n: Node, rest: { Node }): string
+const function blockLet(n: Node, rest: { Node }): string
 	local kw = n.text
 
 	if #n.children == 0 then
@@ -340,7 +340,7 @@ seq = function(nodes: { Node }): string
 end
 
 -- The top of the file: record declarations, then the expression.
-local function program(roots: { Node }): string
+const function program(roots: { Node }): string
 	local out: { string } = {}
 	local i = 1
 
