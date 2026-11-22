@@ -80,3 +80,23 @@ Go ahead only if the indented form is clearly shorter, and the layer does not ne
 3. **Mixed styles inside one file.** Not allowed in the first version, as above. A bracketed expression inside an indented file would be a useful escape, but it reopens the question, so it waits.
 4. **The name.** A file is `.l2i` or `.l2`, with the marker in the file. The marker is simpler, but a name is easier to see in a listing.
 5. **Whether it is worth it.** The trial in section 6 decides. The bracketed form already works, and the layer is a cost.
+
+## 9. Trial result
+
+The trial rewrote the record helpers of `types.prog` (`recLit` to `recPat`, 117 lines, `L2/trial/records.prog`) with indentation (`L2/trial/records.l2`), and `L2/layout.luau` turns the indented file into bracketed text. `layout_trial_run.luau` parses both versions and compares the trees, ignoring positions.
+
+| | bracketed (.prog) | indented (.l2) |
+|---|---|---|
+| lines | 118 | 139 |
+| closing brackets in the source | 415 | 254 |
+| same tree | | yes |
+
+Findings:
+
+- The trees are the same, so the rewrite keeps the language, and the layer's output parses on the first run.
+- The deep closers went. Every `let` and `if` nest that ended in a line of twenty or more `)` is now written without them.
+- The source is longer, since each `let`, `else` and multi-line branch takes its own line.
+- The layer needs keyword rules for `let`, `letrec`, `if` and `else`. The rule for a line with children (an application) covers everything else. Applications across lines were not exercised, since this region has none.
+- The 254 brackets left in the source are in single-line expressions, such as `(fst (snd r))`. The layer doesn't touch those.
+
+Against the criterion in section 6: the indented form is not clearly shorter (more lines), and the layer needs per-keyword rules. So the trial does not meet the bar for building the layer. The gain is in the closers, which were the error-prone part, and this trial had none to fix. Whether that is worth a layer of about 200 lines is for you to decide. I'd keep the bracketed form for now.
