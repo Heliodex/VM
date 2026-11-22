@@ -125,7 +125,7 @@ local files: { { name: string; path: string } } = {}
 listPrograms("L2/programs", "", files)
 table.sort(
 	files,
-	function(a, b)
+	function(a: { name: string; path: string }, b: { name: string; path: string })
 		return a.name < b.name
 	end
 )
