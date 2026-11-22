@@ -376,8 +376,8 @@ M.program = function(program: Parser.Program): string
 	local out: { string } = {}
 
 	for _, d in program.decls do
-		local cons: { string } = {}
-		local fields: { Parser.FieldDecl }? = nil
+		-- Each constructor's text, and the fields of a record constructor, which is the last one.
+		local items: { { text: string; fields: { Parser.FieldDecl }? } } = {}
 
 		for k, c in d.cons do
 			if c.fields ~= nil then
@@ -385,12 +385,11 @@ M.program = function(program: Parser.Program): string
 					fail(c.at, "a record constructor is the last constructor of its type")
 				end
 
-				fields = c.fields
-				table.insert(cons, c.name)
+				table.insert(items, { text = c.name; fields = c.fields })
 			elseif c.payload ~= nil then
-				table.insert(cons, `{c.name} {typeText(c.payload :: Parser.Type)}`)
+				table.insert(items, { text = `{c.name} {typeText(c.payload :: Parser.Type)}`; fields = nil })
 			else
-				table.insert(cons, c.name)
+				table.insert(items, { text = c.name; fields = nil })
 			end
 		end
 
@@ -399,22 +398,38 @@ M.program = function(program: Parser.Program): string
 				` {table.concat(d.params, " ")}`
 			else
 				""
-		const text = `type {d.name}{params} = {table.concat(cons, " | ")}`
+		local texts: { string } = {}
 
-		-- A long sum with no record constructor is written with each constructor on a | line below the type line, as the layer reads it.
-		if fields == nil and #text > 80 then
-			line(out, 0, `type {d.name}{params} =`)
-
-			for _, c in cons do
-				line(out, 1, `| {c}`)
-			end
-		else
-			line(out, 0, text)
+		for _, it in items do
+			table.insert(texts, it.text)
 		end
 
-		if fields ~= nil then
-			for _, f in fields :: { Parser.FieldDecl } do
-				line(out, 1, `{f.name}: {typeText(f.type)}`)
+		local header = `type {d.name}{params}`
+		local oneLine = `{header} = {table.concat(texts, " | ")}`
+
+		-- A long sum is written with each constructor on a | line below the type line, and a record constructor's fields below its | line.
+		if #oneLine > 80 then
+			line(out, 0, `{header} =`)
+
+			for _, it in items do
+				line(out, 1, `| {it.text}`)
+
+				if it.fields ~= nil then
+					for _, f in it.fields :: { Parser.FieldDecl } do
+						line(out, 2, `{f.name}: {typeText(f.type)}`)
+					end
+				end
+			end
+		else
+			line(out, 0, oneLine)
+
+			-- A short sum keeps a record constructor's fields below the type line.
+			for _, it in items do
+				if it.fields ~= nil then
+					for _, f in it.fields :: { Parser.FieldDecl } do
+						line(out, 1, `{f.name}: {typeText(f.type)}`)
+					end
+				end
 			end
 		end
 	end
