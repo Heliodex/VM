@@ -97,6 +97,20 @@ local function convertPattern(p: Parser.Pattern): VM.Value
 		return conOf(0, cellOf(bytesOf(p.name), cellOf(bind, posOf(p.at))))
 	elseif p.k == "bind" then
 		return conOf(1, cellOf(bytesOf(p.name), posOf(p.at)))
+	elseif p.k == "rec" then
+		local binds: { VM.Value } = {}
+
+		for _, f in p.fields do
+			const bind: VM.Value =
+				if f.bind ~= nil then
+					bytesOf(f.bind :: string)
+				else
+					VM.NIL
+
+			table.insert(binds, cellOf(bytesOf(f.name), cellOf(bind, posOf(f.at))))
+		end
+
+		return conOf(3, cellOf(bytesOf(p.name), cellOf(listOf(binds), posOf(p.at))))
 	end
 
 	return conOf(2, posOf(p.at))
@@ -122,6 +136,16 @@ local function convertType(t: Parser.Type): VM.Value
 	const f = t :: { k: string, a: Parser.Type, b: Parser.Type, at: { line: number, col: number } }
 
 	return conOf(4, cellOf(convertType(f.a), cellOf(convertType(f.b), posOf(f.at))))
+end
+
+const function convertFieldInits(items: { Parser.FieldInit }): VM.Value
+	local out: { VM.Value } = {}
+
+	for _, f in items do
+		table.insert(out, cellOf(bytesOf(f.name), cellOf(convertExpr(f.value), posOf(f.at))))
+	end
+
+	return listOf(out)
 end
 
 const function convertExprs(items: { Parser.Expr }): VM.Value
@@ -187,6 +211,10 @@ convertExpr = function(e: Parser.Expr): VM.Value
 		return conOf(12, cellOf(convertExpr(e.e), posOf(e.at)))
 	elseif e.k == "check" then
 		return conOf(13, cellOf(convertExpr(e.e), posOf(e.at)))
+	elseif e.k == "record" then
+		return conOf(15, cellOf(bytesOf(e.name), cellOf(convertFieldInits(e.fields), posOf(e.at))))
+	elseif e.k == "with" then
+		return conOf(16, cellOf(convertExpr(e.base), cellOf(convertFieldInits(e.fields), posOf(e.at))))
 	end
 
 	const u = e :: { k: string, e: Parser.Expr, at: { line: number, col: number } }
@@ -208,11 +236,19 @@ const function convertProgram(p: Parser.Program): VM.Value
 		local cons: { VM.Value } = {}
 
 		for _, c in d.cons do
-			const payload: VM.Value =
-				if c.payload ~= nil then
-					convertType(c.payload :: Parser.Type)
-				else
-					conOf(5, VM.NIL)
+			local payload: VM.Value = conOf(5, VM.NIL)
+
+			if c.payload ~= nil then
+				payload = convertType(c.payload :: Parser.Type)
+			elseif c.fields ~= nil then
+				local fields: { VM.Value } = {}
+
+				for _, f in c.fields :: { Parser.FieldDecl } do
+					table.insert(fields, cellOf(bytesOf(f.name), cellOf(convertType(f.type), posOf(f.at))))
+				end
+
+				payload = conOf(6, listOf(fields))
+			end
 			table.insert(cons, cellOf(bytesOf(c.name), cellOf(payload, posOf(c.at))))
 		end
 
@@ -412,6 +448,32 @@ const CASES = {
 	"letrec {\n\tf = (fn x\n\t\tx)\n\tg = (fn y\n\t\t(f y))\n\t(g 1)\n}",
 	"let { ; a comment\n\tx = 1\n\tx\n}",
 	"let {\n}",
+	"type MS = MS {\n\tst: St\n\tfixed: Int\n}\n\nfn x\n\tx",
+	"type Tr = TEmpty | TNode {\n\tvalue: Bind\n\tleft: Tr\n\tright: Tr\n}\n\nfn x\n\tx",
+	"type A = X | Y {\n\tn: Int\n}\n\nfn x\n\tx",
+	"type MS = MS {\n\tst: St,\n\tfixed: Int\n}\n\nfn x\n\tx",
+	"type MS = MS { st: St }\n\nfn x\n\tx",
+	"type MS = MS {\n}\n\nfn x\n\tx",
+	"type MS = MS {\n\tSt: Int\n}\n\nfn x\n\tx",
+	"type MS = MS {\n\tn\n}\n\nfn x\n\tx",
+	"type A = Y { n: Int }\n\nfn x\n\tx",
+	"fn x\n\tlet s = MS {\n\t\tfixed = 1\n\t\tcatch = 0\n\t}\n\ts",
+	"fn x\n\tMS {\n\t\tfixed = 1,\n\t\tcatch = 0\n\t}",
+	"fn x\n\tMS {\n\t}",
+	"fn x\n\tMS {\n\t\tFixed = 1\n\t}",
+	"fn x\n\tMS { fixed = 1 }",
+	"fn x\n\tMS {\n\t\tfixed = (g 1)\n\t\tcatch = MS2 {\n\t\t\ta = 1\n\t\t}\n\t}",
+	"fn x\n\tPair {\n\t\tleft = 1\n\t\tright = 2\n\t}",
+	"fn ms\n\twith ms {\n\t\tfixed = 0\n\t}",
+	"fn ms\n\twith ms {\n\t\tfixed = 0\n\t\tcatch = 1\n\t}",
+	"fn x\n\twith (f x) {\n\t\tfixed = 0\n\t}",
+	"fn x\n\tlet s = (with ms {\n\t\tfixed = 0\n\t})\n\ts",
+	"fn ms\n\tmatch ms {\n\t\tMS {\n\t\t\tfixed = f\n\t\t\tcatch = _\n\t\t} -> f\n\t}",
+	"fn ms\n\tmatch ms {\n\t\tMS {\n\t\t\tfixed = f\n\t\t} -> f\n\t\t_ -> 0\n\t}",
+	"fn ms\n\tmatch ms {\n\t\tMS {\n\t\t\tfixed = F\n\t\t} -> 0\n\t}",
+	"fn x\n\tmatch Empty {\n\t\tEmpty -> 0\n\t}",
+	"fn x\n\tmatch (MS {\n\t\tfixed = 1\n\t}) {\n\t\t_ -> 0\n\t}",
+	"fn x\n\tmatch f MS {\n\t\t_ -> 0\n\t}",
 }
 
 for i, src in CASES do

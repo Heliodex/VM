@@ -4,10 +4,10 @@ A binding is (name . (value . at)), an arm is (pat . (body . at)), a pattern is 
 ---
 append = lib/append.prog
 ---
-type Kind = LParen | RParen | LBrack | RBrack | LBrace | RBrace | Dot | Arrow | Question | Newline | Eof | Num Int | Str [Int] | Sym [Int]
-type Expr = EInt (Int . (Int . Int)) | EStr ([Int] . (Int . Int)) | ENil (Int . Int) | EName ([Int] . (Int . Int)) | EList ([Expr] . (Int . Int)) | EPair (Expr . (Expr . (Int . Int))) | EApp (Expr . ([Expr] . (Int . Int))) | EFn ([[Int]] . (Expr . (Int . Int))) | ELet ([Int] . (Expr . (Expr . (Int . (Int . Int))))) | EMutual ([([Int] . (Expr . (Int . Int)))] . (Expr . (Int . Int))) | EIf (Expr . (Expr . (Expr . (Int . Int)))) | EMatch (Expr . ([(Pat . (Expr . (Int . Int)))] . (Int . Int))) | ETry (Expr . (Int . Int)) | ECheck (Expr . (Int . Int)) | EUntyped (Expr . (Int . Int))
-type Pat = PCon ([Int] . ([Int] . (Int . Int))) | PBind ([Int] . (Int . Int)) | PWild (Int . Int)
-type Ty = TName ([Int] . (Int . Int)) | TApp ([Int] . ([Ty] . (Int . Int))) | TPair (Ty . (Ty . (Int . Int))) | TList (Ty . (Int . Int)) | TFun (Ty . (Ty . (Int . Int))) | NoType
+type Kind = LParen | RParen | LBrack | RBrack | LBrace | RBrace | Dot | Arrow | Question | Newline | Eof | Num Int | Str [Int] | Sym [Int] | Colon | Comma
+type Expr = EInt (Int . (Int . Int)) | EStr ([Int] . (Int . Int)) | ENil (Int . Int) | EName ([Int] . (Int . Int)) | EList ([Expr] . (Int . Int)) | EPair (Expr . (Expr . (Int . Int))) | EApp (Expr . ([Expr] . (Int . Int))) | EFn ([[Int]] . (Expr . (Int . Int))) | ELet ([Int] . (Expr . (Expr . (Int . (Int . Int))))) | EMutual ([([Int] . (Expr . (Int . Int)))] . (Expr . (Int . Int))) | EIf (Expr . (Expr . (Expr . (Int . Int)))) | EMatch (Expr . ([(Pat . (Expr . (Int . Int)))] . (Int . Int))) | ETry (Expr . (Int . Int)) | ECheck (Expr . (Int . Int)) | EUntyped (Expr . (Int . Int)) | ERec ([Int] . ([([Int] . (Expr . (Int . Int)))] . (Int . Int))) | EWith (Expr . ([([Int] . (Expr . (Int . Int)))] . (Int . Int)))
+type Pat = PCon ([Int] . ([Int] . (Int . Int))) | PBind ([Int] . (Int . Int)) | PWild (Int . Int) | PRec ([Int] . ([([Int] . ([Int] . (Int . Int)))] . (Int . Int)))
+type Ty = TName ([Int] . (Int . Int)) | TApp ([Int] . ([Ty] . (Int . Int))) | TPair (Ty . (Ty . (Int . Int))) | TList (Ty . (Int . Int)) | TFun (Ty . (Ty . (Int . Int))) | NoType | TRec [([Int] . (Ty . (Int . Int)))]
 
 let tok = (fn ts
 	match (head ts) {
@@ -48,9 +48,17 @@ let kn = (fn t
 		Num _ -> 11
 		Str _ -> 12
 		Sym _ -> 13
+		Colon -> 14
+		Comma -> 15
 	})
+let isLine = (fn s
+	(if (= s 1) 1 (= s 3)))
+let isNoRec = (fn s
+	(if (= s 2) 1 (= s 3)))
+let noRecSig = (fn s
+	(if (isLine s) 3 2))
 letrec norm = (fn (ts sig)
-	(if (= sig 1)
+	(if (isLine sig)
 		ts
 		(if (= (kn (tok ts)) 9)
 			(norm (after ts) sig)
@@ -88,7 +96,7 @@ let isKw = (fn t
 	(if (isWord t "match") 1
 	(if (isWord t "check") 1
 	(if (isWord t "untyped") 1
-	(if (isWord t "type") 1 (isWord t "cond"))))))))))
+	(if (isWord t "type") 1 (if (isWord t "cond") 1 (isWord t "with")))))))))))
 let isCapB = (fn w
 	(if (< (first w) 65) 0 (if (< 90 (first w)) 0 1)))
 let atomStartT = (fn t
@@ -102,7 +110,7 @@ let typeAtomStartT = (fn t
 		(if (isWord t "|") 0 1)
 		(if (= (kn t) 0) 1 (= (kn t) 2))))
 let kindText = (fn c
-	(if (= c 0) "(" (if (= c 1) ")" (if (= c 2) "[" (if (= c 3) "]" (if (= c 4) "{" (if (= c 5) "}" (if (= c 6) "." (if (= c 7) "->" (if (= c 8) "?" (if (= c 9) "NL" (if (= c 10) "eof" (if (= c 11) "int" (if (= c 12) "str" "sym"))))))))))))))
+	(if (= c 0) "(" (if (= c 1) ")" (if (= c 2) "[" (if (= c 3) "]" (if (= c 4) "{" (if (= c 5) "}" (if (= c 6) "." (if (= c 7) "->" (if (= c 8) "?" (if (= c 9) "NL" (if (= c 10) "eof" (if (= c 11) "int" (if (= c 12) "str" (if (= c 14) ":" (if (= c 15) "," "sym"))))))))))))))))
 letrec showInt = (fn n
 	(if (< n 10)
 		(Ok (cons (+ 48 n) ~))
@@ -161,19 +169,66 @@ let letNameOk = (fn t
 		(Ok 1)))))
 let patBindOk = (fn t
 	(if (isSymT t) (if (isCapB (symOf t)) 0 (if (isKw t) 0 1)) 0))
+; A field list: a block between { and }, one field per line, with no commas. item reads one field from its name to the end of its line, and gives Ok of the field and the rest.
+letrec skipNL = (fn ts
+	(if (= (kn (tok ts)) 9)
+		(skipNL (after ts))
+		ts))
+letrec fieldItems = (fn (ts item)
+	(let n = (skipNL ts)
+	(let t = (tok n)
+	(if (= (kn t) 5)
+		(Ok (~ . (after n)))
+		(if (= (kn t) 15)
+			(failTok t "a field goes on its own line, not after a comma")
+			(let f = (item n)?
+			(let r = (snd f)
+			(if (= (kn (tok r)) 15)
+				(failTok (tok r) "a field goes on its own line, not after a comma")
+				(if (if (= (kn (tok r)) 9) 1 (= (kn (tok r)) 5))
+					(let more = (fieldItems r item)?
+					(Ok ((cons (fst f) (fst more)) . (snd more))))
+					(failTok (tok r) "a field ends at the end of its line; wrap a longer value in parentheses"))))))))))
+let fieldLines = (fn (ts sig item)
+	(let br = (expectK ts sig 4)?
+	(if (= (kn (tok (snd br))) 9)
+		(let its = (fieldItems (snd br) item)?
+		(if (= (@ (fst its)) 1)
+			(failTok (tok (skipNL (snd br))) "a field list needs at least one field")
+			(Ok ((fst its) . (snd its)))))
+		(failTok (tok (snd br)) "a field list needs a newline after {, before its first field"))))
+let fieldName = (fn n
+	(let nr = (expectK n 1 13)?
+	(if (if (isKw (fst nr)) 1 (if (isWord (fst nr) "_") 1 (isCapB (symOf (fst nr)))))
+		(failTok (fst nr) "a field's name starts with a lowercase letter")
+		(Ok ((symOf (fst nr)) . (snd nr))))))
+let fieldBind = (fn n
+	(let nr = (fieldName n)?
+	(let er = (expectW (snd nr) 1 "=")?
+	(let vt = (expectK (snd er) 1 13)?
+	(if (isWord (fst vt) "_")
+		(Ok (((fst nr) . (~ . (at (tok n)))) . (snd vt)))
+		(if (if (isKw (fst vt)) 1 (isCapB (symOf (fst vt))))
+			(failTok (fst vt) "a field is bound to a lowercase name, or to _")
+			(Ok (((fst nr) . ((symOf (fst vt)) . (at (tok n)))) . (snd vt)))))))))
+let recStart = (fn (n sig)
+	(if (isNoRec sig) 0 (if (isCapB (symOf (tok n))) (= (kn (tok (after n))) 4) 0)))
 let parsePattern = (fn ts
 	(let t = (tok ts)
 	(if (isSymT t)
 		(if (isWord t "_")
 			(Ok ((PWild (at t)) . (after ts)))
-			(if (isCapB (symOf t))
-				(let nx = (tok (after ts))
-				(if (isWord nx "_")
-					(Ok ((PCon ((symOf t) . (~ . (at t)))) . (after (after ts))))
-					(if (patBindOk nx)
-						(Ok ((PCon ((symOf t) . ((symOf nx) . (at t)))) . (after (after ts))))
-						(Ok ((PCon ((symOf t) . (~ . (at t)))) . (after ts))))))
-				(Ok ((PBind ((symOf t) . (at t))) . (after ts)))))
+			(if (if (isCapB (symOf t)) (= (kn (tok (after ts))) 4) 0)
+				(let fl = (fieldLines (after ts) 1 fieldBind)?
+				(Ok ((PRec ((symOf t) . ((fst fl) . (at t)))) . (snd fl))))
+				(if (isCapB (symOf t))
+					(let nx = (tok (after ts))
+					(if (isWord nx "_")
+						(Ok ((PCon ((symOf t) . (~ . (at t)))) . (after (after ts))))
+						(if (patBindOk nx)
+							(Ok ((PCon ((symOf t) . ((symOf nx) . (at t)))) . (after (after ts))))
+							(Ok ((PCon ((symOf t) . (~ . (at t)))) . (after ts))))))
+					(Ok ((PBind ((symOf t) . (at t))) . (after ts))))))
 		(failTok t "expected a pattern here"))))
 let parseSymAtom = (fn (n t)
 	(if (isWord t "~")
@@ -214,6 +269,8 @@ let atOf = (fn e
 		ETry p -> (snd p)
 		ECheck p -> (snd p)
 		EUntyped p -> (snd p)
+		ERec p -> (snd (snd p))
+		EWith p -> (snd (snd p))
 	})
 
 let hdI = (fn l
@@ -351,9 +408,31 @@ fn toks
 			(Ok ((cons con (fst more)) . (snd more))))
 			(Ok ((cons con ~) . n)))))))))
 		payloadOf = (fn ts
-		(if (typeAtomStartT (tok ts))
-			(parseTypeAtom ts 1)
-			(Ok (NoType . ts))))
+		(if (= (kn (tok ts)) 4)
+			(let fl = (fieldLines ts 1 parseFieldDecl)?
+			(Ok ((TRec (fst fl)) . (snd fl))))
+			(if (typeAtomStartT (tok ts))
+				(parseTypeAtom ts 1)
+				(Ok (NoType . ts)))))
+		parseFieldDecl = (fn ts
+		(let nr = (fieldName ts)?
+		(let c = (expectK (snd nr) 1 14)?
+		(let ty = (parseType (snd c) 1)?
+		(Ok (((fst nr) . ((fst ty) . (at (tok ts)))) . (snd ty)))))))
+		parseFieldInit = (fn ts
+		(let nr = (fieldName ts)?
+		(let er = (expectW (snd nr) 1 "=")?
+		(let v = (parseExpr (snd er) 1)?
+		(Ok (((fst nr) . ((fst v) . (at (tok ts)))) . (snd v)))))))
+		parseRecLit = (fn (n sig)
+		(let t = (tok n)
+		(let fl = (fieldLines (after n) sig parseFieldInit)?
+		(Ok ((ERec ((symOf t) . ((fst fl) . (at t)))) . (snd fl))))))
+		parseWith = (fn (ts sig)
+		(let start = (tok ts)
+		(let base = (parseAtom (after ts) (noRecSig sig))?
+		(let fl = (fieldLines (snd base) sig parseFieldInit)?
+		(Ok ((EWith ((fst base) . ((fst fl) . (at start)))) . (snd fl)))))))
 		parseExpr = (fn (ts sig)
 		(let n = (norm ts sig)
 		(let t = (tok n)
@@ -364,7 +443,7 @@ fn toks
 		(if (isWord t "match") (parseMatch n sig)
 		(if (isWord t "check") (parseCheck n sig)
 		(if (isWord t "untyped") (parseUntyped n sig)
-			(if (isWord t "cond") (parseCond n sig) (parseAppTail n sig))))))))))))
+			(if (isWord t "cond") (parseCond n sig) (if (isWord t "with") (parseWith n sig) (parseAppTail n sig)))))))))))))
 		parseAppTail = (fn (n sig)
 		(let r = (parseApp n sig)?
 		(let n2 = (norm (snd r) sig)
@@ -396,7 +475,9 @@ fn toks
 					(if (= (kn t) 2)
 						(parseListExpr (after n) t)
 						(if (= (kn t) 13)
-							(parseSymAtom n t)
+							(if (recStart n sig)
+								(parseRecLit n sig)
+								(parseSymAtom n t))
 							(failTok t "expected a value here")))))))))
 		parseParenExpr = (fn (ts t)
 		(let r1 = (parseExpr ts 0)?
@@ -522,7 +603,7 @@ fn toks
 		(let nr = (expectK (after ts) sig 13)?
 		(let chk = (letNameOk (fst nr))?
 		(let er = (expectW (snd nr) sig "=")?
-		(if (= sig 1)
+		(if (isLine sig)
 			(failTok start "a let in a match arm needs parentheses around it")
 			(letValue (snd er) start (symOf (fst nr))))))))))
 		letValue = (fn (ts start name)
@@ -541,7 +622,7 @@ fn toks
 		(Ok ((EIf ((fst c) . ((fst t) . ((fst e) . (at start))))) . (snd e))))))))
 		parseMatch = (fn (ts sig)
 		(let start = (tok ts)
-		(let sc = (parseExpr (after ts) sig)?
+		(let sc = (parseExpr (after ts) (noRecSig sig))?
 		(let br = (expectK (snd sc) sig 4)?
 		(let b = (snd br)
 		(if (= (kn (tok b)) 9)

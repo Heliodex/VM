@@ -625,6 +625,10 @@ local function buildArms(arms: { Arm }, i: number, scope: { string }, ctors: { [
 		return M.app(M.lam(desugar(arm.body, withNames(scope, { pat.name }), ctors)), M.var(0))
 	end
 
+	if pat.k == "rec" then
+		return fail(pat.at, "record patterns are not desugared yet")
+	end
+
 	const c = ctors[pat.name]
 
 	if c == nil then
@@ -715,6 +719,8 @@ desugar = function(node: Expr, scope: { string }, ctors: { [string]: Ctor }): M.
 		return M.app(M.lam(desugar(node.body, inner, ctors)), desugar(node.value, scope, ctors))
 	elseif node.k == "mutual" then
 		return desugar(mutualSurface(node.bindings, node.body, node.at), scope, ctors)
+	elseif node.k == "record" or node.k == "with" then
+		return fail(node.at, "records are not desugared yet")
 	elseif node.k == "untyped" then
 		return desugar(node.e, scope, ctors)
 	elseif node.k == "check" then

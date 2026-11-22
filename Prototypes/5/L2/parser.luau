@@ -25,12 +25,15 @@ export type Type =
 	| { k: "tpair"; a: Type; b: Type; at: Pos }
 	| { k: "tlist"; item: Type; at: Pos }
 	| { k: "tfun"; a: Type; b: Type; at: Pos }
-export type Con = { name: string; payload: Type?; at: Pos }
+export type FieldDecl = { name: string; type: Type; at: Pos }
+export type Con = { name: string; payload: Type?; fields: { FieldDecl }?; at: Pos }
 export type TypeDecl = { name: string; params: { string }; cons: { Con }; at: Pos }
+export type FieldBind = { name: string; bind: string?; at: Pos }
 export type Pattern =
 	| { k: "con"; name: string; bind: string?; at: Pos }
 	| { k: "bind"; name: string; at: Pos }
 	| { k: "wild"; at: Pos }
+	| { k: "rec"; name: string; fields: { FieldBind }; at: Pos }
 export type Expr =
 	| { k: "int"; n: number; at: Pos }
 	| { k: "str"; bytes: { number }; at: Pos }
@@ -48,6 +51,9 @@ export type Expr =
 	| { k: "rawfix"; value: Expr; at: Pos }
 	| { k: "check"; e: Expr; test: Test?; expect: string; at: Pos }
 	| { k: "untyped"; e: Expr; at: Pos }
+	| { k: "record"; name: string; fields: { FieldInit }; at: Pos }
+	| { k: "with"; base: Expr; fields: { FieldInit }; at: Pos }
+export type FieldInit = { name: string; value: Expr; at: Pos }
 export type Arm = { pat: Pattern; body: Expr; at: Pos }
 -- What a run-time check looks for, made by the checker from a type. Each test is a shape of value: any accepts every value, and a list or sum that refers to itself uses rec, with its fixdef around the whole test.
 export type Test =
@@ -74,6 +80,7 @@ const KEYWORDS: { [string]: boolean } = {
 	untyped = true,
 	type = true,
 	cond = true,
+	with = true,
 }
 
 local function isCapital(name: string): boolean
@@ -84,6 +91,7 @@ local function parse(text: string): Program
 	const toks = Lexer.tokenize(text)
 	local pos = 1
 	local sig = false
+	local noRec = false
 
 	local function raw(): Lexer.Token
 		return toks[pos]
@@ -214,7 +222,73 @@ local function parse(text: string): Program
 		return base
 	end
 
-	-- A declaration: type Name params = Con payload | Con payload. The payload is one type atom, if there is one.
+	-- A field list: a block between { and }, one field per line, with no commas. parseField reads one field up to the end of its line.
+	local function parseFieldLines(parseField: () -> any): { any }
+		expectKind "{"
+
+		if toks[pos].kind ~= "NL" then
+			fail(toks[pos], "a field list needs a newline after {, before its first field")
+		end
+
+		const saved = sig
+		sig = true
+		local items: { any } = {}
+
+		while true do
+			while toks[pos].kind == "NL" do
+				pos += 1
+			end
+
+			if toks[pos].kind == "}" then
+				break
+			end
+
+			if toks[pos].kind == "," then
+				fail(toks[pos], "a field goes on its own line, not after a comma")
+			end
+
+			table.insert(items, parseField())
+
+			if toks[pos].kind == "," then
+				fail(toks[pos], "a field goes on its own line, not after a comma")
+			end
+
+			if toks[pos].kind ~= "NL" and toks[pos].kind ~= "}" then
+				fail(toks[pos], "a field ends at the end of its line; wrap a longer value in parentheses")
+			end
+		end
+
+		if #items == 0 then
+			fail(toks[pos], "a field list needs at least one field")
+		end
+
+		pos += 1
+		sig = saved
+
+		return items
+	end
+
+	-- A field's name, which is lowercase, as a variable is.
+	local function fieldName(): Lexer.Token
+		const nameTok = expectKind "sym"
+
+		if KEYWORDS[word(nameTok)] or word(nameTok) == "_" or isCapital(word(nameTok)) then
+			fail(nameTok, "a field's name starts with a lowercase letter")
+		end
+
+		return nameTok
+	end
+
+	-- A field in a declaration: name: type.
+	local function parseFieldDecl(): FieldDecl
+		const nameTok = fieldName()
+		expectKind ":"
+		const ty = parseType()
+
+		return { name = word(nameTok); type = ty; at = at(nameTok) }
+	end
+
+	-- A declaration: type Name params = Con payload | Con payload. The payload is one type atom, if there is one, or a record's fields in braces.
 	local function parseTypeDecl(): TypeDecl
 		const start = advance()
 		const nameTok = expectKind "sym"
@@ -240,12 +314,15 @@ local function parse(text: string): Program
 			end
 
 			local payload: Type? = nil
+			local fields: { FieldDecl }? = nil
 
-			if typeAtomStart(cur()) then
+			if cur().kind == "{" then
+				fields = parseFieldLines(parseFieldDecl)
+			elseif typeAtomStart(cur()) then
 				payload = parseTypeAtom()
 			end
 
-			table.insert(cons, { name = word(conTok); payload = payload; at = at(conTok) })
+			table.insert(cons, { name = word(conTok); payload = payload; fields = fields; at = at(conTok) })
 
 			if cur().kind == "sym" and word(cur()) == "|" then
 				advance()
@@ -259,6 +336,36 @@ local function parse(text: string): Program
 
 	-- EXPRESSIONS
 	local parseExpr: () -> Expr
+
+	-- name = value, in a record literal or a with. The value is read with records allowed, even inside a match scrutinee.
+	local function parseFieldInit(): FieldInit
+		const nameTok = fieldName()
+		expectSym "="
+		const saved = noRec
+		noRec = false
+		const value = parseExpr()
+		noRec = saved
+
+		return { name = word(nameTok); value = value; at = at(nameTok) }
+	end
+
+	-- name = name, or name = _, in a record pattern.
+	local function parseFieldBind(): FieldBind
+		const nameTok = fieldName()
+		expectSym "="
+		const valTok = expectKind "sym"
+		local bind: string? = nil
+
+		if word(valTok) ~= "_" then
+			if KEYWORDS[word(valTok)] or isCapital(word(valTok)) then
+				fail(valTok, "a field is bound to a lowercase name, or to _")
+			end
+
+			bind = word(valTok)
+		end
+
+		return { name = word(nameTok); bind = bind; at = at(nameTok) }
+	end
 
 	local function atomStart(t: Lexer.Token): boolean
 		if t.kind == "int" or t.kind == "str" or t.kind == "(" or t.kind == "[" then
@@ -282,7 +389,9 @@ local function parse(text: string): Program
 		elseif t.kind == "(" then
 			advance()
 			const saved = sig
+			const savedRec = noRec
 			sig = false
+			noRec = false
 			const first = parseExpr()
 			local result: Expr = first
 
@@ -293,12 +402,15 @@ local function parse(text: string): Program
 
 			expectKind ")"
 			sig = saved
+			noRec = savedRec
 
 			return result
 		elseif t.kind == "[" then
 			advance()
 			const saved = sig
+			const savedRec = noRec
 			sig = false
+			noRec = false
 			local items: { Expr } = {}
 
 			while cur().kind ~= "]" do
@@ -311,6 +423,7 @@ local function parse(text: string): Program
 
 			advance()
 			sig = saved
+			noRec = savedRec
 
 			return { k = "list"; items = items; at = at(t) }
 		elseif t.kind == "sym" then
@@ -318,6 +431,13 @@ local function parse(text: string): Program
 				advance()
 
 				return { k = "nil"; at = at(t) }
+			end
+
+			if isCapital(word(t)) and not noRec and toks[pos + 1].kind == "{" then
+				advance()
+				const fields = parseFieldLines(parseFieldInit)
+
+				return { k = "record"; name = word(t); fields = fields; at = at(t) }
 			end
 
 			if KEYWORDS[word(t)] then
@@ -594,6 +714,13 @@ local function parse(text: string): Program
 			return { k = "wild"; at = at(t) }
 		end
 
+		if isCapital(word(t)) and toks[pos + 1].kind == "{" then
+			advance()
+			const fields = parseFieldLines(parseFieldBind)
+
+			return { k = "rec"; name = word(t); fields = fields; at = at(t) }
+		end
+
 		if isCapital(word(t)) then
 			advance()
 			local bind: string? = nil
@@ -616,7 +743,10 @@ local function parse(text: string): Program
 
 	local function parseMatch(): Expr
 		const start = advance()
+		const savedRec = noRec
+		noRec = true
 		const scrut = parseExpr()
+		noRec = savedRec
 		expectKind "{"
 
 		if toks[pos].kind ~= "NL" then
@@ -673,6 +803,18 @@ local function parse(text: string): Program
 		return { k = "untyped"; e = e; at = at(start) }
 	end
 
+	-- with base { field = value }: a copy of base with the fields named changed.
+	local function parseWith(): Expr
+		const start = advance()
+		const saved = noRec
+		noRec = true
+		const base = parseAtom()
+		noRec = saved
+		const fields = parseFieldLines(parseFieldInit)
+
+		return { k = "with"; base = base; fields = fields; at = at(start) }
+	end
+
 	parseExpr = function(): Expr
 		const t = cur()
 
@@ -691,6 +833,8 @@ local function parse(text: string): Program
 				return parseUntyped()
 			elseif word(t) == "cond" then
 				return parseCond()
+			elseif word(t) == "with" then
+				return parseWith()
 			end
 		end
 
