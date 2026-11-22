@@ -7,6 +7,8 @@
 --
 --   let x = e              the lines after it at its level are its body; children, if any, are the value
 --   letrec x = fn args     as let; the children are the body of the fn
+--   let                    children are bindings, name = value; the lines after it at its level are the body: the block form let { }
+--   letrec                 as let, with bindings that are fns: the block form letrec { }, a mutual group
 --   fn args                children are its body, a sequence of lines
 --   if c                   children are the then-branch; the else line at the same level has the else-branch
 --   match e                children are the arms: `pat -> body`, or `pat` with children and then a `->` line
@@ -264,6 +266,44 @@ local function ifText(n: Node, rest: { Node }): string
 	return "(if " .. cond .. "\n(" .. seq(n.children) .. ")\n(" .. seq(rest[1].children) .. "))"
 end
 
+-- A let or letrec block: its children are the bindings, name = value, and the lines after it at its own level are the body.
+local function blockLet(n: Node, rest: { Node }): string
+	local kw = n.text
+
+	if #n.children == 0 then
+		fail(n.line, string.format("%s needs its bindings below it", kw))
+	end
+
+	if #rest == 0 then
+		fail(n.line, string.format("%s needs its body on the lines after it, at the same level", kw))
+	end
+
+	local out: { string } = { kw .. " {" }
+
+	for _, c in n.children do
+		const name, value = string.match(c.text, "^([%l_][%w_]*) = (.*)$")
+
+		if name == nil then
+			fail(c.line, "the lines below a let or letrec are bindings, name = value; its body is at the same level as the let")
+		end
+
+		local valueText: string
+
+		if #c.children > 0 then
+			valueText = expr({ text = value :: string; line = c.line; children = c.children })
+		else
+			valueText = value :: string
+		end
+
+		table.insert(out, (name :: string) .. " = " .. valueText)
+	end
+
+	table.insert(out, "(" .. seq(rest) .. ")")
+	table.insert(out, "}")
+
+	return table.concat(out, "\n")
+end
+
 -- A sequence of sibling lines: one expression. A let or an if takes the lines after it as its body.
 seq = function(nodes: { Node }): string
 	if #nodes == 0 then
@@ -272,6 +312,10 @@ seq = function(nodes: { Node }): string
 
 	const n = nodes[1]
 	const rest: { Node } = table.move(nodes, 2, #nodes, 1, {})
+
+	if n.text == "let" or n.text == "letrec" then
+		return blockLet(n, rest)
+	end
 
 	if string.match(n.text, "^let ") or string.match(n.text, "^letrec ") then
 		return letText(n, rest)

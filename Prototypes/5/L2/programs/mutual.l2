@@ -1,0 +1,20 @@
+A letrec block as a mutual group, indented: ev and od call each other, and the body is at the same level as the letrec.
+---
+---
+fn x
+	letrec
+		ev = fn n
+			if n
+				od (- n 1)
+			else
+				1
+		od = fn n
+			if n
+				ev (- n 1)
+			else
+				0
+	ev x
+---
+4 => 1 fuel 1000
+0 => 1 fuel 1000
+1 => 0 fuel 1000

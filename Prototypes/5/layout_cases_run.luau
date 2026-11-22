@@ -43,6 +43,16 @@ end
 
 local CASES: { { name: string; l2: string; prog: string } } = {
 	{
+		name = "let block",
+		l2 = "let\n\ta = 1\n\tb = + a 2\n+ a b",
+		prog = "let {\n\ta = 1\n\tb = (+ a 2)\n\t(+ a b)\n}",
+	},
+	{
+		name = "letrec block with a mutual group",
+		l2 = "letrec\n\tev = fn n\n\t\tif n\n\t\t\tod (- n 1)\n\t\telse\n\t\t\t1\n\tod = fn n\n\t\tif n\n\t\t\tev (- n 1)\n\t\telse\n\t\t\t0\nev 4",
+		prog = "letrec {\n\tev = fn n\n\t(if n (od (- n 1)) 1)\n\tod = fn n\n\t(if n (ev (- n 1)) 0)\n\tev 4\n}",
+	},
+	{
 		name = "let chain",
 		l2 = "let a = 1\nlet b = 2\n(+ a b)",
 		prog = "let a = 1\nlet b = 2\n(+ a b)",

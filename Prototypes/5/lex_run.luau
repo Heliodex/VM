@@ -167,7 +167,7 @@ local function listPrograms(folder: string, prefix: string, out: { { name: strin
 	for _, entry in fs.listdir(folder) do
 		if entry.type == "dir" then
 			listPrograms(`{folder}/{entry.name}`, `{prefix}{entry.name}/`, out)
-		elseif entry.type == "file" and string.sub(entry.name, -5) == ".prog" then
+		elseif entry.type == "file" and (string.sub(entry.name, -5) == ".prog" or string.sub(entry.name, -3) == ".l2") then
 			table.insert(out, { name = `{prefix}{entry.name}`, text = readFile(`{folder}/{entry.name}`) })
 		end
 	end

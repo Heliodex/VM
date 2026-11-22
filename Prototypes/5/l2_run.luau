@@ -211,7 +211,7 @@ local function listPrograms(folder: string, prefix: string, out: { string })
 	for _, entry in fs.listdir(folder) do
 		if entry.type == "dir" then
 			listPrograms(`{folder}/{entry.name}`, `{prefix}{entry.name}/`, out)
-		elseif entry.type == "file" and string.sub(entry.name, -5) == ".prog" then
+		elseif entry.type == "file" and (string.sub(entry.name, -5) == ".prog" or string.sub(entry.name, -3) == ".l2") then
 			table.insert(out, `{prefix}{entry.name}`)
 		end
 	end
@@ -226,7 +226,7 @@ for _, name in files do
 		const text = readFile(`L2/programs/{name}`)
 
 		return {
-			file = ProgramFile.parse(text),
+			file = ProgramFile.parse(text, name),
 			compiled = L2.compile(text, resolve, name),
 		}
 	end)

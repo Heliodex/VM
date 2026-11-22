@@ -125,16 +125,15 @@ The forms, by the line that starts them (`L2/layout.luau` has the rules):
 | record literal | `Con` with fields below | `Con { ... }` |
 | record declaration | `type T = Con` with fields below | `type T = Con { ... }` |
 
-Not yet decided, and so not in the layer:
+Decided after the trial:
 
-- **Mutual groups** (`letrec { ... }` in the bracketed form). A `letrec` header with the functions below it, and a body last, is the likely form. It needs a rule and a case.
-- **Block forms** `let { }` and `letrec { }`. In the indented form a let chain already is the block, so these are probably not needed in `.l2`.
+- **Block forms.** A `let` or `letrec` with the bindings indented below it is the block form (`let { }`, `letrec { }`). The body is at the same level as the `let`, after the bindings, so it is not indented under them. A `letrec` block is a mutual group, and its bindings are fns.
 
-Status: the layer covers every form in the table, and `L2/layout_cases_run.luau` checks each one against its bracketed form (15 cases, all agreeing). The trial file still lays out to the same tree.
+Status: the layer covers every form in the table, including the block forms. `L2/layout_cases_run.luau` checks each form against its bracketed form (17 cases, all agreeing), and the trial file still lays out to the same tree.
+
+The tools read `.l2` now: `ProgramFile.parse` lays out the program section of a `.l2` file, and the lex, parse, infer and L2 runners list `.l2` files with `.prog` ones. `L2/programs/block_let.l2` and `L2/programs/mutual.l2` run through the whole pipeline.
 
 Still to do, in order:
 
-1. Make the tools read `.l2`: the parse, lex and infer runners, and the program loader.
-2. Write the layer in L2 (`layout.prog`), checked against `layout.luau` on the same cases, as the lexer and parser stages were.
-3. Convert the L2 modules one at a time, starting with `types.prog`, each converted file checked to give the same tree as before.
-4. Decide on mutual groups, and whether block forms are dropped from `.l2`.
+1. Write the layer in L2 (`layout.prog`), checked against `layout.luau` on the same cases, as the lexer and parser stages were.
+2. Convert the L2 modules one at a time, starting with `types.prog`, each converted file checked to give the same tree as before.

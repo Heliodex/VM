@@ -323,7 +323,7 @@ local function listPrograms(folder: string, prefix: string, out: { { name: strin
 	for _, entry in fs.listdir(folder) do
 		if entry.type == "dir" then
 			listPrograms(`{folder}/{entry.name}`, `{prefix}{entry.name}/`, out)
-		elseif entry.type == "file" and string.sub(entry.name, -5) == ".prog" then
+		elseif entry.type == "file" and (string.sub(entry.name, -5) == ".prog" or string.sub(entry.name, -3) == ".l2") then
 			table.insert(out, { name = `{prefix}{entry.name}`, text = readFile(`{folder}/{entry.name}`) })
 		end
 	end
@@ -333,7 +333,7 @@ local files: { { name: string, text: string } } = {}
 listPrograms("L2/programs", "L2/", files)
 
 for _, f in files do
-	check(f.name, ProgramFile.parse(f.text).program)
+	check(f.name, ProgramFile.parse(f.text, f.name).program)
 end
 
 -- Cases that reach each error the parser gives, and the shapes it accepts.

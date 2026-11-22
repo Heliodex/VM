@@ -80,7 +80,10 @@ local function parseTest(text: string, lineNo: number): Test
 	}
 end
 
-local function parse(text: string): File
+const Layout = require "./layout"
+
+-- name is the file's name. A .l2 file is indented, so its program section is laid out to bracketed text first; a .prog file is used as it is.
+local function parse(text: string, name: string?): File
 	const lines = splitLines(text)
 	local separators: { number } = {}
 
@@ -140,10 +143,16 @@ local function parse(text: string): File
 		error("a program file needs at least one test", 0)
 	end
 
+	local program = table.concat(lines, "\n", second + 1, third - 1)
+
+	if name ~= nil and string.sub(name, -3) == ".l2" then
+		program = Layout.layout(program)
+	end
+
 	return {
 		header = table.concat(lines, "\n", 1, first - 1),
 		imports = imports,
-		program = table.concat(lines, "\n", second + 1, third - 1),
+		program = program,
 		programLine = second + 1,
 		tests = tests,
 	}

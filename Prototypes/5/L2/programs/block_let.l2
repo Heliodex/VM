@@ -1,0 +1,11 @@
+A let block, indented: two bindings below the let, and the body at the same level as the let.
+---
+---
+fn x
+	let
+		a = + x 1
+		b = * a 2
+	+ a b
+---
+1 => 6 fuel 1000
+0 => 3 fuel 1000

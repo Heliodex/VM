@@ -45,7 +45,7 @@ end
 
 local compileFile: (text: string, resolve: (string) -> string?, name: string, stack: { string }) -> Compiled
 compileFile = function(text: string, resolve: (string) -> string?, name: string, stack: { string }): Compiled
-	const file = ProgramFile.parse(text)
+	const file = ProgramFile.parse(text, name)
 	local parsed: Parser.Program? = nil
 	local ok, err = pcall(function()
 		parsed = Parser.parse(file.program)
