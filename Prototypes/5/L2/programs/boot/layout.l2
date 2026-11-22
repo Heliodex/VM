@@ -488,16 +488,26 @@ letrec
 	sumOk = fn cs
 		if (= (@ cs) 1)
 			Ok 1
-		elseif (if (startsWith "| " (ntext (hdN cs))) (= (@ (kids (hdN cs))) 1) 0)
-			sumOk (tlOf cs)
+		elseif (startsWith "| " (ntext (hdN cs)))
+			if (= (@ (tlOf cs)) 1)
+				Ok 1
+			elseif (= (@ (kids (hdN cs))) 1)
+				sumOk (tlOf cs)
+			else
+				lineErr (nline (hdN cs)) "a record constructor is the last constructor of its type"
 		else
-			lineErr (nline (hdN cs)) "a constructor of a sum is a line starting with |, with nothing below it"
+			lineErr (nline (hdN cs)) "a constructor of a sum is a line starting with |"
 	sumText = fn cs
+		let name = (dropN (ntext (hdN cs)) 2)
 		if (= (@ (tlOf cs)) 1)
-			Ok (dropN (ntext (hdN cs)) 2)
+			if (= (@ (kids (hdN cs))) 1)
+				Ok name
+			else
+				let fs = (declFields (kids (hdN cs)))?
+				Ok (cat name (cat " {\n" (cat (joinLines fs) "\n}")))
 		else
 			let rest = (sumText (tlOf cs))?
-			Ok (cat (dropN (ntext (hdN cs)) 2) (cat " | " rest))
+			Ok (cat name (cat " | " rest))
 	declLine = fn d
 		if (endsEq (ntext d))
 			if (= (@ (kids d)) 1)
