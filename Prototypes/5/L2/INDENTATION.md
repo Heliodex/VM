@@ -1,6 +1,6 @@
 # L2: an indentation layer (proposal)
 
-Status: a proposal, not implemented. The bracketed L2 of SPEC.md stays the core. This document plans an alternative spelling of the same language, chosen by the file.
+Status: implemented. The bracketed L2 stays the core. This document describes the indented spelling of the same language, chosen by the file.
 
 ## 1. Why
 
@@ -116,7 +116,7 @@ The forms, by the line that starts them (`L2/layout.luau` has the rules):
 | let, letrec | `let x = v` then the body on the lines after | `(let x = v` ... `)` |
 | fn | `fn x` then the body below | as now |
 | application | `f` then one argument to a line below | `(f` args `)` |
-| if | `if c`, the then-branch below, then `else` at the same level with its branch below | `(if c t e)` |
+| if | `if c`, the then-branch below, then any `elseif c2` lines and an `else`, each at the same level with its branch below | `(if c t (if c2 ... e))` |
 | match | `match e`, one arm to a line | `match e { ... }` |
 | arm with a body below | `pat ->` with the body below | `pat -> (...)` |
 | record pattern in an arm | `Con` with fields below, then a `-> body` line at the same level | `Con { ... } -> body` |
@@ -130,7 +130,7 @@ Decided after the trial:
 
 - **Block forms.** A `let` or `letrec` with the bindings indented below it is the block form (`let { }`, `letrec { }`). The body is at the same level as the `let`, after the bindings, so it is not indented under them. A `letrec` block is a mutual group, and its bindings are fns.
 
-Status: the layer covers every form in the table, including the block forms. `L2/layout_cases_run.luau` checks each form against its bracketed form (17 cases, all agreeing), and the trial file still lays out to the same tree.
+Status: the layer covers every form in the table, including the block forms. `L2/layout_cases_run.luau` checks each form against its bracketed form (26 cases, all agreeing), and the trial file still lays out to the same tree.
 
 The tools read `.l2` now: `ProgramFile.parse` lays out the program section of a `.l2` file, and the lex, parse, infer and L2 runners list `.l2` files with `.prog` ones. `L2/programs/block_let.l2` and `L2/programs/mutual.l2` run through the whole pipeline.
 

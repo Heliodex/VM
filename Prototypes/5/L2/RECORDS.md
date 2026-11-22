@@ -1,6 +1,6 @@
-# L2: records (proposal)
+# L2: records
 
-Status: a proposal, not implemented. Nothing here is in SPEC.md yet. The aim is named fields for the records the checker keeps today as nested pairs, with no change to the machine.
+Status: implemented in the reader, the desugarer, both checkers and the layout layer. The aim was named fields for the records the checker keeps as nested pairs, with no change to the machine. The sections below describe the design as built, with the open questions still marked.
 
 ## 1. The problem
 
