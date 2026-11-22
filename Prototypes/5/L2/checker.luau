@@ -960,14 +960,18 @@ inferWith = function(cx: Cx, env: { [string]: Scheme }, node: { base: Parser.Exp
 	const acc = cx.fields[first.name]
 
 	if acc == nil then
-		failAt(first.at, string.format("%s is not a field of a record", first.name))
+		failAt(first.at, string.format("%s is not a field of any record: a with takes its record from its first field", first.name))
 	end
 
 	const info = (acc :: FieldInfo).info
 	const names = info.ctor.fields :: { string }
 	const payload, sumTy = ctorInstance(info, level)
 	const base, bt = infer(cx, env, node.base, level, ret)
-	const baseOut = use(cx, base, bt, sumTy, node.base.at)
+	const baseOk, baseOut = pcall(use, cx, base, bt, sumTy, node.base.at)
+
+	if not baseOk then
+		failAt(node.base.at, string.format("the base of a with must be %s, the record its first field names, but this is %s", render(sumTy, false), render(bt, false)))
+	end
 
 	for k, init in node.fields do
 		local known = false
@@ -979,7 +983,7 @@ inferWith = function(cx: Cx, env: { [string]: Scheme }, node: { base: Parser.Exp
 		end
 
 		if not known then
-			failAt(init.at, string.format("%s is not a field of %s", init.name, info.ctor.name))
+			failAt(init.at, string.format("%s is not a field of %s, which the with takes from its first field", init.name, info.ctor.name))
 		end
 
 		for j = 1, k - 1 do

@@ -217,6 +217,9 @@ end
 
 -- Cases for each form the checker handles, and for each error it reports.
 const CASES = {
+	"type MS = MS {\n\tfixed: Int\n}\n\nfn x\n\twith x {\n\t\tnope = 1\n\t}",
+	"type MS = MS {\n\tfixed: Int\n}\ntype Tr = Tr {\n\tval: Int\n}\n\nfn x\n\twith x {\n\t\tfixed = 1\n\t\tval = 2\n\t}",
+	"type MS = MS {\n\tfixed: Int\n}\ntype Tr = Tr {\n\tval: Int\n}\n\nlet a = Tr {\n\tval = 1\n}\nwith a {\n\tfixed = 1\n}",
 	"fn x\n\t(+ x 1)",
 	"fn x\n\tx",
 	"fn (x y)\n\t(+ x y)",

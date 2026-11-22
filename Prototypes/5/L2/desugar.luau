@@ -845,7 +845,7 @@ local function withExpr(node: Expr & { k: "with" }, scope: { string }, ctors: { 
 	const acc = ctors[first.name]
 
 	if acc == nil or acc.index == nil then
-		return fail(first.at, string.format("%s is not a field of a record", first.name))
+		return fail(first.at, string.format("%s is not a field of any record: a with takes its record from its first field", first.name))
 	end
 
 	const recName = acc.con :: string
@@ -862,7 +862,7 @@ local function withExpr(node: Expr & { k: "with" }, scope: { string }, ctors: { 
 		end
 
 		if not known then
-			fail(init.at, string.format("%s is not a field of %s", init.name, recName))
+			fail(init.at, string.format("%s is not a field of %s, which the with takes from its first field", init.name, recName))
 		end
 
 		for j = 1, k - 1 do
