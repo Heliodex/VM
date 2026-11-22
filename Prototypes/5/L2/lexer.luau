@@ -6,6 +6,8 @@
 -- Kinds:
 --
 --   "(" ")" "[" "]" "{" "}"   delimiters
+--   ":"                       the colon of a record field's type
+--   ","                       a comma, which a field list does not allow
 --   "."                       the dot of a pair, standing alone
 --   "->"                      the arrow of a match arm
 --   "?"                       early return
@@ -47,6 +49,8 @@ const function isDelimiter(c: string): boolean
 		or c == ";"
 		or c == "."
 		or c == "?"
+		or c == ":"
+		or c == ","
 		or c == ""
 end
 
@@ -96,7 +100,7 @@ const function tokenize(src: string): { Token }
 			while i <= n and string.sub(src, i, i) ~= "\n" do
 				i += 1
 			end
-		elseif c == "(" or c == ")" or c == "[" or c == "]" or c == "{" or c == "}" or c == "?" then
+		elseif c == "(" or c == ")" or c == "[" or c == "]" or c == "{" or c == "}" or c == "?" or c == ":" or c == "," then
 			push(c, nil, i)
 			i += 1
 		elseif c == "." then
