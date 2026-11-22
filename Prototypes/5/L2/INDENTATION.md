@@ -100,3 +100,41 @@ Findings:
 - The 254 brackets left in the source are in single-line expressions, such as `(fst (snd r))`. The layer doesn't touch those.
 
 Against the criterion in section 6: the indented form is not clearly shorter (more lines), and the layer needs per-keyword rules. So the trial does not meet the bar for building the layer. The gain is in the closers, which were the error-prone part, and this trial had none to fix. Whether that is worth a layer of about 200 lines is for you to decide. I'd keep the bracketed form for now.
+
+## 10. Decisions and status
+
+Decided with the user, after the trial:
+
+- Indentation is used for multi-line applications too, so brackets are not needed for them. A head on one line, its arguments on the lines below, one to a line.
+- Mixed styles are not allowed. A file is one or the other, and the first version disallows nothing else; whether the rules are too strict is left for later.
+- An indented file is `.l2`. A bracketed file stays `.prog`.
+
+The forms, by the line that starts them (`L2/layout.luau` has the rules):
+
+| form | indented | bracketed |
+|---|---|---|
+| let, letrec | `let x = v` then the body on the lines after | `(let x = v` ... `)` |
+| fn | `fn x` then the body below | as now |
+| application | `f` then one argument to a line below | `(f` args `)` |
+| if | `if c`, the then-branch below, then `else` at the same level with its branch below | `(if c t e)` |
+| match | `match e`, one arm to a line | `match e { ... }` |
+| arm with a body below | `pat ->` with the body below | `pat -> (...)` |
+| record pattern in an arm | `Con` with fields below, then a `-> body` line at the same level | `Con { ... } -> body` |
+| cond | `cond`, one clause to a line | `cond { ... }` |
+| with | `with e` with fields below | `with e { ... }` |
+| record literal | `Con` with fields below | `Con { ... }` |
+| record declaration | `type T = Con` with fields below | `type T = Con { ... }` |
+
+Not yet decided, and so not in the layer:
+
+- **Mutual groups** (`letrec { ... }` in the bracketed form). A `letrec` header with the functions below it, and a body last, is the likely form. It needs a rule and a case.
+- **Block forms** `let { }` and `letrec { }`. In the indented form a let chain already is the block, so these are probably not needed in `.l2`.
+
+Status: the layer covers every form in the table, and `L2/layout_cases_run.luau` checks each one against its bracketed form (15 cases, all agreeing). The trial file still lays out to the same tree.
+
+Still to do, in order:
+
+1. Make the tools read `.l2`: the parse, lex and infer runners, and the program loader.
+2. Write the layer in L2 (`layout.prog`), checked against `layout.luau` on the same cases, as the lexer and parser stages were.
+3. Convert the L2 modules one at a time, starting with `types.prog`, each converted file checked to give the same tree as before.
+4. Decide on mutual groups, and whether block forms are dropped from `.l2`.

@@ -1,16 +1,22 @@
 --!strict
 -- THE L2 LAYOUT LAYER
 --
--- Turns an indented .l2 file into the bracketed L2 that the parser reads (see INDENTATION.md). The rewrite changes only the layout: the tokens are the same, so the tree is the same, and a file in .prog form is never passed through here.
+-- Turns an indented .l2 file into the bracketed L2 that the parser reads (INDENTATION.md). The rewrite changes only the layout: the same tokens come out, so the tree is the same. A file in .prog form never passes through here.
 --
--- The indentation is tabs only. A line with more indentation than the line before it is a child of that line. The rules, by the form a line starts with:
+-- The indentation is tabs only. A line with more indentation than the line before it is a child of that line. The forms:
 --
---   let x = e            the rest of the lines at this level are its body; if the line has children, they are the value
---   letrec x = fn args   as let, with the children as the body of the fn
---   if c                 its children are the then-branch; the next line at its level, `else`, has the children of the else-branch
---   anything else        with children, the line is an application, with its children as the further arguments
+--   let x = e              the lines after it at its level are its body; children, if any, are the value
+--   letrec x = fn args     as let; the children are the body of the fn
+--   fn args                children are its body, a sequence of lines
+--   if c                   children are the then-branch; the else line at the same level has the else-branch
+--   match e                children are the arms: `pat -> body`, or `pat` with children and then a `->` line
+--   cond                   children are clauses: `test -> body`, or `_ -> body`
+--   with e                 children are the field lines: name = value
+--   C                      with children that are field lines: a record literal, or a record pattern in an arm
+--   type T = C             children are the field lines of a record declaration: name: Type
+--   f                      any other line with children: an application, the children its arguments, one per line
 --
--- A block with one expression is wrapped in parentheses. A let, an if and an application are bracketed here, so the source has no closing brackets for them. Errors give the line of the source.
+-- Brackets, and the braces of match, cond, with and records, are added here. A block of one expression is bracketed.
 --
 --   Layout.layout(text): string        raises an error, with the line, if the text does not lay out
 
@@ -30,22 +36,22 @@ local function buildTree(text: string): { Node }
 
 	for raw in string.gmatch(text .. "\n", "([^\n]*)\n") do
 		lineNo += 1
-		local tabs = string.match(raw, "^\t*") or ""
-		local content = string.sub(raw, #tabs + 1)
-		content = string.gsub(content, "%s+$", "")
 
 		if string.match(raw, "^ ") then
 			fail(lineNo, "indent with tabs, not spaces")
 		end
 
+		local tabs = string.match(raw, "^\t*") or ""
+		local content = string.gsub(string.sub(raw, #tabs + 1), "%s+$", "")
+
 		if content ~= "" and string.sub(content, 1, 1) ~= ";" then
-			local indent = #tabs
+			const indent = #tabs
 
 			while #stack > 0 and stack[#stack].indent >= indent do
 				table.remove(stack)
 			end
 
-			local node: Node = { text = content; line = lineNo; children = {} }
+			const node: Node = { text = content; line = lineNo; children = {} }
 
 			if #stack == 0 then
 				table.insert(roots, node)
@@ -60,15 +66,206 @@ local function buildTree(text: string): { Node }
 	return roots
 end
 
-local render: ({ Node }) -> string
+local expr: (Node) -> string
+local seq: ({ Node }) -> string
 
--- The text of a value that has children: its header, in brackets, with the children as its body.
-local function blockText(node: Node): string
-	return "(" .. node.text .. "\n" .. render(node.children) .. ")"
+-- Whether every child is a field line, name = value.
+local function allFields(children: { Node }): boolean
+	if #children == 0 then
+		return false
+	end
+
+	for _, c in children do
+		if string.match(c.text, "^[%l_][%w_]* = ") == nil then
+			return false
+		end
+	end
+
+	return true
 end
 
--- A sequence of sibling lines is one expression. A let or an if takes the lines after it as its body.
-render = function(nodes: { Node }): string
+-- The field lines of a record, a with, or a record pattern, one to a line, inside its braces.
+local function fieldLines(children: { Node }): string
+	local out: { string } = {}
+
+	for _, c in children do
+		local name, value = string.match(c.text, "^([%l_][%w_]*) = (.*)$")
+
+		if name == nil then
+			fail(c.line, "a field is written name = value")
+		end
+
+		if #c.children > 0 then
+			table.insert(out, name :: string .. " = " .. expr({ text = value :: string; line = c.line; children = c.children }))
+		else
+			table.insert(out, name :: string .. " = " .. (value :: string))
+		end
+	end
+
+	return table.concat(out, "\n")
+end
+
+-- The arms of a match or the clauses of a cond. An arm may be `pat -> body`, or `pat` with children (a record pattern) and a `->` line after it.
+local function armLines(children: { Node }): string
+	local out: { string } = {}
+	local i = 1
+
+	while i <= #children do
+		local c = children[i]
+		const nxt = children[i + 1]
+
+		if #c.children > 0 and nxt ~= nil and string.sub(nxt.text, 1, 2) == "->" then
+			local body = string.gsub(string.sub(nxt.text, 3), "^ ", "")
+
+			if #nxt.children > 0 then
+				body = "(" .. seq(nxt.children) .. ")"
+			end
+
+			table.insert(out, c.text .. " {\n" .. fieldLines(c.children) .. "\n} -> " .. body)
+			i += 2
+		else
+			local pat, body = string.match(c.text, "^(.-) %-> (.*)$")
+
+			if pat == nil then
+				pat = string.match(c.text, "^(.-) %->$")
+
+				if pat == nil then
+					fail(c.line, "an arm is written pat -> body")
+				end
+
+				if #c.children == 0 then
+					fail(c.line, "an arm needs a body after its ->")
+				end
+
+				body = "(" .. seq(c.children) .. ")"
+			elseif #c.children > 0 then
+				fail(c.line, "an arm with a body on its line has no lines below it")
+			end
+
+			table.insert(out, (pat :: string) .. " -> " .. (body :: string))
+			i += 1
+		end
+	end
+
+	return table.concat(out, "\n")
+end
+
+-- A match, a cond or a with, as an expression: its own braces.
+local function braced(n: Node): string?
+	local scrut = string.match(n.text, "^match (.*)$")
+
+	if scrut ~= nil then
+		if #n.children == 0 then
+			fail(n.line, "a match needs arms below it")
+		end
+
+		return "match " .. (scrut :: string) .. " {\n" .. armLines(n.children) .. "\n}"
+	end
+
+	if n.text == "cond" then
+		if #n.children == 0 then
+			fail(n.line, "a cond needs clauses below it")
+		end
+
+		return "cond {\n" .. armLines(n.children) .. "\n}"
+	end
+
+	local base = string.match(n.text, "^with (.*)$")
+
+	if base ~= nil then
+		if #n.children == 0 then
+			fail(n.line, "a with needs field lines below it")
+		end
+
+		return "with " .. (base :: string) .. " {\n" .. fieldLines(n.children) .. "\n}"
+	end
+
+	return nil
+end
+
+-- One expression from one line and the lines below it.
+expr = function(n: Node): string
+	local b = braced(n)
+
+	if b ~= nil then
+		return b
+	end
+
+	if string.match(n.text, "^[%u]") and allFields(n.children) then
+		return n.text .. " {\n" .. fieldLines(n.children) .. "\n}"
+	end
+
+	if #n.children == 0 then
+		return n.text
+	end
+
+	if string.match(n.text, "^fn ") then
+		return "(" .. n.text .. "\n" .. seq(n.children) .. ")"
+	end
+
+	if string.match(n.text, "^if ") or string.match(n.text, "^let ") or string.match(n.text, "^letrec ") then
+		fail(n.line, "a let or an if takes its body on the lines after it, not as an argument")
+	end
+
+	local args: { string } = {}
+
+	for _, c in n.children do
+		table.insert(args, expr(c))
+	end
+
+	return "(" .. n.text .. "\n" .. table.concat(args, "\n") .. ")"
+end
+
+-- A let or letrec: its value, then the lines after it as its body.
+local function letText(n: Node, rest: { Node }): string
+	local kw, body = string.match(n.text, "^(letrec) (.*)$")
+
+	if kw == nil then
+		kw, body = string.match(n.text, "^(let) (.*)$")
+	end
+
+	local name, value = string.match(body :: string, "^([%l_][%w_]*) = (.*)$")
+
+	if name == nil then
+		fail(n.line, "a let is written let name = value")
+	end
+
+	local valueText: string
+
+	if #n.children > 0 then
+		valueText = expr({ text = value :: string; line = n.line; children = n.children })
+	else
+		valueText = value :: string
+	end
+
+	if #rest == 0 then
+		fail(n.line, "a let needs a body after it")
+	end
+
+	return "(" .. (kw :: string) .. " " .. (name :: string) .. " = " .. valueText .. "\n" .. seq(rest) .. ")"
+end
+
+-- An if with its else line, as the branches of a bracketed if.
+local function ifText(n: Node, rest: { Node }): string
+	local cond = string.match(n.text, "^if (.*)$") :: string
+
+	if #n.children == 0 then
+		fail(n.line, "an if needs its then-branch below it")
+	end
+
+	if #rest == 0 or rest[1].text ~= "else" or #rest[1].children == 0 then
+		fail(n.line, "an if needs an else line at its own level, with the else-branch below it")
+	end
+
+	if #rest > 1 then
+		fail(rest[2].line, "an else ends the if, and more lines follow it")
+	end
+
+	return "(if " .. cond .. "\n(" .. seq(n.children) .. ")\n(" .. seq(rest[1].children) .. "))"
+end
+
+-- A sequence of sibling lines: one expression. A let or an if takes the lines after it as its body.
+seq = function(nodes: { Node }): string
 	if #nodes == 0 then
 		fail(0, "a block needs an expression")
 	end
@@ -76,51 +273,12 @@ render = function(nodes: { Node }): string
 	const n = nodes[1]
 	const rest: { Node } = table.move(nodes, 2, #nodes, 1, {})
 
-	local kw, body = string.match(n.text, "^(letrec) (.*)$")
-
-	if kw == nil then
-		kw, body = string.match(n.text, "^(let) (.*)$")
+	if string.match(n.text, "^let ") or string.match(n.text, "^letrec ") then
+		return letText(n, rest)
 	end
 
-	if kw ~= nil then
-		local name, value = string.match(body :: string, "^([^=]-) = (.*)$")
-
-		if name == nil then
-			fail(n.line, "a let needs = after its name")
-		end
-
-		name = string.gsub(name :: string, "%s+$", "")
-
-		local valueText = value :: string
-
-		if #n.children > 0 then
-			valueText = "(" .. valueText .. "\n" .. render(n.children) .. ")"
-		end
-
-		if #rest == 0 then
-			fail(n.line, "a let needs a body after it")
-		end
-
-		const keyword = kw :: string
-		return "(" .. keyword .. " " .. name .. " = " .. valueText .. "\n" .. render(rest) .. ")"
-	end
-
-	local cond = string.match(n.text, "^if (.*)$")
-
-	if cond ~= nil then
-		if #n.children == 0 then
-			fail(n.line, "an if needs its then-branch below it")
-		end
-
-		if #rest == 0 or rest[1].text ~= "else" or #rest[1].children == 0 then
-			fail(n.line, "an if needs an else line, with its branch below it, at the same indent")
-		end
-
-		if #rest > 1 then
-			fail(rest[2].line, "an else ends the if, and more lines follow it")
-		end
-
-		return "(if " .. (cond :: string) .. "\n(" .. render(n.children) .. ")\n(" .. render(rest[1].children) .. "))"
+	if string.match(n.text, "^if ") then
+		return ifText(n, rest)
 	end
 
 	if n.text == "else" then
@@ -128,14 +286,48 @@ render = function(nodes: { Node }): string
 	end
 
 	if #rest > 0 then
-		fail(rest[1].line, "a line with no body is followed by more lines")
+		fail(rest[1].line, "a line is followed by more lines, but it is not a let or an if")
 	end
 
-	if #n.children > 0 then
-		return blockText(n)
+	return expr(n)
+end
+
+-- The top of the file: record declarations, then the expression.
+local function program(roots: { Node }): string
+	local out: { string } = {}
+	local i = 1
+
+	while i <= #roots and string.match(roots[i].text, "^type ") do
+		const d = roots[i]
+
+		if #d.children > 0 then
+			local lines: { string } = {}
+
+			for _, c in d.children do
+				if string.match(c.text, "^[%l_][%w_]*: ") == nil then
+					fail(c.line, "a record field is written name: Type")
+				end
+
+				table.insert(lines, c.text)
+			end
+
+			table.insert(out, d.text .. " {\n" .. table.concat(lines, "\n") .. "\n}")
+		else
+			table.insert(out, d.text)
+		end
+
+		i += 1
 	end
 
-	return n.text
+	local body = table.move(roots, i, #roots, 1, {})
+
+	if #body == 0 then
+		fail(0, "a program needs an expression after its declarations")
+	end
+
+	table.insert(out, seq(body))
+
+	return table.concat(out, "\n")
 end
 
 M.layout = function(text: string): string
@@ -145,7 +337,7 @@ M.layout = function(text: string): string
 		fail(0, "the file is empty")
 	end
 
-	return render(roots)
+	return program(roots)
 end
 
 return M
