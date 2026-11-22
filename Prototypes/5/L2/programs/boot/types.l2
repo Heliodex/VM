@@ -626,6 +626,26 @@ letrec infer = fn (st env node level)
 			let envF2 = (cons ((hdOr names ~) . (EVar (Scheme (~ . (fst p))))) envF)
 			let rest = (inferFn (snd p) envF2 (tl names) body)
 			((fst rest) . ((tArrow (fst p) (fst (snd rest))) . (snd (snd rest))))
+	letrec bindVars = fn (st0 envB bs)
+		if (= (@ bs) 1)
+			(st0 . (envB . ~))
+		else
+			let f = (fresh st0 (+ level 1))
+			let rest = (bindVars (snd f) (cons ((fst (hdOr bs (~ . ((ENil (0 . 0)) . (0 . 0))))) . (EVar (Scheme (~ . (fst f))))) envB) (tl bs))
+			((fst rest) . ((fst (snd rest)) . (cons (fst f) (snd (snd rest)))))
+	letrec inferBinds = fn (st0 envI bs vs)
+		if (= (@ bs) 1)
+			st0
+		else
+			let b = (hdOr bs (~ . ((ENil (0 . 0)) . (0 . 0))))
+			let v = (infer st0 envI (fst (snd b)) (+ level 1))
+			let s2 = (unifyAt (snd v) (snd (snd b)) (fst v) (hdOr vs (TVar 0)))
+			inferBinds s2 envI (tl bs) (tl vs)
+	letrec bindEnv = fn (sx envB bs vs)
+		if (= (@ bs) 1)
+			envB
+		else
+			bindEnv sx (cons ((fst (hdOr bs (~ . ((ENil (0 . 0)) . (0 . 0))))) . (EVar (generalize sx level (hdOr vs (TVar 0))))) envB) (tl bs) (tl vs)
 	match node
 		EInt p -> (tInt . st)
 		EStr p -> ((tList tInt) . st)
@@ -663,6 +683,10 @@ letrec infer = fn (st env node level)
 				let v = (infer st env (fst (snd p)) (+ level 1))
 				let env2 = (cons ((fst p) . (EVar (generalize (snd v) level (fst v)))) env)
 				(infer (snd v) env2 (fst (snd (snd p))) level)
+		EMutual p ->
+			let bv = (bindVars st env (fst p))
+			let st2 = (inferBinds (fst bv) (fst (snd bv)) (fst p) (snd (snd bv)))
+			(infer st2 (bindEnv st2 env (fst p) (snd (snd bv))) (fst (snd p)) level)
 		EIf p ->
 			let rc = (infer st env (fst p) level)
 			let rt = (infer (snd rc) env (fst (snd p)) level)
