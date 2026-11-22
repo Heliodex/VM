@@ -1,7 +1,7 @@
 --!strict
 -- CHECKS THE L2 TOKENIZER, WRITTEN IN L2, AGAINST THE LUAU LEXER
 --
--- L2/programs/boot/lex.prog is the tokenizer in L2. For every input here, both lexers run on the same text, and the results must agree: the same tokens, with the same kinds, values, lines, columns and spacing, or the same error message. The inputs are every program file in L1 and L2, and a set of edge cases.
+-- L2/programs/boot/lex.l2 is the tokenizer in L2. For every input here, both lexers run on the same text, and the results must agree: the same tokens, with the same kinds, values, lines, columns and spacing, or the same error message. The inputs are every program file in L1 and L2, and a set of edge cases.
 --
 --   lute run lex_run.luau      (from Prototypes/5)
 
@@ -36,8 +36,8 @@ local function resolve(name: string): string?
 end
 
 -- The L2 tokenizer, compiled from its program file.
-const tokenizerText = readFile "L2/programs/boot/lex.prog"
-const tokenizer = L2.compile(tokenizerText, resolve, "boot/lex.prog")
+const tokenizerText = readFile "L2/programs/boot/lex.l2"
+const tokenizer = L2.compile(tokenizerText, resolve, "boot/lex.l2")
 -- The tag of each kind, in the order the L2 type Kind declares its constructors.
 const KIND_TAG: { [string]: number } = {
 	["("] = 0,

@@ -58,7 +58,7 @@ const function listPrograms(folder: string, prefix: string)
 	for _, entry in fs.listdir(folder) do
 		if entry.type == "dir" then
 			listPrograms(`{folder}/{entry.name}`, `{prefix}{entry.name}/`)
-		elseif entry.type == "file" and string.sub(entry.name, -5) == ".prog" then
+		elseif entry.type == "file" and string.sub(entry.name, -3) == ".l2" then
 			table.insert(files, `{prefix}{entry.name}`)
 		end
 	end
@@ -73,7 +73,7 @@ local skipped = 0
 for _, name in files do
 	const text = readFile(`L2/programs/{name}`)
 	const okP, program = pcall(function()
-		return ProgramFile.parse(text).program
+		return ProgramFile.parse(text, name).program
 	end)
 
 	if not okP then

@@ -1,0 +1,23 @@
+Combines the items of a list from the left, starting from an initial value. The input is the pair (f . (init . xs)): f takes the pair (acc . item) and gives the new accumulator. The output is Ok of the result.
+---
+
+---
+fn p
+	let f = (fst p)
+	let init = (fst (snd p))
+	letrec go = fn (acc l)
+		if (= (@ l) 1)
+			(Ok acc)
+		else
+			let h = ((head l)?)
+			let t = ((tail l)?)
+			(go (f (acc . h)) t)
+	(go init (snd (snd p)))
+---
+((fn p
+	(+ (fst p) (snd p))) . (0 . [1 2 3])) => Ok 6 fuel 1000
+((fn p
+	(+ (fst p) (snd p))) . (7 . ~)) => Ok 7 fuel 1000
+((fn p
+	(cons (snd p) (fst p))) . (~ . [1 2])) => Ok [2 1] fuel 1000
+

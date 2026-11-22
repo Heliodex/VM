@@ -1,0 +1,23 @@
+The first n items of a list. The input is the pair (n . xs). If n is more than the length, the whole list is given; if n is 0 or less, the result is nil.
+---
+
+---
+fn p
+	letrec t = fn (n l)
+		if (< n 1)
+			(Ok ~)
+		else
+			if (= (@ l) 1)
+				(Ok ~)
+			else
+				let h = ((head l)?)
+				let r = ((tail l)?)
+				let rest = ((t (- n 1) r)?)
+				(Ok (cons h rest))
+	(t (fst p) (snd p))
+---
+(2 . [1 2 3]) => Ok [1 2] fuel 1000
+(0 . [1 2]) => Ok ~ fuel 1000
+(5 . [1 2]) => Ok [1 2] fuel 1000
+(1 . ~) => Ok ~ fuel 1000
+

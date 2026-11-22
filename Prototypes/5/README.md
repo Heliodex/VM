@@ -45,12 +45,12 @@ The second language is **L2** (language 2). It is typed, and it has the surface 
 | `L2/desugar.luau` | Compiles a checked surface tree to machine expressions. Early return and the checks are compiled here. |
 | `L2/l2.luau` | Compiles an L2 program file: the imports, the checks, and the program. |
 | `L2/programfile.luau` | Reads an L2 program file. Tests may span lines. |
-| `L2/programs/*.prog`, `L2/programs/lib/*.prog` | L2 program files, and the L2 standard library. |
+| `L2/programs/*.l2`, `L2/programs/lib/*.l2` | L2 program files, and the L2 standard library. |
 | `l2_run.luau` | Runs every L2 program file and its tests, and checks that malformed programs are refused. |
 | `checker_run.luau` | Checks the type checker: inferred types, the type errors, and `check` and `untyped` on untyped values. |
-| `L2/programs/boot/lex.prog` | The L2 tokenizer, written in L2: the first stage of the L2 compiler in L2. |
+| `L2/programs/boot/lex.l2` | The L2 tokenizer, written in L2: the first stage of the L2 compiler in L2. |
 | `lex_run.luau` | Checks the L2 tokenizer against the Luau lexer on every program file and a set of edge cases. |
-| `L2/programs/boot/parse.prog` | The L2 parser, written in L2: stage 2 of the L2 compiler in L2. It reads the tokenizer's output. |
+| `L2/programs/boot/parse.l2` | The L2 parser, written in L2: stage 2 of the L2 compiler in L2. It reads the tokenizer's output. |
 | `parse_run.luau` | Checks the L2 parser, run on the tokenizer's output, against the Luau parser on every L2 program file and a set of cases that reach each error. |
 | `L2/programs/boot/types.l2` | The L2 checker in L2, with no mutation: the types, the state, unification, generalisation, and type inference for the core forms. |
 | `infer_run.luau` | Checks the L2 checker against the Luau checker on the programs of every L2 program file, and a set of cases for each form and error. Type variables are renamed by where they first appear, so numbering does not matter. |

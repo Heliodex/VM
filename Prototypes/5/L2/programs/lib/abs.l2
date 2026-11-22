@@ -1,0 +1,11 @@
+The absolute value of an integer.
+---
+
+---
+fn x
+	(if (< x 0) (- 0 x) x)
+---
+-7 => 7 fuel 1000
+0 => 0 fuel 1000
+5 => 5 fuel 1000
+

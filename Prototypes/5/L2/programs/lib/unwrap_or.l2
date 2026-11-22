@@ -1,0 +1,14 @@
+The value of a result, or a default. The input is the pair (r . d): a Ok gives its value, and an Err gives the default.
+---
+
+---
+fn p
+	let r = (fst p)
+	match r
+		Ok v -> v
+		Err e -> (snd p)
+---
+(Ok 5 . 9) => 5 fuel 1000
+(Err "bad" . 9) => 9 fuel 1000
+(Ok ~ . ~) => ~ fuel 1000
+

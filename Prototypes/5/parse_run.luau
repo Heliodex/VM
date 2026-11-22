@@ -1,7 +1,7 @@
 --!strict
 -- CHECKS THE L2 PARSER, WRITTEN IN L2, AGAINST THE LUAU PARSER
 --
--- L2/programs/boot/parse.prog is the parser in L2, and it reads the token list that L2/programs/boot/lex.prog gives. For every program here, both parsers run on the same text, and the results must agree: the same tree, with the same positions, or the same error message. The tree is written as values in the layout given at the top of parse.prog, so both results can be compared as data.
+-- L2/programs/boot/parse.l2 is the parser in L2, and it reads the token list that L2/programs/boot/lex.l2 gives. For every program here, both parsers run on the same text, and the results must agree: the same tree, with the same positions, or the same error message. The tree is written as values in the layout given at the top of parse.prog, so both results can be compared as data.
 --
 -- The inputs are the program sections of every L2 program file, and a set of cases that reach each error the parser gives. An input the tokenizer refuses is skipped here, since lex_run.luau checks the tokenizer.
 --
@@ -38,8 +38,8 @@ local function resolve(name: string): string?
 	return nil
 end
 
-const tokenizer = L2.compile(readFile "L2/programs/boot/lex.prog", resolve, "boot/lex.prog")
-const parser = L2.compile(readFile "L2/programs/boot/parse.prog", resolve, "boot/parse.prog")
+const tokenizer = L2.compile(readFile "L2/programs/boot/lex.l2", resolve, "boot/lex.l2")
+const parser = L2.compile(readFile "L2/programs/boot/parse.l2", resolve, "boot/parse.l2")
 
 -- VALUES
 const function bytesOf(s: string): VM.Value

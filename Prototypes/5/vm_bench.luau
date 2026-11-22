@@ -1,7 +1,7 @@
 --!strict
 -- Temporary benchmark for the VM: steps and steps per second on two workloads.
 --   fib: a recursive function built from the VM's builders (calls, primitives, if, fix).
---   checker: the L2 checker on option.prog, repeated (a realistic L2 workload).
+--   checker: the L2 checker on option.l2, repeated (a realistic L2 workload).
 
 const L2 = require "./L2/l2"
 const ProgramFile = require "./L2/programfile"
@@ -61,11 +61,11 @@ print(
 			"-"
 	)
 )
--- The checker, run on option.prog several times, with the program parsed once.
-const tokenizer = L2.compile(readFile "L2/programs/boot/lex.prog", resolve, "boot/lex.prog")
-const parser = L2.compile(readFile "L2/programs/boot/parse.prog", resolve, "boot/parse.prog")
+-- The checker, run on option.l2 several times, with the program parsed once.
+const tokenizer = L2.compile(readFile "L2/programs/boot/lex.l2", resolve, "boot/lex.l2")
+const parser = L2.compile(readFile "L2/programs/boot/parse.l2", resolve, "boot/parse.l2")
 const checkerProgram = L2.compile(readFile "L2/programs/boot/types.l2", resolve, "boot/types.l2")
-const src = ProgramFile.parse(readFile "L2/programs/option.prog").program
+const src = ProgramFile.parse(readFile "L2/programs/option.l2").program
 local v: VM.Value = VM.NIL
 
 for i = #src, 1, -1 do
@@ -76,7 +76,7 @@ const tokenized = L2.run(tokenizer, v, 1e8)
 const parsed = L2.run(parser, ((tokenized :: any).value :: VM.Con).payload, 5e8)
 const request: VM.Value = { kind = "con"; tag = 3; payload = ((parsed :: any).value :: VM.Con).payload }
 timed(
-	"checker on option.prog x 10",
+	"checker on option.l2 x 10",
 	function()
 		local total = 0
 		local last: any = { status = "value"; value = VM.NIL; steps = 0 }

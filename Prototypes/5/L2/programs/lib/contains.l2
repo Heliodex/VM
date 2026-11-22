@@ -1,0 +1,22 @@
+Whether an item is in a list of integers. The input is the pair (x . xs); the output is Ok 1 if x is in xs, and Ok 0 if not.
+---
+
+---
+fn p
+	let x = (fst p)
+	letrec c = fn l
+		if (= (@ l) 1)
+			(Ok 0)
+		else
+			let h = ((head l)?)
+			if (= h x)
+				(Ok 1)
+			else
+				let t = ((tail l)?)
+				(c t)
+	(c (snd p))
+---
+(2 . [1 2 3]) => Ok 1 fuel 1000
+(9 . [1 2 3]) => Ok 0 fuel 1000
+(1 . ~) => Ok 0 fuel 1000
+

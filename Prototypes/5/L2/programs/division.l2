@@ -1,0 +1,10 @@
+Division gives an Err for a zero divisor, rather than ending the run. A divisor that is not zero gives Ok of the quotient.
+---
+
+---
+fn x
+	(/ 10 x)
+---
+2 => Ok 5 fuel 1000
+0 => Err [100 105 118 105 115 105 111 110 32 98 121 32 122 101 114 111] fuel 1000
+

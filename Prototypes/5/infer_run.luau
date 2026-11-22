@@ -38,8 +38,8 @@ local function resolve(name: string): string?
 	return nil
 end
 
-const tokenizer = L2.compile(readFile "L2/programs/boot/lex.prog", resolve, "boot/lex.prog")
-const parser = L2.compile(readFile "L2/programs/boot/parse.prog", resolve, "boot/parse.prog")
+const tokenizer = L2.compile(readFile "L2/programs/boot/lex.l2", resolve, "boot/lex.l2")
+const parser = L2.compile(readFile "L2/programs/boot/parse.l2", resolve, "boot/parse.l2")
 const checkerProgram = L2.compile(readFile "L2/programs/boot/types.l2", resolve, "boot/types.l2")
 
 -- The bytes of a string, and a string of the bytes of a list of values.

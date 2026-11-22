@@ -182,7 +182,17 @@ end
 
 -- A flat expression, or a block that is the value of a let or an argument.
 const function headerOf(e: Expr): string?
-	if e.k == "fn" then
+	if e.k == "record" then
+		return e.name
+	elseif e.k == "with" then
+		const b = flat(e.base)
+
+		if b == nil then
+			return nil
+		end
+
+		return `with {b}`
+	elseif e.k == "fn" then
 		if #e.names == 1 then
 			return `fn {e.names[1]}`
 		end
@@ -204,8 +214,33 @@ const function headerOf(e: Expr): string?
 end
 
 -- The lines below the header of a block value: a fn's body, a match's arms, or an application's arguments.
-const function emitBelow(e: Expr, ind: number, out: { string })
-	if e.k == "fn" then
+-- A field line, name = value: the value on the line, or a header with its block below.
+local emitBelow: (Expr, number, { string }) -> ()
+
+const function emitField(name: string, value: Expr, ind: number, out: { string })
+	const t = flat(value)
+
+	if t ~= nil then
+		line(out, ind, `{name} = {t}`)
+		return
+	end
+
+	const h = headerOf(value)
+
+	if h == nil then
+		fail(value.at, "a field value of this form is not written as a block")
+	end
+
+	line(out, ind, `{name} = {h :: string}`)
+	emitBelow(value, ind + 1, out)
+end
+
+emitBelow = function(e: Expr, ind: number, out: { string })
+	if e.k == "record" or e.k == "with" then
+		for _, f in e.fields do
+			emitField(f.name, f.value, ind, out)
+		end
+	elseif e.k == "fn" then
 		emit(e.body, ind, out)
 	elseif e.k == "match" then
 		for _, arm in e.arms do
@@ -255,7 +290,16 @@ emit = function(e: Expr, ind: number, out: { string })
 		return
 	end
 
-	if e.k == "let" then
+	if e.k == "record" or e.k == "with" then
+		const h = headerOf(e)
+
+		if h == nil then
+			fail(e.at, "a record or with is written with its base on one line")
+		end
+
+		line(out, ind, h :: string)
+		emitBelow(e, ind + 1, out)
+	elseif e.k == "let" then
 		emitValue(
 			e.value,
 			e.name,
@@ -317,9 +361,17 @@ M.program = function(program: Parser.Program): string
 
 	for _, d in program.decls do
 		local cons: { string } = {}
+		local fields: { Parser.FieldDecl }? = nil
 
-		for _, c in d.cons do
-			if c.payload ~= nil then
+		for k, c in d.cons do
+			if c.fields ~= nil then
+				if k ~= #d.cons then
+					fail(c.at, "a record constructor is the last constructor of its type")
+				end
+
+				fields = c.fields
+				table.insert(cons, c.name)
+			elseif c.payload ~= nil then
 				table.insert(cons, `{c.name} {typeText(c.payload :: Parser.Type)}`)
 			else
 				table.insert(cons, c.name)
@@ -332,6 +384,12 @@ M.program = function(program: Parser.Program): string
 			else
 				""
 		line(out, 0, `type {d.name}{params} = {table.concat(cons, " | ")}`)
+
+		if fields ~= nil then
+			for _, f in fields :: { Parser.FieldDecl } do
+				line(out, 1, `{f.name}: {typeText(f.type)}`)
+			end
+		end
 	end
 
 	emit(program.expr, 0, out)

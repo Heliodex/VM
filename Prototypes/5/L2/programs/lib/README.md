@@ -1,6 +1,6 @@
 # The standard library, in L2
 
-Each file here is an L2 program file (see `L2/programs/`). Each one defines one function, and its tests run with the rest of `l2_run.luau`. A program that uses a library function imports it by its path from the top of `L2/programs/`, such as `lib/sort.prog` importing `lib/insert.prog`.
+Each file here is an L2 program file (see `L2/programs/`). Each one defines one function, and its tests run with the rest of `l2_run.luau`. A program that uses a library function imports it by its path from the top of `L2/programs/`, such as `lib/sort.l2` importing `lib/insert.l2`.
 
 This is the L2 counterpart of `L1/programs/lib/`. The same functions are here, with the L2 conventions in place of the L1 ones.
 

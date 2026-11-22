@@ -1,0 +1,16 @@
+A letrec block binds all its names together, so its functions can call each other, as a mutual group does.
+---
+
+---
+fn n
+	letrec
+		even = fn k
+			(if (= k 0) 1 (odd (- k 1)))
+		odd = fn k
+			(if (= k 0) 0 (even (- k 1)))
+	(even n)
+---
+0 => 1 fuel 1000
+3 => 0 fuel 1000
+4 => 1 fuel 1000
+
