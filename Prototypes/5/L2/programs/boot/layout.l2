@@ -480,9 +480,36 @@ letrec
 			else
 				let more = (declFields (tlOf ks))?
 				Ok (cons (ntext c) more)
+	endsEq = fn s
+		if (< (lenL s) 2)
+			0
+		else
+			startsWith " =" (dropN s (- (lenL s) 2))
+	sumOk = fn cs
+		if (= (@ cs) 1)
+			Ok 1
+		elseif (if (startsWith "| " (ntext (hdN cs))) (= (@ (kids (hdN cs))) 1) 0)
+			sumOk (tlOf cs)
+		else
+			lineErr (nline (hdN cs)) "a constructor of a sum is a line starting with |, with nothing below it"
+	sumText = fn cs
+		if (= (@ (tlOf cs)) 1)
+			Ok (dropN (ntext (hdN cs)) 2)
+		else
+			let rest = (sumText (tlOf cs))?
+			Ok (cat (dropN (ntext (hdN cs)) 2) (cat " | " rest))
 	declLine = fn d
-		if (= (@ (kids d)) 1)
+		if (endsEq (ntext d))
+			if (= (@ (kids d)) 1)
+				lineErr (nline d) "a sum needs its constructors below it, each starting with |"
+			else
+				let checked = (sumOk (kids d))?
+				let st = (sumText (kids d))?
+				Ok (cat (ntext d) (cat " " st))
+		elseif (= (@ (kids d)) 1)
 			Ok (ntext d)
+		elseif (startsWith "| " (ntext (hdN (kids d))))
+			lineErr (nline (hdN (kids d))) "the constructors of a sum go below a type line that ends with ="
 		else
 			let fs = (declFields (kids d))?
 			Ok (cat (ntext d) (cat " {\n" (cat (joinLines fs) "\n}")))

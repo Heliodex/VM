@@ -68,6 +68,9 @@ const function layerInL2(src: string): string
 end
 
 local ERRORS: { { name: string; l2: string } } = {
+	{ name = "a sum with no constructors below"; l2 = "type T =\n\nfn x\n\tx" },
+	{ name = "a sum constructor with no |"; l2 = "type T =\n\tA\n\tB\n\nfn x\n\tx" },
+	{ name = "constructors below a type line with no ="; l2 = "type T = A\n\t| B\n\nfn x\n\tx" },
 	{ name = "an empty file"; l2 = "" },
 	{ name = "a space at the start of a line"; l2 = " fn x" },
 	{ name = "a let with no body"; l2 = "let a = 1" },
@@ -192,6 +195,11 @@ local CASES: { { name: string; l2: string; prog: string } } = {
 		name = "record declaration in a sum",
 		l2 = "type Tr = TEmpty | TNode\n\tvalue: Int\n\tleft: Int\n\nfn x\n\tx",
 		prog = "type Tr = TEmpty | TNode {\n\tvalue: Int\n\tleft: Int\n}\n\nfn x\n\tx",
+	},
+	{
+		name = "a sum with its constructors below",
+		l2 = "type Opt =\n\t| None\n\t| Some Int\n\nfn x\n\tx",
+		prog = "type Opt = None | Some Int\n\nfn x\n\tx",
 	},
 	{
 		name = "a record literal in a let",

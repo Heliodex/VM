@@ -16,6 +16,7 @@
 --   with e                 children are the field lines: name = value
 --   C                      with children that are field lines: a record literal, or a record pattern in an arm
 --   type T = C             children are the field lines of a record declaration: name: Type
+--   type T =             children are the constructors of a sum, each a line starting with |
 --   f                      any other line with children: an application, the children its arguments, one per line
 --
 -- Brackets, and the braces of match, cond, with and records, are added here. A block of one expression is bracketed.
@@ -370,7 +371,27 @@ const function program(roots: { Node }): string
 	while i <= #roots and string.match(roots[i].text, "^type ") do
 		const d = roots[i]
 
-		if #d.children > 0 then
+		if string.sub(d.text, -2) == " =" then
+			if #d.children == 0 then
+				fail(d.line, "a sum needs its constructors below it, each starting with |")
+			end
+
+			local parts: { string } = {}
+
+			for _, c in d.children do
+				if string.sub(c.text, 1, 2) ~= "| " or #c.children > 0 then
+					fail(c.line, "a constructor of a sum is a line starting with |, with nothing below it")
+				end
+
+				table.insert(parts, string.sub(c.text, 3))
+			end
+
+			table.insert(out, d.text .. " " .. table.concat(parts, " | "))
+		elseif #d.children > 0 then
+			if string.sub(d.children[1].text, 1, 2) == "| " then
+				fail(d.children[1].line, "the constructors of a sum go below a type line that ends with =")
+			end
+
 			local lines: { string } = {}
 
 			for _, c in d.children do

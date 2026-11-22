@@ -124,6 +124,7 @@ The forms, by the line that starts them (`L2/layout.luau` has the rules):
 | with | `with e` with fields below | `with e { ... }` |
 | record literal | `Con` with fields below | `Con { ... }` |
 | record declaration | `type T = Con` with fields below | `type T = Con { ... }` |
+| sum | `type T =` with each constructor on a line below, starting with `\|` | `type T = A \| B` |
 
 Decided after the trial:
 
