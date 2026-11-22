@@ -26,13 +26,16 @@ export type Result = { expr: Parser.Expr; input: Parser.Test; inputExpect: strin
 type Pos = Parser.Pos
 type CheckNode = { k: "check"; e: Parser.Expr; test: Parser.Test?; expect: string; at: Pos }
 type Pending = { node: CheckNode; ty: Ty }
-type SumCtor = { name: string; tag: number; payload: Ty? }
+type SumCtor = { name: string; tag: number; payload: Ty?; fields: { string }? }
+-- An accessor: the field at index (from 1) of a record of count fields, whose constructor is info.
+type FieldInfo = { info: CtorInfo; index: number; count: number }
 type Sum = { key: string; name: string; params: { Ty }; ctors: { SumCtor } }
 type CtorInfo = { sum: Sum; ctor: SumCtor }
 type Cx = {
 	sums: { [string]: Sum },
 	sumNames: { [string]: string },
 	ctors: { [string]: CtorInfo },
+	fields: { [string]: FieldInfo },
 	pending: { Pending },
 	errors: { string },
 }
@@ -304,6 +307,7 @@ local function newCx(): Cx
 			Ok = { sum = result; ctor = ok },
 			Err = { sum = result; ctor = err },
 		},
+		fields = {},
 		pending = {},
 		errors = {},
 	}
@@ -360,6 +364,33 @@ local function convType(cx: Cx, t: Parser.Type, params: { [string]: Ty }): Ty
 end
 
 -- Declares every sum of the program. Names are entered first, so a sum can refer to itself and to the others.
+-- A record's payload is its fields as pairs, nested with the last field unwrapped, as the desugarer builds them.
+local function payloadOf(tys: { Ty }): Ty
+	local n = #tys
+	local t = tys[n]
+
+	for i = n - 1, 1, -1 do
+		t = pairOf(tys[i], t)
+	end
+
+	return t
+end
+
+-- The type of field index (from 1) of a record of count fields, whose payload is payload: the tail is taken index - 1 times, then the head, unless it is the last field.
+local function fieldAt(payload: Ty, index: number, count: number): Ty
+	local t: any = payload
+
+	for _ = 1, index - 1 do
+		t = t.args[2]
+	end
+
+	if index < count then
+		return t.args[1]
+	end
+
+	return t
+end
+
 local function declare(cx: Cx, decls: { Parser.TypeDecl }, fileKey: string)
 	local paramMaps: { { [string]: Ty } } = {}
 
@@ -392,14 +423,35 @@ local function declare(cx: Cx, decls: { Parser.TypeDecl }, fileKey: string)
 			end
 
 			local payload: Ty? = nil
+			local fields: { string }? = nil
 
-			if c.payload ~= nil then
+			if c.fields ~= nil then
+				local tys: { Ty } = {}
+				fields = {}
+
+				for _, f in c.fields :: { Parser.FieldDecl } do
+					if cx.ctors[f.name] ~= nil or cx.fields[f.name] ~= nil then
+						failAt(f.at, string.format("%s is already declared", f.name))
+					end
+
+					table.insert(tys, convType(cx, f.type, paramMaps[i]))
+					table.insert(fields :: { string }, f.name)
+				end
+
+				payload = payloadOf(tys)
+			elseif c.payload ~= nil then
 				payload = convType(cx, c.payload :: Parser.Type, paramMaps[i])
 			end
 
-			const ctor: SumCtor = { name = c.name; tag = k - 1; payload = payload }
+			const ctor: SumCtor = { name = c.name; tag = k - 1; payload = payload; fields = fields }
 			table.insert(sum.ctors, ctor)
 			cx.ctors[c.name] = { sum = sum; ctor = ctor }
+
+			if fields ~= nil then
+				for j, fname in fields do
+					cx.fields[fname] = { info = cx.ctors[c.name]; index = j; count = #fields }
+				end
+			end
 		end
 	end
 end
@@ -504,6 +556,10 @@ local function lookup(cx: Cx, env: { [string]: Scheme }, name: string, at: Pos, 
 	const info = cx.ctors[name]
 
 	if info ~= nil then
+		if info.ctor.fields ~= nil then
+			return failAt(at, string.format("%s is a record: write its fields in braces", name))
+		end
+
 		const payload, sumTy = ctorInstance(info, level)
 
 		if payload ~= nil then
@@ -511,6 +567,14 @@ local function lookup(cx: Cx, env: { [string]: Scheme }, name: string, at: Pos, 
 		end
 
 		return sumTy
+	end
+
+	const accessor = cx.fields[name]
+
+	if accessor ~= nil then
+		const payload, sumTy = ctorInstance(accessor.info, level)
+
+		return arrow(sumTy, fieldAt(payload :: Ty, accessor.index, accessor.count))
 	end
 
 	return failAt(at, string.format("%s is not bound", name))
@@ -525,6 +589,8 @@ local function use(cx: Cx, node: Parser.Expr, actual: Ty, expected: Ty, at: Pos)
 end
 
 local inferNode: (Cx, { [string]: Scheme }, Parser.Expr, number, Ty) -> (Parser.Expr, Ty)
+local inferRecord: (Cx, { [string]: Scheme }, { name: string; fields: { Parser.FieldInit }; at: Pos }, number, Ty) -> (Parser.Expr, Ty)
+local inferWith: (Cx, { [string]: Scheme }, { base: Parser.Expr; fields: { Parser.FieldInit }; at: Pos }, number, Ty) -> (Parser.Expr, Ty)
 
 -- Records a type error, and rethrows anything else, since that is a bug in the checker.
 local function recordError(cx: Cx, err: unknown)
@@ -701,11 +767,19 @@ inferNode = function(cx: Cx, env: { [string]: Scheme }, node: Parser.Expr, level
 			const pat = arm.pat
 			local inner = table.clone(env)
 
-			if pat.k == "con" then
+			if pat.k == "con" or pat.k == "rec" then
 				const info = cx.ctors[pat.name]
 
 				if info == nil then
 					failAt(pat.at, string.format("%s is not a constructor", pat.name))
+				end
+
+				if pat.k == "rec" and info.ctor.fields == nil then
+					failAt(pat.at, string.format("%s is not a record", pat.name))
+				end
+
+				if pat.k == "con" and info.ctor.fields ~= nil then
+					failAt(pat.at, string.format("%s is a record: match its fields in braces", pat.name))
 				end
 
 				if sumTy == nil then
@@ -724,7 +798,40 @@ inferNode = function(cx: Cx, env: { [string]: Scheme }, node: Parser.Expr, level
 				const payload = ctorWithArgs(info, sumArgs)
 				covered[info.ctor.tag] = true
 
-				if pat.bind ~= nil then
+				if pat.k == "rec" then
+					const names = info.ctor.fields :: { string }
+					local seen: { [string]: boolean } = {}
+
+					for _, f in pat.fields do
+						local index: number? = nil
+
+						for j, n in names do
+							if n == f.name then
+								index = j
+							end
+						end
+
+						if index == nil then
+							failAt(f.at, string.format("%s has no field %s", pat.name, f.name))
+						end
+
+						if seen[f.name] then
+							failAt(f.at, string.format("%s is given twice", f.name))
+						end
+
+						seen[f.name] = true
+
+						if f.bind ~= nil then
+							inner[f.bind :: string] = { vars = {}; ty = fieldAt(payload :: Ty, index :: number, #names) }
+						end
+					end
+
+					for _, n in names do
+						if not seen[n] then
+							failAt(pat.at, string.format("%s needs the field %s", pat.name, n))
+						end
+					end
+				elseif pat.bind ~= nil then
 					if payload == nil then
 						failAt(pat.at, string.format("%s has no payload to bind", pat.name))
 					end
@@ -757,6 +864,10 @@ inferNode = function(cx: Cx, env: { [string]: Scheme }, node: Parser.Expr, level
 		end
 
 		return { k = "match"; scrut = scrut; arms = arms; at = node.at }, resTy
+	elseif node.k == "record" then
+		return inferRecord(cx, env, node, level, ret)
+	elseif node.k == "with" then
+		return inferWith(cx, env, node, level, ret)
 	elseif node.k == "untyped" then
 		const e = infer(cx, env, node.e, level, ret)
 
@@ -786,6 +897,119 @@ end
 
 -- DESCRIBING TYPES AS TESTS
 -- The test a check of type t runs. A list or sum that refers to itself is described once, and the references to it are rec.
+-- The field values of a record literal, against the field types, in the order the declaration gives them.
+inferRecord = function(cx: Cx, env: { [string]: Scheme }, node: { name: string; fields: { Parser.FieldInit }; at: Pos }, level: number, ret: Ty): (Parser.Expr, Ty)
+	const info = cx.ctors[node.name]
+
+	if info == nil or info.ctor.fields == nil then
+		failAt(node.at, string.format("%s is not a record", node.name))
+	end
+
+	const names = info.ctor.fields :: { string }
+	const payload, sumTy = ctorInstance(info, level)
+
+	for k, init in node.fields do
+		local known = false
+
+		for _, n in names do
+			if n == init.name then
+				known = true
+			end
+		end
+
+		if not known then
+			failAt(init.at, string.format("%s has no field %s", node.name, init.name))
+		end
+
+		for j = 1, k - 1 do
+			if node.fields[j].name == init.name then
+				failAt(init.at, string.format("%s is given twice", init.name))
+			end
+		end
+	end
+
+	local values: { [string]: Parser.Expr } = {}
+
+	for j, n in names do
+		local init: Parser.FieldInit? = nil
+
+		for _, f in node.fields do
+			if f.name == n then
+				init = f
+			end
+		end
+
+		if init == nil then
+			failAt(node.at, string.format("%s needs the field %s", node.name, n))
+		end
+
+		const out, ity = infer(cx, env, (init :: Parser.FieldInit).value, level, ret)
+		values[n] = use(cx, out, ity, fieldAt(payload :: Ty, j, #names), (init :: Parser.FieldInit).value.at)
+	end
+
+	local fields: { Parser.FieldInit } = {}
+
+	for _, init in node.fields do
+		table.insert(fields, { name = init.name; value = values[init.name]; at = init.at })
+	end
+
+	return { k = "record"; name = node.name; fields = fields; at = node.at }, sumTy
+end
+
+-- A record with some of its fields changed: the base has the record's type, and each field named has that field's type.
+inferWith = function(cx: Cx, env: { [string]: Scheme }, node: { base: Parser.Expr; fields: { Parser.FieldInit }; at: Pos }, level: number, ret: Ty): (Parser.Expr, Ty)
+	const first = node.fields[1]
+	const acc = cx.fields[first.name]
+
+	if acc == nil then
+		failAt(first.at, string.format("%s is not a field of a record", first.name))
+	end
+
+	const info = (acc :: FieldInfo).info
+	const names = info.ctor.fields :: { string }
+	const payload, sumTy = ctorInstance(info, level)
+	const base, bt = infer(cx, env, node.base, level, ret)
+	const baseOut = use(cx, base, bt, sumTy, node.base.at)
+
+	for k, init in node.fields do
+		local known = false
+
+		for _, n in names do
+			if n == init.name then
+				known = true
+			end
+		end
+
+		if not known then
+			failAt(init.at, string.format("%s is not a field of %s", init.name, info.ctor.name))
+		end
+
+		for j = 1, k - 1 do
+			if node.fields[j].name == init.name then
+				failAt(init.at, string.format("%s is given twice", init.name))
+			end
+		end
+	end
+
+	local fields: { Parser.FieldInit } = {}
+
+	for _, init in node.fields do
+		local index = 1
+
+		for j, n in names do
+			if n == init.name then
+				index = j
+			end
+		end
+
+		const out, ity = infer(cx, env, init.value, level, ret)
+		const checked = use(cx, out, ity, fieldAt(payload :: Ty, index, #names), init.value.at)
+		table.insert(fields, { name = init.name; value = checked; at = init.at })
+	end
+
+	return { k = "with"; base = baseOut; fields = fields; at = node.at }, sumTy
+end
+
 local function describe(cx: Cx, t: Ty): Parser.Test
 	local stack: { [string]: boolean } = {}
 	local used: { [string]: boolean } = {}
