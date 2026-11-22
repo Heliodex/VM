@@ -27,20 +27,34 @@ Records are therefore a reader and checker feature. The machine never sees a fie
 
 ## 3. Syntax
 
+Field lists are written one field per line, between `{` and `}`. There are no commas. A comma in a field list is an error, reported as "a field goes on its own line, not after a comma". This follows the block form for local bindings (SPEC section 12.1), where each binding is on its own line.
+
 ### 3.1 Declaring a record
 
 A record is a sum with one constructor, whose payload is named fields:
 
 ```
-type MS = MS { st: St, fixed: Int, name: [Int], ty: Ty, args: [Ty], cov: [Int], catch: Int }
+type MS = MS {
+	st: St
+	fixed: Int
+	name: [Int]
+	ty: Ty
+	args: [Ty]
+	cov: [Int]
+	catch: Int
+}
 ```
 
-The constructor is `MS`, as for any sum. The braces are part of the declaration, and the field list is comma-separated.
+The constructor is `MS`, as for any sum. The braces are part of the declaration.
 
 A constructor of a larger sum may also have a record payload, in place of the single type it has now:
 
 ```
-type Tr = TEmpty | TNode { value: Bind, left: Tr, right: Tr }
+type Tr = TEmpty | TNode {
+	value: Bind
+	left: Tr
+	right: Tr
+}
 ```
 
 A constructor takes either one type (today) or one record, not both.
@@ -48,7 +62,15 @@ A constructor takes either one type (today) or one record, not both.
 ### 3.2 Building a value
 
 ```
-MS { st = s, fixed = 1, name = n, ty = t, args = a, cov = c, catch = 0 }
+let s0 = MS {
+	st = s
+	fixed = 1
+	name = n
+	ty = t
+	args = a
+	cov = c
+	catch = 0
+}
 ```
 
 Every field must be given, once. A missing field, an extra field or a repeated field is an error. Fields may be given in any order, since the order in the literal does not affect the value.
@@ -70,7 +92,9 @@ Accessors are names in scope, so two records may not share a field name in one s
 Values are not mutable, so a change is a new value:
 
 ```
-with ms { fixed = 0 }
+with ms {
+	fixed = 0
+}
 ```
 
 This builds a record with the same constructor, takes every field from `ms`, and replaces the fields named. The fields named must exist in the record. The desugaring is an ordinary construction, so no new machine form is needed.
@@ -81,7 +105,15 @@ A record is matched in a `match` arm by naming every field:
 
 ```
 match ms {
-	MS { st = s, fixed = f, name = n, ty = t, args = a, cov = c, catch = k } -> body
+	MS {
+		st = s
+		fixed = f
+		name = n
+		ty = t
+		args = a
+		cov = c
+		catch = k
+	} -> body
 }
 ```
 
@@ -104,8 +136,10 @@ The record's parameters are the parameters of its declaration: `type Pair a = Pa
 
 Record literals and record patterns use `{`, which is already the block delimiter. The two uses are told apart by context:
 
-- A record literal is a constructor name followed directly by `{`, with fields inside it. A constructor name followed by `{` in a `match` scrutinee would be ambiguous (`match Empty {`), so the parser reads the scrutinee in a no-record context, as it already does for `sig` in `parser.luau`. A scrutinee that is a record literal is written in parentheses.
+- A record literal is a constructor name followed by `{`, with fields inside it, one per line. A constructor name followed by `{` in a `match` scrutinee would be ambiguous (`match Empty {`), so the parser reads the scrutinee in a no-record context, as it already does for `sig` in `parser.luau`. A scrutinee that is a record literal is written in parentheses.
 - A record pattern is a constructor name followed by `{` in a `match` arm, where a pattern is expected.
+
+Inside the braces the parser reads one field, then requires a new line or `}`. It does not allow a comma, so a comma is reported at once. A field's value may run to the end of its line; a longer value goes in parentheses, as a `let` value does.
 
 Field names are lowercase names, as variables are. Constructor names stay capitalised, so the two never collide.
 
@@ -118,9 +152,11 @@ Each record error names the record and the field, and is reported at the field w
 - `fixed is given twice`
 - `fixed is not a field of MS` (for `with` and patterns)
 - `fixed is already declared` (two records in one scope with the same field)
+- `a field goes on its own line, not after a comma` (a comma in a field list)
 
 ## 7. What this does not do
 
+- No one-line records. `MS { fixed = 1 }` on one line is not a record literal; a field list always spans lines. This keeps one way to write a record.
 - No default field values.
 - No `..` to skip fields in a pattern. Naming every field is the rule.
 - No field access by dot syntax. `(fixed ms)` is the one form, so no change is needed to the reader's handling of `.` in pairs.
@@ -135,8 +171,8 @@ Each record error names the record and the field, and is reported at the field w
 
 ## 9. Plan if accepted
 
-1. Reader: parse `type T = C { fields }` and record literals and patterns in `parse.prog` and `parser.luau`, with the context rule in section 5.
+1. Reader: parse `type T = C { fields }` and record literals and patterns in `parse.prog` and `parser.luau`, with the context rule and the no-comma rule in section 5.
 2. Desugarer: expand each construction, pattern, `with` and accessor to the nested-pair form, in `desugar.luau`.
 3. Checker: give each record's constructor and accessors their schemes, in `checker.luau`, and the same in `types.prog`.
-4. Tests: a round trip from record syntax to the pair form, the errors in section 6, and the `match Empty {` case. The comparison runners (`parse_run`, `infer_run`) then cover records as they cover the rest.
+4. Tests: a round trip from record syntax to the pair form, the errors in section 6, the comma error, and the `match Empty {` case. The comparison runners (`parse_run`, `infer_run`) then cover records as they cover the rest.
 5. Migrate the checker's own records (`St`, `MS`, `Tr`, `Entry`) to records, and check that the self-check step count stays within a few per cent of the current figure, since the accessors compile to the same chains.
