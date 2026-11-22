@@ -349,7 +349,7 @@ letrec
 			condText n
 		elseif (startsWith "with " (ntext n))
 			withText n
-		elseif (if (isCapB (ntext n)) (allFieldsOf (kids n)) 0)
+		elseif (if (isCapB (ntext n)) (if (= (@ (kids n)) 1) 0 (allFieldsOf (kids n))) 0)
 			recordText n
 		elseif (= (@ (kids n)) 1)
 			Ok (ntext n)

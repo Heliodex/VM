@@ -213,6 +213,11 @@ local CASES: { { name: string; l2: string; prog: string } } = {
 		prog = "type Tr = TNode {\n\tvalue: Int\n} | TEmpty\n\nfn x\n\tx",
 	},
 	{
+		name = "a capitalised line with an argument is an application",
+		l2 = "fn x\n\tErr x",
+		prog = "fn x\n\tErr x",
+	},
+	{
 		name = "a record literal in a let",
 		l2 = "let s = MS\n\tfixed = 1\ns",
 		prog = "let s = MS {\n\tfixed = 1\n}\ns",
