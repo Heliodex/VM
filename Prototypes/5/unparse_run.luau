@@ -5,10 +5,10 @@
 --
 --   lute run unparse_run.luau      (from Prototypes/5)
 
+const Layout = require "./L2/layout"
 const Parser = require "./L2/parser"
 const ProgramFile = require "./L2/programfile"
 const Unparse = require "./L2/unparse"
-const Layout = require "./L2/layout"
 const fs = require "@lute/fs"
 
 const function readFile(path: string): string
@@ -66,7 +66,6 @@ end
 
 listPrograms("L2/programs", "")
 table.sort(files)
-
 local total = 0
 local failures = 0
 local skipped = 0
@@ -92,7 +91,6 @@ for _, name in files do
 			const okR, relaid = pcall(function()
 				return Parser.parse(Layout.layout(written :: string))
 			end)
-
 			local diff: string? = nil
 
 			if not okR then

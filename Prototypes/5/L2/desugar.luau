@@ -149,7 +149,6 @@ local function buildCtors(decls: { Parser.TypeDecl }): { [string]: Ctor }
 				sum = decl.name,
 				fields = names,
 			}
-
 			-- Every field of a record is an accessor. A field name is lowercase, so it cannot clash with a constructor, but two records cannot share one.
 			local fieldDecls: { Parser.FieldDecl } = con.fields or {}
 

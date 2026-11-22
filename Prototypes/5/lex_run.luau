@@ -63,7 +63,7 @@ const function bytesValue(bytes: { number }): VM.Value
 	local v: VM.Value = VM.NIL
 
 	for i = #bytes, 1, -1 do
-		v = { kind = "cell", head = bytes[i], tail = v } :: VM.Cell
+		v = { kind = "cell"; head = bytes[i]; tail = v } :: VM.Cell
 	end
 
 	return v
@@ -96,7 +96,7 @@ const function tokenValue(t: Lexer.Token): VM.Value
 		payload = bytesValue(stringBytes(t.value :: string))
 	end
 
-	const kind: VM.Value = { kind = "con", tag = KIND_TAG[t.kind], payload = payload }
+	const kind: VM.Value = { kind = "con"; tag = KIND_TAG[t.kind]; payload = payload }
 	const spaced: VM.Value =
 		if t.spaced then
 			1
@@ -106,7 +106,7 @@ const function tokenValue(t: Lexer.Token): VM.Value
 	return {
 		kind = "cell",
 		head = kind,
-		tail = { kind = "cell", head = t.line, tail = { kind = "cell", head = t.col, tail = spaced } },
+		tail = { kind = "cell"; head = t.line; tail = { kind = "cell"; head = t.col; tail = spaced } },
 	}
 end
 
@@ -115,16 +115,16 @@ const function expectedValue(src: string): string
 	const ok, res = pcall(Lexer.tokenize, src)
 
 	if not ok then
-		return Data.write({ kind = "con", tag = 1, payload = bytesValue(stringBytes(tostring(res))) } :: VM.Value)
+		return Data.write({ kind = "con"; tag = 1; payload = bytesValue(stringBytes(tostring(res))) } :: VM.Value)
 	end
 
 	local list: VM.Value = VM.NIL
 
 	for i = #(res :: { Lexer.Token }), 1, -1 do
-		list = { kind = "cell", head = tokenValue((res :: { Lexer.Token })[i]), tail = list }
+		list = { kind = "cell"; head = tokenValue((res :: { Lexer.Token })[i]); tail = list }
 	end
 
-	return Data.write({ kind = "con", tag = 0, payload = list } :: VM.Value)
+	return Data.write({ kind = "con"; tag = 0; payload = list } :: VM.Value)
 end
 
 -- The L2 tokenizer's outcome for src, as the same text.
@@ -163,17 +163,17 @@ const function check(name: string, src: string)
 end
 
 -- Every program file in L1 and L2, whole.
-local function listPrograms(folder: string, prefix: string, out: { { name: string, text: string } })
+local function listPrograms(folder: string, prefix: string, out: { { name: string; text: string } })
 	for _, entry in fs.listdir(folder) do
 		if entry.type == "dir" then
 			listPrograms(`{folder}/{entry.name}`, `{prefix}{entry.name}/`, out)
 		elseif entry.type == "file" and (string.sub(entry.name, -5) == ".prog" or string.sub(entry.name, -3) == ".l2") then
-			table.insert(out, { name = `{prefix}{entry.name}`, text = readFile(`{folder}/{entry.name}`) })
+			table.insert(out, { name = `{prefix}{entry.name}`; text = readFile(`{folder}/{entry.name}`) })
 		end
 	end
 end
 
-local sources: { { name: string, text: string } } = {}
+local sources: { { name: string; text: string } } = {}
 listPrograms("L1/programs", "L1/", sources)
 listPrograms("L2/programs", "L2/", sources)
 

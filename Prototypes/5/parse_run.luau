@@ -46,7 +46,7 @@ const function bytesOf(s: string): VM.Value
 	local v: VM.Value = VM.NIL
 
 	for i = #s, 1, -1 do
-		v = { kind = "cell", head = string.byte(s, i) :: number, tail = v } :: VM.Cell
+		v = { kind = "cell"; head = string.byte(s, i) :: number; tail = v } :: VM.Cell
 	end
 
 	return v
@@ -57,21 +57,21 @@ const function listOf(items: { VM.Value }): VM.Value
 	local v: VM.Value = VM.NIL
 
 	for i = #items, 1, -1 do
-		v = { kind = "cell", head = items[i], tail = v } :: VM.Cell
+		v = { kind = "cell"; head = items[i]; tail = v } :: VM.Cell
 	end
 
 	return v
 end
 
 const function cellOf(h: VM.Value, t: VM.Value): VM.Value
-	return { kind = "cell", head = h, tail = t } :: VM.Cell
+	return { kind = "cell"; head = h; tail = t } :: VM.Cell
 end
 
 const function conOf(tag: number, payload: VM.Value): VM.Value
-	return { kind = "con", tag = tag, payload = payload } :: VM.Con
+	return { kind = "con"; tag = tag; payload = payload } :: VM.Con
 end
 
-const function posOf(at: { line: number, col: number }): VM.Value
+const function posOf(at: { line: number; col: number }): VM.Value
 	return cellOf(at.line, at.col)
 end
 
@@ -106,7 +106,6 @@ local function convertPattern(p: Parser.Pattern): VM.Value
 					bytesOf(f.bind :: string)
 				else
 					VM.NIL
-
 			table.insert(binds, cellOf(bytesOf(f.name), cellOf(bind, posOf(f.at))))
 		end
 
@@ -133,7 +132,7 @@ local function convertType(t: Parser.Type): VM.Value
 		return conOf(3, cellOf(convertType(t.item), posOf(t.at)))
 	end
 
-	const f = t :: { k: string, a: Parser.Type, b: Parser.Type, at: { line: number, col: number } }
+	const f = t :: { k: string; a: Parser.Type; b: Parser.Type; at: { line: number; col: number } }
 
 	return conOf(4, cellOf(convertType(f.a), cellOf(convertType(f.b), posOf(f.at))))
 end
@@ -217,7 +216,7 @@ convertExpr = function(e: Parser.Expr): VM.Value
 		return conOf(16, cellOf(convertExpr(e.base), cellOf(convertFieldInits(e.fields), posOf(e.at))))
 	end
 
-	const u = e :: { k: string, e: Parser.Expr, at: { line: number, col: number } }
+	const u = e :: { k: string; e: Parser.Expr; at: { line: number; col: number } }
 
 	return conOf(14, cellOf(convertExpr(u.e), posOf(u.at)))
 end
@@ -249,6 +248,7 @@ const function convertProgram(p: Parser.Program): VM.Value
 
 				payload = conOf(6, listOf(fields))
 			end
+
 			table.insert(cons, cellOf(bytesOf(c.name), cellOf(payload, posOf(c.at))))
 		end
 
@@ -319,17 +319,17 @@ const function check(name: string, src: string)
 end
 
 -- The program section of each L2 program file.
-local function listPrograms(folder: string, prefix: string, out: { { name: string, text: string } })
+local function listPrograms(folder: string, prefix: string, out: { { name: string; text: string } })
 	for _, entry in fs.listdir(folder) do
 		if entry.type == "dir" then
 			listPrograms(`{folder}/{entry.name}`, `{prefix}{entry.name}/`, out)
 		elseif entry.type == "file" and (string.sub(entry.name, -5) == ".prog" or string.sub(entry.name, -3) == ".l2") then
-			table.insert(out, { name = `{prefix}{entry.name}`, text = readFile(`{folder}/{entry.name}`) })
+			table.insert(out, { name = `{prefix}{entry.name}`; text = readFile(`{folder}/{entry.name}`) })
 		end
 	end
 end
 
-local files: { { name: string, text: string } } = {}
+local files: { { name: string; text: string } } = {}
 listPrograms("L2/programs", "L2/", files)
 
 for _, f in files do

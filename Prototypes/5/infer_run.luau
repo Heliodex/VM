@@ -47,7 +47,7 @@ const function bytesValue(s: string): VM.Value
 	local v: VM.Value = VM.NIL
 
 	for i = #s, 1, -1 do
-		v = { kind = "cell", head = string.byte(s, i) :: number, tail = v } :: VM.Cell
+		v = { kind = "cell"; head = string.byte(s, i) :: number; tail = v } :: VM.Cell
 	end
 
 	return v
@@ -138,7 +138,7 @@ local function l2Outcome(src: string): string?
 
 	const program = (parsed.value :: VM.Con).payload :: VM.Cell
 	-- The request Infer (tag 3 of Req) with the program: its declarations, then its body.
-	const request: VM.Value = { kind = "con", tag = 3, payload = program }
+	const request: VM.Value = { kind = "con"; tag = 3; payload = program }
 	-- The checker's own source takes more than 1e9 steps (about 11 minutes for this suite), so the limit is 1e10.
 	const result = L2.run(checkerProgram, request, 1e10)
 
@@ -198,17 +198,17 @@ local function check(name: string, src: string)
 end
 
 -- The program section of each L2 program file.
-local function listPrograms(folder: string, prefix: string, out: { { name: string, text: string } })
+local function listPrograms(folder: string, prefix: string, out: { { name: string; text: string } })
 	for _, entry in fs.listdir(folder) do
 		if entry.type == "dir" then
 			listPrograms(`{folder}/{entry.name}`, `{prefix}{entry.name}/`, out)
 		elseif entry.type == "file" and (string.sub(entry.name, -5) == ".prog" or string.sub(entry.name, -3) == ".l2") then
-			table.insert(out, { name = `{prefix}{entry.name}`, text = readFile(`{folder}/{entry.name}`) })
+			table.insert(out, { name = `{prefix}{entry.name}`; text = readFile(`{folder}/{entry.name}`) })
 		end
 	end
 end
 
-local files: { { name: string, text: string } } = {}
+local files: { { name: string; text: string } } = {}
 listPrograms("L2/programs", "L2/", files)
 
 for _, f in files do

@@ -5,9 +5,9 @@
 --
 --   lute run layout_cases_run.luau      (from Prototypes/5)
 
-const Parser = require "./L2/parser"
-const Layout = require "./L2/layout"
 const L2 = require "./L2/l2"
+const Layout = require "./L2/layout"
+const Parser = require "./L2/parser"
 const VM = require "./interpreter/vm"
 const fs = require "@lute/fs"
 
@@ -15,17 +15,24 @@ const function readFile(path: string): string
 	const handle = fs.open(path)
 	const text = fs.read(handle)
 	fs.close(handle)
+
 	return text
 end
 
 -- The layer in L2, from boot/layout.l2, which is itself indented: the Luau layer lays it out when it is read.
-const layerProgram = L2.compile(readFile("L2/programs/boot/layout.l2"), function(_name: string): string? return nil end, "boot/layout.l2")
+const layerProgram = L2.compile(
+	readFile "L2/programs/boot/layout.l2",
+	function(_name: string): string?
+		return nil
+	end,
+	"boot/layout.l2"
+)
 
 const function bytesValue(s: string): VM.Value
 	local v: VM.Value = VM.NIL
 
 	for i = #s, 1, -1 do
-		v = { kind = "cell", head = string.byte(s, i) :: number, tail = v } :: VM.Cell
+		v = { kind = "cell"; head = string.byte(s, i) :: number; tail = v } :: VM.Cell
 	end
 
 	return v
@@ -45,7 +52,7 @@ end
 
 -- The L2 layer's outcome for a source: Ok of the text, or Err of the message, as the Luau layer raises it.
 const function layerInL2(src: string): string
-	const outcome = L2.run(layerProgram, bytesValue(src), 1000000000)
+	const outcome = L2.run(layerProgram, bytesValue(src), 1e9)
 
 	if outcome.status ~= "value" then
 		return "the L2 layer " .. outcome.status
@@ -61,10 +68,10 @@ const function layerInL2(src: string): string
 end
 
 local ERRORS: { { name: string; l2: string } } = {
-	{ name = "an empty file", l2 = "" },
-	{ name = "a space at the start of a line", l2 = " fn x" },
-	{ name = "a let with no body", l2 = "let a = 1" },
-	{ name = "an arm with no ->", l2 = "fn m\n\tmatch m\n\t\tOk v" },
+	{ name = "an empty file"; l2 = "" },
+	{ name = "a space at the start of a line"; l2 = " fn x" },
+	{ name = "a let with no body"; l2 = "let a = 1" },
+	{ name = "an arm with no ->"; l2 = "fn m\n\tmatch m\n\t\tOk v" },
 }
 
 -- Whether two trees are the same, ignoring the position of each node.
@@ -187,7 +194,6 @@ local CASES: { { name: string; l2: string; prog: string } } = {
 		prog = "let s = MS {\n\tfixed = 1\n}\ns",
 	},
 }
-
 local failures = 0
 
 for _, case in CASES do
@@ -195,15 +201,19 @@ for _, case in CASES do
 		return Parser.parse(Layout.layout(case.l2))
 	end)
 	const okB, treeB = pcall(Parser.parse, case.prog)
-
 	local result: string
+
 	if not okA then
 		result = `the layout failed: {tostring(treeA)}`
 	elseif not okB then
 		result = `the bracketed text does not parse: {tostring(treeB)}`
 	else
 		const diff = same(treeA, treeB, "program")
-		result = if diff == nil then "" else `the trees differ at {diff}`
+		result =
+			if diff == nil then
+				""
+			else
+				`the trees differ at {diff}`
 	end
 
 	if result == "" and okA then
@@ -225,7 +235,11 @@ end
 
 for _, case in ERRORS do
 	const okA, msg = pcall(Layout.layout, case.l2)
-	const want = if okA then "no error" else tostring(msg)
+	const want =
+		if okA then
+			"no error"
+		else
+			tostring(msg)
 	const got = layerInL2(case.l2)
 	local result: string
 

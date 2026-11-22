@@ -11,7 +11,6 @@ const Parser = require "./parser"
 
 type Expr = Parser.Expr
 type Pos = Parser.Pos
-
 local M = {}
 
 const function fail(at: Pos?, msg: string)
@@ -28,7 +27,7 @@ const function quoted(bytes: { number }): string
 
 	for _, b in bytes do
 		if b == 34 then
-			table.insert(out, "\\\"")
+			table.insert(out, '\\"')
 		elseif b == 92 then
 			table.insert(out, "\\\\")
 		elseif b == 10 then
@@ -83,7 +82,6 @@ end
 
 -- An expression on one line, or nil when it has to be a block.
 local flat: (Expr) -> string?
-
 flat = function(e: Expr): string?
 	if e.k == "int" then
 		return tostring(e.n)
@@ -175,7 +173,6 @@ flat = function(e: Expr): string?
 
 	return nil
 end
-
 -- The lines of a block, indented by ind tabs. Each line is a string with its tabs in front.
 local emit: (Expr, number, { string }) -> ()
 
@@ -235,6 +232,7 @@ const function emitValue(value: Expr, name: string, kw: string, ind: number, out
 
 	if t ~= nil then
 		line(out, ind, `{kw}{name} = {t}`)
+
 		return
 	end
 
@@ -253,11 +251,21 @@ emit = function(e: Expr, ind: number, out: { string })
 
 	if t ~= nil then
 		line(out, ind, t :: string)
+
 		return
 	end
 
 	if e.k == "let" then
-		emitValue(e.value, e.name, if e.rec then "letrec " else "let ", ind, out)
+		emitValue(
+			e.value,
+			e.name,
+			if e.rec then
+				"letrec "
+			else
+				"let ",
+			ind,
+			out
+		)
 		emit(e.body, ind, out)
 	elseif e.k == "fn" then
 		line(out, ind, headerOf(e) :: string)
@@ -303,7 +311,6 @@ emit = function(e: Expr, ind: number, out: { string })
 		fail(e.at, "this form has no indented form in the converter")
 	end
 end
-
 -- The program: its type declarations, then its expression. The header is the file's first lines, kept as they are.
 M.program = function(program: Parser.Program): string
 	local out: { string } = {}
@@ -319,7 +326,11 @@ M.program = function(program: Parser.Program): string
 			end
 		end
 
-		local params = if #d.params > 0 then ` {table.concat(d.params, " ")}` else ""
+		local params =
+			if #d.params > 0 then
+				` {table.concat(d.params, " ")}`
+			else
+				""
 		line(out, 0, `type {d.name}{params} = {table.concat(cons, " | ")}`)
 	end
 

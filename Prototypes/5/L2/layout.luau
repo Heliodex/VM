@@ -23,7 +23,6 @@
 --   Layout.layout(text): string        raises an error, with the line, if the text does not lay out
 
 export type Node = { text: string; line: number; children: { Node } }
-
 local M = {}
 
 const function fail(line: number, msg: string)
@@ -98,9 +97,9 @@ const function fieldLines(children: { Node }): string
 		end
 
 		if #c.children > 0 then
-			table.insert(out, name :: string .. " = " .. expr({ text = value :: string; line = c.line; children = c.children }))
+			table.insert(out, name :: string .. " = " .. expr { text = value :: string; line = c.line; children = c.children })
 		else
-			table.insert(out, name :: string .. " = " .. (value :: string))
+			table.insert(out, name :: string .. " = " .. value :: string)
 		end
 	end
 
@@ -130,6 +129,7 @@ const function armLines(children: { Node }): string
 
 			if pat == nil then
 				pat = string.match(c.text, "^(.-) %->$")
+
 				if pat ~= nil then
 					pat = string.gsub(pat :: string, " +$", "")
 				end
@@ -147,7 +147,7 @@ const function armLines(children: { Node }): string
 				fail(c.line, "an arm with a body on its line has no lines below it")
 			end
 
-			table.insert(out, (pat :: string) .. " -> " .. (body :: string))
+			table.insert(out, pat :: string .. " -> " .. body :: string)
 			i += 1
 		end
 	end
@@ -164,7 +164,7 @@ const function braced(n: Node): string?
 			fail(n.line, "a match needs arms below it")
 		end
 
-		return "match " .. (scrut :: string) .. " {\n" .. armLines(n.children) .. "\n}"
+		return "match " .. scrut :: string .. " {\n" .. armLines(n.children) .. "\n}"
 	end
 
 	if n.text == "cond" then
@@ -182,7 +182,7 @@ const function braced(n: Node): string?
 			fail(n.line, "a with needs field lines below it")
 		end
 
-		return "with " .. (base :: string) .. " {\n" .. fieldLines(n.children) .. "\n}"
+		return "with " .. base :: string .. " {\n" .. fieldLines(n.children) .. "\n}"
 	end
 
 	return nil
@@ -238,7 +238,7 @@ const function letText(n: Node, rest: { Node }): string
 	local valueText: string
 
 	if #n.children > 0 then
-		valueText = expr({ text = value :: string; line = n.line; children = n.children })
+		valueText = expr { text = value :: string; line = n.line; children = n.children }
 	else
 		valueText = value :: string
 	end
@@ -247,7 +247,7 @@ const function letText(n: Node, rest: { Node }): string
 		fail(n.line, "a let needs a body after it")
 	end
 
-	return "(" .. (kw :: string) .. " " .. (name :: string) .. " = " .. valueText .. "\n" .. seq(rest) .. ")"
+	return "(" .. kw :: string .. " " .. name :: string .. " = " .. valueText .. "\n" .. seq(rest) .. ")"
 end
 
 -- An if with its else line, as the branches of a bracketed if.
@@ -293,12 +293,12 @@ const function blockLet(n: Node, rest: { Node }): string
 		local valueText: string
 
 		if #c.children > 0 then
-			valueText = expr({ text = value :: string; line = c.line; children = c.children })
+			valueText = expr { text = value :: string; line = c.line; children = c.children }
 		else
 			valueText = value :: string
 		end
 
-		table.insert(out, (name :: string) .. " = " .. valueText)
+		table.insert(out, name :: string .. " = " .. valueText)
 	end
 
 	table.insert(out, "(" .. seq(rest) .. ")")

@@ -894,7 +894,6 @@ inferNode = function(cx: Cx, env: { [string]: Scheme }, node: Parser.Expr, level
 	-- Only the parser's forms reach the checker. The desugarer's rawfix form and check nodes are never in its input.
 	error({ typeError = string.format("line %d, column %d: this form cannot be checked", node.at.line, node.at.col) }, 0)
 end
-
 -- DESCRIBING TYPES AS TESTS
 -- The test a check of type t runs. A list or sum that refers to itself is described once, and the references to it are rec.
 -- The field values of a record literal, against the field types, in the order the declaration gives them.
@@ -955,7 +954,6 @@ inferRecord = function(cx: Cx, env: { [string]: Scheme }, node: { name: string; 
 
 	return { k = "record"; name = node.name; fields = fields; at = node.at }, sumTy
 end
-
 -- A record with some of its fields changed: the base has the record's type, and each field named has that field's type.
 inferWith = function(cx: Cx, env: { [string]: Scheme }, node: { base: Parser.Expr; fields: { Parser.FieldInit }; at: Pos }, level: number, ret: Ty): (Parser.Expr, Ty)
 	const first = node.fields[1]
