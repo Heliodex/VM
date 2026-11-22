@@ -4,10 +4,54 @@ A binding is (name . (value . at)), an arm is (pat . (body . at)), a pattern is 
 ---
 append = lib/append.l2
 ---
-type Kind = LParen | RParen | LBrack | RBrack | LBrace | RBrace | Dot | Arrow | Question | Newline | Eof | Num Int | Str [Int] | Sym [Int] | Colon | Comma
-type Expr = EInt (Int . (Int . Int)) | EStr ([Int] . (Int . Int)) | ENil (Int . Int) | EName ([Int] . (Int . Int)) | EList ([Expr] . (Int . Int)) | EPair (Expr . (Expr . (Int . Int))) | EApp (Expr . ([Expr] . (Int . Int))) | EFn ([[Int]] . (Expr . (Int . Int))) | ELet ([Int] . (Expr . (Expr . (Int . (Int . Int))))) | EMutual ([([Int] . (Expr . (Int . Int)))] . (Expr . (Int . Int))) | EIf (Expr . (Expr . (Expr . (Int . Int)))) | EMatch (Expr . ([(Pat . (Expr . (Int . Int)))] . (Int . Int))) | ETry (Expr . (Int . Int)) | ECheck (Expr . (Int . Int)) | EUntyped (Expr . (Int . Int)) | ERec ([Int] . ([([Int] . (Expr . (Int . Int)))] . (Int . Int))) | EWith (Expr . ([([Int] . (Expr . (Int . Int)))] . (Int . Int)))
-type Pat = PCon ([Int] . ([Int] . (Int . Int))) | PBind ([Int] . (Int . Int)) | PWild (Int . Int) | PRec ([Int] . ([([Int] . ([Int] . (Int . Int)))] . (Int . Int)))
-type Ty = TName ([Int] . (Int . Int)) | TApp ([Int] . ([Ty] . (Int . Int))) | TPair (Ty . (Ty . (Int . Int))) | TList (Ty . (Int . Int)) | TFun (Ty . (Ty . (Int . Int))) | NoType | TRec [([Int] . (Ty . (Int . Int)))]
+type Kind =
+	| LParen
+	| RParen
+	| LBrack
+	| RBrack
+	| LBrace
+	| RBrace
+	| Dot
+	| Arrow
+	| Question
+	| Newline
+	| Eof
+	| Num Int
+	| Str [Int]
+	| Sym [Int]
+	| Colon
+	| Comma
+type Expr =
+	| EInt (Int . (Int . Int))
+	| EStr ([Int] . (Int . Int))
+	| ENil (Int . Int)
+	| EName ([Int] . (Int . Int))
+	| EList ([Expr] . (Int . Int))
+	| EPair (Expr . (Expr . (Int . Int)))
+	| EApp (Expr . ([Expr] . (Int . Int)))
+	| EFn ([[Int]] . (Expr . (Int . Int)))
+	| ELet ([Int] . (Expr . (Expr . (Int . (Int . Int)))))
+	| EMutual ([([Int] . (Expr . (Int . Int)))] . (Expr . (Int . Int)))
+	| EIf (Expr . (Expr . (Expr . (Int . Int))))
+	| EMatch (Expr . ([(Pat . (Expr . (Int . Int)))] . (Int . Int)))
+	| ETry (Expr . (Int . Int))
+	| ECheck (Expr . (Int . Int))
+	| EUntyped (Expr . (Int . Int))
+	| ERec ([Int] . ([([Int] . (Expr . (Int . Int)))] . (Int . Int)))
+	| EWith (Expr . ([([Int] . (Expr . (Int . Int)))] . (Int . Int)))
+type Pat =
+	| PCon ([Int] . ([Int] . (Int . Int)))
+	| PBind ([Int] . (Int . Int))
+	| PWild (Int . Int)
+	| PRec ([Int] . ([([Int] . ([Int] . (Int . Int)))] . (Int . Int)))
+type Ty =
+	| TName ([Int] . (Int . Int))
+	| TApp ([Int] . ([Ty] . (Int . Int)))
+	| TPair (Ty . (Ty . (Int . Int)))
+	| TList (Ty . (Int . Int))
+	| TFun (Ty . (Ty . (Int . Int)))
+	| NoType
+	| TRec [([Int] . (Ty . (Int . Int)))]
 let tok = fn ts
 	match (head ts)
 		Ok t -> t

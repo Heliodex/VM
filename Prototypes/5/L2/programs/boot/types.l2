@@ -5,14 +5,51 @@ type Ty = TVar Int | TCon ([Int] . [Ty])
 type Bind = Unbound Int | Bound Ty
 type St = St (Int . (Tr . [[Int]]))
 type Scheme = Scheme ([Int] . Ty)
-type Entry = EVar Scheme | ECtor ([Int] . ([Int] . (Int . (Int . Ty)))) | ESum ([Int] . ([Int] . [([Int] . (Int . Int))])) | ERecC ([Int] . ([Int] . (Int . ([[Int]] . Ty)))) | EAcc ([Int] . (Int . Int))
+type Entry =
+	| EVar Scheme
+	| ECtor ([Int] . ([Int] . (Int . (Int . Ty))))
+	| ESum ([Int] . ([Int] . [([Int] . (Int . Int))]))
+	| ERecC ([Int] . ([Int] . (Int . ([[Int]] . Ty))))
+	| EAcc ([Int] . (Int . Int))
 type Look = Found Entry | Missing
-type PTy = TName ([Int] . (Int . Int)) | TApp ([Int] . ([PTy] . (Int . Int))) | TPair (PTy . (PTy . (Int . Int))) | TList (PTy . (Int . Int)) | TFun (PTy . (PTy . (Int . Int))) | NoType | TRec [([Int] . (PTy . (Int . Int)))]
-type Req = Unify (Ty . Ty) | Gen (Int . Ty) | Inst (Int . Scheme) | Infer ([([Int] . ([[Int]] . ([([Int] . (PTy . (Int . Int)))] . (Int . Int))))] . Expr)
+type PTy =
+	| TName ([Int] . (Int . Int))
+	| TApp ([Int] . ([PTy] . (Int . Int)))
+	| TPair (PTy . (PTy . (Int . Int)))
+	| TList (PTy . (Int . Int))
+	| TFun (PTy . (PTy . (Int . Int)))
+	| NoType
+	| TRec [([Int] . (PTy . (Int . Int)))]
+type Req =
+	| Unify (Ty . Ty)
+	| Gen (Int . Ty)
+	| Inst (Int . Scheme)
+	| Infer ([([Int] . ([[Int]] . ([([Int] . (PTy . (Int . Int)))] . (Int . Int))))] . Expr)
 type MS = MS (St . (Int . ([Int] . (Ty . ([Ty] . ([Int] . Int))))))
-type Expr = EInt (Int . (Int . Int)) | EStr ([Int] . (Int . Int)) | ENil (Int . Int) | EName ([Int] . (Int . Int)) | EList ([Expr] . (Int . Int)) | EPair (Expr . (Expr . (Int . Int))) | EApp (Expr . ([Expr] . (Int . Int))) | EFn ([[Int]] . (Expr . (Int . Int))) | ELet ([Int] . (Expr . (Expr . (Int . (Int . Int))))) | EMutual ([([Int] . (Expr . (Int . Int)))] . (Expr . (Int . Int))) | EIf (Expr . (Expr . (Expr . (Int . Int)))) | EMatch (Expr . ([(Pat . (Expr . (Int . Int)))] . (Int . Int))) | ETry (Expr . (Int . Int)) | ECheck (Expr . (Int . Int)) | EUntyped (Expr . (Int . Int)) | ERec ([Int] . ([([Int] . (Expr . (Int . Int)))] . (Int . Int))) | EWith (Expr . ([([Int] . (Expr . (Int . Int)))] . (Int . Int)))
+type Expr =
+	| EInt (Int . (Int . Int))
+	| EStr ([Int] . (Int . Int))
+	| ENil (Int . Int)
+	| EName ([Int] . (Int . Int))
+	| EList ([Expr] . (Int . Int))
+	| EPair (Expr . (Expr . (Int . Int)))
+	| EApp (Expr . ([Expr] . (Int . Int)))
+	| EFn ([[Int]] . (Expr . (Int . Int)))
+	| ELet ([Int] . (Expr . (Expr . (Int . (Int . Int)))))
+	| EMutual ([([Int] . (Expr . (Int . Int)))] . (Expr . (Int . Int)))
+	| EIf (Expr . (Expr . (Expr . (Int . Int))))
+	| EMatch (Expr . ([(Pat . (Expr . (Int . Int)))] . (Int . Int)))
+	| ETry (Expr . (Int . Int))
+	| ECheck (Expr . (Int . Int))
+	| EUntyped (Expr . (Int . Int))
+	| ERec ([Int] . ([([Int] . (Expr . (Int . Int)))] . (Int . Int)))
+	| EWith (Expr . ([([Int] . (Expr . (Int . Int)))] . (Int . Int)))
 type Tr = TEmpty | TNode (Bind . (Tr . Tr))
-type Pat = PCon ([Int] . ([Int] . (Int . Int))) | PBind ([Int] . (Int . Int)) | PWild (Int . Int) | PRec ([Int] . ([([Int] . ([Int] . (Int . Int)))] . (Int . Int)))
+type Pat =
+	| PCon ([Int] . ([Int] . (Int . Int)))
+	| PBind ([Int] . (Int . Int))
+	| PWild (Int . Int)
+	| PRec ([Int] . ([([Int] . ([Int] . (Int . Int)))] . (Int . Int)))
 let hdOr = fn (l dflt)
 	match (head l)
 		Ok x -> x

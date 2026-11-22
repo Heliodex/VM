@@ -3,7 +3,23 @@ The L2 tokenizer, written in L2, the first stage of the L2 compiler in L2. It ta
 reverse = lib/reverse.l2
 append = lib/append.l2
 ---
-type Kind = LParen | RParen | LBrack | RBrack | LBrace | RBrace | Dot | Arrow | Question | Newline | Eof | Num Int | Str [Int] | Sym [Int] | Colon | Comma
+type Kind =
+	| LParen
+	| RParen
+	| LBrack
+	| RBrack
+	| LBrace
+	| RBrace
+	| Dot
+	| Arrow
+	| Question
+	| Newline
+	| Eof
+	| Num Int
+	| Str [Int]
+	| Sym [Int]
+	| Colon
+	| Comma
 let first = fn l
 	match (head l)
 		Ok c -> c
