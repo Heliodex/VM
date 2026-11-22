@@ -6,13 +6,12 @@ fn p
 	letrec nth = fn (n l)
 		if (= (@ l) 1)
 			(Err "index out of range")
+		elseif (= n 0)
+			let h = ((head l)?)
+			(Ok h)
 		else
-			if (= n 0)
-				let h = ((head l)?)
-				(Ok h)
-			else
-				let t = ((tail l)?)
-				(nth (- n 1) t)
+			let t = ((tail l)?)
+			(nth (- n 1) t)
 	(nth (fst p) (snd p))
 ---
 (0 . [7 8 9]) => Ok 7 fuel 1000

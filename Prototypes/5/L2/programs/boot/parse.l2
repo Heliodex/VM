@@ -144,20 +144,18 @@ letrec fieldItems = fn (ts item)
 	let t = (tok n)
 	if (= (kn t) 5)
 		(Ok (~ . (after n)))
+	elseif (= (kn t) 15)
+		(failTok t "a field goes on its own line, not after a comma")
 	else
-		if (= (kn t) 15)
-			(failTok t "a field goes on its own line, not after a comma")
+		let f = ((item n)?)
+		let r = (snd f)
+		if (= (kn (tok r)) 15)
+			(failTok (tok r) "a field goes on its own line, not after a comma")
+		elseif (if (= (kn (tok r)) 9) 1 (= (kn (tok r)) 5))
+			let more = ((fieldItems r item)?)
+			(Ok ((cons (fst f) (fst more)) . (snd more)))
 		else
-			let f = ((item n)?)
-			let r = (snd f)
-			if (= (kn (tok r)) 15)
-				(failTok (tok r) "a field goes on its own line, not after a comma")
-			else
-				if (if (= (kn (tok r)) 9) 1 (= (kn (tok r)) 5))
-					let more = ((fieldItems r item)?)
-					(Ok ((cons (fst f) (fst more)) . (snd more)))
-				else
-					(failTok (tok r) "a field ends at the end of its line; wrap a longer value in parentheses")
+			(failTok (tok r) "a field ends at the end of its line; wrap a longer value in parentheses")
 let fieldLines = fn (ts sig item)
 	let br = ((expectK ts sig 4)?)
 	if (= (kn (tok (snd br))) 9)
@@ -180,27 +178,24 @@ let parsePattern = fn ts
 	if (isSymT t)
 		if (isWord t "_")
 			(Ok ((PWild (at t)) . (after ts)))
+		elseif (if (isCapB (symOf t)) (= (kn (tok (after ts))) 4) 0)
+			let fl = ((fieldLines (after ts) 1 fieldBind)?)
+			(Ok ((PRec ((symOf t) . ((fst fl) . (at t)))) . (snd fl)))
+		elseif (isCapB (symOf t))
+			let nx = (tok (after ts))
+			(if (isWord nx "_") (Ok ((PCon ((symOf t) . (~ . (at t)))) . (after (after ts)))) (if (patBindOk nx) (Ok ((PCon ((symOf t) . ((symOf nx) . (at t)))) . (after (after ts)))) (Ok ((PCon ((symOf t) . (~ . (at t)))) . (after ts)))))
 		else
-			if (if (isCapB (symOf t)) (= (kn (tok (after ts))) 4) 0)
-				let fl = ((fieldLines (after ts) 1 fieldBind)?)
-				(Ok ((PRec ((symOf t) . ((fst fl) . (at t)))) . (snd fl)))
-			else
-				if (isCapB (symOf t))
-					let nx = (tok (after ts))
-					(if (isWord nx "_") (Ok ((PCon ((symOf t) . (~ . (at t)))) . (after (after ts)))) (if (patBindOk nx) (Ok ((PCon ((symOf t) . ((symOf nx) . (at t)))) . (after (after ts)))) (Ok ((PCon ((symOf t) . (~ . (at t)))) . (after ts)))))
-				else
-					(Ok ((PBind ((symOf t) . (at t))) . (after ts)))
+			(Ok ((PBind ((symOf t) . (at t))) . (after ts)))
 	else
 		(failTok t "expected a pattern here")
 let parseSymAtom = fn (n t)
 	if (isWord t "~")
 		(Ok ((ENil (at t)) . (after n)))
+	elseif (isKw t)
+		let m = ((append ((symOf t) . " cannot be used as a value here"))?)
+		(failTok t m)
 	else
-		if (isKw t)
-			let m = ((append ((symOf t) . " cannot be used as a value here"))?)
-			(failTok t m)
-		else
-			(if (isWord t "_") (failTok t "_ is only a pattern, and cannot be used as a value") (Ok ((EName ((symOf t) . (at t))) . (after n))))
+		(if (isWord t "_") (failTok t "_ is only a pattern, and cannot be used as a value") (Ok ((EName ((symOf t) . (at t))) . (after n))))
 let tyP = fn f
 	match f
 		TName p -> p
@@ -330,12 +325,11 @@ fn toks
 			if (isSymT t)
 				if (isCapB (symOf t))
 					(Ok (~ . n))
+				elseif (isWord t "=")
+					(Ok (~ . n))
 				else
-					if (isWord t "=")
-						(Ok (~ . n))
-					else
-						let more = ((paramsLoop (after n))?)
-						(Ok ((cons (symOf t) (fst more)) . (snd more)))
+					let more = ((paramsLoop (after n))?)
+					(Ok ((cons (symOf t) (fst more)) . (snd more)))
 			else
 				(Ok (~ . n))
 		consLoop = fn ts
@@ -414,13 +408,12 @@ fn toks
 			let t = (tok n)
 			if (= (kn t) 3)
 				(Ok (~ . (after n)))
+			elseif (= (kn t) 10)
+				(failTok t "a list is never closed")
 			else
-				if (= (kn t) 10)
-					(failTok t "a list is never closed")
-				else
-					let a = ((parseAtom n 0)?)
-					let more = ((itemsLoop (snd a))?)
-					(Ok ((cons (fst a) (fst more)) . (snd more)))
+				let a = ((parseAtom n 0)?)
+				let more = ((itemsLoop (snd a))?)
+				(Ok ((cons (fst a) (fst more)) . (snd more)))
 		parseFn = fn (ts sig)
 			let start = (tok ts)
 			let n1 = (norm (after ts) sig)
