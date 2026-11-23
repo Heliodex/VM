@@ -12,6 +12,10 @@ type (
 	Law struct {
 		Arity int
 		Body *Node
+
+		// hash is the content hash, kept once LawHash has computed it (hash.go).
+		hash [32]byte
+		hashed bool
 	}
 
 	// NilT is the nil value, the empty list. There is one.
