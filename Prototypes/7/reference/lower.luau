@@ -118,6 +118,36 @@ local lawHook: ((Expr, Law) -> ())? = nil
 local lower: (e: Expr, depth: number, map: { number }) -> Form
 local lowerFix: (e: Expr, depth: number, map: { number }) -> Form
 
+-- A constant: a variable bound to a closed value (a law or an integer, a form that is a lit) is not a slot of the frame, and is not passed to the laws that use it. Its map entry is CONST_BASE - k, where constForms[k] is the form it stands for. A top-level function of the program is such a constant, so a law that calls one does not carry it as an argument.
+local CONST_BASE = -1000
+local constForms: { Form } = {}
+
+const function isConst(slot: number?): boolean
+	return slot ~= nil and slot < CONST_BASE
+end
+
+-- The levels that a lambda or a pin must take as arguments: the free levels of e, except the constants.
+const function capturedLevels(e: Expr, depth: number, base: number, map: { number }): { number }
+	local out: { number } = {}
+
+	for _, lvl in sortedFree(e, depth, base) do
+		if not isConst(map[lvl]) then
+			table.insert(out, lvl)
+		end
+	end
+
+	return out
+end
+
+-- Copies the constants of the map into a law's map, so that its body sees them too.
+const function inheritConsts(map: { number }, inner: { number })
+	for lvl, slot in map do
+		if isConst(slot) then
+			inner[lvl] = slot
+		end
+	end
+end
+
 -- The form that gives a slot of the current law's frame. Slot 0 is the recursive function itself, which is the law applied to the outer variables it uses (map[-1] counts them, and they are its first arguments), so a partial application of the law, not the law alone. With no outer variables, it is the law.
 const function slotForm(slot: number, map: { number }): Form
 	if slot ~= 0 then
@@ -270,8 +300,9 @@ lowerFix = function(e: Expr, depth: number, map: { number }): Form
 
 	-- The function's own lambdas are at depth + 1 onwards, so its body is under n of them.
 	const n, body = lamChain(value)
-	const free = sortedFree(body, depth + 1 + n, depth)
+	const free = capturedLevels(body, depth + 1 + n, depth, map)
 	local inner: { number } = {}
+	inheritConsts(map, inner)
 
 	for i, lvl in free do
 		inner[lvl] = i
@@ -297,7 +328,49 @@ lowerFix = function(e: Expr, depth: number, map: { number }): Form
 
 	return { op = "call"; f = { op = "lit"; value = law }; args = argsOf(free, map) }
 end
+-- An application of a lambda to a closed value, when the value lowers to a lit: the lambda's variable is that constant, and the body is lowered in this frame (no slot, no law). It is tried first, since a top-level binding of the program is such an application. nil when it does not apply.
+const function tryConstLet(e: Expr, depth: number, map: { number }): Form?
+	if e.op ~= "apply" then
+		return nil
+	end
+
+	const app = e :: VM.ApplyExpr
+
+	if app.f.op ~= "lam" or app.f == VM.fix then
+		return nil
+	end
+
+	-- A value with a variable of the frame is not a constant, so it is left to the let and to the call.
+	if #capturedLevels(app.arg, depth, depth, map) > 0 then
+		return nil
+	end
+
+	const value = lower(app.arg, depth, map)
+
+	if value.op ~= "lit" then
+		return nil
+	end
+
+	table.insert(constForms, value)
+	const k = #constForms
+	local inner: { number } = {}
+
+	for lvl, sl in map do
+		inner[lvl] = sl
+	end
+
+	inner[depth] = CONST_BASE - k
+
+	return lower((app.f :: VM.LamExpr).body, depth + 1, inner)
+end
+
 lower = function(e: Expr, depth: number, map: { number }): Form
+	const constLet = tryConstLet(e, depth, map)
+
+	if constLet ~= nil then
+		return constLet
+	end
+
 	if e.op == "quote" then
 		if type(e.value) == "number" then
 			return { op = "lit"; value = e.value }
@@ -317,11 +390,16 @@ lower = function(e: Expr, depth: number, map: { number }): Form
 			return { op = "arg"; index = 2 ^ 40 }
 		end
 
+		if isConst(slot) then
+			return constForms[CONST_BASE - slot]
+		end
+
 		return slotForm(slot, map)
 	elseif e.op == "lam" then
 		const n, body = lamChain(e)
-		const free = sortedFree(body, depth + n, depth)
+		const free = capturedLevels(body, depth + n, depth, map)
 		local inner: { number } = {}
+		inheritConsts(map, inner)
 
 		for i, lvl in free do
 			inner[lvl] = i
@@ -344,8 +422,9 @@ lower = function(e: Expr, depth: number, map: { number }): Form
 
 		return { op = "call"; f = { op = "lit"; value = law }; args = argsOf(free, map) }
 	elseif e.op == "pin" then
-		const free = sortedFree(e.e, depth, depth)
+		const free = capturedLevels(e.e, depth, depth, map)
 		local inner: { number } = {}
+		inheritConsts(map, inner)
 
 		-- The law's first argument is a dummy (slot 1), and the free variables are its arguments after it (slots 2 onwards).
 		for i, lvl in free do
