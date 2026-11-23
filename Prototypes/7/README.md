@@ -23,7 +23,7 @@ Conclusions that shape this plan:
 
 - **The step count is the problem, not the step rate.** The hybrid is close to what a tree or closure machine in Luau can do per step. A machine rewrite might give about 2×. The target needs about 45× fewer steps at the same host speed, or a mix of fewer steps and jets.
 - **The checker is doing too much work, in two ways (measured in Phase 0).** The name environment is an association list searched by name (`findE`), and that search is quadratic in the number of declarations. Separately, each declaration costs about 128,000 steps, much of it in `/` and `%` by 2 and list access, which return `Result` values that are matched at every step. The binding store is a binary trie, not an association list as first assumed. See `measure/README.md`.
-- **Layout was the largest cost, and is now fixed (Phase 0, runs 5 and 6).** Before the change, the VM's layout pass was 49% of the corpus build and grew quadratically in lines. After it (Phase 1, run 6), layout is 11% of the corpus build and grows linearly; the checker, at 68%, is now the largest cost, and it is still quadratic.
+- **Layout was the largest cost, and is now fixed (Phase 0, runs 5 and 6).** Before the change, the VM's layout pass was 49% of the corpus build and grew quadratically in lines. After it (Phase 1, run 6), layout is 11% of the corpus build and grows linearly. After the checker changes (Phase 1, run 8), the checker is 52% of the corpus build and grows linearly too; layout is 16%, parse 23%, lex 8%.
 - **Names are lists of bytes.** Every name comparison walks a list, and every string is a list of cells. Interned names would make equality a single comparison.
 - **The step-parity invariant will not survive jets or memoisation** unless the design says how fuel is charged. The section "Fuel, jets and memo" below handles this.
 
@@ -54,7 +54,7 @@ So the target as stated is for a *bootstrapped front end*, layout through check.
 
     steps budget = time budget × measured steps per second
 
-At the hybrid's 18.5M steps/s, the budget is about 18.5M steps for 2,500 lines, about 7,400 steps per line. With the Phase 1 layout (run 6), the bootstrapped front end on the 2,235-line corpus takes 886M steps, about 396,000 per line. At that average, 2,500 lines take about 990M steps, about 55× the budget at 18M steps/s (it was about 96× before the layout change). The average understates a larger build, because the checker is still superlinear in lines: on the generated programs its steps per function rise with size, so a 2,500-line build costs more per line than the corpus does.
+At the hybrid's 18.5M steps/s, the budget is about 18.5M steps for 2,500 lines, about 7,400 steps per line. With the Phase 1 changes (run 8), the bootstrapped front end on the 2,235-line corpus takes 592.5M steps, about 265,000 per line. At that average, 2,500 lines take about 663M steps, about 37× the budget at 18M steps/s (it was about 96× before the layout change and about 55× after it). The average no longer understates a larger build: the checker, layout and parse are all linear in lines now (the doubling ratios are about 2.0), so a 2,500-line build should cost about the corpus average per line. The corpus is still 265 lines short of the target size, so the 2,500-line figure is an extrapolation.
 
 **3. A relative check that does not depend on the host.** Steps and fuel are host-independent, so they are the primary numbers. Add two ratios so that a result has meaning even when the host changes:
 
@@ -65,7 +65,7 @@ At the hybrid's 18.5M steps/s, the budget is about 18.5M steps for 2,500 lines, 
 
 **Open questions for the speed target** (listed again in "Decisions" below):
 
-- Does the target need to hold on Luau, or only on a future native host? On Luau the step rate is about 18M steps/s, so the budget is about 18M steps. That is reachable only if the roughly 55× reduction comes from algorithms and jets, not the machine. If it cannot be reached, the target needs a native host.
+- Does the target need to hold on Luau, or only on a future native host? On Luau the step rate is about 18M steps/s, so the budget is about 18M steps. That is reachable only if the roughly 37× reduction comes from algorithms and jets, not the machine. If it cannot be reached, the target needs a native host.
 - Corpus: resolved as the four boot files now, with the top-up and the full compiler to follow (see "Speed target").
 
 ## Core design (draft)

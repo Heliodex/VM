@@ -175,3 +175,47 @@ What this says about the trie: its per-level cost is the pattern matching, the c
 
 - **The wider suite** (`infer_run_variant.luau`, a copy of Prototype 6's `infer_run.luau` pointed at `boot/types.l2`, output in `results/infer_run_variant.txt`): all 160 programs give the same type or errors as the Luau checker (108 types, 52 errors). The three skipped are the ones the suite already skipped, which the parser refuses or whose form is not handled yet.
 - **The negative test** (`negative_import_run.luau`): a program that calls `reverse` without importing it gives `reverse is not bound` on both checkers, at line 2. With the import, both give no errors.
+
+## Run 8: the Phase 1 checker (`results/run8.txt`)
+
+The checker is `boot/types.l2` with the Phase 1 changes: the name environment is a persistent trie on the bytes of the name, the binding store is a radix-4 trie with one division per level, the mutual group is one function, and the hot list loops read each head once. The layout is `boot/layout.l2` (run 6). Run 8 is about five minutes.
+
+### Corpus (2,235 lines, 82,118 bytes), VM stages
+
+| File | Imports | Layout | Lex | Parse | Check | Total |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `lex.l2` | 1.49M | 5.72M | 3.03M | 8.60M | 19.61M | 38.45M |
+| `parse.l2` | 0.85M | 27.82M | 13.86M | 37.73M | 97.13M | 177.39M |
+| `layout.l2` | 0 | 17.03M | 7.84M | 21.41M | 42.64M | 88.92M |
+| `types.l2` | 0 | 45.26M | 23.92M | 67.25M | 151.34M | 287.76M |
+| **Corpus** | **2.34M** | **95.83M** | **48.65M** | **134.99M** | **310.72M** | **592.52M** |
+
+- **Per line:** about 265,000 steps, against about 690,000 in run 5 and about 396,000 in run 6.
+- **Shares:** checker 52%, parse 23%, layout 16%, lex 8%, imports 0.4%.
+- **Host:** the Luau front end builds the corpus in 0.11 s. As before, that is host work and is not the target.
+- **Time:** 48.6 s of CPU time on the hybrid machine in this run. Earlier runs were 51 to 60 s for more steps, so this run's machine was faster or less loaded than run 5's; the step counts are the reliable figure.
+- **The target gap:** at about 265,000 steps per line, 2,500 lines take about 663M steps. At 18M steps per second that is about 37 times the budget.
+
+### Scaling (checker steps, generated programs)
+
+| Functions | Checker steps | Per function | Ratio to the previous size |
+| ---: | ---: | ---: | ---: |
+| 25 | 2.51M | 100k | - |
+| 50 | 4.87M | 97k | 1.94 |
+| 100 | 9.65M | 96k | 1.98 |
+| 200 | 19.16M | 96k | 1.99 |
+| 400 | 38.36M | 96k | 2.00 |
+| 800 | 79.66M | 100k | 2.08 |
+| 1,600 | 162.37M | 101k | 2.04 |
+
+The doubling ratios stay between 1.94 and 2.08, against 2.0 to 2.9 in run 4. The small climb at the largest sizes is the trie's log factor, not a quadratic term.
+
+### Validation
+
+- **The checker on Prototype 6's `types.l2`:** 151,336,815 steps with the variant, against 299,622,490 in Prototype 6 (vm_bench). The result is the same type text as Prototype 6's checker. The driver now says this rather than reporting a mismatch.
+- **Layout:** the VM layout equals the host layout on all four files.
+- **Answers:** `infer_run_variant.luau` gives the same answers as the Luau checker on all 160 programs (`results/infer_run_nogroup.txt`), and `imports_run.luau` agrees on the four files (AGREE, 0 failures). `negative_import_run.luau` still refuses an unimported name on both checkers.
+
+### Profile (`results/checker_profile_nogroup.txt`, before the last same-loop change)
+
+Of 151M steps: the binding trie's `findB` is about 33% (its per-level division and `Result` match are the floor for this machine); `setB` about 15%; the fixed-point combinator (`fixpoint`) about 9%; the list accessor `tl` about 8%; the environment's child walk `envKid` about 6%; name comparison `same` about 5%.

@@ -279,7 +279,7 @@ print("  result: " .. tostring(hybridRun.result))
 print(
 	if hybridRun.check.steps == CHECKER_STEPS
 		then "  matches vm_bench: " .. commas(CHECKER_STEPS) .. " steps"
-		else `  differs from vm_bench ({commas(CHECKER_STEPS)} steps) by {hybridRun.check.steps - CHECKER_STEPS} steps; the variant's Infer dispatch has the InferI arm, which costs this once per run`
+		else `  differs from vm_bench's Prototype 6 count ({commas(CHECKER_STEPS)} steps) by {hybridRun.check.steps - CHECKER_STEPS} steps, as expected: this run checks with the variant checker in boot/, not Prototype 6's (the result is compared below)`
 )
 print(
 	if hybridRun.laidOut == typesP6.source
