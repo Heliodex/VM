@@ -113,7 +113,7 @@ Fuel: one unit per form evaluated, as in the reference. A `call` costs one unit 
 These three features change the work done. They must not change the answer, and they must say what they do to fuel. The rules:
 
 - **Memo.** A memo entry stores the result of a call and the fuel that call used. A hit charges that stored fuel and does no work. So the fuel is exactly what the reference would have charged, and only the work drops. The memo key is the law's hash and the hashes of its arguments.
-- **Jets.** A jet replaces a law, matched by the law's hash, with native code. It must return the same result as the reference body on every input. Its fuel is a declared formula in the jet's own definition, not the reference step count. The formula is checked on the test suite against the reference. A jet whose fuel cannot be made to match is marked as "work only", and the parity check then compares results but not fuel for that law.
+- **Jets.** A jet replaces a law, matched by the law's hash, with native code. It must return the same result as the reference body on every input. Its fuel is a declared formula in the jet's own definition, not the reference step count. The formula is checked on the test suite and on generated inputs against the reference. A law whose fuel cannot be stated as a formula gets no jet: there are no work-only jets (SPEC.md decision 11), so fuel is the same on every machine.
 - **Work.** A separate counter counts real host operations (allocations, table reads, jet calls). Fuel and work are reported side by side. The step parity invariant of Prototypes 5 and 6 becomes: fuel is identical, and results are identical. Work is measured, not checked.
 
 ### Execution
@@ -151,13 +151,13 @@ Each change is measured on the same harness, and the variant lives in `measure/b
 
 *Exit, met:* the checker's steps are linear in the size of the program on generated programs of 25 to 1,600 functions (ratios 1.94 to 2.08 per doubling), the 160 programs of `infer_run` give the same answers as the Luau checker (`measure/results/infer_run_*.txt`), imports agree with the Luau checker and an unimported name is refused by both (`imports_run.luau`, `negative_import_run.luau`), and layout's output equals the host's on 57 inputs (`layout_parity.luau`). The remaining accessor cost is a Phase 1 follow-up, not a blocker for the exit test.
 
-**Phase 2: the core spec.** Done: `Prototypes/7/SPEC.md`. It has seven kinds of value, eleven forms (within the limit of twelve), twelve primitives with no `Result`, the outcomes, the fuel rule, the memo rule (a hit charges the stored fuel), the jet rule (declared fuel, or "work only"), and examples.
+**Phase 2: the core spec.** Done: `Prototypes/7/SPEC.md`. It has seven kinds of value, eleven forms (within the limit of twelve), twelve primitives with no `Result`, the outcomes, the fuel rule, the memo rule (a hit charges the stored fuel), the jet rule (declared fuel, with no work-only jets), and examples.
 
 The binary format is part of the spec (section 12), modelled on Prototype 5's. It is implemented and tested in the Luau reference (`reference/format.luau`, with `reference/int.luau` for integers of any size, and `reference/format_run.luau`: 50 checks, including the spec's bytes, round trips of values and programs, a program 20,000 forms deep, and each refusal with its reason). It is iterative, so depth is not a host limit.
 
 *Exit, met:* the spec has eleven forms, each with a rule and an example, and seven examples in section 9 with their expected outcomes. Phase 3 checks the examples by running them.
 
-Decisions taken in the spec (section 11, each revisable): laziness is explicit (`delay`, `force`); jet fuel is a declared formula, or "work only"; strings stay lists of integers; pins are wrappers read through `unpin`; errors end the run and are not values; calls are strict; the step rule is one per form and one per law entry.
+Decisions taken in the spec (section 11, each revisable): laziness is explicit (`delay`, `force`); jet fuel is a declared formula, and there are no work-only jets (decision 11); strings stay lists of integers; pins are wrappers read through `unpin`; errors end the run and are not values; calls are strict; the step rule is one per form and one per law entry.
 
 The two costs Phase 1 measured are answered in the core: recursion is `arg 0` (no fixed-point combinator, about 9% of the checker's steps), and `div`, `head` and `tail` are primitives with no `Result` (the program tests first, about 12% of the checker's steps were the accessors).
 
@@ -191,7 +191,7 @@ The two costs Phase 1 measured are answered in the core: recursion is `arg 0` (n
 
 ## Risks
 
-- **Fuel parity with jets and memo.** The fuel rule above is the answer, but a jet whose formula is hard to state will leave its law "work only", and the parity check gets weaker there. Keep the list of such laws short.
+- **Fuel parity with jets and memo.** The fuel rule above is the answer. A law whose formula is hard to state gets no jet, so it runs at the speed of the spec code. Keep track of the laws this leaves out, since they are the speed the Phase 8 target has to live with.
 - **Hashing cost in Luau.** Hashing every value could cost more than it saves. The lazy, cached hash limits this, but Phase 7 must show the net gain.
 - **Scope creep into syntax.** The surface stays L2. New syntax waits until the core and the speed target are measured.
 - **Measuring on one host.** Every number is from one machine. The harness records the host, so a second host can be added later.
@@ -206,10 +206,10 @@ These need an answer from the project owner before the phase that depends on the
 1. **Resolved:** the workload is a build, and the target is 2,500 lines of L2 under 1 s on the reference host, for the bootstrapped build on the VM. The corpus is the four boot files, with a top-up to 2,500 and the full compiler to follow (see "Speed target").
 1a. **Resolved:** imports are part of the bootstrapped build. The checker's request must carry the imported names and their schemes, so a file that imports library code is fully checked on the VM. This is new work in the checker (Phase 1).
 2. **Host: decided.** Luau through Phase 3 (the reference interpreter, the binary format and the front end). Go from Phase 4, for the fast machine, with the Go implementation reading the same binary format and checked against the Luau reference on the spec's examples and fuel. The front end (boot L2 and the Luau desugarer) stays in Luau, and it serialises core programs for the Go machine. Go's `math/big` is the reason; the small-integer fast path keeps the common case fast in either language.
-3. **Fuel of jets** (before Phase 5). Option A: every jet declares a fuel formula and is checked against the reference. Option B: jets are "work only" and the parity check compares results alone. The plan assumes A, and uses B only where A cannot be stated.
+3. **Resolved: fuel of jets.** Every jet declares a fuel formula, checked against the reference on the suite and on generated inputs. There are no work-only jets, so a law whose fuel cannot be stated gets no jet (SPEC.md decision 11). The reason is determinism: a work-only jet would make steps and out-of-fuel depend on which jets are installed.
 4. **Strings and names** (before Phase 6). Option A: keep lists of bytes, and rely on interning and jets. Option B: a byte kind backed by the host's strings. The plan assumes B, but it waits for Phase 0 to show whether text is a large cost.
 5. **Laziness.** Whether the core keeps `delay` and `force` as explicit forms, as drafted, or makes evaluation lazy by default. The plan assumes explicit forms, so that the cost of each thunk is visible in the fuel and work counts.
 
 ## Next step
 
-Phase 5, the jets. Two things come first. Decision 3 (the fuel of jets) needs an answer; the plan assumes option A, where each jet declares a fuel formula. The Phase 0 histogram picks the candidates. Phase 8's full-build number also waits on two things that are still open: the corpus is 2,235 lines, not the 2,500 of the target, and desugar is not bootstrapped.
+Phase 5, the jets. Decision 3 is resolved, so the first jet can start: each jet declares a fuel formula, with no work-only jets. The Phase 0 histogram picks the candidates. Phase 8's full-build number also waits on two things that are still open: the corpus is 2,235 lines, not the 2,500 of the target, and desugar is not bootstrapped.
