@@ -10,13 +10,15 @@ Every value is one of these kinds. The kind number is what the primitive `kind` 
 
 | Kind | Name | What it is |
 | ---: | --- | --- |
-| 0 | integer | An integer in the range -(2^53 - 1) to 2^53 - 1. A result outside the range is an error. |
+| 0 | integer | A signed whole number of any size: no upper or lower bound. Its exact value is kept whatever its length. |
 | 1 | nil | The empty list. There is one nil. |
 | 2 | cell | A pair `(a . b)`, where `a` and `b` are values. Lists are cells ending in nil. |
 | 3 | function | A law, or a partial application of a law (a law with fewer arguments than its arity). |
 | 4 | pin | A value in normal form, held by its content hash. Equal pins are the same object. |
 | 5 | con | A constructor: a tag (an integer from 0 up) and a payload value. |
 | 6 | thunk | A delayed call: a function and its arguments, not yet run. |
+
+The integer kind is arbitrary precision. It is a property of the VM, not of any host: an integer of a thousand digits is as much an integer as 3. The bound of ±(2^53 − 1) that Prototypes 5 and 6 had is a limit of the Luau host, whose numbers are doubles. It is not part of the design, and an implementation on a host with a different limit must not reintroduce it.
 
 A **law** is a closed function: `law name arity body`. It has a name (its content hash), an arity (a number from 1 up), and a body (a form). A law has no free variables. Everything it uses is an argument, the law itself (`arg 0`), or a value it builds. Laws are values, so a law can be passed and returned, and a lifted lambda is a law with its free variables as extra arguments.
 
@@ -94,9 +96,9 @@ Twelve primitives, each written by a number (its tag) and a name. The tag is wha
 
 | Tag | Name | Arity | Rule |
 | ---: | --- | ---: | --- |
-| 0 | add | 2 | integers; the sum, which must be in range |
-| 1 | sub | 2 | integers; the difference, which must be in range |
-| 2 | mul | 2 | integers; the product, which must be in range |
+| 0 | add | 2 | integers; the exact sum |
+| 1 | sub | 2 | integers; the exact difference |
+| 2 | mul | 2 | integers; the exact product |
 | 3 | div | 2 | integers; the quotient, rounded down; the divisor must not be zero |
 | 4 | mod | 2 | integers; the remainder with the sign of the divisor, so `a = b·div + mod`; the divisor must not be zero |
 | 5 | lt | 2 | integers; 1 if the first is less than the second, else 0 |
@@ -110,7 +112,7 @@ Twelve primitives, each written by a number (its tag) and a name. The tag is wha
 Three rules about primitives:
 
 - **There is no `Result`.** `div` and `mod` by zero, and `head` or `tail` of a non-cell, are errors of the whole run, not values. A program that must handle them tests first, with `kind` or `eq`. This is the rule that the Phase 1 measurements asked for: the checker paid for a `Result` at every division and every list access, and in the core those tests are one primitive each, with no wrapping.
-- **Overflow is an error.** An integer result outside -(2^53 - 1) to 2^53 - 1 ends the run.
+- **Integers are never out of range.** Every integer result is exact, at any size, so there is no overflow outcome. An implementation whose host cannot hold a large integer represents it in another way (a bignum, a list of limbs), and does not fail or round. An implementation that rounds or stops on a large integer is not conformant.
 - **Kind reads any value**, including a pin, a function and a thunk, so a program can always check what it has before it reads it.
 
 ## 5. Outcomes
@@ -118,7 +120,7 @@ Three rules about primitives:
 A run gives one of three outcomes:
 
 - `value v`: the program's result;
-- `error m`: the run cannot continue, with a message `m` (a division by zero, a non-cell `head`, an unbound slot, a `force` of a non-thunk, an overflow, and the like);
+- `error m`: the run cannot continue, with a message `m` (a division by zero, a non-cell `head`, an unbound slot, a `force` of a non-thunk, and the like);
 - `out_of_fuel`: the run used up its fuel.
 
 Errors are not caught by the core. A program that wants to recover tests first (section 4).
@@ -231,6 +233,7 @@ These are the defaults this spec takes. Each can be changed, and a change is rec
 5. **Errors end the run** and are not values. The surface language adds `Result` on top, by testing before the primitive.
 6. **Calls are strict** in their arguments. Laziness is only through `delay`.
 7. **The step rule** is one step per form and one per law entry. Phase 3 writes the step counts of the examples into its tests, so a change to this rule is visible.
+8. **Integers are unbounded.** The VM's integers have no size limit, and the ±(2^53 − 1) bound of Prototypes 5 and 6 is a limit of the Luau host (doubles), not of the VM. The reason: a bound in the VM would make the answer depend on the host. Consequence for Phase 3: the Luau reference needs a bignum representation for integers, and its tests must include values beyond 2^53.
 
 ## 12. Form count
 
