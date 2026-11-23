@@ -34,7 +34,7 @@ type Law = Types.Law
 const NIL = Format.NIL
 -- The helpers that have jets (the owner names of measure/boot/types.l2 at its present lines).
 -- Each helper, with the arity of the law that a jet replaces. hdOr is curried, so its jet is the inner law of two arguments (the outer law of one argument has the list as a free variable of the inner one).
-const JET_ARITY: { [string]: number } = { ["tl@24"] = 1, ["hdOr@14"] = 2, ["stP@63"] = 1 }
+const JET_ARITY: { [string]: number } = { ["tl@24"] = 1, ["hdOr@14"] = 2, ["stP@63"] = 1, ["findB@84"] = 2, ["setB@100"] = 3 }
 -- The laws of those helpers, as the checker's lowering makes them (filled by the benchmark below).
 const jetLaws: { [string]: Law } = {}
 const P6_PROGRAMS = "../../6/L2/programs/"
@@ -382,5 +382,69 @@ do
 
 	for i, v in { { kind = "con", tag = 0, payload = list(3, NIL) } :: Value, NIL, 5, { kind = "con", tag = 1, payload = 2 } :: Value, list(1) } do
 		emit(`jet stP@63 {i}`, "body", law(1, call(lit(st), arg(1))), v, 1000)
+	end
+end
+
+-- ---- 6. the radix-4 trie of the checker (findB and setB): random tries, built as the checker builds them (SPEC-free: the constructors are tags 0 for TEmpty, 1 for TNode, and the node is (binding . (c0 . (c1 . (c2 . c3))))), with ids and bindings at random, and the fuel at the edges of each call's cost.
+do
+	math.randomseed(7)
+	const EMPTY: Value = { kind = "con", tag = 0, payload = NIL }
+
+	const function bindOf(): Value
+		if math.random(0, 1) == 0 then
+			return { kind = "con", tag = 0, payload = math.random(0, 3) }
+		end
+
+		return { kind = "con", tag = 1, payload = math.random(0, 9) }
+	end
+
+	const function kidsOf(a: Value, b: Value, c: Value, d: Value): Value
+		return { kind = "cell", head = a, tail = { kind = "cell", head = b, tail = { kind = "cell", head = c, tail = d } } }
+	end
+
+	local function randomTrie(depth: number): Value
+		if depth == 0 or math.random() < 0.3 then
+			return EMPTY
+		end
+
+		const payload: Value = { kind = "cell", head = bindOf(), tail = kidsOf(randomTrie(depth - 1), randomTrie(depth - 1), randomTrie(depth - 1), randomTrie(depth - 1)) }
+
+		return { kind = "con", tag = 1, payload = payload }
+	end
+
+	const F = jetLaws["findB@84"]
+	const S = jetLaws["setB@100"]
+
+	for i = 1, 300 do
+		const trie = randomTrie(4)
+		const id = math.random(0, 255)
+		emit(`jet findB@84 {i}`, "body", law(1, call(lit(F), arg(1), lit(id))), trie, 1e6)
+	end
+
+	-- the fuel edges: exactly the call's steps, and one less
+	for i = 1, 40 do
+		const trie = randomTrie(4)
+		const id = math.random(0, 255)
+		const outcome = Interp.runForm(call(lit(F), arg(1), lit(id)), trie, 1e6)
+		emit(`jet findB@84 edge {i} exact`, "body", law(1, call(lit(F), arg(1), lit(id))), trie, outcome.steps)
+		emit(`jet findB@84 edge {i} one less`, "body", law(1, call(lit(F), arg(1), lit(id))), trie, outcome.steps - 1)
+	end
+
+	emit("jet findB@84 negative id", "body", law(1, call(lit(F), arg(1), lit(-1))), EMPTY, 500)
+
+	for i = 1, 300 do
+		const trie = randomTrie(4)
+		const id = math.random(0, 255)
+		const b = bindOf()
+		emit(`jet setB@100 {i}`, "body", law(1, call(lit(S), arg(1), lit(id), lit(b))), trie, 1e6)
+	end
+
+	for i = 1, 40 do
+		const trie = randomTrie(4)
+		const id = math.random(0, 255)
+		const b = bindOf()
+		const outcome = Interp.runForm(call(lit(S), arg(1), lit(id), lit(b)), trie, 1e6)
+		emit(`jet setB@100 edge {i} exact`, "body", law(1, call(lit(S), arg(1), lit(id), lit(b))), trie, outcome.steps)
+		emit(`jet setB@100 edge {i} one less`, "body", law(1, call(lit(S), arg(1), lit(id), lit(b))), trie, outcome.steps - 1)
 	end
 end
