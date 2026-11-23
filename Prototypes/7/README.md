@@ -238,7 +238,9 @@ The corpus build on the Go machine, on this host (441.6 million core steps, jets
 - **Kept:** frames built straight from the function's arguments and the new ones, with no intermediate list: 6.85 s to about 6.1 s.
 - **Rejected:** a table of preboxed small integers, to avoid the allocation when an integer becomes a value: no change (6.2 s both ways), so it is reverted.
 - **Collector setting:** GOGC=400 on the same code gives 5.15 s, 17% less. It is a runtime setting that trades memory for time; the live heap is small, so the cost is modest. Not adopted in the library, which should not set the collector; a host can.
-- **Not done:** a flat program layout (the node tree becomes a few integer arrays, so the collector has almost nothing to scan), and one allocation per frame instead of two (the environment merged into the slots). I estimate the flat layout at a fifth to a third of the time, but have not built it.
+- **Frames as slices:** a frame is a slice, and a let or a case appends to its own copy, so the environment type and the restore record go. The corpus build goes to about 5.5 s, with the same steps. This is a simplification as well as a speed gain.
+- **Tried and reverted:** a flat program layout (the node tree as integer arrays, so the collector has nothing to scan). It made the machine about 7% slower: the collector mostly runs on other cores, so the single-threaded loop is the critical path, and the flat layout slowed the loop.
+- **Simplification (decision 15):** `cell` is a primitive, `cons`, not a form. Every step count is the same, the spec has ten forms and fifteen primitives, and the readers and the machine each lose a case. The checker takes 108,352,804 steps and the corpus build 441,584,946, as before.
 
 Together, the frame change and GOGC=400 give about 5.1 s on the corpus, still about five times the 1 s target. The speed target needs the step count (about 198,000 core steps per line) to fall, or most of the interpreted steps to become jets, as the Phase 8 decision said; the experiments here only trim the constant.
 

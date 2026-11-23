@@ -62,6 +62,6 @@ On the checker, the jets are used about 565,000 times and replace 62.8% of the c
 
 ## The corpus build and the memo
 
-The corpus is the four boot files (2,235 lines). The build runs each through its imports and then layout, lex, parse and check, on four core programs, and checks every stage against the reference. It takes about 6.9 s here, against a 1 s target for 2,500 lines (see the plan, Phase 8). With the memo on, a cold build takes about twice as long, and an unchanged rebuild takes 0.04 s.
+The corpus is the four boot files (2,235 lines). The build runs each through its imports and then layout, lex, parse and check, on four core programs, and checks every stage against the reference. It takes about 5.5 s here (down from 6.9 s, after the simplifications in the plan's experiments section), against a 1 s target for 2,500 lines (see the plan, Phase 8). With the memo on, a cold build takes about twice as long, and an unchanged rebuild takes 0.04 s.
 
 The memo (decisions 13 and 14) is off by default. Turn it on with `MemoOn`, and it stores only calls of at least `MemoMinFuel` (1,000) steps. A one-declaration change to the checker re-checks 270 calls.
