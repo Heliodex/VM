@@ -19,7 +19,7 @@ const (
 )
 
 // costSame is the cost of each arm, in steps, counting the entry (fitted; see same_test.go).
-var costSame = [sameArms]int64{72, 72, 102, 76, 139}
+var costSame = [sameArms]int64{72, 72, 91, 59, 110}
 
 // sameWalk is same: the result, and the arms its path takes.
 func sameWalk(a, b Value, w *[sameArms]int64) (Value, bool) {
@@ -61,7 +61,7 @@ func sameWalk(a, b Value, w *[sameArms]int64) (Value, bool) {
 
 func init() {
 	// same@39: arity 2, the two names. The hash is the law's content hash (sha256 of its encoding, section 12.7).
-	register("e0a06fa60989e7efc41409e8fffffef546a04d029c2e596779108cf4843e6f28", func(args []Value) (Value, int64, bool) {
+	register("3e86f7c1398a8db3be9e86e8dfda54d432246ae62731cb7c18297e922afd5320", func(args []Value) (Value, int64, bool) {
 		var w [sameArms]int64
 
 		res, ok := sameWalk(args[0], args[1], &w)
