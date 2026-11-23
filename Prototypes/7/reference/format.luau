@@ -31,7 +31,7 @@ export type Form = any
 const NIL = { kind = "nil" }
 
 -- The argument count of each primitive, by tag (SPEC.md section 4).
-const PRIM_ARITY = { 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1 }
+const PRIM_ARITY = { 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1 }
 
 local VALUE_HEADER = 1
 local PROGRAM_HEADER = 2

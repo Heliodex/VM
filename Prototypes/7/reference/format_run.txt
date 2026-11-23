@@ -27,6 +27,7 @@ PASS  round trip program: safediv  -> same
 PASS  round trip program: unwrap  -> same
 PASS  round trip program: laziness  -> same
 PASS  round trip program: loop  -> same
+PASS  round trip program: tagof and payload  -> same
 PASS  round trip: a program 20,000 forms deep  -> same
 PASS  refused: an empty string  -> binary: the bytes are not a value
 PASS  refused: a program read as a value  -> binary: the bytes are not a value
@@ -39,7 +40,7 @@ PASS  refused: bytes after a value  -> binary: there are bytes after the value
 PASS  refused: a law whose body is not a form  -> binary: tag 0 is not a form
 PASS  refused: a program of arity 2  -> binary: a program is a law of arity 1
 PASS  refused: an unknown form tag  -> binary: tag 27 is not a form
-PASS  refused: a primitive of tag 12  -> binary: primitive 12 does not exist
+PASS  refused: a primitive of tag 14  -> binary: primitive 14 does not exist
 PASS  refused: a case with the tag 0 twice  -> binary: the case has tag 0 twice
 PASS  refused: a partial application with no fewer arguments than its arity  -> binary: a partial application has fewer arguments than its law's arity, and at least one
 PASS  refused: a program with bytes after it  -> binary: there are bytes after the program
@@ -48,4 +49,4 @@ PASS  a thunk has no binary form  -> binary: a thunk has no binary form
 PASS  a pin of a thunk has no binary form  -> binary: a pin of a thunk has no binary form
 PASS  a program must be a law of arity 1  -> binary: a program is a law of arity 1
 PASS  a prim with the wrong number of arguments is refused  -> binary: primitive 0 takes 2 arguments, but is given 1
-50 of 50 checks pass
+51 of 51 checks pass

@@ -2,7 +2,7 @@
 
 Status: draft for Phase 3. Every rule the reference interpreter needs is here. Where the plan left a choice open, the default the plan recommends is taken and listed under "Decisions taken" at the end.
 
-The core is what a surface language compiles to. It has eleven forms and twelve primitives, and nothing else. Recursion, data structures, strings and effects are built on top of these, or are added later with a rule of their own.
+The core is what a surface language compiles to. It has eleven forms and fourteen primitives, and nothing else. Recursion, data structures, strings and effects are built on top of these, or are added later with a rule of their own.
 
 ## 1. Values
 
@@ -92,7 +92,7 @@ Every form has a fixed number of parts, so a program is checked when it is built
 
 ## 4. Primitives
 
-Twelve primitives, each written by a number (its tag) and a name. The tag is what a program uses in the `prim` form.
+Fourteen primitives, each written by a number (its tag) and a name. The tag is what a program uses in the `prim` form.
 
 | Tag | Name | Arity | Rule |
 | ---: | --- | ---: | --- |
@@ -108,6 +108,8 @@ Twelve primitives, each written by a number (its tag) and a name. The tag is wha
 | 9 | tail | 1 | a cell; its second component. Not a cell: an error |
 | 10 | pin | 1 | any value that is not a thunk; a pin holding it, interned by content hash. Pinning a pin gives the same pin |
 | 11 | unpin | 1 | a pin; the value it holds. Not a pin: an error |
+| 12 | tagof | 1 | a constructor; its tag, a number from 0 up. Any other value: -1 |
+| 13 | payload | 1 | a constructor; its payload. Any other value: an error |
 
 Three rules about primitives:
 
@@ -234,6 +236,7 @@ These are the defaults this spec takes. Each can be changed, and a change is rec
 6. **Calls are strict** in their arguments. Laziness is only through `delay`.
 7. **The step rule** is one step per form and one per law entry. Phase 3 writes the step counts of the examples into its tests, so a change to this rule is visible.
 8. **Integers are unbounded.** The VM's integers have no size limit, and the ±(2^53 − 1) bound of Prototypes 5 and 6 is a limit of the Luau host (doubles), not of the VM. The reason: a bound in the VM would make the answer depend on the host. Consequence for Phase 3: the Luau reference needs a bignum representation for integers, and its tests must include values beyond 2^53.
+9. **Constructor tags are read by primitives.** `tagof` and `payload` are primitives 12 and 13, not forms. Phase 3 found this gap: Prototype 6 reads a constructor's tag with forms, but a `case` cannot read a tag for an open set of tags, so the core needs a way to get the tag as a number. Adding two primitives keeps the form count at eleven.
 
 ## 12. Binary format
 
@@ -295,7 +298,7 @@ A law is its arity, then its body. A body is a form, written with one tag byte p
 | 23 (`17`) | `let e b` | `e`, then `b` |
 | 24 (`18`) | `delay (call f e1 … en)` | `n`, a magnitude, then `f`, then `e1` to `en`; the call is not a separate form, so it has no tag of its own |
 | 25 (`19`) | `force e` | `e` |
-| 26 (`1a`) | `prim op a1 … an` | the primitive's tag `op` (a magnitude, less than 12), then its arguments; the number of arguments is the primitive's arity (section 4), so it is not written |
+| 26 (`1a`) | `prim op a1 … an` | the primitive's tag `op` (a magnitude, less than 14), then its arguments; the number of arguments is the primitive's arity (section 4), so it is not written |
 
 Form tags are in their own range, 16 to 26, and never appear as values, so a reader knows from its position whether it is reading a value or a form. A form's parts are read in the order of the table.
 
@@ -305,7 +308,7 @@ Rules a reader enforces, beyond the encoding itself:
 
 - A `delay` form's call has the arguments it declares, and nothing else.
 - The tags in a `case` are distinct.
-- A `prim` tag is less than 12.
+- A `prim` tag is less than 14.
 - A partial application has fewer arguments than its law's arity.
 
 A reader does not check frame indices (`arg i` against the frame of its law). An index past the frame is an error of the run (section 5), as it would be for any program that is built in memory.
@@ -337,7 +340,7 @@ A reader refuses, with a message that gives the reason:
 - bytes that end before the value or program is complete;
 - bytes after the value or program;
 - a form with a missing part;
-- a duplicate tag in a `case`, a `prim` tag of 12 or more, a partial application with too many arguments, and a program whose arity is not 1;
+- a duplicate tag in a `case`, a `prim` tag of 14 or more, a partial application with too many arguments, and a program whose arity is not 1;
 - a position past what the implementation can index (at least 2^53 − 1 in every implementation, section 12.2).
 
 The reader and writer have no limit on the depth of a program: both keep their own stack, as the machine does (the Luau reference tests a program 20,000 forms deep).
@@ -346,4 +349,4 @@ A writer refuses a thunk, a pin of a thunk, and any other value without a binary
 
 ## 13. Form count
 
-The forms are `lit`, `arg`, `call`, `cell`, `con`, `case`, `if`, `let`, `delay`, `force` and `prim`. That is eleven, within the limit of twelve in Phase 2's exit test. The twelve primitives are not forms: they are the table in section 4, so the form count does not grow when a primitive is added.
+The forms are `lit`, `arg`, `call`, `cell`, `con`, `case`, `if`, `let`, `delay`, `force` and `prim`. That is eleven, within the limit of twelve in Phase 2's exit test. The fourteen primitives are not forms: they are the table in section 4, so the form count does not grow when a primitive is added.
