@@ -111,28 +111,27 @@ func machine(m mode, node *Node, env *Env, fv Value, args []Value, fuel int64) O
 		case mApply:
 			var (
 				law *Law
-				all []Value
+				have []Value // the arguments a partial application already has (fewer than the arity)
 			)
 
 			switch f := fv.(type) {
 			case *App:
 				law = f.Law
-				all = make([]Value, 0, len(f.Args)+len(args))
-				all = append(all, f.Args...)
-				all = append(all, args...)
+				have = f.Args
 			case *Law:
 				law = f
-				all = args
 			default:
 				return fail("a call of a value that is not a function", steps)
 			}
 
-			n := len(all)
-			if n < law.Arity {
-				// Not saturated: a partial application, which is not a law entry and costs nothing.
-				if n == 0 {
+			if len(have)+len(args) < law.Arity {
+				// Not saturated: a partial application, which is not a law entry and costs nothing. It copies its arguments, which may alias the operands of a call (see the call's finish).
+				if len(have)+len(args) == 0 {
 					value = law
 				} else {
+					all := make([]Value, 0, len(have)+len(args))
+					all = append(all, have...)
+					all = append(all, args...)
 					value = &App{
 						Law: law,
 						Args: all,
@@ -144,10 +143,27 @@ func machine(m mode, node *Node, env *Env, fv Value, args []Value, fuel int64) O
 				continue
 			}
 
+			// The frame, built straight from the function's arguments and the new ones: slot 0 is the law, then the arguments in order. What is over the arity is applied to the result, later.
+			from := law.Arity - len(have)
+			slots := make([]Value, law.Arity+1)
+			slots[0] = law
+
+			copy(slots[1:], have)
+			copy(slots[1+len(have):], args[:from])
+
+			var extra []Value
+
+			if len(args) > from {
+				extra = args[from:]
+			}
+
+			saturated := len(extra) == 0
+			args := slots[1:]
+
 			// A saturated call of a law that has a jet: the jet gives the result and the fuel the body would use (jets.go). It is taken only when the whole call fits in the fuel; otherwise the body runs and stops at the spec's step.
-			if JetsOn && n == law.Arity {
+			if JetsOn && saturated {
 				if fn := jetFor(law); fn != nil {
-					if res, cost, ok := fn(all); ok && steps+cost <= fuel {
+					if res, cost, ok := fn(args); ok && steps+cost <= fuel {
 						steps += cost
 						value = res
 						m = mRet
@@ -163,8 +179,8 @@ func machine(m mode, node *Node, env *Env, fv Value, args []Value, fuel int64) O
 				memoOn bool
 			)
 
-			if MemoOn && n == law.Arity {
-				if key, ok := memoKey(law, all); ok {
+			if MemoOn && saturated {
+				if key, ok := memoKey(law, args); ok {
 					if e, hit := memo[key]; hit {
 						if steps+e.fuel <= fuel {
 							steps += e.fuel
@@ -202,17 +218,12 @@ func machine(m mode, node *Node, env *Env, fv Value, args []Value, fuel int64) O
 				})
 			}
 
-			if n > law.Arity {
+			if len(extra) > 0 {
 				k = append(k, cont{
 					kind: kApplyRest,
-					rest: append([]Value(nil), all[law.Arity:]...),
+					rest: append([]Value(nil), extra...),
 				})
 			}
-
-			slots := make([]Value, law.Arity+1)
-			slots[0] = law
-
-			copy(slots[1:], all[:law.Arity])
 
 			env = &Env{
 				Slots: slots,
@@ -256,7 +267,8 @@ func machine(m mode, node *Node, env *Env, fv Value, args []Value, fuel int64) O
 				switch c.node.Op {
 				case OpCall:
 					fv = vals[0]
-					args = append([]Value(nil), vals[1:]...)
+					// The arguments alias the operands, which are cut back below. They are read once, to build the frame or a partial application (which copies them), so nothing outlives the operands.
+					args = vals[1:]
 					m = mApply
 				case OpCell:
 					value = &Cell{

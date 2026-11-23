@@ -229,6 +229,19 @@ These need an answer from the project owner before the phase that depends on the
 6. **Resolved: the content hash.** It is SHA-256 of a value's binary encoding without the header byte (SPEC.md section 12.7). It names a law, keys a memo, selects a jet, and interns a pin. Jets are chosen by the hash of the law, so no hint from a program is needed.
 7. **Resolved: jets are for laws only.** Primitives stay primitives: a jet on one would add a law entry to its fuel for no gain. A new primitive needs a spec change with its reason (SPEC.md decision 12). Work that fuel does not count, such as `pin` encoding a whole value, is a known gap, closed by a spec change rather than a jet.
 
+## Speed experiments (after the plan)
+
+The corpus build on the Go machine, on this host (441.6 million core steps, jets on; the figures are single runs, with noise of about 3%):
+
+- **Baseline:** 6.85 s. Without the jets, 10.2 s.
+- **Profile:** the collector takes about 40% of the time, the machine's own loop about 30%. Allocation is mostly frames (the slots of each call, about 27% of bytes) and partial applications with the argument lists they copy (about 37%). The decoded programs are 16 MB, with 163,580 pointer objects, and the collector rescans them each cycle.
+- **Kept:** frames built straight from the function's arguments and the new ones, with no intermediate list: 6.85 s to about 6.1 s.
+- **Rejected:** a table of preboxed small integers, to avoid the allocation when an integer becomes a value: no change (6.2 s both ways), so it is reverted.
+- **Collector setting:** GOGC=400 on the same code gives 5.15 s, 17% less. It is a runtime setting that trades memory for time; the live heap is small, so the cost is modest. Not adopted in the library, which should not set the collector; a host can.
+- **Not done:** a flat program layout (the node tree becomes a few integer arrays, so the collector has almost nothing to scan), and one allocation per frame instead of two (the environment merged into the slots). I estimate the flat layout at a fifth to a third of the time, but have not built it.
+
+Together, the frame change and GOGC=400 give about 5.1 s on the corpus, still about five times the 1 s target. The speed target needs the step count (about 198,000 core steps per line) to fall, or most of the interpreted steps to become jets, as the Phase 8 decision said; the experiments here only trim the constant.
+
 ## Next step
 
 Phases 1 to 8 are done, with the misses written above (the speed target is not met: about 7 times). The remaining work is the experiments on simplicity and speed that the user asked for: the first is to measure the interpreted step rate with a compiled-closure machine, against the 3 times the decision above needs, and the second is to look for steps the front end can drop without changing its results.

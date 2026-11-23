@@ -12,6 +12,9 @@ The core of `SPEC.md`, run on Go. It reads the binary format of section 12, and 
 - `jets.go`: the jet table, and the helper jets (see "Jets" below).
 - `trie.go`, `trie_test.go`: the jets for `findB` and `setB`, and the fit of their arm costs.
 - `hash.go`: the content hash (SPEC.md section 12.7).
+- `memo.go`, `memo_test.go`: the memo (SPEC.md section 7), and the incremental measurement.
+- `corpus_test.go`: the corpus build (Phase 8), against `testdata/corpus.txt`.
+- `profile_test.go`: the core's profile of the checker (`PROFILE=1`).
 - `fast_test.go`: runs every case in `testdata/cases.txt` with the jets on and off, and times the checker.
 - `jets_test.go`: checks that every jet still names a law of the checker's program.
 - `gen/gen.luau`: writes `testdata/cases.txt` from the reference.
@@ -56,3 +59,9 @@ On the checker, the jets are used about 565,000 times and replace 62.8% of the c
 - The machine reads the bytes of a program into a tree of resolved nodes, not into one flat array. The flat layout is the next step if the speed target needs it.
 - Readers and writers recurse, as the Go call stack allows (up to 1 GB by default, so far deeper than the 20,000 tested). The spec asks for no depth limit; the Go stack is the limit here.
 - The reference's inline checks in `interp_run.luau` are not ported one by one. Each rule they test is covered by a hand-written case, and the spec's examples keep their step counts (`call (lit inc) (lit 41)` is 7 steps).
+
+## The corpus build and the memo
+
+The corpus is the four boot files (2,235 lines). The build runs each through its imports and then layout, lex, parse and check, on four core programs, and checks every stage against the reference. It takes about 6.9 s here, against a 1 s target for 2,500 lines (see the plan, Phase 8). With the memo on, a cold build takes about twice as long, and an unchanged rebuild takes 0.04 s.
+
+The memo (decisions 13 and 14) is off by default. Turn it on with `MemoOn`, and it stores only calls of at least `MemoMinFuel` (1,000) steps. A one-declaration change to the checker re-checks 270 calls.
