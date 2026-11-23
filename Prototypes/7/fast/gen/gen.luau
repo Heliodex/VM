@@ -64,7 +64,6 @@ const function conForm(tag: number, e: Form): Form
 	return { op = "con"; tag = tag; e = e }
 end
 
-
 const function ifForm(c: Form, t: Form, e: Form): Form
 	return { op = "if"; c = c; t = t; e = e }
 end
