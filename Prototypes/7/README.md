@@ -37,9 +37,17 @@ Conclusions that shape this plan:
 
 The target has three parts. Each one is measured on a fixed reference host, and the harness records the host and the Luau version with every result.
 
-**1. The user-facing time budget (agreed).** A build of 2,500 lines of L2 takes under 1 s on the reference host. A build is lex, parse, check and desugar of the program. Running the program's tests is not part of the build. Interactive re-check is not a target for now.
+**1. The user-facing time budget (agreed).** A bootstrapped build of 2,500 lines of L2 takes under 1 s on the reference host, on the VM. The build is the bootstrapped compiler running on the VM, with imports included in the check. Running the program's tests is not part of the build. Interactive re-check is not a target for now.
 
-**The build corpus.** A fixed set of L2 source, 2,500 lines in total. The proposed corpus is the L2 compiler's own sources in L2 (`Prototypes/6/L2/programs/boot/*.l2`, 2,235 lines), topped up with library programs to 2,500. The size is the project owner's figure. The exact files are a proposal. Note that Prototype 5's Luau L2 implementation is 4,478 lines in nine files (about 3,400 in the lexer, parser, layout, checker, desugarer and driver), so 2,500 lines is smaller than the old implementation.
+The build's stages, as they stand:
+
+- **Layout** (`boot/layout.l2`): on the VM, from the raw indented program section. Measured by the Phase 0 harness, and its output must equal the host layout's.
+- **Lex, parse, check** (`boot/lex.l2`, `boot/parse.l2`, `boot/types.l2`): on the VM. The check is partial today (some forms report "this form is not checked yet") and has no import support yet.
+- **Desugar**: not bootstrapped. It runs on the host, so it is not counted in the build. When it is bootstrapped, it joins the build.
+
+So the target as stated is for a *bootstrapped front end*, layout through check. The full-compiler target waits for desugar to be bootstrapped.
+
+**The build corpus.** The four boot files, which are the bootstrapped front end today (`Prototypes/6/L2/programs/boot/`: `layout.l2`, `lex.l2`, `parse.l2`, `types.l2`, 2,235 lines in all). The target size is 2,500 lines, so the corpus is 265 lines short. The top-up with library programs is not done. The corpus is re-measured when the bootstrapped compiler gains desugar, so the full compiler is measured as one piece. The size 2,500 is the project owner's figure. Note that Prototype 5's Luau L2 implementation is 4,478 lines in nine files, and the Luau pieces that the bootstrap replaces (lexer, parser, layout, checker, desugarer) total about 3,700 of those lines, so 2,500 lines is smaller than the old implementation.
 
 **2. A step budget, derived from the time budget.** Convert seconds into steps using the throughput the host actually achieves:
 
@@ -57,7 +65,7 @@ At the hybrid's 18.5M steps/s, the budget is about 18.5M steps for 2,500 lines, 
 **Open questions for the speed target** (listed again in "Decisions" below):
 
 - Does the target need to hold on Luau, or only on a future native host? On Luau the step rate is about 18M steps/s, so the budget is about 18M steps. That is reachable only if the 49–68× reduction comes from algorithms and jets, not the machine. If it cannot be reached, the target needs a native host.
-- Is the corpus right? The 2,500 lines and the file choice are proposals.
+- Corpus: resolved as the four boot files now, with the top-up and the full compiler to follow (see "Speed target").
 
 ## Core design (draft)
 
@@ -133,6 +141,8 @@ Note: the plan first proposed scaling by repeating `types.l2`. It was replaced b
 - `halfOf` and `oddOf` (`/` and `%` by 2, each matched through a `Result`): a bit primitive or a direct trie step. About 28% of steps on `types.l2`;
 - `first`, `tl` and `hdOr`, the list accessors that wrap their result: direct access where the list is known to be non-empty. About 22% of steps.
 
+- **Imports** (decided: they are part of the bootstrapped build). The checker's request has no slot for imported names, so `lex.l2` and `parse.l2`, which import `reverse` and `append`, are checked with those names unbound. The request must carry each import's name and scheme, as the Luau checker takes `importSchemes`. Exit: `infer_run` agrees with the Luau checker on programs that use imports, and the corpus check reports no unbound imports.
+
 This runs on Prototype 6, so each gain is measured before any new machine exists.
 
 *Exit:* steps against size is linear on the same inputs, with the checker's answers unchanged (`infer_run` and `checker_run` agree).
@@ -172,13 +182,15 @@ This runs on Prototype 6, so each gain is measured before any new machine exists
 - **Scope creep into syntax.** The surface stays L2. New syntax waits until the core and the speed target are measured.
 - **Measuring on one host.** Every number is from one machine. The harness records the host, so a second host can be added later.
 - **Luau's ceiling.** On Luau, the step rate caps the design. If the build cannot be done within about 18M steps, the design will need a native host, and Phase 8 has to say so.
-- **Corpus size.** The 2,500-line build is smaller than the Prototype 5 Luau implementation (4,478 lines). If the corpus is too small to show the costs that matter, the target is met on an easy input. Phase 0 checks this by reporting how the costs grow with size.
+- **Corpus size.** The 2,500-line target is smaller than the Prototype 5 Luau implementation (4,478 lines). If the corpus is too small to show the costs that matter, the target is met on an easy input. Phase 0 checks this by reporting how the costs grow with size, on generated programs up to 3,209 lines.
+- **The corpus is not yet the full compiler.** Desugar is not bootstrapped, and the checker has no imports. Until both are done, the build is a front end, and the target says so.
 
 ## Decisions
 
 These need an answer from the project owner before the phase that depends on them.
 
-1. **Resolved:** the workload is a build, and the target is 2,500 lines of L2 under 1 s on the reference host. **Still open:** the corpus files (proposed in "Speed target"), which must be fixed before Phase 0 numbers are compared with the target.
+1. **Resolved:** the workload is a build, and the target is 2,500 lines of L2 under 1 s on the reference host, for the bootstrapped build on the VM. The corpus is the four boot files, with a top-up to 2,500 and the full compiler to follow (see "Speed target").
+1a. **Resolved:** imports are part of the bootstrapped build. The checker's request must carry the imported names and their schemes, so a file that imports library code is fully checked on the VM. This is new work in the checker (Phase 1).
 2. **Host.** Luau only, or a native host later? On Luau the step rate caps the design (see Risks). Native hosts change the choice of jets and make uniqueness and parallelism worth considering.
 3. **Fuel of jets** (before Phase 5). Option A: every jet declares a fuel formula and is checked against the reference. Option B: jets are "work only" and the parity check compares results alone. The plan assumes A, and uses B only where A cannot be stated.
 4. **Strings and names** (before Phase 6). Option A: keep lists of bytes, and rely on interning and jets. Option B: a byte kind backed by the host's strings. The plan assumes B, but it waits for Phase 0 to show whether text is a large cost.
@@ -186,4 +198,4 @@ These need an answer from the project owner before the phase that depends on the
 
 ## Next step
 
-Phase 1, on the measured candidates above. The first measurement to repeat after each change is the same harness, so the numbers stay comparable. The corpus files still need the project owner's confirmation, and the bootstrapped checker still needs imports before the two files that import library code can be fully checked.
+Phase 1, on the measured candidates above, and the import support it depends on for a complete check. The first measurement to repeat after each change is the same harness, so the numbers stay comparable. The harness now times the layout stage on the VM too, so the layout's share is part of every later comparison.
