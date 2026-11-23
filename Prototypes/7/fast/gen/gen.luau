@@ -344,6 +344,8 @@ do
 			function(e, l)
 				const owner = V.ownerOf(e)
 
+				print(`# law {owner} {l.arity} {hex(Format.encodeValue(l) :: string)}`)
+
 				if JET_ARITY[owner] == l.arity then
 					jetLaws[owner] = l
 				end

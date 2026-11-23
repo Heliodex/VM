@@ -48,6 +48,9 @@ const (
 	kForce
 )
 
+// StepHook, when set, is told the law of each step the machine charges: the frame's law for a form, and the callee for an entry. It is for measurement (the core's profile); the results do not depend on it.
+var StepHook func(law Value)
+
 func fail(msg string, steps int64) Outcome {
 	return Outcome{
 		Status: "error",
@@ -76,6 +79,10 @@ func machine(m mode, node *Node, env *Env, fv Value, args []Value, fuel int64) O
 			}
 
 			steps++
+
+			if StepHook != nil {
+				StepHook(env.Slots[0])
+			}
 
 			switch node.Op {
 			case OpLit:
@@ -170,6 +177,11 @@ func machine(m mode, node *Node, env *Env, fv Value, args []Value, fuel int64) O
 			env = &Env{
 				Slots: slots,
 			}
+
+			if StepHook != nil {
+				StepHook(law)
+			}
+
 			node = law.Body
 			m = mEval
 		case mRet:
