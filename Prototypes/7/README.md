@@ -119,6 +119,7 @@ Each phase ends with an exit test. A phase is not finished until its test passes
 
 - the checker on `types.l2` at 1×, 2× and 4× input (for example, the parsed declarations repeated with fresh names). Steps against size.
 - a histogram of steps by form and by library function (`lookupM`, `subst`, `bindsOf`, `hdOr`, and the rest), and of allocations.
+- the whole build on the build corpus (2,500 lines): lex, parse, check and desugar, each stage's steps reported separately. This is the first measurement of the real target, and the first time the lex, parse and desugar costs are known.
 
 *Exit:* we know whether the checker's cost is linear, and we know the five largest cost centres. If it is quadratic, the cause is named.
 
@@ -160,13 +161,14 @@ Each phase ends with an exit test. A phase is not finished until its test passes
 - **Hashing cost in Luau.** Hashing every value could cost more than it saves. The lazy, cached hash limits this, but Phase 7 must show the net gain.
 - **Scope creep into syntax.** The surface stays L2. New syntax waits until the core and the speed target are measured.
 - **Measuring on one host.** Every number is from one machine. The harness records the host, so a second host can be added later.
-- **Luau's ceiling.** On Luau, the step rate caps the design. If the interactive target needs fewer than about 4M steps, the design will need a native host, and Phase 8 has to say so.
+- **Luau's ceiling.** On Luau, the step rate caps the design. If the build cannot be done within about 18M steps, the design will need a native host, and Phase 8 has to say so.
+- **Corpus size.** The 2,500-line build is smaller than the Prototype 5 Luau implementation (4,478 lines). If the corpus is too small to show the costs that matter, the target is met on an easy input. Phase 0 checks this by reporting how the costs grow with size.
 
 ## Decisions
 
 These need an answer from the project owner before the phase that depends on them.
 
-1. **The user-facing workload and its time budget** (before Phase 8, and the step budget depends on it). The proposed budgets in "Speed target" are not agreed.
+1. **Resolved:** the workload is a build, and the target is 2,500 lines of L2 under 1 s on the reference host. **Still open:** the corpus files (proposed in "Speed target"), which must be fixed before Phase 0 numbers are compared with the target.
 2. **Host.** Luau only, or a native host later? On Luau the step rate caps the design (see Risks). Native hosts change the choice of jets and make uniqueness and parallelism worth considering.
 3. **Fuel of jets** (before Phase 5). Option A: every jet declares a fuel formula and is checked against the reference. Option B: jets are "work only" and the parity check compares results alone. The plan assumes A, and uses B only where A cannot be stated.
 4. **Strings and names** (before Phase 6). Option A: keep lists of bytes, and rely on interning and jets. Option B: a byte kind backed by the host's strings. The plan assumes B, but it waits for Phase 0 to show whether text is a large cost.
