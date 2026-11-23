@@ -192,7 +192,35 @@ local function containsLam(e: Expr): boolean
 end
 
 -- An application of a lambda to one argument: a let.
-const function isLetApp(e: Expr): boolean
+-- Whether a lambda in e, at binder depth depth, captures the variable at level.
+local function capturesLevel(e: Expr, depth: number, level: number): boolean
+	if e.op == "lam" then
+		for _, l in sortedFree(e.body, depth + 1, depth) do
+			if l == level then
+				return true
+			end
+		end
+
+		return false
+	end
+
+	if e.op == "apply" then
+		return capturesLevel(e.f, depth, level) or capturesLevel(e.arg, depth, level)
+	elseif e.op == "if" then
+		return capturesLevel(e.c, depth, level) or capturesLevel(e.t, depth, level) or capturesLevel(e.e, depth, level)
+	elseif e.op == "cell" then
+		return capturesLevel(e.head, depth, level) or capturesLevel(e.tail, depth, level)
+	elseif e.op == "prim" then
+		return capturesLevel(e.a, depth, level) or e.b ~= nil and capturesLevel(e.b, depth, level)
+	elseif e.op == "pin" or e.op == "force" or e.op == "construct" or e.op == "tagof" or e.op == "payload" or e.op == "index" then
+		return capturesLevel(e.e, depth, level)
+	end
+
+	return false
+end
+
+-- Whether an application of a lambda is a let at depth, given the map of the current law. A let is used when the lambda's body makes no lambda, or when none of its lambdas captures the law's own function (slot 0): a closure that captures it rebuilds the partial application from every outer variable, which costs more than the closure did.
+const function isLetApp(e: Expr, depth: number, map: { number }): boolean
 	if e.op ~= "apply" then
 		return false
 	end
@@ -200,9 +228,24 @@ const function isLetApp(e: Expr): boolean
 	const f = (e :: VM.ApplyExpr).f
 
 	-- The fixed point is a lambda too, but it is not a let: applied to a function it is the recursion of the desugarer's letrec and of its mutual groups.
-	return f.op == "lam" and f ~= VM.fix and not containsLam(f.body)
+	if f.op ~= "lam" or f == VM.fix then
+		return false
+	end
+
+	if not containsLam(f.body) then
+		return true
+	end
+
+	for lvl, slot in map do
+		if lvl >= 0 and slot == 0 and capturesLevel(f.body, depth + 1, lvl) then
+			return false
+		end
+	end
+
+	return true
 end
 
+-- Whether a let at depth can be used: a lambda in its body may not capture the function itself (slot 0) of the law, which costs a rebuilt partial application at every closure.
 -- The argument of a fixed point that the desugarer writes for a recursive function: a lambda whose body is a lambda.
 const function isFixOfLams(e: Expr): boolean
 	if e.op ~= "lam" then
@@ -342,7 +385,7 @@ lower = function(e: Expr, depth: number, map: { number }): Form
 		return { op = "if"; c = lower(e.c, depth, map); t = lower(e.t, depth, map); e = lower(e.e, depth, map) }
 	elseif e.op == "apply" and e.f == VM.fix and isFixOfLams(e.arg) then
 		return lowerFix(e.arg, depth, map)
-	elseif isLetApp(e) then
+	elseif isLetApp(e, depth, map) then
 		-- An immediately applied lambda is a let: the argument is evaluated in this frame, and the lambda's variable is the next slot of the frame, so no law is made and nothing is entered (SPEC.md section 3, let).
 		const slot = map[-2] or 0
 		local inner: { number } = {}
