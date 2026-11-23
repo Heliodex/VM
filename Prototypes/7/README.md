@@ -163,4 +163,16 @@ Each phase ends with an exit test. A phase is not finished until its test passes
 - **Measuring on one host.** Every number is from one machine. The harness records the host, so a second host can be added later.
 - **Luau's ceiling.** On Luau, the step rate caps the design. If the interactive target needs fewer than about 4M steps, the design will need a native host, and Phase 8 has to say so.
 
-<!-- next: decisions -->
+## Decisions
+
+These need an answer from the project owner before the phase that depends on them.
+
+1. **The user-facing workload and its time budget** (before Phase 8, and the step budget depends on it). The proposed budgets in "Speed target" are not agreed.
+2. **Host.** Luau only, or a native host later? On Luau the step rate caps the design (see Risks). Native hosts change the choice of jets and make uniqueness and parallelism worth considering.
+3. **Fuel of jets** (before Phase 5). Option A: every jet declares a fuel formula and is checked against the reference. Option B: jets are "work only" and the parity check compares results alone. The plan assumes A, and uses B only where A cannot be stated.
+4. **Strings and names** (before Phase 6). Option A: keep lists of bytes, and rely on interning and jets. Option B: a byte kind backed by the host's strings. The plan assumes B, but it waits for Phase 0 to show whether text is a large cost.
+5. **Laziness.** Whether the core keeps `delay` and `force` as explicit forms, as drafted, or makes evaluation lazy by default. The plan assumes explicit forms, so that the cost of each thunk is visible in the fuel and work counts.
+
+## Next step
+
+Phase 0. Freeze Prototype 6, then write the measurement harness in `Prototypes/7/measure/`, so that the baseline numbers for this plan come from the same tool that later phases use.
