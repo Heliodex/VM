@@ -58,14 +58,14 @@ A jet is native code that replaces one law's body (SPEC.md section 3, decision 1
 
 There are seven jets on the checker and on the corpus's helpers, and nine more on the corpus's list helpers (below):
 
-- `tl`, `hdOr` and `stP`, the small helpers, with their fuel measured on the reference.
+- `tl`, `hdOr` and `stP`, the small helpers, with their fuel measured on the reference (a cell takes 12 steps for `tl` and `hdOr`, anything else 53; `stP` takes 12 for a constructor). Their laws use `head` or `tail` as a match on the kind of the list, so they are re-measured whenever the desugarer changes.
 - `same`, the name comparison: a walk of two lists of bytes, with the arm costs fitted to the reference's steps (`same_test.go`).
-- `first` (the checker's and the parser's) and `hd` (the layout's), a match on a cell, 21 steps, and 67 on anything else; `kn` (the parser's token kinds), 10 + 5k for kind k, and it gives up past 15 (`corpusjets.go`).
+- `first` (the checker's and the parser's) and `hd` (the layout's), a match on a cell, 12 steps, and 53 on anything else; `kn` (the parser's token kinds), 10 + 5k for kind k, and it gives up past 15 (`corpusjets.go`).
 - `prune`, the checker's chase of a type variable through the trie (`prune.go`): its own arms are a constructor (22 steps), an unbound variable (35) and a bound one (33), and each `findB` it calls is costed by the trie's table.
 - `lenOf` (the checker's length), `envKid` and `envPut` (the name environment's lookup and insertion), and the parser's `same` (a different body from the checker's `same`: its test on a list is a nil test, so a value that is not a list is refused): each walks its list and counts its arms (`listjets.go`).
 - `findB` and `setB`, the radix-4 trie's lookup and update. Each is a whole recursion, not one level: a walk takes the same path as the body and counts the six arms (empty, a zero id, and the four children). The arm costs are fitted to the reference's steps (`trie_test.go`), and the fit is exact on every case, including the fuel edges (exactly the call's steps, and one less).
 
-The steps are unchanged, by design. The checker takes 76,283,777 core steps and about 0.18 s with the jets, on one host (the figures for the checker alone are in the plan's Phase 8 section).
+The steps are unchanged, by design. The checker takes 68,125,825 core steps and about 0.18 s with the jets, on one host (the figures for the checker alone are in the plan's Phase 8 section).
 
 ## Limits of this version
 
@@ -76,6 +76,6 @@ The steps are unchanged, by design. The checker takes 76,283,777 core steps and 
 
 ## The corpus build and the memo
 
-The corpus is the four boot files and the 20 standard-library files (24 files, 2,590 lines). The build runs each through its imports and then layout, lex, parse and check, on four core programs, and checks every stage against the reference. It takes 303,047,553 core steps and about 1.0 s here (0.97 s best of five), with the jets on (2.85 s with them off), against a 1 s target for 2,500 lines, which the 2,590-line build meets by linear extrapolation with a thin margin (see the plan, Phase 8). With the memo on, a cold build takes 2.5 s, and an unchanged rebuild takes 0.04 s.
+The corpus is the four boot files and the 20 standard-library files (24 files, 2,590 lines). The build runs each through its imports and then layout, lex, parse and check, on four core programs, and checks every stage against the reference. It takes 263,212,747 core steps and about 0.94 s here (best of five), with the jets on (2.46 s with them off), against a 1 s target for 2,500 lines, which the 2,590-line build meets by linear extrapolation (about 0.91 s at 2,500 lines; see the plan, Phase 8). With the memo on, a cold build takes 2.5 s, and an unchanged rebuild takes 0.04 s.
 
 The memo (decisions 13 and 14) is off by default. Turn it on with `MemoOn`, and it stores only calls of at least `MemoMinFuel` (1,000) steps. A one-declaration change to the checker re-checks 270 calls.
