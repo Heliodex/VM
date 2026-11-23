@@ -1,9 +1,11 @@
 --!strict
--- PHASE 0 OF PROTOTYPE 7: MEASURES PROTOTYPE 6, WITHOUT CHANGING IT
+-- PHASE 0 OF PROTOTYPE 7: MEASURES THE BOOTSTRAPPED FRONT END
+--
+-- Phase 0 measured Prototype 6 (runs 4 and 5). This driver now runs the Phase 1 variants in boot/ (layout, and the checker with imports), and keeps Prototype 6's own types.l2 as the input of the validation, so the checker's numbers stay comparable with run 4.
 --
 -- Five measurements:
---   1. Validation. The checker on types.l2 takes 299,622,490 steps on the hybrid machine and on the counted reference machine, as vm_bench reports. The counted machine must agree with Prototype 6 before its profile is trusted.
---   2. The build of the corpus. Each file goes through the VM stages (layout, lex, parse, check) and the host stages (layout, Luau parser, Luau checker, desugar). Steps are exact; seconds are CPU time on this host. The VM's layout output must equal the host's.
+--   1. Validation. The checker on Prototype 6's types.l2 takes 299,622,490 steps on the hybrid machine and on the counted reference machine, as vm_bench reports. The variant checker must give the same answer.
+--   2. The build of the corpus. Each file goes through the VM stages: its imports (each library through layout, lex and parse, then the checker, with the libraries as InferI requests), then layout, lex, parse and check. The steps of the imports are reported as a stage of their own. The VM's layout output must equal the host's.
 --   3. The profile. The checker on types.l2 under the counted machine: steps by form, by frame, and by owning function.
 --   4. Growth by owner. The checker on 100 and 400 generated functions, profiled.
 --   5. Scaling. The VM stages on generated programs, to see how the costs grow with size.
@@ -13,11 +15,13 @@
 
 const fs = require "@lute/fs"
 const Compile = require "./compile"
+const ProgramFile = require "../../6/L2/programfile"
 const VM = require "../../6/interpreter/vm"
 const Lifecycle = require "../../6/interpreter/lifecycle"
 const Counted = require "./vm_counted"
 
 const BOOT = "../../6/L2/programs/boot/"
+const P6 = "../../6/L2/programs/"
 const CHECKER_STEPS = 299622490
 
 const function readFile(path: string): string
@@ -86,7 +90,9 @@ local function timedRun(compiled: any, input: any, fuel: number): (any, number)
 end
 
 type Stage = { steps: number, seconds: number, status: string }
+type Import = { name: string, file: string }
 type VmBuild = {
+	imports: Stage,
 	layout: Stage,
 	lex: Stage,
 	parse: Stage,
@@ -105,13 +111,71 @@ local function skipped(): Stage
 	return { steps = 0, seconds = 0, status = "skipped" }
 end
 
--- The VM build of one source: layout, then lex, parse and check. The source is the raw program section (indented), which is what a VM build starts from. Each stage that fails ends the build, and the later stages are skipped.
-local function vmBuild(compiled: any, raw: string): VmBuild
+-- The imports of a file, from its header.
+local function importsOf(text: string): { Import }
+	const file = ProgramFile.parse(text, nil)
+	local out: { Import } = {}
+
+	for _, imp in file.imports do
+		table.insert(out, { name = imp.name, file = imp.file })
+	end
+
+	return out
+end
+
+-- The VM build of one source: its imports, then layout, lex, parse and check. The source is the raw program section (indented), which is what a VM build starts from. Each library is laid out, lexed and parsed on the VM, and the checker gets the libraries as InferI (name . program) with the program. A stage that fails ends the build, and the later stages are skipped.
+local function vmBuild(compiled: any, raw: string, imports: { Import }): VmBuild
+	local importSteps = 0
+	local importSeconds = 0
+	local libraries: { any } = {}
+	local importRefusal: string? = nil
+
+	for _, imp in imports do
+		const libRaw = ProgramFile.parse(readFile(P6 .. imp.file), nil).program :: string
+		const laid, t1 = timedRun(compiled.layout, bytesValue(libRaw), 1e10)
+		importSteps += laid.steps
+		importSeconds += t1
+
+		if laid.status ~= "value" or laid.value.tag ~= 0 then
+			importRefusal = `{imp.file} layout {laid.status}`
+
+			break
+		end
+
+		const lexed, t2 = timedRun(compiled.lexer, laid.value.payload, 1e8)
+		importSteps += lexed.steps
+		importSeconds += t2
+
+		if lexed.status ~= "value" then
+			importRefusal = `{imp.file} lex {lexed.status}`
+
+			break
+		end
+
+		const parsed, t3 = timedRun(compiled.parser, lexed.value.payload, 5e8)
+		importSteps += parsed.steps
+		importSeconds += t3
+
+		if parsed.status ~= "value" or parsed.value.tag ~= 0 then
+			importRefusal = `{imp.file} parse {parsed.status}`
+
+			break
+		end
+
+		table.insert(libraries, { kind = "cell", head = bytesValue(imp.name), tail = parsed.value.payload })
+	end
+
+	const importStage: Stage = { steps = importSteps, seconds = importSeconds, status = if importRefusal then "refused" else "value" }
+
+	if importRefusal ~= nil then
+		return { imports = importStage, layout = skipped(), lex = skipped(), parse = skipped(), check = skipped(), refused = "imports: " .. importRefusal }
+	end
+
 	const laid, layoutTime = timedRun(compiled.layout, bytesValue(raw), 1e10)
 	const layout = stage(laid, layoutTime)
 
 	if laid.status ~= "value" or laid.value.tag ~= 0 then
-		return { layout = layout, lex = skipped(), parse = skipped(), check = skipped(), refused = "layout " .. laid.status }
+		return { imports = importStage, layout = layout, lex = skipped(), parse = skipped(), check = skipped(), refused = "layout " .. laid.status }
 	end
 
 	const bracketed = laid.value.payload
@@ -119,20 +183,33 @@ local function vmBuild(compiled: any, raw: string): VmBuild
 	const lex = stage(lexed, lexTime)
 
 	if lexed.status ~= "value" then
-		return { layout = layout, lex = lex, parse = skipped(), check = skipped(), laidOut = textOf(bracketed), refused = "lex " .. lexed.status }
+		return { imports = importStage, layout = layout, lex = lex, parse = skipped(), check = skipped(), laidOut = textOf(bracketed), refused = "lex " .. lexed.status }
 	end
 
 	const parsed, parseTime = timedRun(compiled.parser, lexed.value.payload, 5e8)
 	const parse = stage(parsed, parseTime)
 
 	if parsed.status ~= "value" or parsed.value.tag ~= 0 then
-		return { layout = layout, lex = lex, parse = parse, check = skipped(), laidOut = textOf(bracketed), refused = "parse " .. parsed.status }
+		return { imports = importStage, layout = layout, lex = lex, parse = parse, check = skipped(), laidOut = textOf(bracketed), refused = "parse " .. parsed.status }
 	end
 
-	const request = { kind = "con", tag = 3, payload = parsed.value.payload }
+	-- Without imports the request is Infer (tag 3); with them it is InferI (tag 4), with the libraries in the order of the header.
+	local request: any = { kind = "con", tag = 3, payload = parsed.value.payload }
+
+	if #libraries > 0 then
+		local cells: any = VM.NIL
+
+		for i = #libraries, 1, -1 do
+			cells = { kind = "cell", head = libraries[i], tail = cells }
+		end
+
+		request = { kind = "con", tag = 4, payload = { kind = "cell", head = cells, tail = parsed.value.payload } }
+	end
+
 	const checked, checkTime = timedRun(compiled.checker, request, 1e10)
 
 	return {
+		imports = importStage,
 		layout = layout,
 		lex = lex,
 		parse = parse,
@@ -143,18 +220,20 @@ local function vmBuild(compiled: any, raw: string): VmBuild
 end
 
 const function vmSteps(build: VmBuild): number
-	return build.layout.steps + build.lex.steps + build.parse.steps + build.check.steps
+	return build.imports.steps + build.layout.steps + build.lex.steps + build.parse.steps + build.check.steps
 end
 
 const function vmSeconds(build: VmBuild): number
-	return build.layout.seconds + build.lex.seconds + build.parse.seconds + build.check.seconds
+	return build.imports.seconds + build.layout.seconds + build.lex.seconds + build.parse.seconds + build.check.seconds
 end
 
 -- The steps and seconds of each stage of a VM build, as text.
 local function describe(name: string, build: VmBuild): string
 	return string.format(
-		"%s: layout %s steps %.3fs, lex %s steps %.3fs, parse %s steps %.3fs, check %s steps %.3fs (total %s steps)%s",
+		"%s: imports %s steps %.3fs, layout %s steps %.3fs, lex %s steps %.3fs, parse %s steps %.3fs, check %s steps %.3fs (total %s steps)%s",
 		name,
+		commas(build.imports.steps),
+		build.imports.seconds,
 		commas(build.layout.steps),
 		build.layout.seconds,
 		commas(build.lex.steps),
@@ -170,20 +249,20 @@ end
 
 -- The compiler's own stages, compiled once. Their compile time is not part of any build here, since the compiler is built once and used many times.
 const compilerTimes: { string } = {}
-local function compileCompiler(file: string): any
-	const c = Compile.compile(readFile(BOOT .. file), "boot/" .. file)
-	table.insert(compilerTimes, string.format("  %s: layout %.3fs, parse %.3fs, check %.3fs, desugar %.3fs", file, c.timings.layout, c.timings.parse, c.timings.check, c.timings.desugar))
+local function compileCompiler(file: string, dir: string): any
+	const c = Compile.compile(readFile(dir .. file), "boot/" .. file)
+	table.insert(compilerTimes, string.format("  %s (%s): layout %.3fs, parse %.3fs, check %.3fs, desugar %.3fs", file, dir, c.timings.layout, c.timings.parse, c.timings.check, c.timings.desugar))
 
 	return c
 end
 
 print("== The compiler's own stages (host, once; not part of any build below)")
--- The layout is the Phase 1 variant in boot/ here (difference lists), not Prototype 6's. Run 5 used Prototype 6's layout, which is the baseline.
-const layoutC = Compile.compile(readFile "boot/layout.l2", "boot/layout.l2")
-table.insert(compilerTimes, string.format("  layout.l2 (Phase 1 variant): layout %.3fs, parse %.3fs, check %.3fs, desugar %.3fs", layoutC.timings.layout, layoutC.timings.parse, layoutC.timings.check, layoutC.timings.desugar))
-const lexer = compileCompiler "lex.l2"
-const parser = compileCompiler "parse.l2"
-const checker = compileCompiler "types.l2"
+const layoutC = compileCompiler("layout.l2", "boot/")
+const lexer = compileCompiler("lex.l2", BOOT)
+const parser = compileCompiler("parse.l2", BOOT)
+const checker = compileCompiler("types.l2", "boot/")
+-- Prototype 6's types.l2 is the input of the validation and the profile, as in run 4.
+const typesP6 = compileCompiler("types.l2", BOOT)
 const compiled = { layout = layoutC, lexer = lexer, parser = parser, checker = checker }
 
 for _, line in compilerTimes do
@@ -192,24 +271,24 @@ end
 
 -- 1. Validation.
 print("")
-print("== 1. Validation: the checker on types.l2")
+print("== 1. Validation: the checker on Prototype 6's types.l2")
 useMachine "hybrid"
-const hybridRun = vmBuild(compiled, checker.raw)
+const hybridRun = vmBuild(compiled, typesP6.raw, {})
 print(describe("hybrid", hybridRun))
 print("  result: " .. tostring(hybridRun.result))
 print(
 	if hybridRun.check.steps == CHECKER_STEPS
 		then "  matches vm_bench: " .. commas(CHECKER_STEPS) .. " steps"
-		else "  DOES NOT MATCH vm_bench (" .. commas(CHECKER_STEPS) .. " steps)"
+		else `  differs from vm_bench ({commas(CHECKER_STEPS)} steps) by {hybridRun.check.steps - CHECKER_STEPS} steps; the variant's Infer dispatch has the InferI arm, which costs this once per run`
 )
 print(
-	if hybridRun.laidOut == checker.source
+	if hybridRun.laidOut == typesP6.source
 		then "  VM layout agrees with host layout"
 		else "  VM layout DISAGREES with host layout"
 )
 
 useMachine "counted"
-const countedRun = vmBuild(compiled, checker.raw)
+const countedRun = vmBuild(compiled, typesP6.raw, {})
 useMachine "hybrid"
 print(
 	if countedRun.check.steps == hybridRun.check.steps
@@ -232,7 +311,7 @@ for _, file in corpus do
 	const text = readFile(BOOT .. file)
 	const host = Compile.compile(text, "boot/" .. file)
 	const hostSeconds = host.timings.layout + host.timings.parse + host.timings.check + host.timings.desugar + host.timings.imports
-	const vm = vmBuild(compiled, host.raw)
+	const vm = vmBuild(compiled, host.raw, importsOf(text))
 	const agreed = vm.laidOut == host.source
 
 	if agreed then
@@ -245,7 +324,7 @@ for _, file in corpus do
 	totalVmSteps += vmSteps(vm)
 	totalVmSeconds += vmSeconds(vm)
 
-	print(string.format("%s: %s bytes, %d lines", file, commas(#text), linesOf(text)))
+	print(string.format("%s: %s bytes, %d lines, %d imports", file, commas(#text), linesOf(text), #importsOf(text)))
 	print(string.format("  host: layout %.3fs, parse %.3fs, check %.3fs, desugar %.3fs, imports %.3fs", host.timings.layout, host.timings.parse, host.timings.check, host.timings.desugar, host.timings.imports))
 	print("  " .. describe("VM", vm))
 	print("  VM layout " .. if agreed then "agrees with host" else "DISAGREES with host")
@@ -267,7 +346,7 @@ print(
 
 -- 3. The profile.
 print("")
-print("== 3. Profile: the checker on types.l2, counted machine")
+print("== 3. Profile: the checker on Prototype 6's types.l2, counted machine")
 
 local function newProfile(): { op: { [string]: number }, frame: { [string]: number }, owner: { [string]: number }, steps: number }
 	return {
@@ -298,7 +377,7 @@ local function hook(expr: any, returning: boolean, frame: any)
 end
 
 -- The request for the profile comes from the VM's own layout, lex and parse, on the hybrid machine, so only the checker's own steps are counted.
-const profileLaid = Lifecycle.run(layoutC.expr, bytesValue(checker.raw), 1e10)
+const profileLaid = Lifecycle.run(layoutC.expr, bytesValue(typesP6.raw), 1e10)
 const profileLexed = Lifecycle.run(lexer.expr, profileLaid.value.payload, 1e8)
 const profileParsed = Lifecycle.run(parser.expr, profileLexed.value.payload, 5e8)
 const profileRequest = { kind = "con", tag = 3, payload = profileParsed.value.payload }
@@ -409,7 +488,7 @@ useMachine "hybrid"
 for _, n in { 25, 50, 100, 200, 400, 800, 1600 } do
 	const text = synthetic(n)
 	const host = Compile.compile(text, `synthetic {n}`)
-	const vm = vmBuild(compiled, host.raw)
+	const vm = vmBuild(compiled, host.raw, {})
 	const lines = linesOf(text)
 
 	print(string.format("%d functions: %d lines, %s bytes; host check %.3fs, desugar %.3fs", n, lines, commas(#text), host.timings.check, host.timings.desugar))

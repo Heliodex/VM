@@ -143,3 +143,24 @@ Prototype 6's layout builds each enclosing block's text by copying the text of t
 - the generated programs at 25, 100, 400 and 800 functions.
 
 All 57 agree: where the host gives text, the VM gives the same text, and where the host refuses, the VM gives the same message. Eight of the malformed inputs refuse on both sides, and the ninth is accepted on both sides.
+
+## Run 7: imports in the bootstrapped checker
+
+`boot/types.l2` is a Phase 1 variant of Prototype 6's checker. It adds one request, `InferI` (tag 4), which carries the imports as `(name . program)` pairs with the program. The checker infers and generalises each library itself, so no scheme crosses the boundary as a value or as text. Each library has its own range of type-variable ids (1000 times its position), and the program starts above all of them, so an imported scheme's ids never meet the program's bindings. The output format is unchanged. The `Infer` path is the same as before, with one more arm in the dispatcher.
+
+`boot/layout.l2` is the Phase 1 layout from run 6, and the harness uses it from here on.
+
+### Results (`results/run7.txt`)
+
+- **Validation.** The checker on Prototype 6's `types.l2` takes 299,622,570 steps, 80 more than run 4. The difference is the `InferI` arm in the dispatcher, which runs once per request. The answer is the same.
+- **Imports.** In the corpus build, the imports of `lex.l2` (2 libraries) take 1.49M steps and `parse.l2` (1 library) 0.85M. These are layout, lex and parse of each library on the VM. The checker's cost of inferring them is part of the check.
+- **Checker on `parse.l2`** dropped from 200.0M to 177.5M steps. Before, the unbound-import errors cost steps to build. Now the imports resolve, and no errors are built.
+- **Checker on `lex.l2`** rose from 31.0M to 32.3M steps, the cost of inferring its two libraries.
+- **Corpus total** on the VM is 866.9M steps, against 885.8M in run 6. The imports are 2.3M of that.
+- **Agreement with the Luau checker** (`imports_run.luau`): `lex.l2` and `parse.l2`, which import libraries, give the same type as the Luau checker and no errors. `layout.l2` and `types.l2`, which import nothing, agree too.
+- **Scaling** is unchanged, since the generated programs import nothing.
+
+### Not yet checked
+
+- The wider `infer_run` suite (160 programs in Prototype 6) has not been run against this variant.
+- No negative test has been run: a program that uses a library name it does not import should give an unbound-name error on both checkers.

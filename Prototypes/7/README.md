@@ -143,7 +143,7 @@ Note: the plan first proposed scaling by repeating `types.l2`. It was replaced b
 - `halfOf` and `oddOf` (`/` and `%` by 2, each matched through a `Result`): a bit primitive or a direct trie step. About 28% of steps on `types.l2`;
 - `first`, `tl` and `hdOr`, the list accessors that wrap their result: direct access where the list is known to be non-empty. About 22% of steps.
 
-- **Imports** (decided: they are part of the bootstrapped build). The checker's request has no slot for imported names, so `lex.l2` and `parse.l2`, which import `reverse` and `append`, are checked with those names unbound. The request must carry each import's name and scheme, as the Luau checker takes `importSchemes`. Exit: `infer_run` agrees with the Luau checker on programs that use imports, and the corpus check reports no unbound imports.
+- **Imports: done (run 7, first part).** The checker has a request, `InferI`, that carries each import as `(name . program)`. The checker infers and generalises each library itself, so the scheme is never transported as text or value across the boundary, and the output format is unchanged. Each library has its own range of type-variable ids, and the program starts above them. Exit, partly met: on `lex.l2` and `parse.l2` (which import `reverse` and `append`), and on the two files with no imports, the VM and the Luau checker agree (`measure/imports_run.luau`), and the corpus has no unbound imports. Not yet met: the wider `infer_run` suite has not been run against the variant, and no negative test (a use of an unimported name) has been run.
 
 This runs on Prototype 6, so each gain is measured before any new machine exists.
 

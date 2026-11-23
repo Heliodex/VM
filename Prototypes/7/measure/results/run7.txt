@@ -1,0 +1,150 @@
+== The compiler's own stages (host, once; not part of any build below)
+  layout.l2 (boot/): layout 0.001s, parse 0.004s, check 0.004s, desugar 0.007s
+  lex.l2 (../../6/L2/programs/boot/): layout 0.000s, parse 0.001s, check 0.002s, desugar 0.001s
+  parse.l2 (../../6/L2/programs/boot/): layout 0.002s, parse 0.006s, check 0.009s, desugar 0.020s
+  types.l2 (boot/): layout 0.004s, parse 0.009s, check 0.021s, desugar 0.008s
+  types.l2 (../../6/L2/programs/boot/): layout 0.004s, parse 0.010s, check 0.016s, desugar 0.007s
+
+== 1. Validation: the checker on Prototype 6's types.l2
+hybrid: imports 0 steps 0.000s, layout 45,260,315 steps 4.139s, lex 23,916,068 steps 2.277s, parse 67,246,509 steps 7.160s, check 299,622,570 steps 15.958s (total 436,045,462 steps)
+  result: ((40 82 101 113 32 45 62 32 40 91 73 110 116 93 32 46 32 91 91 73 110 116 93 93 41 41))
+  DOES NOT MATCH vm_bench (299,622,490 steps)
+  VM layout agrees with host layout
+  counted machine agrees: 299,622,570 steps
+
+== 2. The build of the corpus (each file, host and VM)
+lex.l2: 5,359 bytes, 144 lines, 2 imports
+  host: layout 0.001s, parse 0.004s, check 0.003s, desugar 0.002s, imports 0.001s
+  VM: imports 1,491,726 steps 0.061s, layout 5,720,219 steps 0.511s, lex 3,027,476 steps 0.281s, parse 8,597,463 steps 0.408s, check 32,252,495 steps 1.567s (total 51,089,379 steps)
+  VM layout agrees with host
+  check result: ((40 91 73 110 116 93 32 45 62 32 82 101 115 117 108 116 32 40 91 40 75 105 110 100 32 46 32 40 73 110 116 32 46 32 40 73 110 116 32 46 32 73 110 116 41 41 41 93 41 32 40 91 73 110 116 93 41 41))
+parse.l2: 23,641 bytes, 626 lines, 1 imports
+  host: layout 0.001s, parse 0.005s, check 0.007s, desugar 0.022s, imports 0.000s
+  VM: imports 852,855 steps 0.047s, layout 27,816,346 steps 2.425s, lex 13,858,948 steps 1.255s, parse 37,733,066 steps 3.799s, check 177,534,702 steps 9.009s (total 257,795,917 steps)
+  VM layout agrees with host
+  check result: ((40 91 40 75 105 110 100 32 46 32 40 73 110 116 32 46 32 40 73 110 116 32 46 32 73 110 116 41 41 41 93 32 45 62 32 82 101 115 117 108 116 32 40 40 91 40 91 73 110 116 93 32 46 32 40 91 91 73 110 116 93 93 32 46 32 40 91 40 91 73 110 116 93 32 46 32 40 84 121 32 46 32 40 73 110 116 32 46 32 73 110 116 41 41 41 93 32 46 32 40 73 110 116 32 46 32 73 110 116 41 41 41 41 93 32 46 32 69 120 112 114 41 41 32 40 91 73 110 116 93 41 41))
+layout.l2: 13,698 bytes, 552 lines, 0 imports
+  host: layout 0.001s, parse 0.004s, check 0.007s, desugar 0.007s, imports 0.000s
+  VM: imports 0 steps 0.000s, layout 17,030,618 steps 1.536s, lex 7,839,475 steps 0.717s, parse 21,405,595 steps 2.177s, check 75,676,907 steps 3.894s (total 121,952,595 steps)
+  VM layout agrees with host
+  check result: ((40 91 73 110 116 93 32 45 62 32 82 101 115 117 108 116 32 40 91 73 110 116 93 41 32 40 91 73 110 116 93 41 41))
+types.l2: 39,420 bytes, 913 lines, 0 imports
+  host: layout 0.002s, parse 0.009s, check 0.013s, desugar 0.010s, imports 0.000s
+  VM: imports 0 steps 0.000s, layout 45,260,315 steps 3.989s, lex 23,916,068 steps 2.173s, parse 67,246,509 steps 7.350s, check 299,622,570 steps 18.703s (total 436,045,462 steps)
+  VM layout agrees with host
+  check result: ((40 82 101 113 32 45 62 32 40 91 73 110 116 93 32 46 32 91 91 73 110 116 93 93 41 41))
+corpus total: 82,118 bytes, 2235 lines; host 0.100s; VM 866,883,353 steps in 59.901s (hybrid); layout agreed on 4 of 4 files
+
+== 3. Profile: the checker on Prototype 6's types.l2, counted machine
+checker steps under the profile: 299,622,570 (outcome value)
+  every step is in the profile
+by form (steps that evaluate a node):
+  var                                                50,927,145   17.00%
+  apply                                              29,868,876    9.97%
+  lam                                                22,330,682    7.45%
+  prim                                               17,757,160    5.93%
+  quote                                              15,996,139    5.34%
+  if                                                 13,367,450    4.46%
+  tagof                                               6,059,797    2.02%
+  payload                                             4,826,596    1.61%
+  construct                                           4,646,350    1.55%
+  index                                               4,365,194    1.46%
+  cell                                                1,284,059    0.43%
+by frame (steps that hand a value to a waiting frame):
+  apply                                              59,737,752   19.94%
+  prim                                               32,621,864   10.89%
+  if                                                 13,367,450    4.46%
+  tagof                                               6,059,797    2.02%
+  payload                                             4,826,596    1.61%
+  construct                                           4,646,350    1.55%
+  index                                               4,365,194    1.46%
+  cell                                                2,568,118    0.86%
+  final                                                       1    0.00%
+by owning function (every step, top 40):
+  findB@81                                           44,393,837   14.82%
+  oddOf@74                                           41,408,098   13.82%
+  halfOf@69                                          41,408,098   13.82%
+  first@18                                           29,161,471    9.73%
+  top                                                22,498,037    7.51%
+  setB@86                                            20,995,497    7.01%
+  tl@23                                              19,643,635    6.56%
+  hdOr@13                                            15,734,375    5.25%
+  findE@254                                          14,820,161    4.95%
+  same@38                                            12,923,186    4.31%
+  pickSide@79                                         8,677,073    2.90%
+  prune@99                                            5,416,841    1.81%
+  stP@48                                              3,438,267    1.15%
+  unify@141                                           2,100,221    0.70%
+  lowerT@114                                          1,483,048    0.49%
+  occurs@107                                          1,369,289    0.46%
+  lenOf@40                                            1,236,560    0.41%
+  subst@183                                           1,060,813    0.35%
+  lowerArgs@115                                       1,033,590    0.34%
+  infer@573                                           1,022,872    0.34%
+  unifyArgs@142                                         976,520    0.33%
+  unifyCon@147                                          966,040    0.32%
+  all@108                                               955,822    0.32%
+  substArgs@184                                         789,607    0.26%
+  appArgs@581                                           639,172    0.21%
+  bindVar@139                                           636,091    0.21%
+  fresh@96                                              423,848    0.14%
+  errsOf@56                                             405,674    0.14%
+  bindsOf@54                                            346,034    0.12%
+  atOfE@213                                             336,064    0.11%
+  levelOf@91                                            308,131    0.10%
+  mkSt@58                                               296,668    0.10%
+  instantiate@195                                       192,374    0.06%
+  unifyAt@258                                           190,270    0.06%
+  lookupM@181                                           188,580    0.06%
+  lookupName@290                                        184,830    0.06%
+  addPos@256                                            175,634    0.06%
+  freeAbove@164                                         175,445    0.06%
+  instMap@190                                           175,154    0.06%
+  grew@300                                              160,976    0.05%
+
+== 4. Growth by owner: the checker on 100 and 400 generated functions, counted
+100 functions: checker 13,870,286 steps (outcome value)
+400 functions: checker 73,287,702 steps (outcome value)
+  owner                                               100 fns        400 fns   growth
+  halfOf@69                                         2,203,356      9,292,968     4.2x
+  oddOf@74                                          2,203,356      9,292,968     4.2x
+  findB@81                                          2,017,513      8,462,323     4.2x
+  first@18                                            761,064      8,044,314    10.6x
+  setB@86                                           1,679,029      6,860,389     4.1x
+  top                                               1,170,743      5,562,655     4.8x
+  tl@23                                               549,033      4,675,683     8.5x
+  findE@254                                           341,159      4,603,559    13.5x
+  hdOr@13                                             410,208      4,276,908    10.4x
+  same@38                                             350,672      3,455,372     9.9x
+  pickSide@79                                         391,913      1,649,923     4.2x
+  stP@48                                              293,091      1,164,291     4.0x
+  prune@99                                            284,368      1,128,868     4.0x
+  unify@141                                           153,176        609,776     4.0x
+  infer@573                                           112,833        448,233     4.0x
+
+== 5. Scaling: generated programs, chained functions
+25 functions: 59 lines, 888 bytes; host check 0.000s, desugar 0.000s
+  VM: imports 0 steps 0.000s, layout 1,301,620 steps 0.065s, lex 621,864 steps 0.026s, parse 1,856,432 steps 0.096s, check 3,347,428 steps 0.166s (total 7,127,344 steps)
+  check steps per function: 133,897, per line: 56,736; check result: ((40 73 110 116 32 45 62 32 73 110 116 41))
+50 functions: 109 lines, 1,714 bytes; host check 0.000s, desugar 0.000s
+  VM: imports 0 steps 0.000s, layout 2,580,020 steps 0.119s, lex 1,237,514 steps 0.168s, parse 3,633,682 steps 0.201s, check 6,694,613 steps 0.318s (total 14,145,829 steps)
+  check steps per function: 133,892, per line: 61,418; check result: ((40 73 110 116 32 45 62 32 73 110 116 41))
+100 functions: 209 lines, 3,368 bytes; host check 0.001s, desugar 0.000s
+  VM: imports 0 steps 0.000s, layout 5,140,431 steps 0.240s, lex 2,470,886 steps 0.295s, parse 7,188,284 steps 0.348s, check 13,870,286 steps 0.672s (total 28,669,887 steps)
+  check steps per function: 138,702, per line: 66,365; check result: ((40 73 110 116 32 45 62 32 73 110 116 41))
+200 functions: 409 lines, 6,969 bytes; host check 0.001s, desugar 0.001s
+  VM: imports 0 steps 0.000s, layout 10,636,831 steps 1.012s, lex 5,140,686 steps 0.497s, parse 14,307,484 steps 0.814s, check 30,811,179 steps 1.637s (total 60,896,180 steps)
+  check steps per function: 154,055, per line: 75,332; check result: ((40 73 110 116 32 45 62 32 73 110 116 41))
+400 functions: 809 lines, 14,169 bytes; host check 0.007s, desugar 0.005s
+  VM: imports 0 steps 0.000s, layout 21,629,631 steps 2.031s, lex 10,480,286 steps 1.011s, parse 28,545,884 steps 2.938s, check 73,287,702 steps 3.845s (total 133,943,503 steps)
+  check steps per function: 183,219, per line: 90,590; check result: ((40 73 110 116 32 45 62 32 73 110 116 41))
+800 functions: 1609 lines, 28,570 bytes; host check 0.007s, desugar 0.017s
+  VM: imports 0 steps 0.000s, layout 43,615,231 steps 3.904s, lex 21,159,486 steps 2.000s, parse 57,022,684 steps 6.039s, check 193,502,742 steps 10.441s (total 315,300,143 steps)
+  check steps per function: 241,878, per line: 120,262; check result: ((40 73 110 116 32 45 62 32 73 110 116 41))
+1600 functions: 3209 lines, 59,175 bytes; host check 0.058s, desugar 0.051s
+  VM: imports 0 steps 0.000s, layout 89,886,842 steps 8.162s, lex 43,763,158 steps 4.201s, parse 114,037,586 steps 12.170s, check 568,806,853 steps 57.026s (total 816,494,439 steps)
+  check steps per function: 355,504, per line: 177,253; check result: ((40 73 110 116 32 45 62 32 73 110 116 41))
+
+real	6m40.503s
+user	6m39.882s
+sys	0m0.351s
