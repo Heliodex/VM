@@ -23,6 +23,7 @@ Conclusions that shape this plan:
 
 - **The step count is the problem, not the step rate.** The hybrid is close to what a tree or closure machine in Luau can do per step. A machine rewrite might give about 2×. The target needs about 45× fewer steps at the same host speed, or a mix of fewer steps and jets.
 - **The checker is doing too much work, in two ways (measured in Phase 0).** The name environment is an association list searched by name (`findE`), and that search is quadratic in the number of declarations. Separately, each declaration costs about 128,000 steps, much of it in `/` and `%` by 2 and list access, which return `Result` values that are matched at every step. The binding store is a binary trie, not an association list as first assumed. See `measure/README.md`.
+- **Layout is the largest cost, not the checker (measured in Phase 0, run 5).** The VM's layout pass is 49% of the corpus build and grows quadratically in lines. The checker is 39%. Layout had not been measured on the VM before run 5.
 - **Names are lists of bytes.** Every name comparison walks a list, and every string is a list of cells. Interned names would make equality a single comparison.
 - **The step-parity invariant will not survive jets or memoisation** unless the design says how fuel is charged. The section "Fuel, jets and memo" below handles this.
 
@@ -53,7 +54,7 @@ So the target as stated is for a *bootstrapped front end*, layout through check.
 
     steps budget = time budget × measured steps per second
 
-At the hybrid's 18.5M steps/s, the budget is about 18.5M steps for 2,500 lines, about 7,400 steps per line. Phase 0 measured the whole bootstrapped build on the 2,235-line corpus: 789.9M steps, about 353,000 per line, so 2,500 lines take about 884M steps. That is about 49× the budget at 18M steps/s, and about 68× at the 13M steps/s of the slower run. Cost is not linear in the input: the name environment makes it quadratic in the number of declarations, so a large build costs more per line than the average suggests.
+At the hybrid's 18.5M steps/s, the budget is about 18.5M steps for 2,500 lines, about 7,400 steps per line. Phase 0 measured the whole bootstrapped front end on the 2,235-line corpus, with layout on the VM: 1,542M steps, about 690,000 per line. At that average, 2,500 lines take about 1.7B steps, about 96× the budget at 18M steps/s. The average understates a larger build: layout and the checker are both superlinear in lines (about 600 steps per line² for layout at 200 functions and up), so a 2,500-line build costs more per line than the corpus does.
 
 **3. A relative check that does not depend on the host.** Steps and fuel are host-independent, so they are the primary numbers. Add two ratios so that a result has meaning even when the host changes:
 
@@ -64,7 +65,7 @@ At the hybrid's 18.5M steps/s, the budget is about 18.5M steps for 2,500 lines, 
 
 **Open questions for the speed target** (listed again in "Decisions" below):
 
-- Does the target need to hold on Luau, or only on a future native host? On Luau the step rate is about 18M steps/s, so the budget is about 18M steps. That is reachable only if the 49–68× reduction comes from algorithms and jets, not the machine. If it cannot be reached, the target needs a native host.
+- Does the target need to hold on Luau, or only on a future native host? On Luau the step rate is about 18M steps/s, so the budget is about 18M steps. That is reachable only if the roughly 96× reduction comes from algorithms and jets, not the machine. If it cannot be reached, the target needs a native host.
 - Corpus: resolved as the four boot files now, with the top-up and the full compiler to follow (see "Speed target").
 
 ## Core design (draft)
@@ -135,8 +136,9 @@ Note: the plan first proposed scaling by repeating `types.l2`. It was replaced b
 
 *Exit, met:* the checker's cost is superlinear, and the cost centres are named: the name environment search (quadratic), the binding trie's index arithmetic and access, and the `Result`-wrapped list accessors.
 
-**Phase 1: fix the checker's algorithms, in L2.** Measured candidates, in order of the cost they remove:
+**Phase 1: fix the front end's algorithms, in L2.** Measured candidates, in order of the cost they remove:
 
+- **Layout first.** It is 49% of the corpus build on the VM, grows quadratically in lines (about 600 steps per line² from 200 functions up), and is 90% of the VM steps at 1,600 functions. The host layout is cheap on the same input, so the cost is in the VM code, not in the task. Profile it the same way as the checker (by owner, growth between two sizes) before changing it. The likely place is a per-line list append or walk, which is a hypothesis until profiled;
 - the name environment (`findE`, with `same`): a balanced map keyed by name. This removes the quadratic term (about 31% of steps at 400 functions, 64% at 1,600);
 - `halfOf` and `oddOf` (`/` and `%` by 2, each matched through a `Result`): a bit primitive or a direct trie step. About 28% of steps on `types.l2`;
 - `first`, `tl` and `hdOr`, the list accessors that wrap their result: direct access where the list is known to be non-empty. About 22% of steps.
