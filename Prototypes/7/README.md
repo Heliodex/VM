@@ -216,4 +216,10 @@ These need an answer from the project owner before the phase that depends on the
 
 ## Next step
 
-Lower `letrec` to self-reference: a recursive function refers to itself by `arg 0`, not through `fix`. This is the core's own rule (SPEC.md section 2, `arg 0`), and the Phase 1 measurements already priced `fix` at about 9% of the checker's steps. It changes the core programs and their fuel, so the new reference is checked first by `cross_run` (193 agree, as now) and by the Phase 4 cases regenerated. After it, `findB` and `setB` (about 47% of the steps in the run 8 profile) can have jets: each would then cover the whole recursion, not one level.
+Recursion is now one law (`fix` is lowered to self-reference, commit 445f28b): the checker takes 125,455,651 core steps, down from 141,778,148, and `cross_run` still agrees on 193 comparisons. What remains before `findB` and `setB` can be jetted as whole recursions:
+
+- **Uncurry.** An L2 function of several arguments is a chain of one-argument lambdas, so a recursive call is two entries and a closure. Lowering the chain as one law of several arguments makes a recursive call one entry. Results are unchanged; the laws' arities and hashes change, so the jets' hashes are re-read from the regenerated program.
+- **Flatten calls.** `apply (apply f a) b` becomes one `call f a b`. Results are unchanged, but the arguments are evaluated before the application, so when two arguments would both error the message can differ. `cross_run` compares errors, not messages, so it would still pass; the Phase 4 cases check messages, and those would be regenerated.
+- **Then the jets.** `findB` and `setB` each get a fuel formula summed along the path their recursion takes, measured on the reference as the three helpers were.
+
+The first two change the core's arities and evaluation order, so I'd like a go-ahead before starting them.
