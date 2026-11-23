@@ -231,10 +231,10 @@ do
 	const unwrap = law(
 		1,
 		{
-			op = "case",
-			e = arg(1),
-			alts = { { tag = 0; body = arg(2) }; { tag = 1; body = lit(0) } },
-			elseBody = lit(0),
+			op = "if",
+			c = prim(6, prim(10, arg(1)), lit(0)),
+			t = prim(11, arg(1)),
+			e = lit(0),
 		}
 	)
 	const laziness = law(
@@ -307,7 +307,7 @@ do
 		{ name = "a program of arity 2"; bytes = "\2\2\16\0"; want = "arity 1"; decodeAs = "program" },
 		{ name = "an unknown form tag"; bytes = "\2\1\27"; want = "tag 27 is not a form"; decodeAs = "program" },
 		{ name = "a primitive of tag 15"; bytes = "\2\1\26\15\16\0\16\0"; want = "does not exist"; decodeAs = "program" },
-		{ name = "a case with the tag 0 twice"; bytes = "\2\1\21\17\1\2\0\16\2\0\0\16\2\0\0"; want = "twice"; decodeAs = "program" },
+		{ name = "the tag of the removed case form is not a form"; bytes = "\2\1\21"; want = "tag 21 is not a form"; decodeAs = "program" },
 		{ name = "a partial application with no fewer arguments than its arity"; bytes = "\1\6\5\1\16\0\1\0"; want = "fewer arguments"; decodeAs = "value" },
 		{ name = "a program with bytes after it"; bytes = "\2\1\16\0\0"; want = "after"; decodeAs = "program" },
 		{ name = "an index past 2^53 - 1 (a position, not an integer value)"; bytes = "\2\1\17\128\128\128\128\128\128\128\16"; want = "past 2^53 - 1"; decodeAs = "program" },

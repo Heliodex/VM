@@ -165,10 +165,10 @@ do
 	const unwrap = law(
 		1,
 		{
-			op = "case",
-			e = arg(1),
-			alts = { { tag = 0; body = arg(2) }; { tag = 1; body = lit(0) } },
-			elseBody = lit(0),
+			op = "if",
+			c = prim(6, prim(10, arg(1)), lit(0)),
+			t = prim(11, arg(1)),
+			e = lit(0),
 		}
 	)
 	o = Interp.run(unwrap, con(0, 9), 1000)
@@ -301,8 +301,6 @@ end
 do
 	local o = Interp.runForm(prim(8, lit(3)), NIL, 100)
 	check("head of a value that is not a cell is an error", o.status == "error" and string.find(tostring(messageOf(o)), "not a cell") ~= nil, `{o.status} {tostring(messageOf(o))}`)
-	o = Interp.runForm({ op = "case"; e = lit(con(2, 1)); alts = { { tag = 0; body = lit(0) } } }, NIL, 100)
-	check("a case with no branch for the tag is an error", o.status == "error" and string.find(tostring(messageOf(o)), "no branch") ~= nil, `{o.status} {tostring(messageOf(o))}`)
 	o = Interp.runForm(call(lit(3), lit(1)), NIL, 100)
 	check("calling a value that is not a function is an error", o.status == "error", `{o.status} {tostring(messageOf(o))}`)
 	o = Interp.runForm({ op = "force"; e = lit(3) }, NIL, 100)

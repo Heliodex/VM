@@ -19,7 +19,7 @@ type Form = Types.Form
 type Law = Types.Law
 type Thunk = Types.Thunk
 type Outcome = Types.Outcome
--- The slots of one invocation of a law: slot 0 is the law, then the arguments, then what let and case push.
+-- The slots of one invocation of a law: slot 0 is the law, then the arguments, then what let pushes.
 type Env = { slots: { Value } }
 -- A continuation: what to do with the next value. Each kind has the fields it needs.
 type Items = { t: "items"; items: { Form }; vals: { Value }; i: number; fin: string; form: Form; env: Env }
@@ -155,8 +155,6 @@ const function itemsOf(form: Form): ({ Form }, string)
 		return items, "delay"
 	elseif form.op == "con" then
 		return { form.e }, "con"
-	elseif form.op == "case" then
-		return { form.e }, "case"
 	elseif form.op == "if" then
 		return { form.c }, "if"
 	elseif form.op == "let" then
@@ -355,41 +353,6 @@ const function machine(mode0: Mode, form0: Form, env0: Env, fv0: Value, args0: {
 						table.insert(k, { t = "restore"; env = e; len = #e.slots } :: Cont)
 						table.insert(e.slots, vals[1])
 						form = f.body
-						env = e
-						mode = "eval"
-					elseif fin == "case" then
-						if f.op ~= "case" then
-							error("machine: a case finish on another form", 0)
-						end
-
-						const scrut = vals[1]
-
-						if type(scrut) ~= "table" or scrut.kind ~= "con" then
-							return { status = "error"; message = "case of a value that is not a constructor"; steps = steps }
-						end
-
-						local branch: Form? = nil
-						local pushed: Value = scrut
-
-						for _, alt in f.alts do
-							if alt.tag == scrut.tag then
-								branch = alt.body
-								pushed = scrut.payload
-								break
-							end
-						end
-
-						if branch == nil then
-							if f.elseBody == nil then
-								return { status = "error"; message = "no branch for the constructor's tag " .. tostring(scrut.tag); steps = steps }
-							end
-
-							branch = f.elseBody
-						end
-
-						table.insert(k, { t = "restore"; env = e; len = #e.slots } :: Cont)
-						table.insert(e.slots, pushed)
-						form = branch :: Form
 						env = e
 						mode = "eval"
 					elseif fin == "force" then

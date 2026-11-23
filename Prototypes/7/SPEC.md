@@ -2,7 +2,7 @@
 
 Status: draft for Phase 3. Every rule the reference interpreter needs is here. Where the plan left a choice open, the default the plan recommends is taken and listed under "Decisions taken" at the end.
 
-The core is what a surface language compiles to. It has ten forms and thirteen primitives, and nothing else. Recursion, data structures, strings and effects are built on top of these, or are added later with a rule of their own.
+The core is what a surface language compiles to. It has nine forms and thirteen primitives, and nothing else. Recursion, data structures, strings and effects are built on top of these, or are added later with a rule of their own.
 
 ## 1. Values
 
@@ -30,13 +30,13 @@ A law's body runs in a frame, a list of slots, numbered from 0:
 
 - slot 0 is the law itself;
 - slots 1 to `arity` are the arguments, in order;
-- each `let` form pushes one slot, and each `case` branch with a payload pushes one slot. Slots are numbered from the first one pushed after the arguments.
+- each `let` form pushes one slot. Slots are numbered from the first one pushed after the arguments.
 
 A slot is fixed once it is pushed. The frame of a call is its own; a call does not see its caller's frame. A thunk holds the values of its call, not the frame it was made in.
 
 ## 3. Forms
 
-There are ten forms. Each has a rule and an example. A form's evaluation is one step (section 6). The snippets in this section are the body of a law of arity 1 unless they say otherwise, so `arg 1` is the input.
+There are nine forms. Each has a rule and an example. A form's evaluation is one step (section 6). The snippets in this section are the body of a law of arity 1 unless they say otherwise, so `arg 1` is the input.
 
 **`lit v`** gives the value `v` (an integer, nil, a law, or any other value written into the program).
 
@@ -59,10 +59,6 @@ If `f` is not a function, the outcome is an error.
 **`con k e`** evaluates `e` and gives the constructor with tag `k` and that payload.
 
     con 0 (lit 5)                  gives Ok 5 for a sum whose tag 0 is Ok
-
-**`case e { k1 → b1; …; kn → bn; else → d }`** evaluates `e`, which must be a constructor. If its tag is `ki`, the branch `bi` runs with the payload pushed as the next slot. If no tag matches, the `else` branch `d` runs with the constructor pushed as the next slot. A `case` with no `else` and no matching tag is an error.
-
-    case (con 1 (lit 9)) { 0 → (lit 0); 1 → (arg 2); else → (lit 0) }    gives 9
 
 **`if c t e`** evaluates `c`, which must be an integer. If it is not zero, `t` is the value; if it is zero, `e` is.
 
@@ -188,10 +184,10 @@ Each example is a whole program and its expected outcome. Phase 3 runs them. An 
     call (lit safediv) (prim cons (lit 6) (lit 3))       value Ok 2
     call (lit safediv) (prim cons (lit 6) (lit 0))       value Err nil
 
-**Constructor dispatch.** A `case` on a constructor gives its payload as the next slot. Here the input is `Ok 9` (tag 0):
+**Constructor dispatch.** A constructor's tag is read by `tagof` and its payload by `payload` (primitives 10 and 11, section 4), so a dispatch is an `if` on the tag. Here the input is `Ok 9` (tag 0):
 
     law unwrap 1
-      case (arg 1) { 0 → (arg 2); 1 → (lit 0); else → (lit 0) }
+      if (prim eq (prim tagof (arg 1)) (lit 0)) (prim payload (arg 1)) (lit 0)
 
     call (lit unwrap) (con 0 (lit 9))               value 9
 
@@ -242,6 +238,8 @@ These are the defaults this spec takes. Each can be changed, and a change is rec
 15. **`cell` is a primitive.** A cell is built by a primitive, `cons` (tag 14 when it was added; tag 12 after decision 16), and not by a form. The two are the same to the machine: each is one step, then its two arguments in order, so every step count is unchanged. A form that only builds a value is one more case in every reader and every machine, and `cons` sits beside `head` and `tail`, which read the same values. The forms go from eleven to ten, and the primitives from fourteen to fifteen (thirteen after decision 16). Form tag 19 is unused, so the other tags keep their values.
 
 16. **Pins are removed.** A pin was a wrapper that interned a value by its content and had its own kind. Decision 13 hashes compound values from their parts, so the memo and the jets need no interning, and a program cannot observe a pin except through its kind (4) and its errors. The lowering of Prototypes 5 and 6 never made a pin primitive: their `pin` expression is a `delay` (decision 1). So the `pin` and `unpin` primitives go, the primitives go from fifteen to thirteen, and the three after them are renumbered (`tagof` 12 to 10, `payload` 13 to 11, `cons` 14 to 12). Kind 4 is reserved, so the other kinds keep their numbers, and the binary format's tag 7 (a pin) is reserved and refused. Every law that uses a renumbered primitive has a new content hash, so the jets are re-hashed; their fuel is unchanged, as every step count is.
+
+17. **`case` is removed.** The form read a constructor by its tag, and gave the payload as the next slot. Nothing in the pipeline builds it: the lowering of Prototypes 5 and 6 reads constructors with `tagof` and `payload` (decision 9), and their matches are chains of tests, so a `case` appears only in hand-written examples. Keeping it cost a rule, a reader, a writer and a machine case. A jump table would save a few steps per match (about 3% of the checker's steps, measured), and it can come back as a spec change with that measurement as its reason. The forms go from ten to nine. Form tag 21 is reserved, and a reader refuses it. The `case` mentioned in decisions 9 and 15 is this form.
 
 ## 12. Binary format
 
@@ -298,22 +296,21 @@ A law is its arity, then its body. A body is a form, written with one tag byte p
 | 18 (`12`) | `call f e1 … en` | `n`, a magnitude (zero or more), then `f`, then `e1` to `en` |
 | 19 (`13`) | not a form: `cell` is primitive 14 (section 4) | |
 | 20 (`14`) | `con k e` | the tag `k`, a magnitude, then `e` |
-| 21 (`15`) | `case e` | `e`; then the number of alternatives `k`, a magnitude; then for each alternative its tag (a magnitude) and its body; then a byte `0` if there is no `else` branch, or `1` followed by the `else` body |
+| 21 (`15`) | not a form: `case` was removed (decision 17) | |
 | 22 (`16`) | `if c t e` | `c`, then `t`, then `e` |
 | 23 (`17`) | `let e b` | `e`, then `b` |
 | 24 (`18`) | `delay (call f e1 … en)` | `n`, a magnitude, then `f`, then `e1` to `en`; the call is not a separate form, so it has no tag of its own |
 | 25 (`19`) | `force e` | `e` |
-| 26 (`1a`) | `prim op a1 … an` | the primitive's tag `op` (a magnitude, less than 15), then its arguments; the number of arguments is the primitive's arity (section 4), so it is not written |
+| 26 (`1a`) | `prim op a1 … an` | the primitive's tag `op` (a magnitude, less than 13), then its arguments; the number of arguments is the primitive's arity (section 4), so it is not written |
 
-Form tags are in their own range, 16 to 26 (19 is unused), and never appear as values, so a reader knows from its position whether it is reading a value or a form. A form's parts are read in the order of the table.
+Form tags are in their own range, 16 to 26 (19 and 21 are unused), and never appear as values, so a reader knows from its position whether it is reading a value or a form. A form's parts are read in the order of the table.
 
 A **program** is header 2, then a law of arity 1 (its arity, which must be 1, then its body). A reader refuses a program whose arity is not 1.
 
 Rules a reader enforces, beyond the encoding itself:
 
 - A `delay` form's call has the arguments it declares, and nothing else.
-- The tags in a `case` are distinct.
-- A `prim` tag is less than 15.
+- A `prim` tag is less than 13.
 - A partial application has fewer arguments than its law's arity.
 
 A reader does not check frame indices (`arg i` against the frame of its law). An index past the frame is an error of the run (section 5), as it would be for any program that is built in memory.
@@ -345,7 +342,7 @@ A reader refuses, with a message that gives the reason:
 - bytes that end before the value or program is complete;
 - bytes after the value or program;
 - a form with a missing part;
-- a duplicate tag in a `case`, a `prim` tag of 15 or more, a partial application with too many arguments, and a program whose arity is not 1;
+- a `prim` tag of 13 or more, a form tag that is unused (19 or 21), a partial application with too many arguments, and a program whose arity is not 1;
 - a position past what the implementation can index (at least 2^53 − 1 in every implementation, section 12.2).
 
 The reader and writer have no limit on the depth of a program: both keep their own stack, as the machine does (the Luau reference tests a program 20,000 forms deep).
@@ -367,4 +364,4 @@ The header byte is left out so that a value's hash is the same whether it is wri
 
 ## 13. Form count
 
-The forms are `lit`, `arg`, `call`, `con`, `case`, `if`, `let`, `delay`, `force` and `prim`. That is ten, within the limit of twelve in Phase 2's exit test. The thirteen primitives are not forms: they are the table in section 4, so the form count does not grow when a primitive is added.
+The forms are `lit`, `arg`, `call`, `con`, `if`, `let`, `delay`, `force` and `prim`. That is nine, within the limit of twelve in Phase 2's exit test. The thirteen primitives are not forms: they are the table in section 4, so the form count does not grow when a primitive is added.

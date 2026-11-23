@@ -30,7 +30,6 @@ const F_LIT = 16
 const F_ARG = 17
 const F_CALL = 18
 const F_CON = 20
-const F_CASE = 21
 const F_IF = 22
 const F_LET = 23
 const F_DELAY = 24
@@ -122,22 +121,6 @@ const function formPieces(f: Form): { Piece }
 		return pieces
 	elseif f.op == "con" then
 		return { string.char(F_CON); posBytes(f.tag); { form = f.e } }
-	elseif f.op == "case" then
-		local pieces: { Piece } = { string.char(F_CASE); { form = f.e }; posBytes(#f.alts) }
-
-		for _, alt in f.alts do
-			table.insert(pieces, posBytes(alt.tag))
-			table.insert(pieces, { form = alt.body })
-		end
-
-		if f.elseBody == nil then
-			table.insert(pieces, string.char(0))
-		else
-			table.insert(pieces, string.char(1))
-			table.insert(pieces, { form = f.elseBody })
-		end
-
-		return pieces
 	elseif f.op == "if" then
 		return { string.char(F_IF); { form = f.c }; { form = f.t }; { form = f.e } }
 	elseif f.op == "let" then
@@ -483,75 +466,6 @@ const function open(want: string, t: number, r: Reader): (Datum?, Frame?)
 				end
 
 				return { done = { op = "con"; tag = tag; e = asForm(datum) } }
-			end,
-		}
-	elseif t == F_CASE then
-		local e: Form? = nil
-		local k = 0
-		local alts: { { tag: number; body: Form } } = {}
-		local seen: { boolean } = {}
-		local tag = 0
-		local st = 0
-
-		return nil, {
-			init = "form",
-			feed = function(datum: Datum, dtype: string): Ask
-				if st == 0 then
-					e = asForm(datum)
-					st = 1
-
-					return { req = "pos" }
-				elseif st == 1 then
-					k = asNumber(datum)
-					st = 2
-
-					if k == 0 then
-						st = 4
-
-						return { req = "flag" }
-					end
-
-					return { req = "pos" }
-				elseif st == 2 then
-					tag = asNumber(datum)
-
-					if seen[tag] then
-						error(`binary: the case has tag {tag} twice`, 0)
-					end
-
-					seen[tag] = true
-					st = 3
-
-					return { req = "form" }
-				elseif st == 3 then
-					table.insert(alts, { tag = tag; body = asForm(datum) })
-
-					if #alts < k then
-						st = 2
-
-						return { req = "pos" }
-					end
-
-					st = 4
-
-					return { req = "flag" }
-				elseif st == 4 then
-					if datum == 1 then
-						st = 5
-
-						return { req = "form" }
-					elseif datum ~= 0 then
-						error("binary: the else flag is 0 or 1", 0)
-					end
-
-					const built: Types.Case = { op = "case"; e = e :: Form; alts = alts; elseBody = nil }
-
-					return { done = built }
-				end
-
-				const built: Types.Case = { op = "case"; e = e :: Form; alts = alts; elseBody = asForm(datum) }
-
-				return { done = built }
 			end,
 		}
 	elseif t == F_IF then
