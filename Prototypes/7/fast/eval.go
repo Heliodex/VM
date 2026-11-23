@@ -166,7 +166,7 @@ func (r *recRun) eval(node *Node, env []Value, tail bool) (Value, bool) {
 
 // conOf gives a constructor of the value of its child.
 func (r *recRun) conOf(node *Node, env []Value) Value {
-	v, _ := r.eval(node.Kids[0], env, false)
+	v := r.operand(node.Kids[0], env)
 
 	return &Con{
 		Tag: node.Tag,
@@ -176,7 +176,7 @@ func (r *recRun) conOf(node *Node, env []Value) Value {
 
 // ifOf evaluates an if: its condition, then the branch it picks.
 func (r *recRun) ifOf(node *Node, env []Value, tail bool) (Value, bool) {
-	v, _ := r.eval(node.Kids[0], env, false)
+	v := r.operand(node.Kids[0], env)
 	if !isInt(v) {
 		r.fail("if needs an integer condition")
 	}
@@ -190,14 +190,14 @@ func (r *recRun) ifOf(node *Node, env []Value, tail bool) (Value, bool) {
 
 // letOf evaluates a let: its value, then its body with the value in the frame.
 func (r *recRun) letOf(node *Node, env []Value, tail bool) (Value, bool) {
-	v, _ := r.eval(node.Kids[0], env, false)
+	v := r.operand(node.Kids[0], env)
 
 	return r.eval(node.Kids[1], append(env, v), tail)
 }
 
 // caseOf evaluates a case: its scrutinee, then the branch for its tag, with the payload (or the scrutinee, for the else branch) in the frame.
 func (r *recRun) caseOf(node *Node, env []Value, tail bool) (Value, bool) {
-	v, _ := r.eval(node.Kids[0], env, false)
+	v := r.operand(node.Kids[0], env)
 	con, ok := v.(*Con)
 
 	if !ok {
@@ -228,13 +228,38 @@ func (r *recRun) caseOf(node *Node, env []Value, tail bool) (Value, bool) {
 	return r.eval(branch, append(env, pushed), tail)
 }
 
+// operand gives the value of a node that is an operand (not in tail position). A leaf, a lit or an arg, is its own step and cannot nest, so it is read here, without the depth count of eval; any other node is evaluated by eval.
+func (r *recRun) operand(node *Node, env []Value) Value {
+	switch node.Op {
+	case OpLit:
+		r.charge()
+
+		if StepHook != nil {
+			StepHook(env[0])
+		}
+
+		return node.Lit
+	case OpArg:
+		r.charge()
+
+		if StepHook != nil {
+			StepHook(env[0])
+		}
+
+		return r.argOf(node, env)
+	}
+
+	v, _ := r.eval(node, env, false)
+
+	return v
+}
+
 // operands evaluates kids in order, onto the operand stack, and gives the window of their values. The window is valid until the stack is cut back below it.
 func (r *recRun) operands(kids []*Node, env []Value) []Value {
 	base := len(r.vs)
 
 	for _, a := range kids {
-		v, _ := r.eval(a, env, false)
-		r.vs = append(r.vs, v)
+		r.vs = append(r.vs, r.operand(a, env))
 	}
 
 	return r.vs[base:]
@@ -243,7 +268,7 @@ func (r *recRun) operands(kids []*Node, env []Value) []Value {
 // call evaluates a call: its function, then its arguments. In tail position the call is returned to runBody, with its arguments (which it reads at once, before anything else is evaluated).
 func (r *recRun) call(node *Node, env []Value, tail bool) (Value, bool) {
 	base := len(r.vs)
-	fv, _ := r.eval(node.Kids[0], env, false)
+	fv := r.operand(node.Kids[0], env)
 	args := r.operands(node.Kids[1:], env)
 
 	if tail {
@@ -275,7 +300,7 @@ func (r *recRun) delay(node *Node, env []Value) Value {
 
 // force gives the value of a thunk: its stored result, or the call that computes it, which is stored.
 func (r *recRun) force(node *Node, env []Value) Value {
-	v, _ := r.eval(node.Kids[0], env, false)
+	v := r.operand(node.Kids[0], env)
 	th, ok := v.(*Thunk)
 
 	if !ok {
