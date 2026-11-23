@@ -26,6 +26,8 @@ type (
 		vbase, i, n int
 		rest []Value
 		th *Thunk
+		key string
+		start int64
 	}
 
 	mode uint8
@@ -46,6 +48,8 @@ const (
 	kApplyRest
 	// kForce: a thunk, to store the result in once its call has run.
 	kForce
+	// kMemo: a memoised call, to store its result under key, with the fuel it used since start.
+	kMemo
 )
 
 // StepHook, when set, is told the law of each step the machine charges: the frame's law for a form, and the callee for an entry. It is for measurement (the core's profile); the results do not depend on it.
@@ -153,6 +157,34 @@ func machine(m mode, node *Node, env *Env, fv Value, args []Value, fuel int64) O
 				}
 			}
 
+			var (
+				// A memoised call (memo.go): a hit charges the stored fuel, if the whole call fits in the fuel; a miss is stored when the call returns.
+				memoKeyOf string
+				memoOn bool
+			)
+
+			if MemoOn && n == law.Arity {
+				if key, ok := memoKey(law, all); ok {
+					if e, hit := memo[key]; hit {
+						if steps+e.fuel <= fuel {
+							steps += e.fuel
+							MemoCounts.Hits++
+							MemoCounts.ChargedFuel += e.fuel
+							value = e.value
+							m = mRet
+
+							continue
+						}
+					} else {
+						MemoCounts.Misses++
+						memoKeyOf = key
+						memoOn = true
+					}
+				}
+			}
+
+			start := steps
+
 			if steps >= fuel {
 				return Outcome{
 					Status: "out_of_fuel",
@@ -161,6 +193,14 @@ func machine(m mode, node *Node, env *Env, fv Value, args []Value, fuel int64) O
 			}
 
 			steps++
+
+			if memoOn {
+				k = append(k, cont{
+					kind: kMemo,
+					key: memoKeyOf,
+					start: start,
+				})
+			}
 
 			if n > law.Arity {
 				k = append(k, cont{
@@ -330,6 +370,13 @@ func machine(m mode, node *Node, env *Env, fv Value, args []Value, fuel int64) O
 			case kForce:
 				c.th.Done = true
 				c.th.Result = value
+				k = k[:len(k)-1]
+			case kMemo:
+				memo[c.key] = memoEntry{
+					value: value,
+					fuel: steps - c.start,
+				}
+				MemoCounts.Stores++
 				k = k[:len(k)-1]
 			}
 		}

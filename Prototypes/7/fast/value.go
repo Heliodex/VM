@@ -31,22 +31,38 @@ type (
 	App struct {
 		Law *Law
 		Args []Value
+
+		// hash, data and hashed cache hashOf (hash.go).
+		hash [32]byte
+		data, hashed bool
 	}
 
 	// Cell is a pair (Head . Tail).
 	Cell struct {
 		Head, Tail Value
+
+		// hash, data and hashed cache hashOf (hash.go).
+		hash [32]byte
+		data, hashed bool
 	}
 
 	// Con is a constructor: a tag and a payload.
 	Con struct {
 		Tag int
 		Payload Value
+
+		// hash, data and hashed cache hashOf (hash.go).
+		hash [32]byte
+		data, hashed bool
 	}
 
 	// Pin is a value in normal form, interned by its content: equal pins are the same pointer.
 	Pin struct {
 		Value Value
+
+		// hash, data and hashed cache hashOf (hash.go).
+		hash [32]byte
+		data, hashed bool
 	}
 
 	// Thunk is a delayed call of F to Args. It runs once; its result is kept in Result.

@@ -343,7 +343,6 @@ do
 			checker.expr,
 			function(e, l)
 				const owner = V.ownerOf(e)
-
 				print(`# law {owner} {l.arity} {hex(Format.encodeValue(l) :: string)}`)
 
 				if JET_ARITY[owner] == l.arity then
@@ -449,4 +448,36 @@ do
 		emit(`jet setB@100 edge {i} exact`, "body", law(1, call(lit(S), arg(1), lit(id), lit(b))), trie, outcome.steps)
 		emit(`jet setB@100 edge {i} one less`, "body", law(1, call(lit(S), arg(1), lit(id), lit(b))), trie, outcome.steps - 1)
 	end
+end
+
+-- ---- 7. the incremental re-check (Phase 7): the same checker on Prototype 6's types.l2, with one declaration changed. The change is div10's error branch, from 0 to 1: one line of one function.
+do
+	const base = readFile(BOOT6 .. "types.l2")
+	const marker = "Err e -> 0\nlet mod10"
+	const found = string.find(base, marker, 1, true)
+
+	if found == nil then
+		error("the marker of the changed declaration is not in types.l2", 0)
+	end
+
+	const second = string.find(base, marker, found + 1, true)
+
+	if second ~= nil then
+		error("the marker of the changed declaration is not unique", 0)
+	end
+
+	const modified = string.sub(base, 1, found - 1) .. "Err e -> 1\nlet mod10" .. string.sub(base, found + #marker)
+	const modC = Compile.compile(modified, "types.l2")
+	const laid = Lifecycle.run(Compile.compile(readFile "boot/layout.l2", "boot/layout.l2").expr, V.bytesValue(modC.raw), 1e10)
+	const lexer = Compile.compile(readFile(BOOT6 .. "lex.l2"), "lex.l2")
+	const parser = Compile.compile(readFile(BOOT6 .. "parse.l2"), "parse.l2")
+	const lexed = Lifecycle.run(lexer.expr, O.payloadOf(O.valueOf(laid)), 1e8)
+	const parsed = Lifecycle.run(parser.expr, O.payloadOf(O.valueOf(lexed)), 5e8)
+	const request: P6VM.Value = { kind = "con", tag = 3, payload = O.payloadOf(O.valueOf(parsed)) }
+	const input = convertInput(request)
+	const checkerExpr = Compile.compile(readFile "boot/types.l2", "boot/types.l2")
+	const body = call(Lower.expr(checkerExpr.expr, nil), arg(1))
+	const outcome = Interp.runForm(body, input, 1e10)
+	print(`# changed declaration: {outcome.status} after {string.format("%d", outcome.steps)} steps`)
+	line("checker: variant types.l2 with div10 changed", "body", law(1, body), input, 1e10, outcome)
 end
