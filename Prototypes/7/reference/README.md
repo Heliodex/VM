@@ -27,7 +27,7 @@ Run each from this folder with `lute run <file>`. The outputs are in `*.txt` bes
 Four comparisons disagree on purpose. Each is recorded in `cross_run.luau` with its reason, and none is hidden:
 
 1. **The integer range** (three examples). Prototype 5 gives an "out of range" error for add, sub and mul past 2^53. The spec removes that limit (SPEC.md section 1 and decision 8), so the reference gives the exact result. Those three Prototype 5 examples expect the old behaviour, and they are superseded by the spec.
-2. **The kind of a pin** (one example). Prototype 5 reports a pin as kind 4. A Prototype 5 pin is a suspended expression: creating one does not run it, and forcing runs it once. The core models that as a thunk, kind 6. The spec gives pins their own kind 4 for stored values (decision 4), so a suspended expression is a thunk. This is an open decision, below.
+2. **The kind of a pin** (one example). Prototype 5 reports a pin as kind 4. A Prototype 5 pin is a suspended expression: creating one does not run it, and forcing runs it once. The core models that as a thunk, kind 6. The spec gives pins their own kind 4 for stored values (decision 4), so a suspended expression is a thunk. This is decided: SPEC.md decision 10 keeps kind 6.
 
 ## Fuel
 
@@ -55,5 +55,4 @@ The reference is given a budget of 20 times the other machine's fuel, so a progr
 
 ## Open decisions
 
-- **The kind of a suspended expression.** Kind 6 (thunk) is the spec's; Prototype 5's example says 4. Either the example's expectation is superseded (the spec's choice), or the core's kind numbering changes so that a suspended expression reports 4. The first is what the reference does.
 - **Speed of the reference.** It is slow by design. Nothing here is tuned; Phase 4 is where the speed is.

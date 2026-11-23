@@ -131,7 +131,7 @@ const function agree(p: Shown, r: Types.Value): boolean
 	return false
 end
 
--- A disagreement is either a failure, or one of the differences the spec makes on purpose, which is named where it is recorded: the integer range (SPEC.md section 1 and decision 8), and a Prototype 5 pin, which the core models as a thunk (decision 4 and the open question in README.md).
+-- A disagreement is either a failure, or one of the differences the spec makes on purpose, which is named where it is recorded: the integer range (SPEC.md section 1 and decision 8), and a Prototype 5 pin, which the core models as a thunk (decisions 4 and 10).
 const function record(name: string, ok: boolean, detail: string, explained: string?)
 	if ok then
 		agreed += 1
