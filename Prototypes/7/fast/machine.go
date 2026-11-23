@@ -133,6 +133,19 @@ func machine(m mode, node *Node, env *Env, fv Value, args []Value, fuel int64) O
 				continue
 			}
 
+			// A saturated call of a law that has a jet: the jet gives the result and the fuel the body would use (jets.go). It is taken only when the whole call fits in the fuel; otherwise the body runs and stops at the spec's step.
+			if JetsOn && n == law.Arity {
+				if fn := jetFor(law); fn != nil {
+					if res, cost, ok := fn(all); ok && steps+cost <= fuel {
+						steps += cost
+						value = res
+						m = mRet
+
+						continue
+					}
+				}
+			}
+
 			if steps >= fuel {
 				return Outcome{
 					Status: "out_of_fuel",

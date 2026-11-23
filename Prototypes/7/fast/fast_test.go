@@ -66,7 +66,63 @@ func unhex(t *testing.T, s string) []byte {
 	return b
 }
 
-func TestCases(t *testing.T) {
+// TestChecker runs the checker benchmark on its own, and reports the steps per second against the reference's, as recorded in the cases file.
+func TestChecker(t *testing.T) {
+	var (
+		refSteps int64
+		refSeconds float64
+	)
+
+	f, err := os.ReadFile(casesFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	re := regexp.MustCompile(`# reference checker: \w+ after (\d+) steps in ([0-9.]+)s`)
+
+	if m := re.FindSubmatch(f); m != nil {
+		refSteps, _ = strconv.ParseInt(string(m[1]), 10, 64)
+		refSeconds, _ = strconv.ParseFloat(string(m[2]), 64)
+	} else {
+		t.Skip("no reference timing in the cases file")
+	}
+
+	for _, c := range readCases(t) {
+		if !strings.HasPrefix(c[0], "checker:") {
+			continue
+		}
+
+		prog, err := DecodeProgram(unhex(t, c[2]))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		input, err := DecodeValue(unhex(t, c[3]))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		fuel, _ := strconv.ParseInt(c[4], 10, 64)
+		start := time.Now()
+		out := RunBody(prog.Body, input, fuel)
+		elapsed := time.Since(start).Seconds()
+
+		if out.Status != c[5] {
+			t.Fatalf("checker status %s, want %s", out.Status, c[5])
+		}
+
+		if out.Steps != refSteps {
+			t.Fatalf("checker steps %d, reference %d", out.Steps, refSteps)
+		}
+
+		goRate := float64(out.Steps) / elapsed
+		refRate := float64(refSteps) / refSeconds
+
+		t.Log(fmt.Sprintf("checker: %d steps in %.3fs, %.1f M steps/s; reference %.1f M steps/s; ratio %.1fx", out.Steps, elapsed, goRate/1e6, refRate/1e6, goRate/refRate))
+	}
+}
+
+func checkCases(t *testing.T) {
 	cases := readCases(t)
 
 	t.Logf("%d cases", len(cases))
@@ -143,58 +199,20 @@ func TestCases(t *testing.T) {
 	}
 }
 
-// TestChecker runs the checker benchmark on its own, and reports the steps per second against the reference's, as recorded in the cases file.
-func TestChecker(t *testing.T) {
-	var (
-		refSteps int64
-		refSeconds float64
-	)
+// TestCases runs every case with the jets on, as the machine runs by default.
+func TestCases(t *testing.T) {
+	JetsOn = true
 
-	f, err := os.ReadFile(casesFile)
-	if err != nil {
-		t.Fatal(err)
-	}
+	checkCases(t)
+}
 
-	re := regexp.MustCompile(`# reference checker: \w+ after (\d+) steps in ([0-9.]+)s`)
+// TestCasesWithoutJets runs every case with the jets off: the spec code alone, which must give the same results and the same steps.
+func TestCasesWithoutJets(t *testing.T) {
+	JetsOn = false
 
-	if m := re.FindSubmatch(f); m != nil {
-		refSteps, _ = strconv.ParseInt(string(m[1]), 10, 64)
-		refSeconds, _ = strconv.ParseFloat(string(m[2]), 64)
-	} else {
-		t.Skip("no reference timing in the cases file")
-	}
+	defer func() {
+		JetsOn = true
+	}()
 
-	for _, c := range readCases(t) {
-		if !strings.HasPrefix(c[0], "checker:") {
-			continue
-		}
-
-		prog, err := DecodeProgram(unhex(t, c[2]))
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		input, err := DecodeValue(unhex(t, c[3]))
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		fuel, _ := strconv.ParseInt(c[4], 10, 64)
-		start := time.Now()
-		out := RunBody(prog.Body, input, fuel)
-		elapsed := time.Since(start).Seconds()
-
-		if out.Status != c[5] {
-			t.Fatalf("checker status %s, want %s", out.Status, c[5])
-		}
-
-		if out.Steps != refSteps {
-			t.Fatalf("checker steps %d, reference %d", out.Steps, refSteps)
-		}
-
-		goRate := float64(out.Steps) / elapsed
-		refRate := float64(refSteps) / refSeconds
-
-		t.Log(fmt.Sprintf("checker: %d steps in %.3fs, %.1f M steps/s; reference %.1f M steps/s; ratio %.1fx", out.Steps, elapsed, goRate/1e6, refRate/1e6, goRate/refRate))
-	}
+	checkCases(t)
 }
