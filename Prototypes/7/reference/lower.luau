@@ -5,7 +5,8 @@
 --
 -- Each expression is lowered with the depth of binders in scope (its level), and a map from the level of each variable the current law can see to the argument that holds it. A variable's level is depth - 1 - index, so the innermost binder has the highest level.
 --
---   Lower.expr(e): form    lowers a top-level expression, with no binders in scope
+--   Lower.expr(e): form            lowers a top-level expression, with no binders in scope
+--   Lower.closedClosure(body): law  a closed closure (an input that is a lambda at the top level), as a law of arity 1
 --
 -- The mapping of the constructs:
 --   quote v                 lit v (nil is the core's nil)
@@ -23,10 +24,14 @@
 --   payload e               prim 13 e
 
 const Primitives = require "../../6/interpreter/primitives"
+const VM = require "../../6/interpreter/vm"
 const Format = require "./format"
+const Types = require "./types"
 
+type Expr = VM.Expr
+type Form = Types.Form
+type Law = Types.Law
 const NIL = Format.NIL
-
 -- The core's primitive tag of each name (SPEC.md section 4).
 const CORE_TAG: { [string]: number } = {
 	add = 0,
@@ -40,45 +45,42 @@ const CORE_TAG: { [string]: number } = {
 }
 
 -- The free levels of an expression: the variables it refers to whose binders are below base. depth is the number of binders in scope where the expression sits.
-local function freeLevels(e: any, depth: number, base: number, acc: { [number]: boolean })
-	const op = e.op
-
-	if op == "var" then
+const function freeLevels(e: Expr, depth: number, base: number, acc: { boolean })
+	if e.op == "var" then
 		const lvl = depth - 1 - e.index
 
 		if lvl < base then
 			acc[lvl] = true
 		end
-	elseif op == "lam" then
+	elseif e.op == "lam" then
 		freeLevels(e.body, depth + 1, base, acc)
-	elseif op == "pin" or op == "force" or op == "construct" or op == "tagof" or op == "payload" or op == "index" then
+	elseif e.op == "pin" then
 		freeLevels(e.e, depth, base, acc)
-	elseif op == "cell" then
+	elseif e.op == "force" or e.op == "construct" or e.op == "tagof" or e.op == "payload" or e.op == "index" then
+		freeLevels(e.e, depth, base, acc)
+	elseif e.op == "cell" then
 		freeLevels(e.head, depth, base, acc)
 		freeLevels(e.tail, depth, base, acc)
-	elseif op == "if" then
+	elseif e.op == "if" then
 		freeLevels(e.c, depth, base, acc)
 		freeLevels(e.t, depth, base, acc)
 		freeLevels(e.e, depth, base, acc)
-	elseif op == "apply" then
+	elseif e.op == "apply" then
 		freeLevels(e.f, depth, base, acc)
 		freeLevels(e.arg, depth, base, acc)
-	elseif op == "prim" then
+	elseif e.op == "prim" then
 		freeLevels(e.a, depth, base, acc)
 
 		if e.b ~= nil then
 			freeLevels(e.b, depth, base, acc)
 		end
-	elseif op ~= "quote" then
-		error("lower: an expression " .. tostring(op) .. " is not known", 0)
 	end
 end
 
 -- The free levels in order, as a list.
-local function sortedFree(e: any, depth: number, base: number): { number }
-	local acc: { [number]: boolean } = {}
+const function sortedFree(e: Expr, depth: number, base: number): { number }
+	local acc: { boolean } = {}
 	freeLevels(e, depth, base, acc)
-
 	local out: { number } = {}
 
 	for lvl in acc do
@@ -91,7 +93,7 @@ local function sortedFree(e: any, depth: number, base: number): { number }
 end
 
 -- The address of index n: its binary digits below the leading 1, from the first step to the last. 0 is head, 1 is tail.
-local function steps(n: number): { number }
+const function steps(n: number): { number }
 	local bits: { number } = {}
 	local m = n
 
@@ -109,20 +111,38 @@ local function steps(n: number): { number }
 	return out
 end
 
-local lower: (e: any, depth: number, map: { [number]: number }) -> any
+local lower: (e: Expr, depth: number, map: { number }) -> Form
 
-lower = function(e: any, depth: number, map: { [number]: number }): any
-	const op = e.op
+-- The arguments that hold the given levels in the current law's frame.
+const function argsOf(levels: { number }, map: { number }): { Form }
+	local args: { Form } = {}
 
-	if op == "quote" then
-		local v = e.value
+	for _, lvl in levels do
+		const slot = map[lvl]
 
-		if type(v) == "table" and v.kind == "nil" then
-			v = NIL
+		if slot == nil then
+			error(`lower: a free variable at level {lvl} is not in the law's frame`, 0)
 		end
 
-		return { op = "lit", value = v }
-	elseif op == "var" then
+		const arg: Form = { op = "arg", index = slot }
+		table.insert(args, arg)
+	end
+
+	return args
+end
+
+lower = function(e: Expr, depth: number, map: { number }): Form
+	if e.op == "quote" then
+		if type(e.value) == "number" then
+			return { op = "lit", value = e.value }
+		end
+
+		if type(e.value) == "table" and e.value.kind == "nil" then
+			return { op = "lit", value = NIL }
+		end
+
+		error("lower: a quoted value is an integer or nil", 0)
+	elseif e.op == "var" then
 		const lvl = depth - 1 - e.index
 		const slot = map[lvl]
 
@@ -132,94 +152,95 @@ lower = function(e: any, depth: number, map: { [number]: number }): any
 		end
 
 		return { op = "arg", index = slot }
-	elseif op == "lam" then
+	elseif e.op == "lam" then
 		const free = sortedFree(e.body, depth + 1, depth)
-		local inner: { [number]: number } = {}
+		local inner: { number } = {}
 
 		for i, lvl in free do
 			inner[lvl] = i
 		end
 
 		inner[depth] = #free + 1
-
-		const law = { kind = "law", arity = #free + 1, body = lower(e.body, depth + 1, inner) }
+		const law: Law = { kind = "law", arity = #free + 1, body = lower(e.body, depth + 1, inner) }
 
 		if #free == 0 then
 			return { op = "lit", value = law }
 		end
 
-		local args: { any } = {}
-
-		for _, lvl in free do
-			table.insert(args, { op = "arg", index = map[lvl] })
-		end
-
-		return { op = "call", f = { op = "lit", value = law }, args = args }
-	elseif op == "pin" then
+		return { op = "call", f = { op = "lit", value = law }, args = argsOf(free, map) }
+	elseif e.op == "pin" then
 		const free = sortedFree(e.e, depth, depth)
-		local inner: { [number]: number } = {}
+		local inner: { number } = {}
 
 		for i, lvl in free do
 			inner[lvl] = i
 		end
 
-		const law = { kind = "law", arity = #free + 1, body = lower(e.e, depth, inner) }
-		local args: { any } = { { op = "lit", value = NIL } }
+		const law: Law = { kind = "law", arity = #free + 1, body = lower(e.e, depth, inner) }
+		local args: { Form } = { { op = "lit", value = NIL } }
 
-		for _, lvl in free do
-			table.insert(args, { op = "arg", index = map[lvl] })
+		for _, a in argsOf(free, map) do
+			table.insert(args, a)
 		end
 
 		return { op = "delay", call = { op = "call", f = { op = "lit", value = law }, args = args } }
-	elseif op == "cell" then
+	elseif e.op == "cell" then
 		return { op = "cell", a = lower(e.head, depth, map), b = lower(e.tail, depth, map) }
-	elseif op == "index" then
+	elseif e.op == "index" then
 		local form = lower(e.e, depth, map)
 
 		for _, step in steps(e.n) do
-			form = { op = "prim", tag = if step == 0 then 8 else 9, args = { form } }
+			const step_form: Form = {
+				op = "prim",
+				tag = if step == 0 then
+					8
+				else
+					9,
+				args = { form },
+			}
+			form = step_form
 		end
 
 		return form
-	elseif op == "force" then
+	elseif e.op == "force" then
 		return { op = "force", e = lower(e.e, depth, map) }
-	elseif op == "if" then
+	elseif e.op == "if" then
 		return { op = "if", c = lower(e.c, depth, map), t = lower(e.t, depth, map), e = lower(e.e, depth, map) }
-	elseif op == "apply" then
+	elseif e.op == "apply" then
 		return { op = "call", f = lower(e.f, depth, map), args = { lower(e.arg, depth, map) } }
-	elseif op == "prim" then
-		local name = Primitives.BY_TAG[e.tag].name
-		local tag = CORE_TAG[name]
+	elseif e.op == "prim" then
+		const name = Primitives.BY_TAG[e.tag].name
+		const tag = CORE_TAG[name]
 
 		if tag == nil then
 			error(`lower: the primitive {name} has no core tag`, 0)
 		end
 
-		local args: { any } = { lower(e.a, depth, map) }
+		local args: { Form } = { lower(e.a, depth, map) }
 
 		if e.b ~= nil then
 			table.insert(args, lower(e.b, depth, map))
 		end
 
 		return { op = "prim", tag = tag, args = args }
-	elseif op == "construct" then
+	elseif e.op == "construct" then
 		return { op = "con", tag = e.tag, e = lower(e.e, depth, map) }
-	elseif op == "tagof" then
+	elseif e.op == "tagof" then
 		return { op = "prim", tag = 12, args = { lower(e.e, depth, map) } }
-	elseif op == "payload" then
+	elseif e.op == "payload" then
 		return { op = "prim", tag = 13, args = { lower(e.e, depth, map) } }
 	end
 
-	error(`lower: an expression {tostring(op)} is not known`, 0)
+	error(`lower: an expression {e.op} is not known`, 0)
 end
 
 -- Lowers a top-level expression: no binders, so the map is empty.
-local function expr(e: any): any
+const function expr(e: Expr): Form
 	return lower(e, 0, {})
 end
 
 -- A closed closure: the body of a lambda at the top level, with no environment, as a law of arity 1. Its variable of index 0 is its argument.
-local function closedClosure(body: any): any
+const function closedClosure(body: Expr): Law
 	return { kind = "law", arity = 1, body = lower(body, 1, { [0] = 1 }) }
 end
 

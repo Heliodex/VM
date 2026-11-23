@@ -10,51 +10,58 @@
 --
 -- Both give an outcome: { status = "value", value, steps }, { status = "error", message, steps }, or { status = "out_of_fuel", steps }.
 
-const Int = require "./int"
 const Format = require "./format"
+const Int = require "./int"
+const Types = require "./types"
 
-export type Outcome = { status: string, value: any?, message: string?, steps: number }
-
-const NIL = Format.NIL
-
+type Value = Types.Value
+type Form = Types.Form
+type Law = Types.Law
+type Thunk = Types.Thunk
+type Outcome = Types.Outcome
+-- The slots of one invocation of a law: slot 0 is the law, then the arguments, then what let and case push.
+type Env = { slots: { Value } }
+-- A continuation: what to do with the next value. Each kind has the fields it needs.
+type Items = { t: "items", items: { Form }, vals: { Value }, i: number, fin: string, form: Form, env: Env }
+type Restore = { t: "restore", env: Env, len: number }
+type ApplyRest = { t: "applyrest", rest: { Value } }
+type ForceStore = { t: "forcestore", thunk: Thunk }
+type Cont = Items | Restore | ApplyRest | ForceStore
 -- Pins are interned by their content: the same bytes give the same pin object.
-const PINS: { [string]: any } = {}
+const PINS: { [string]: Types.Pin } = {}
+-- Placeholders for the machine's registers when a mode does not use them.
+const NOFORM: Form = { op = "lit", value = Format.NIL }
+const NOENV: Env = { slots = {} }
 
 -- The kind number of a value (SPEC.md section 1).
-local function kindOf(v: any): number
-	if type(v) == "number" or Int.isBig(v) then
+const function kindOf(v: Value): number
+	if type(v) == "number" then
 		return 0
 	end
 
-	if v == NIL then
+	if v.kind == "big" then
+		return 0
+	elseif v.kind == "nil" then
 		return 1
-	end
-
-	if v.kind == "cell" then
+	elseif v.kind == "cell" then
 		return 2
-	end
-
-	if v.kind == "law" or v.kind == "app" then
+	elseif v.kind == "law" or v.kind == "app" then
 		return 3
-	end
-
-	if v.kind == "pin" then
+	elseif v.kind == "pin" then
 		return 4
-	end
-
-	if v.kind == "con" then
+	elseif v.kind == "con" then
 		return 5
 	end
 
 	return 6
 end
 
-local function isInt(v: any): boolean
-	return type(v) == "number" or Int.isBig(v)
+const function isInt(v: Value): boolean
+	return type(v) == "number" or v.kind == "big"
 end
 
 -- The primitives (SPEC.md section 4). Each gives a value, or an error message.
-local function primitive(tag: number, vals: { any }): (any?, string?)
+const function primitive(tag: number, vals: { Value }): (Value?, string?)
 	const a = vals[1]
 	const b = vals[2]
 
@@ -63,29 +70,40 @@ local function primitive(tag: number, vals: { any }): (any?, string?)
 			return nil, "the integer operation " .. tostring(tag) .. " needs integers"
 		end
 
+		const x: Int.Int = a :: Int.Int
+		const y: Int.Int = b :: Int.Int
+
 		if tag == 0 then
-			return Int.add(a, b), nil
+			return Int.add(x, y), nil
 		elseif tag == 1 then
-			return Int.sub(a, b), nil
+			return Int.sub(x, y), nil
 		elseif tag == 2 then
-			return Int.mul(a, b), nil
+			return Int.mul(x, y), nil
 		elseif tag == 3 then
-			if Int.sign(b) == 0 then
+			if Int.sign(y) == 0 then
 				return nil, "division by zero"
 			end
 
-			return Int.divFloor(a, b), nil
+			return Int.divFloor(x, y), nil
 		elseif tag == 4 then
-			if Int.sign(b) == 0 then
+			if Int.sign(y) == 0 then
 				return nil, "modulus by zero"
 			end
 
-			return Int.modFloor(a, b), nil
+			return Int.modFloor(x, y), nil
 		elseif tag == 5 then
-			return if Int.compare(a, b) < 0 then 1 else 0, nil
+			return
+				if Int.compare(x, y) < 0 then
+					1
+				else
+					0, nil
 		end
 
-		return if Int.compare(a, b) == 0 then 1 else 0, nil
+		return
+			if Int.compare(x, y) == 0 then
+				1
+			else
+				0, nil
 	elseif tag == 7 then
 		return kindOf(a), nil
 	elseif tag == 8 then
@@ -109,19 +127,19 @@ local function primitive(tag: number, vals: { any }): (any?, string?)
 			return a, nil
 		end
 
-		local ok, key = pcall(Format.encodeValue, a)
+		const ok, key = pcall(Format.encodeValue, a)
 
 		if not ok then
 			return nil, "a pin has no binary form: " .. tostring(key)
 		end
 
-		local existing = PINS[key]
+		const existing = PINS[key]
 
 		if existing ~= nil then
 			return existing, nil
 		end
 
-		local pin = { kind = "pin", value = a }
+		const pin: Types.Pin = { kind = "pin", value = a }
 		PINS[key] = pin
 
 		return pin, nil
@@ -149,52 +167,52 @@ local function primitive(tag: number, vals: { any }): (any?, string?)
 end
 
 -- The subforms a form evaluates first, in order, and what finishes it. A form with no subforms is not here.
-local function itemsOf(form: any): ({ any }, string)
-	const op = form.op
-
-	if op == "call" then
-		local items = { form.f }
+const function itemsOf(form: Form): ({ Form }, string)
+	if form.op == "call" then
+		local items: { Form } = { form.f }
 
 		for _, a in form.args do
 			table.insert(items, a)
 		end
 
 		return items, "call"
-	elseif op == "delay" then
-		local items = { form.call.f }
+	elseif form.op == "delay" then
+		local items: { Form } = { form.call.f }
 
 		for _, a in form.call.args do
 			table.insert(items, a)
 		end
 
 		return items, "delay"
-	elseif op == "cell" then
+	elseif form.op == "cell" then
 		return { form.a, form.b }, "cell"
-	elseif op == "con" then
+	elseif form.op == "con" then
 		return { form.e }, "con"
-	elseif op == "case" then
+	elseif form.op == "case" then
 		return { form.e }, "case"
-	elseif op == "if" then
+	elseif form.op == "if" then
 		return { form.c }, "if"
-	elseif op == "let" then
+	elseif form.op == "let" then
 		return { form.e }, "let"
-	elseif op == "force" then
+	elseif form.op == "force" then
 		return { form.e }, "force"
-	elseif op == "prim" then
+	elseif form.op == "prim" then
 		return form.args, "prim"
 	end
 
-	error("binary: a form with no subforms: " .. tostring(op), 0)
+	error("binary: a form with no subforms: " .. form.op, 0)
 end
 
--- The machine. mode is "eval" (form, env), "ret" (value), or "apply" (fv, args). The continuations are tables with a kind t: "items" (a form waiting for the values of its subforms), "restore" (pop the slots pushed by a let or a case), "applyrest" (apply the value to the arguments that the saturated call did not take), and "forcestore" (store the result in the thunk).
-local function machine(mode0: string, form0: any, env0: any, fv0: any, args0: any, fuel: number): Outcome
-	local k: { any } = {}
+type Mode = "eval" | "ret" | "apply"
+
+-- The machine. mode is "eval" (form, env), "ret" (value), or "apply" (fv, args). The continuations are of the types above.
+const function machine(mode0: Mode, form0: Form, env0: Env, fv0: Value, args0: { Value }, fuel: number): Outcome
+	local k: { Cont } = {}
 	local steps = 0
 	local mode = mode0
 	local form = form0
 	local env = env0
-	local value: any = nil
+	local value: Value = Format.NIL
 	local fv = fv0
 	local args = args0
 
@@ -205,31 +223,30 @@ local function machine(mode0: string, form0: any, env0: any, fv0: any, args0: an
 			end
 
 			steps += 1
-			const op = form.op
 
-			if op == "lit" then
+			if form.op == "lit" then
 				value = form.value
 				mode = "ret"
-			elseif op == "arg" then
-				value = env.slots[form.index + 1]
+			elseif form.op == "arg" then
+				const slot: Value? = env.slots[form.index + 1]
 
-				if value == nil then
+				if slot == nil then
 					return { status = "error", message = "no slot " .. tostring(form.index) .. " in the frame", steps = steps }
 				end
 
+				value = slot
 				mode = "ret"
 			else
-				local items, fin = itemsOf(form)
-				table.insert(k, { t = "items", items = items, vals = {}, i = 1, fin = fin, form = form, env = env })
+				const items, fin = itemsOf(form)
+				table.insert(k, { t = "items", items = items, vals = {}, i = 1, fin = fin, form = form, env = env } :: Cont)
 				form = items[1]
 			end
 		elseif mode == "apply" then
-			local law: any
-			local all: { any }
+			local law: Law
+			local all: { Value } = {}
 
 			if type(fv) == "table" and fv.kind == "app" then
 				law = fv.law
-				all = {}
 
 				for _, a in fv.args do
 					table.insert(all, a)
@@ -262,18 +279,17 @@ local function machine(mode0: string, form0: any, env0: any, fv0: any, args0: an
 				end
 
 				steps += 1
-
-				local rest: { any } = {}
+				local rest: { Value } = {}
 
 				for i = arity + 1, n do
 					table.insert(rest, all[i])
 				end
 
 				if #rest > 0 then
-					table.insert(k, { t = "applyrest", rest = rest })
+					table.insert(k, { t = "applyrest", rest = rest } :: Cont)
 				end
 
-				local slots: { any } = { law }
+				local slots: { Value } = { law }
 
 				for i = 1, arity do
 					slots[i + 1] = all[i]
@@ -285,11 +301,11 @@ local function machine(mode0: string, form0: any, env0: any, fv0: any, args0: an
 			end
 		else
 			-- A value goes to the continuation on top.
-			if #k == 0 then
+			const c = table.remove(k)
+
+			if c == nil then
 				return { status = "value", value = value, steps = steps }
 			end
-
-			const c = table.remove(k) :: any
 
 			if c.t == "items" then
 				c.vals[c.i] = value
@@ -310,10 +326,14 @@ local function machine(mode0: string, form0: any, env0: any, fv0: any, args0: an
 						value = { kind = "cell", head = vals[1], tail = vals[2] }
 						mode = "ret"
 					elseif fin == "con" then
+						if f.op ~= "con" then
+							error("machine: a con finish on another form", 0)
+						end
+
 						value = { kind = "con", tag = f.tag, payload = vals[1] }
 						mode = "ret"
 					elseif fin == "call" then
-						local all: { any } = {}
+						const all: { Value } = {}
 
 						for i = 2, #vals do
 							table.insert(all, vals[i])
@@ -323,55 +343,74 @@ local function machine(mode0: string, form0: any, env0: any, fv0: any, args0: an
 						args = all
 						mode = "apply"
 					elseif fin == "delay" then
-						local all: { any } = {}
+						const all: { Value } = {}
 
 						for i = 2, #vals do
 							table.insert(all, vals[i])
 						end
 
-						value = { kind = "thunk", f = vals[1], args = all, done = false }
+						const thunk: Thunk = { kind = "thunk", f = vals[1], args = all, done = false, result = nil }
+						value = thunk
 						mode = "ret"
 					elseif fin == "prim" then
+						if f.op ~= "prim" then
+							error("machine: a prim finish on another form", 0)
+						end
+
 						const result, message = primitive(f.tag, vals)
 
-						if message ~= nil then
-							return { status = "error", message = message, steps = steps }
+						if message ~= nil or result == nil then
+							return { status = "error", message = message or "a primitive gave nothing", steps = steps }
 						end
 
 						value = result
 						mode = "ret"
 					elseif fin == "if" then
+						if f.op ~= "if" then
+							error("machine: an if finish on another form", 0)
+						end
+
 						const c0 = vals[1]
 
 						if not isInt(c0) then
 							return { status = "error", message = "if needs an integer condition", steps = steps }
 						end
 
-						form = if Int.sign(c0) ~= 0 then f.t else f.e
+						form =
+							if Int.sign(c0 :: Int.Int) ~= 0 then
+								f.t
+							else
+								f.e
 						env = e
 						mode = "eval"
 					elseif fin == "let" then
-						local len = #e.slots
-						table.insert(k, { t = "restore", env = e, len = len })
+						if f.op ~= "let" then
+							error("machine: a let finish on another form", 0)
+						end
+
+						table.insert(k, { t = "restore", env = e, len = #e.slots } :: Cont)
 						table.insert(e.slots, vals[1])
 						form = f.body
 						env = e
 						mode = "eval"
 					elseif fin == "case" then
+						if f.op ~= "case" then
+							error("machine: a case finish on another form", 0)
+						end
+
 						const scrut = vals[1]
 
 						if type(scrut) ~= "table" or scrut.kind ~= "con" then
 							return { status = "error", message = "case of a value that is not a constructor", steps = steps }
 						end
 
-						local branch: any = nil
-						local pushed: any = nil
+						local branch: Form? = nil
+						local pushed: Value = scrut
 
 						for _, alt in f.alts do
 							if alt.tag == scrut.tag then
 								branch = alt.body
 								pushed = scrut.payload
-
 								break
 							end
 						end
@@ -382,13 +421,11 @@ local function machine(mode0: string, form0: any, env0: any, fv0: any, args0: an
 							end
 
 							branch = f.elseBody
-							pushed = scrut
 						end
 
-						local len = #e.slots
-						table.insert(k, { t = "restore", env = e, len = len })
+						table.insert(k, { t = "restore", env = e, len = #e.slots } :: Cont)
 						table.insert(e.slots, pushed)
-						form = branch
+						form = branch :: Form
 						env = e
 						mode = "eval"
 					elseif fin == "force" then
@@ -399,16 +436,16 @@ local function machine(mode0: string, form0: any, env0: any, fv0: any, args0: an
 						end
 
 						if th.done then
-							value = th.result
+							value = th.result :: Value
 							mode = "ret"
 						else
-							table.insert(k, { t = "forcestore", thunk = th })
+							table.insert(k, { t = "forcestore", thunk = th } :: Cont)
 							fv = th.f
 							args = th.args
 							mode = "apply"
 						end
 					else
-						return { status = "error", message = "machine: unknown finish " .. tostring(fin), steps = steps }
+						return { status = "error", message = "machine: unknown finish " .. fin, steps = steps }
 					end
 				end
 			elseif c.t == "restore" then
@@ -428,17 +465,17 @@ local function machine(mode0: string, form0: any, env0: any, fv0: any, args0: an
 end
 
 -- Runs a program (a law of arity 1) on an input.
-local function run(program: any, input: any, fuel: number): Outcome
-	if type(program) ~= "table" or program.kind ~= "law" or program.arity ~= 1 then
+const function run(program: Law, input: Value, fuel: number): Outcome
+	if program.arity ~= 1 then
 		error("a program is a law of arity 1", 0)
 	end
 
-	return machine("apply", nil, nil, program, { input }, fuel)
+	return machine("apply", NOFORM, NOENV, program, { input }, fuel)
 end
 
 -- Runs a form as the body of a law of arity 1, with the input as its argument. The wrapper costs no step.
-local function runForm(form: any, input: any, fuel: number): Outcome
-	return machine("eval", form, { slots = { NIL, input } }, nil, nil, fuel)
+const function runForm(form: Form, input: Value, fuel: number): Outcome
+	return machine("eval", form, { slots = { Format.NIL, input } }, Format.NIL, {}, fuel)
 end
 
 return {

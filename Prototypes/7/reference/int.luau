@@ -21,14 +21,13 @@
 --   Int.divFloor, Int.modFloor      floored quotient, and remainder with the sign of the divisor (a = b * q + r); the divisor must not be zero
 --   Int.compare(a, b)               -1, 0 or 1
 
-export type Big = { big: boolean, neg: boolean, bytes: { number } }
+export type Big = { kind: "big", neg: boolean, bytes: { number } }
 export type Int = number | Big
-
 -- The largest integer a double holds exactly, with the range the representation above uses for numbers.
 const MAX_SAFE = 9007199254740991
 
 -- Drops the zero bytes at the top end, so the magnitude has one representation.
-local function trimmed(bytes: { number }): { number }
+const function trimmed(bytes: { number }): { number }
 	local n = #bytes
 
 	while n > 0 and bytes[n] == 0 do
@@ -45,7 +44,7 @@ local function trimmed(bytes: { number }): { number }
 end
 
 -- The magnitude as a number, when the magnitude is at most MAX_SAFE. Partial sums of a magnitude at most MAX_SAFE are exact, and a larger magnitude gives a larger float, so this check is exact.
-local function magnitudeNumber(bytes: { number }): number?
+const function magnitudeNumber(bytes: { number }): number?
 	if #bytes > 7 then
 		return nil
 	end
@@ -65,7 +64,7 @@ local function magnitudeNumber(bytes: { number }): number?
 	return value
 end
 
-local function fromMagnitude(neg: boolean, bytes: { number }): Int
+const function fromMagnitude(neg: boolean, bytes: { number }): Int
 	const trim = trimmed(bytes)
 	const small = magnitudeNumber(trim)
 
@@ -81,14 +80,18 @@ local function fromMagnitude(neg: boolean, bytes: { number }): Int
 		return small
 	end
 
-	return { big = true, neg = neg, bytes = trim }
+	return { kind = "big", neg = neg, bytes = trim }
 end
 
-local function magnitudeBytes(v: Int): { number }
+const function magnitudeBytes(v: Int): { number }
 	local out: { number } = {}
 
 	if type(v) == "number" then
-		local m = if v < 0 then -v else v
+		local m =
+			if v < 0 then
+				-v
+			else
+				v
 
 		while m > 0 do
 			local b = m % 256
@@ -106,7 +109,7 @@ local function magnitudeBytes(v: Int): { number }
 	return out
 end
 
-local function lebGroups(bytes: { number }): { number }
+const function lebGroups(bytes: { number }): { number }
 	const trim = trimmed(bytes)
 
 	if #trim == 0 then
@@ -121,7 +124,7 @@ local function lebGroups(bytes: { number }): { number }
 	-- acc holds nacc bits not yet written, least significant first. Bytes are added as they are needed, and a group is taken from the bottom, so the groups come out least significant first.
 	repeat
 		if nacc < 7 and i <= #trim then
-			acc += trim[i] * (2 ^ nacc)
+			acc += trim[i] * 2 ^ nacc
 			nacc += 8
 			i += 1
 		end
@@ -135,13 +138,13 @@ local function lebGroups(bytes: { number }): { number }
 	return out
 end
 
-local function bytesFromGroups(groups: { number }): { number }
+const function bytesFromGroups(groups: { number }): { number }
 	local out: { number } = {}
 	local acc = 0
 	local nacc = 0
 
 	for _, g in groups do
-		acc += g * (2 ^ nacc)
+		acc += g * 2 ^ nacc
 		nacc += 7
 
 		while nacc >= 8 do
@@ -159,7 +162,15 @@ local function bytesFromGroups(groups: { number }): { number }
 	return trimmed(out)
 end
 
-local function sign(v: Int): number
+const function isBig(v: Int | { read kind: string }): boolean
+	if type(v) == "number" then
+		return false
+	end
+
+	return v.kind == "big"
+end
+
+const function sign(v: Int): number
 	if type(v) == "number" then
 		if v < 0 then
 			return -1
@@ -170,10 +181,14 @@ local function sign(v: Int): number
 		return 0
 	end
 
-	return if v.neg then -1 else 1
+	return
+		if v.neg then
+			-1
+		else
+			1
 end
 
-local function equal(a: Int, b: Int): boolean
+const function equal(a: Int, b: Int): boolean
 	if type(a) == "number" and type(b) == "number" then
 		return a == b
 	end
@@ -196,22 +211,29 @@ local function equal(a: Int, b: Int): boolean
 end
 
 -- Magnitude arithmetic on byte arrays, least significant byte first.
-
-local function magCompare(a: { number }, b: { number }): number
+const function magCompare(a: { number }, b: { number }): number
 	if #a ~= #b then
-		return if #a < #b then -1 else 1
+		return
+			if #a < #b then
+				-1
+			else
+				1
 	end
 
 	for i = #a, 1, -1 do
 		if a[i] ~= b[i] then
-			return if a[i] < b[i] then -1 else 1
+			return
+				if a[i] < b[i] then
+					-1
+				else
+					1
 		end
 	end
 
 	return 0
 end
 
-local function magAdd(a: { number }, b: { number }): { number }
+const function magAdd(a: { number }, b: { number }): { number }
 	local out: { number } = {}
 	local carry = 0
 	local n = math.max(#a, #b)
@@ -219,7 +241,11 @@ local function magAdd(a: { number }, b: { number }): { number }
 	for i = 1, n do
 		local s = (a[i] or 0) + (b[i] or 0) + carry
 		out[i] = s % 256
-		carry = if s >= 256 then 1 else 0
+		carry =
+			if s >= 256 then
+				1
+			else
+				0
 	end
 
 	if carry > 0 then
@@ -230,7 +256,7 @@ local function magAdd(a: { number }, b: { number }): { number }
 end
 
 -- a - b, where a is at least b.
-local function magSub(a: { number }, b: { number }): { number }
+const function magSub(a: { number }, b: { number }): { number }
 	local out: { number } = {}
 	local borrow = 0
 
@@ -250,7 +276,7 @@ local function magSub(a: { number }, b: { number }): { number }
 	return trimmed(out)
 end
 
-local function magMulSmall(a: { number }, m: number): { number }
+const function magMulSmall(a: { number }, m: number): { number }
 	local out: { number } = {}
 	local carry = 0
 
@@ -268,7 +294,7 @@ local function magMulSmall(a: { number }, m: number): { number }
 	return trimmed(out)
 end
 
-local function magMul(a: { number }, b: { number }): { number }
+const function magMul(a: { number }, b: { number }): { number }
 	local out: { number } = {}
 
 	for i = 1, #a + #b do
@@ -298,7 +324,7 @@ local function magMul(a: { number }, b: { number }): { number }
 end
 
 -- The quotient and remainder of magnitudes, by long division with one base-256 digit at a time, found by binary search.
-local function magDivMod(a: { number }, b: { number }): ({ number }, { number })
+const function magDivMod(a: { number }, b: { number }): ({ number }, { number })
 	if magCompare(a, b) < 0 then
 		return {}, a
 	end
@@ -315,7 +341,6 @@ local function magDivMod(a: { number }, b: { number }): ({ number }, { number })
 		end
 
 		rem = trimmed(shifted)
-
 		local lo = 0
 		local hi = 255
 
@@ -337,12 +362,11 @@ local function magDivMod(a: { number }, b: { number }): ({ number }, { number })
 end
 
 -- Signed arithmetic. A number is fast-pathed when the exact result is in the number range; otherwise the byte form is used.
-
-local function parts(v: Int): (boolean, { number })
+const function parts(v: Int): (boolean, { number })
 	return sign(v) < 0, magnitudeBytes(v)
 end
 
-local function add(a: Int, b: Int): Int
+const function add(a: Int, b: Int): Int
 	if type(a) == "number" and type(b) == "number" then
 		const r = a + b
 
@@ -365,7 +389,7 @@ local function add(a: Int, b: Int): Int
 	return fromMagnitude(nb, magSub(mb, ma))
 end
 
-local function negate(a: Int): Int
+const function negate(a: Int): Int
 	if type(a) == "number" then
 		return -a
 	end
@@ -373,11 +397,11 @@ local function negate(a: Int): Int
 	return fromMagnitude(not a.neg, a.bytes)
 end
 
-local function sub(a: Int, b: Int): Int
+const function sub(a: Int, b: Int): Int
 	return add(a, negate(b))
 end
 
-local function mul(a: Int, b: Int): Int
+const function mul(a: Int, b: Int): Int
 	if type(a) == "number" and type(b) == "number" then
 		const r = a * b
 
@@ -393,8 +417,8 @@ local function mul(a: Int, b: Int): Int
 end
 
 -- The floored quotient and remainder. The truncated quotient is found on magnitudes, then moved down by one when the remainder has the wrong sign.
-local function divMod(a: Int, b: Int): (Int, Int)
-	if type(a) == "number" and type(b) == "number" and a > -4294967296 and a < 4294967296 and b > -4294967296 and b < 4294967296 then
+const function divMod(a: Int, b: Int): (Int, Int)
+	if type(a) == "number" and type(b) == "number" and a > -0x100000000 and a < 0x100000000 and b > -0x100000000 and b < 0x100000000 then
 		local q = a // b
 		local r = a - q * b
 
@@ -404,7 +428,6 @@ local function divMod(a: Int, b: Int): (Int, Int)
 	const na, ma = parts(a)
 	const nb, mb = parts(b)
 	const qm, rm = magDivMod(ma, mb)
-
 	local q: Int = fromMagnitude(na ~= nb, qm)
 	local r: Int = fromMagnitude(na, rm)
 
@@ -416,37 +439,49 @@ local function divMod(a: Int, b: Int): (Int, Int)
 	return q, r
 end
 
-local function divFloor(a: Int, b: Int): Int
+const function divFloor(a: Int, b: Int): Int
 	local q = divMod(a, b)
 
 	return q
 end
 
-local function modFloor(a: Int, b: Int): Int
+const function modFloor(a: Int, b: Int): Int
 	local _, r = divMod(a, b)
 
 	return r
 end
 
-local function compare(a: Int, b: Int): number
+const function compare(a: Int, b: Int): number
 	if type(a) == "number" and type(b) == "number" then
 		if a == b then
 			return 0
 		end
 
-		return if a < b then -1 else 1
+		return
+			if a < b then
+				-1
+			else
+				1
 	end
 
 	const na = sign(a) < 0
 	const nb = sign(b) < 0
 
 	if na ~= nb then
-		return if na then -1 else 1
+		return
+			if na then
+				-1
+			else
+				1
 	end
 
 	const c = magCompare(magnitudeBytes(a), magnitudeBytes(b))
 
-	return if na then -c else c
+	return
+		if na then
+			-c
+		else
+			c
 end
 
 return {
@@ -456,9 +491,7 @@ return {
 	lebGroups = lebGroups,
 	bytesFromGroups = bytesFromGroups,
 	sign = sign,
-	isBig = function(v: any): boolean
-		return type(v) == "table" and v.big == true
-	end,
+	isBig = isBig,
 	equal = equal,
 	add = add,
 	sub = sub,
