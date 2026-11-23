@@ -307,7 +307,7 @@ do
 		{ name = "a law whose body is not a form"; bytes = "\1\5\1\0"; want = "tag 0 is not a form"; decodeAs = "value" },
 		{ name = "a program of arity 2"; bytes = "\2\2\16\0"; want = "arity 1"; decodeAs = "program" },
 		{ name = "an unknown form tag"; bytes = "\2\1\27"; want = "tag 27 is not a form"; decodeAs = "program" },
-		{ name = "a primitive of tag 14"; bytes = "\2\1\26\14\16\0\16\0"; want = "does not exist"; decodeAs = "program" },
+		{ name = "a primitive of tag 15"; bytes = "\2\1\26\15\16\0\16\0"; want = "does not exist"; decodeAs = "program" },
 		{ name = "a case with the tag 0 twice"; bytes = "\2\1\21\17\1\2\0\16\2\0\0\16\2\0\0"; want = "twice"; decodeAs = "program" },
 		{ name = "a partial application with no fewer arguments than its arity"; bytes = "\1\6\5\1\16\0\1\0"; want = "fewer arguments"; decodeAs = "value" },
 		{ name = "a program with bytes after it"; bytes = "\2\1\16\0\0"; want = "after"; decodeAs = "program" },

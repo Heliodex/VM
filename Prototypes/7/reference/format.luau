@@ -15,7 +15,7 @@ type Form = Types.Form
 type Law = Types.Law
 const NIL: Types.Nil = { kind = "nil" }
 -- The argument count of each primitive, by tag (SPEC.md section 4).
-const PRIM_ARITY: { number } = { 2; 2; 2; 2; 2; 2; 2; 1; 1; 1; 1; 1; 1; 1 }
+const PRIM_ARITY: { number } = { 2; 2; 2; 2; 2; 2; 2; 1; 1; 1; 1; 1; 1; 1; 2 }
 const VALUE_HEADER = 1
 const PROGRAM_HEADER = 2
 -- The tags of values and forms (SPEC.md section 12.3 and 12.4).
@@ -30,7 +30,6 @@ const V_PIN = 7
 const F_LIT = 16
 const F_ARG = 17
 const F_CALL = 18
-const F_CELL = 19
 const F_CON = 20
 const F_CASE = 21
 const F_IF = 22
@@ -128,8 +127,6 @@ const function formPieces(f: Form): { Piece }
 		end
 
 		return pieces
-	elseif f.op == "cell" then
-		return { string.char(F_CELL); { form = f.a }; { form = f.b } }
 	elseif f.op == "con" then
 		return { string.char(F_CON); posBytes(f.tag); { form = f.e } }
 	elseif f.op == "case" then
@@ -494,14 +491,6 @@ const function open(want: string, t: number, r: Reader): (Datum?, Frame?)
 				return { req = "form" }
 			end,
 		}
-	elseif t == F_CELL then
-		return nil, fixedFrame(
-			"form",
-			2,
-			function(p: { Datum }): Value | Form
-				return { op = "cell"; a = asForm(p[1]); b = asForm(p[2]) }
-			end
-		)
 	elseif t == F_CON then
 		local tag = 0
 

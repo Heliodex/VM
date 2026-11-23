@@ -104,6 +104,10 @@ const function primitive(tag: number, vals: { Value }): (Value?, string?)
 				1
 			else
 				0, nil
+	elseif tag == 14 then
+		const cell: Types.Cell = { kind = "cell", head = a, tail = b }
+
+		return cell, nil
 	elseif tag == 7 then
 		return kindOf(a), nil
 	elseif tag == 8 then
@@ -184,8 +188,6 @@ const function itemsOf(form: Form): ({ Form }, string)
 		end
 
 		return items, "delay"
-	elseif form.op == "cell" then
-		return { form.a; form.b }, "cell"
 	elseif form.op == "con" then
 		return { form.e }, "con"
 	elseif form.op == "case" then
@@ -322,10 +324,7 @@ const function machine(mode0: Mode, form0: Form, env0: Env, fv0: Value, args0: {
 					const e = c.env
 					const fin = c.fin
 
-					if fin == "cell" then
-						value = { kind = "cell"; head = vals[1]; tail = vals[2] }
-						mode = "ret"
-					elseif fin == "con" then
+					if fin == "con" then
 						if f.op ~= "con" then
 							error("machine: a con finish on another form", 0)
 						end

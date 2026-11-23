@@ -18,7 +18,6 @@ export type Value = Int | Nil | Cell | Con | Law | App | Pin | Thunk
 export type Lit = { op: "lit"; value: Value }
 export type Arg = { op: "arg"; index: number }
 export type Call = { op: "call"; f: Form; args: { Form } }
-export type CellForm = { op: "cell"; a: Form; b: Form }
 export type ConForm = { op: "con"; tag: number; e: Form }
 export type Alt = { tag: number; body: Form }
 export type Case = { op: "case"; e: Form; alts: { Alt }; elseBody: Form? }
@@ -28,7 +27,7 @@ export type Delay = { op: "delay"; call: Call }
 export type Force = { op: "force"; e: Form }
 export type Prim = { op: "prim"; tag: number; args: { Form } }
 -- A form of the core (SPEC.md section 3). Each form has one of these shapes.
-export type Form = Lit | Arg | Call | CellForm | ConForm | Case | If | Let | Delay | Force | Prim
+export type Form = Lit | Arg | Call | ConForm | Case | If | Let | Delay | Force | Prim
 -- The outcome of a run: a value, an error with a message, or out of fuel. steps is the fuel used.
 export type Outcome = { status: "value"; value: Value; steps: number } | { status: "error"; message: string; steps: number } | { status: "out_of_fuel"; steps: number }
 

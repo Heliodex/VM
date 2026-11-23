@@ -13,7 +13,7 @@
 --   var i                   arg (the slot the map gives the variable's level)
 --   lam body                a law of arity (free + 1): lit law, or call (lit law) applied to the free variables
 --   pin e                   delay (call (lit law) nil free...): a law of arity (free + 1), its first argument a dummy
---   cell a b                cell a b
+--   cell a b                prim cons a b (primitive 14)
 --   index n e               prim head or tail, once per step of n's binary address
 --   force e                 force e
 --   if c t e                if c t e
@@ -271,7 +271,7 @@ lower = function(e: Expr, depth: number, map: { number }): Form
 
 		return { op = "delay"; call = { op = "call"; f = { op = "lit"; value = law }; args = args } }
 	elseif e.op == "cell" then
-		return { op = "cell"; a = lower(e.head, depth, map); b = lower(e.tail, depth, map) }
+		return { op = "prim"; tag = 14; args = { lower(e.head, depth, map), lower(e.tail, depth, map) } }
 	elseif e.op == "index" then
 		local form = lower(e.e, depth, map)
 
