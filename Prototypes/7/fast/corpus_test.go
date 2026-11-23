@@ -189,7 +189,12 @@ func buildFile(data corpusData, f *corpusFile) (map[string]Outcome, buildStats, 
 func readCorpus(t *testing.T) corpusData {
 	t.Helper()
 
-	f, err := os.Open("testdata/corpus.txt")
+	path := os.Getenv("CORPUS")
+	if path == "" {
+		path = "testdata/corpus.txt"
+	}
+
+	f, err := os.Open(path)
 	if err != nil {
 		t.Fatal(err)
 	}
