@@ -698,3 +698,97 @@ do
 	emit("jet parse:same@20 a non-number element", "body", law(1, call(lit(SAME), prim(8, arg(1)), prim(9, arg(1)))), cellV(listOfV({ { kind = "con", tag = 0, payload = 1 } }), listOfV({ 1 })), 1000)
 end
 
+-- ---- 11. prune (the checker's chase of a type variable through the trie's bindings): random tries of bindings, Unbound or Bound to a type variable of a larger id (so the chase ends) or to a constructor, built as the checker builds them (section 6's layout), and types that are variables and constructors, with the edge inputs the jet must refuse.
+do
+	math.randomseed(31)
+	const PRUNE_ARITY = 2
+	const found: { [string]: Law } = {}
+
+	Lower.expr((Compile.compile(readFile("boot/types.l2"), "boot/types.l2")).expr, function(e, l)
+		if V.ownerOf(e) == "prune@126" and l.arity == PRUNE_ARITY then
+			found["prune"] = l
+		end
+	end)
+
+	const PRUNE = found["prune"]
+	const EMPTY: Value = { kind = "con", tag = 0, payload = NIL }
+
+	const function tvar(id: number): Value
+		return { kind = "con", tag = 0, payload = id }
+	end
+
+	const function tcon(): Value
+		return { kind = "con", tag = 1, payload = { kind = "cell", head = NIL, tail = NIL } }
+	end
+
+	const function cellV(a: Value, b: Value): Value
+		return { kind = "cell", head = a, tail = b }
+	end
+
+	-- A trie of the entries { id, binding }, built as the checker's setB builds it: the binding of id 0 is the node's own, and id is split into id div 4 and id mod 4 below the node.
+	local function trieOf(entries: { { id: number, b: Value } }): Value
+		if #entries == 0 then
+			return EMPTY
+		end
+
+		local root: Value = { kind = "con", tag = 0, payload = 0 }
+		local subs: { { { id: number, b: Value } } } = { {}, {}, {}, {} }
+
+		for _, e in entries do
+			if e.id == 0 then
+				root = e.b
+			else
+				table.insert(subs[(e.id % 4) + 1], { id = e.id // 4, b = e.b })
+			end
+		end
+
+		local kids = cellV(trieOf(subs[1]), cellV(trieOf(subs[2]), cellV(trieOf(subs[3]), trieOf(subs[4]))))
+
+		return { kind = "con", tag = 1, payload = cellV(root, kids) }
+	end
+
+	local function randomEntries(): { { id: number, b: any } }
+		local entries: { { id: number, b: any } } = {}
+
+		for id = 0, 15 do
+			if math.random() < 0.6 then
+				local b: any
+
+				if math.random() < 0.5 then
+					b = { kind = "con", tag = 0, payload = math.random(0, 3) }
+				elseif id < 15 and math.random() < 0.7 then
+					b = { kind = "con", tag = 1, payload = tvar(math.random(id + 1, 15)) }
+				else
+					b = { kind = "con", tag = 1, payload = tcon() }
+				end
+
+				table.insert(entries, { id = id, b = b })
+			end
+		end
+
+		return entries
+	end
+
+	local function callPrune(): Form
+		return call(lit(PRUNE), prim(8, arg(1)), prim(9, arg(1)))
+	end
+
+	for i = 1, 400 do
+		const entries = randomEntries()
+		local t: Value
+
+		if math.random() < 0.8 then
+			t = tvar(math.random(0, 15))
+		else
+			t = tcon()
+		end
+
+		emit(`jet check:prune@126 {i}`, "body", law(1, callPrune()), cellV(trieOf(entries), t), 1e6)
+	end
+
+	emit("jet check:prune@126 not a type", "body", law(1, callPrune()), cellV(EMPTY, 5), 1000)
+	emit("jet check:prune@126 a negative variable", "body", law(1, callPrune()), cellV(EMPTY, tvar(-1)), 1000)
+	emit("jet check:prune@126 a constructor of tag 2", "body", law(1, callPrune()), cellV(EMPTY, { kind = "con", tag = 2, payload = 0 }), 1000)
+	emit("jet check:prune@126 a variable in an empty trie", "body", law(1, callPrune()), cellV(EMPTY, tvar(7)), 1000)
+end
+
