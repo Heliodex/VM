@@ -9,6 +9,7 @@
 
 const P5Examples = require "../../5/examples/examples"
 const P5VM = require "../../5/interpreter/vm"
+const P6VM = require "../../6/interpreter/vm"
 const L2 = require "../../6/L2/l2"
 const ProgramFile = require "../../6/L2/programfile"
 const Format = require "./format"
@@ -45,7 +46,10 @@ const function readFile(path: string): string
 end
 
 -- A machine value, as the reference's: integers, nil, cells and constructors deeply. A function is a marker, and so is a pin.
-const function convert(v: any): any
+-- A converted machine value: the reference's values, where a cell or a constructor may hold a marker for a function or a pin (which the reference does not give as a value).
+type Shown = number | Types.Nil | { kind: "cell", head: Shown, tail: Shown } | { kind: "con", tag: number, payload: Shown } | { kind: "function-marker" } | { kind: "pin-marker" }
+
+const function convert(v: P5VM.Value | P6VM.Value): Shown
 	if type(v) == "number" then
 		return v
 	end
@@ -66,7 +70,7 @@ const function convert(v: any): any
 end
 
 -- A test's input, as the reference's value. Unlike a result, a function in an input is a real law: a closed closure lowered (lower.luau). An input closure with an environment is not closed, so it is refused.
-const function convertInput(v: any): any
+const function convertInput(v: P6VM.Value): Types.Value
 	if type(v) == "number" then
 		return v
 	end
@@ -89,9 +93,13 @@ const function convertInput(v: any): any
 end
 
 -- Whether a machine value (converted) and a reference value agree. A function agrees with a law or a partial application, a pin with a pin or a thunk.
-const function agree(p: any, r: any): boolean
+const function agree(p: Shown, r: Types.Value): boolean
 	if type(p) == "number" then
-		return (type(r) == "number" or Int.isBig(r)) and Int.compare(p, r) == 0
+		if type(r) == "number" or Int.isBig(r) then
+			return Int.compare(p, r :: Int.Int) == 0
+		end
+
+		return false
 	end
 
 	if p.kind == "function-marker" then
@@ -106,13 +114,17 @@ const function agree(p: any, r: any): boolean
 		return r == NIL
 	end
 
-	if type(r) ~= "table" or r.kind ~= p.kind then
-		return false
-	end
-
 	if p.kind == "cell" then
+		if type(r) ~= "table" or r.kind ~= "cell" then
+			return false
+		end
+
 		return agree(p.head, r.head) and agree(p.tail, r.tail)
 	elseif p.kind == "con" then
+		if type(r) ~= "table" or r.kind ~= "con" then
+			return false
+		end
+
 		return p.tag == r.tag and agree(p.payload, r.payload)
 	end
 

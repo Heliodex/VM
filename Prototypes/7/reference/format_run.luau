@@ -58,11 +58,11 @@ const function leb(n: number): string
 end
 
 -- Whether two values are the same, following every table, so a round trip is checked deeply.
-const function isInt(v: any): boolean
+const function isInt(v: Types.Value): boolean
 	return type(v) == "number" or Int.isBig(v)
 end
 
--- Iterative, so a deep program does not overflow the call stack of the test.
+-- Iterative, so a deep program does not overflow the call stack of the test. It walks any table, values and forms alike, so its parts are untyped: the one place the tests use any, by design.
 const function same(a: any, b: any): boolean
 	local pending: { { any } } = { { a, b } }
 
@@ -126,7 +126,7 @@ end
 
 const function list(...: Types.Value): Types.Value
 	local items = { ... }
-	local v: any = Format.NIL
+	local v: Types.Value = Format.NIL
 
 	for i = #items, 1, -1 do
 		v = cell(items[i], v)
@@ -140,7 +140,7 @@ const TWO_53 = Int.fromMagnitude(false, { 0, 0, 0, 0, 0, 0, 32 })
 
 -- 1. The bytes of the examples in the spec (section 12.5).
 do
-	const cases: { { name: string, value: any, want: string } } = {
+	const cases: { { name: string, value: Types.Value, want: string } } = {
 		{ name = "the value 0", value = 0, want = "\1\2\0" },
 		{ name = "the value -1", value = -1, want = "\1\3\1" },
 		{ name = "the value nil", value = Format.NIL, want = "\1\0" },
@@ -163,7 +163,7 @@ end
 
 -- 2. Round trips for values.
 do
-	const values: { { name: string, value: any } } = {
+	const values: { { name: string, value: Types.Value } } = {
 		{ name = "0", value = 0 },
 		{ name = "-1", value = -1 },
 		{ name = "2^53 - 1 (the largest number)", value = Int.MAX_SAFE },
@@ -176,7 +176,7 @@ do
 		{
 			name = "a list of 5000 integers",
 			value = (function()
-				local items: { any } = {}
+				local items: { Types.Value } = {}
 
 				for i = 1, 5000 do
 					items[i] = i * 1000000007
@@ -247,7 +247,7 @@ do
 		}
 	)
 	const loop = law(1, call(arg(0), arg(1)))
-	const programs: { { name: string, p: any } } = {
+	const programs: { { name: string, p: Types.Law } } = {
 		{ name = "inc", p = inc },
 		{ name = "length", p = length },
 		{ name = "safediv", p = safediv },
@@ -272,10 +272,11 @@ do
 	end
 
 	-- A program nested 20,000 deep: a chain of lets, each binding a literal.
-	local deep: any = arg(1)
+	local deep: Types.Form = arg(1)
 
 	for i = 1, 20000 do
-		deep = { op = "let", e = lit(i), body = deep }
+		const outer: Types.Form = { op = "let", e = lit(i), body = deep }
+		deep = outer
 	end
 
 	const deepLaw = law(1, deep)

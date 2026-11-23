@@ -71,7 +71,7 @@ end
 
 const function list(...: Types.Value): Types.Value
 	local items = { ... }
-	local v: any = NIL
+	local v: Types.Value = NIL
 
 	for i = #items, 1, -1 do
 		v = cell(items[i], v)
@@ -97,13 +97,13 @@ const function show(v: Types.Value): string
 end
 
 -- Whether two outcomes' values agree: integers by value, nil, cells and constructors deeply.
-const function sameValue(a: any, b: any): boolean
-	const function isI(x: any): boolean
+const function sameValue(a: Types.Value, b: Types.Value): boolean
+	const function isI(x: Types.Value): boolean
 		return type(x) == "number" or Int.isBig(x)
 	end
 
 	if isI(a) or isI(b) then
-		return isI(a) and isI(b) and Int.compare(a, b) == 0
+		return isI(a) and isI(b) and Int.compare(a :: Int.Int, b :: Int.Int) == 0
 	end
 
 	if type(a) ~= "table" or type(b) ~= "table" then
@@ -115,8 +115,16 @@ const function sameValue(a: any, b: any): boolean
 	end
 
 	if a.kind == "cell" then
+		if b.kind ~= "cell" then
+			return false
+		end
+
 		return sameValue(a.head, b.head) and sameValue(a.tail, b.tail)
 	elseif a.kind == "con" then
+		if b.kind ~= "con" then
+			return false
+		end
+
 		return a.tag == b.tag and sameValue(a.payload, b.payload)
 	end
 
@@ -236,7 +244,7 @@ do
 		return seed % 256
 	end
 
-	const function randomInt(): any
+	const function randomInt(): Int.Int
 		local len = 1 + nextByte() % 20
 		local bytes: { number } = {}
 
@@ -318,10 +326,11 @@ end
 
 -- 5. Deep programs: the explicit stack, not the host's, holds the depth.
 do
-	local deep: any = arg(1)
+	local deep: Types.Form = arg(1)
 
 	for i = 1, 20000 do
-		deep = { op = "let", e = lit(i), body = deep }
+		const outer: Types.Form = { op = "let", e = lit(i), body = deep }
+		deep = outer
 	end
 
 	local o = Interp.runForm(deep, 77, 1e7)
@@ -336,7 +345,7 @@ do
 			e = prim(0, lit(1), call(arg(0), prim(9, arg(1)))),
 		}
 	)
-	local items: { any } = {}
+	local items: { Types.Value } = {}
 
 	for i = 1, 5000 do
 		items[i] = i
