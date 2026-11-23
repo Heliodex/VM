@@ -171,6 +171,8 @@ The two costs Phase 1 measured are answered in the core: recursion is `arg 0` (n
 
 *Exit:* the same results and fuel as Phase 3 on every test, and at least 3× the reference machine's steps per second on the checker benchmark.
 
+*Result, met (`fast/`, `fast/README.md`):* the Go machine gives the reference's status, steps, value bytes and error messages on all 248 generated cases: 50 hand-written (one for each rule and primitive, and the errors), the 50 Prototype 5 examples, and the 147 Prototype 6 L2 tests. On the checker benchmark it takes exactly the reference's steps (141,778,148), and runs at 37.8 M steps/s against the reference's 3.0 M, which is 12.7×, on one host. The steps are checked, the timings are one run each. Not done: the machine reads a program into a tree of resolved nodes, not a flat array, which the 3× target does not need; the 40 inline checks of `interp_run.luau` are covered by the rules they test, not ported one by one.
+
 **Phase 5: jets, for the hot library functions.** Use the Phase 0 histogram to pick the top few functions. Candidates: name and byte-string equality, map lookup, list append and reverse, and the substitution walk. Each jet has a reference law, a native body, a declared fuel formula, and a parity test.
 
 *Exit:* every jet agrees with its reference on the whole test suite, the fuel formulas match wherever they are claimed to, and the checker benchmark's steps and work drop by the amount the histogram predicted.
@@ -210,4 +212,4 @@ These need an answer from the project owner before the phase that depends on the
 
 ## Next step
 
-Phase 1, on the measured candidates above, and the import support it depends on for a complete check. The first measurement to repeat after each change is the same harness, so the numbers stay comparable. The harness now times the layout stage on the VM too, so the layout's share is part of every later comparison.
+Phase 5, the jets. Two things come first. Decision 3 (the fuel of jets) needs an answer; the plan assumes option A, where each jet declares a fuel formula. The Phase 0 histogram picks the candidates. Phase 8's full-build number also waits on two things that are still open: the corpus is 2,235 lines, not the 2,500 of the target, and desugar is not bootstrapped.
