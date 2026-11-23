@@ -460,11 +460,18 @@ local function mutualSurface(bindings: { Binding }, body: Expr, at: Pos): Expr
 		return bodyE
 	end
 
-	local chain = branch(n)
+	-- The tags 0 to n - 1 are split by a balanced tree of tests (tag < mid), so a call takes about log2 n tests, not n: the first half of the members is the left branch, the second half the right.
+	local function tree(lo: number, hi: number): Expr
+		if lo == hi then
+			return branch(lo)
+		end
 
-	for j = n - 1, 1, -1 do
-		chain = ifE(appE(nameE("=", at), { nameE(" tag", at); intE(j - 1, at) }, at), branch(j), chain, at)
+		const mid = (lo + hi) // 2
+
+		return ifE(appE(nameE("<", at), { nameE(" tag", at); intE(mid, at) }, at), tree(lo, mid), tree(mid + 1, hi), at)
 	end
+
+	local chain = tree(1, n)
 
 	const dispatch = fnE({ " self" }, fnE({ " tag" }, fnE({ " x" }, chain, at), at), at)
 	local groupBody = body
