@@ -193,16 +193,16 @@ The two costs Phase 1 measured are answered in the core: recursion is `arg 0` (n
 
 **Phase 8: check against the speed target.** Run the harness on the reference host, and compare with the targets in "Speed target". Write the result in this README, including the misses.
 
-*Result: the target is not met, on the Go machine (`fast/corpus_test.go`, `fast/testdata/corpus.txt`).* The corpus is the four boot files (2,235 lines, 82,118 bytes). Each goes through its imports, then layout, lex, parse and check, on the four stage programs, as the Phase 0 harness does. Every stage of every file matches the reference. The build takes 441,584,946 core steps, and 6.7 to 6.9 s on this host. Per file, with its imports: lex.l2 0.5 s, parse.l2 2.0 s, layout.l2 1.0 s, types.l2 3.2 s. Without the jets it takes 10.2 s, and a warm rebuild of the same corpus with the memo takes 0.04 s.
+*Result: the target is not met, on the Go machine (`fast/corpus_test.go`, `fast/testdata/corpus.txt`).* The corpus is the four boot files (2,235 lines, 82,118 bytes). Each goes through its imports, then layout, lex, parse and check, on the four stage programs, as the Phase 0 harness does. Every stage of every file matches the reference. The build takes 317,243,361 core steps (about 142,000 per line) and about 2.8 s on this host, with the jets on. Per file, with its imports: lex.l2 20,667,186 steps, parse.l2 94,820,977, layout.l2 47,747,511, types.l2 154,007,687.
 
-Against the target (2,500 lines under 1 s): the build is about 7 times too slow, and the corpus is 265 lines short of the target size, so the miss is about 7.7 times at 2,500 lines, assuming linear growth (Phase 0 measured near-linear growth on generated programs). The misses, in order of size:
+Against the target (2,500 lines under 1 s): at linear growth the build is about 3.1 s at 2,500 lines, so it is about 3.1 times too slow. The corpus is 265 lines short of the target size, so the 2,500-line figure is an extrapolation (Phase 0 measured near-linear growth on generated programs). The misses, in order of size:
 
-- **The step count.** About 198,000 core steps per line. 36.5% of them are jet steps, which run natively; the other 281 million steps are interpreted, at about 40 million per second.
-- **The step rate.** The interpreter is a single loop over resolved nodes. A native host in the usual sense (a faster compiled language) would speed up each step by a small factor, not 7 times.
-- **The memo** does not help a cold build (it roughly doubles it), so it is a re-check tool only.
+- **The step count.** About 142,000 core steps per line. Before the three corpus jets were added (see the experiments), 194.8 million of the 317.2 million steps were interpreted.
+- **The step rate.** The interpreter is a single loop over resolved nodes. A native host in the usual sense (a faster compiled language) would speed up each step by a small factor, not 3 times.
+- **The memo** does not help a cold build (5.9 s, against 2.8 s without it), so it is a re-check tool only.
 - **The scope.** The corpus is not the full compiler: desugar is not bootstrapped (it runs on the host, and is not counted), and the corpus is 2,235 lines against the 2,500 of the target.
 
-Decision on the native host: the Go machine already is the native host, and the miss is about 7 times, which a faster host would not close on its own. What would change the decision: a front end at about 50,000 core steps per line (a 4 times cut in steps), with the jets covering more of them; or a machine that compiles law bodies to native code (the plan's "leaf forms may be closures", in Go) and runs the interpreted steps at 3 times the rate or more. Each of those is worth about 3 to 4 times, so the target needs two of them. This is a judgement from one host, not a measurement, and the next step measures it.
+Decision on the native host: the Go machine already is the native host, and a faster host would not close a 3 times gap on its own. The target needs about three times less work per line (about 47,000 core steps per line, from 142,000), or about three times the rate on the same work, or both. The options are more jets on the interpreted steps, or a machine that compiles law bodies to native code (the plan's "leaf forms may be closures", in Go). This is a judgement from one host, not a measurement, and the next step measures it.
 
 *Exit:* a results table, a decision on whether the target needs a native host, and a list of what would change the decision.
 
@@ -231,20 +231,18 @@ These need an answer from the project owner before the phase that depends on the
 
 ## Phase 8 results table (current code)
 
-Corpus build (four boot files, 2,235 lines, 82,118 bytes; each file with its imports; the reference host is this machine, one Latitude 5440, i7-1355U). Best of three for the timed run.
+Corpus build (four boot files, 2,235 lines, 82,118 bytes; each file with its imports; the reference host is this machine, one Latitude 5440, i7-1355U). The jets-on run is the best of three; the others are single runs, with noise of about 3%.
 
 | Configuration | Core steps | Time | Against the target (2,500 lines, 1 s) |
 | --- | ---: | ---: | --- |
-| Jets on, memo off (default) | 441,584,946 | 5.20 s | about 5.8 times too slow (linear scaling to 2,500 lines) |
-| Jets off, memo off | 441,584,946 | 7.83 s | about 7.8 times too slow |
-| Memo on, cold | 441,584,946 | 12.9 s | slower: the memo costs about 2.5 times on a cold build |
-| Memo on, warm (same corpus again) | 441,584,946 | 0.04 s | met, but only for an unchanged input |
+| Jets on, memo off (default) | 317,243,361 | 2.8 s | about 3.1 times too slow (linear scaling to 2,500 lines) |
+| Jets off, memo off | 317,243,361 | 5.2 s | about 5.2 times too slow |
+| Memo on, cold | 317,243,361 | 5.9 s | slower: about 2.1 times the jets-on build |
+| Memo on, warm (same corpus again) | 317,243,361 | 0.04 s | met, but only for an unchanged input |
 
-Per file, jets on: lex.l2 0.42 s, parse.l2 1.52 s, layout.l2 0.79 s, types.l2 2.47 s.
+The checker alone (types.l2, jets on): 77,805,895 steps in about 0.53 s.
 
-Checker alone (types.l2, jets on): 108,352,804 steps in about 0.71 s.
-
-Decision (unchanged): the target is not met on the Go machine, and it is not a native-host question alone, since the Go machine is already native. The remaining gap is the interpreted steps (about 36 million of the checker's 108 million are interpreted, and the corpus has about 280 million interpreted steps out of 441 million). The next candidates for jets, by share of the checker's interpreted steps, are envKid (14%), prune (11%) and envPut (11%); each would need a walk over a letrec whose recursive law takes the outer variables as arguments.
+Decision (unchanged): the target is not met on the Go machine, and it is not a native-host question alone, since the Go machine is already native. The remaining gap is the interpreted steps. Before the corpus jets, the corpus had 194.8 million interpreted steps out of 317.2 million. By owner, the largest were: laws with no name of their own in the parser (17.8%), `kn` (11.8%, now a jet), the checker's `first` (6.9%, now a jet), the checker's `envKid` (6.7%), the layout's `hd` (5.7%, now a jet), the checker's `prune` (4.1%) and `envPut` (2.0%). `envKid`, `prune` and `envPut` are the next candidates, each needing a walk over a letrec whose recursive law takes the outer variables as arguments.
 
 ## Speed experiments (after the plan)
 
@@ -261,6 +259,12 @@ The corpus build on the Go machine, on this host (441.6 million core steps, jets
 
 Together, the frame change and GOGC=400 give about 5.1 s on the corpus, still about five times the 1 s target. The speed target needs the step count (about 198,000 core steps per line) to fall, or most of the interpreted steps to become jets, as the Phase 8 decision said; the experiments here only trim the constant.
 
+Since then, the work has been on the steps themselves:
+
+- **A let for an immediately applied lambda** (`reference/lower.luau`, commits aed7bce and 17d7a29). An application of a lambda is a core `let` when no lambda in its body captures the law's own function. A call of a call is one call with all its arguments. The checker goes from 108,537,918 to 77,805,895 core steps, its output on types.l2 is byte-identical, and the corpus from 441,584,946 to 317,243,361. Two rules were measured and not kept. Refusing every `let` whose body makes a lambda gave 400,859,240 corpus steps. The reason for the other refusal is that a closure which captures the recursive law's own function rebuilds its partial application from every outer variable each time the closure is made.
+- **Jets follow the lowering** (commits 74bf00a and cdedda4): the hashes and the fitted costs are re-read. The corpus build went from 4.3 s to 3.55 s.
+- **Jets for three corpus helpers** (`fast/corpusjets.go`, commit 8e77609): `first` and `hd` (a match on a cell, 21 steps; otherwise 67) and `kn` (the token kind's arm, 10 + 5k). The steps are unchanged, and the corpus build goes from 3.55 s to about 2.8 s. The corpus records each law's owner (commit 33ec6cf), so the profile is by function.
+
 ## Next step
 
-Phases 1 to 8 are done, with the misses written above. Since the last note, the cell form became a primitive (decision 15), frames became slices, and the name comparison `same` got a jet (commit 53d05c9). The speed target is still not met (about 5.8 times the 1 s target, on the corpus with jets on). The open work is the speed target: the next jets are the checker's largest interpreted owners (envKid, prune, envPut), each needing a walk that takes the outer variables as arguments. A simplification pass on the spec is also open; the cell change is the first of them.
+Phases 1 to 8 are done, with the misses written above. Since the last note: the lowering makes a let of an immediately applied lambda, the jets follow it, and three corpus helpers have jets. The corpus build takes about 2.8 s, about 3.1 times the 1 s target at 2,500 lines. The open work is the speed target: re-profile the corpus with the current code, then take the next jets (the checker's `envKid`, `prune` and `envPut`, and the parser's anonymous laws if they are small enough to walk), each keeping its fuel. The lowering's cost on closures that capture the recursive law is the other open item. A simplification pass on the spec is also open.
