@@ -112,4 +112,55 @@ These three features change the work done. They must not change the answer, and 
 
 One machine, with an explicit stack and a single dispatch loop. Compiling each law to Luau closures (as `runDirect` did) is an optimisation for leaf forms only, and it may not add a second machine. The stack overflow that forced the hybrid is avoided because the stack is explicit.
 
-<!-- next: phases -->
+## Phases
+
+Each phase ends with an exit test. A phase is not finished until its test passes, and the harness numbers are committed with it.
+
+**Phase 0: measure Prototype 6.** Freeze Prototype 6 as the baseline. Measure, without changing the machine:
+
+- the checker on `types.l2` at 1×, 2× and 4× input (for example, the parsed declarations repeated with fresh names). Steps against size.
+- a histogram of steps by form and by library function (`lookupM`, `subst`, `bindsOf`, `hdOr`, and the rest), and of allocations.
+
+*Exit:* we know whether the checker's cost is linear, and we know the five largest cost centres. If it is quadratic, the cause is named.
+
+**Phase 1: fix the checker's algorithms, in L2.** Only if Phase 0 finds a quadratic or a large avoidable cost. Candidates: union-find for type variables, a balanced map for the environment, and not converting the binding tree to a list per declaration. This runs on Prototype 6, so the gain is measured before any new machine exists.
+
+*Exit:* steps against size is linear on the same inputs, with the checker's answers unchanged (`infer_run` and `checker_run` agree).
+
+**Phase 2: the core spec.** Write `Prototypes/7/SPEC.md`: the values, the forms, the fuel rule, the jet and memo rules, and the outcomes (`value`, `error`, `out_of_fuel`).
+
+*Exit:* the spec has at most twelve forms, and each one has a rule and at least one example.
+
+**Phase 3: the reference interpreter.** A small interpreter of the spec, with an explicit stack. It is the oracle, so it is written for clarity, not speed. Prototype 5's examples are ported to the core, through the L2 desugarer for the L2 programs.
+
+*Exit:* every L2 program and every Prototype 5 example gives the same result on the reference interpreter as on Prototype 6, with the same fuel.
+
+**Phase 4: the fast interpreter.** One machine that compiles each law's body to a flat form and runs it in a single loop with an explicit stack. Leaf forms may be Luau closures.
+
+*Exit:* the same results and fuel as Phase 3 on every test, and at least 3× the reference machine's steps per second on the checker benchmark.
+
+**Phase 5: jets, for the hot library functions.** Use the Phase 0 histogram to pick the top few functions. Candidates: name and byte-string equality, map lookup, list append and reverse, and the substitution walk. Each jet has a reference law, a native body, a declared fuel formula, and a parity test.
+
+*Exit:* every jet agrees with its reference on the whole test suite, the fuel formulas match wherever they are claimed to, and the checker benchmark's steps and work drop by the amount the histogram predicted.
+
+**Phase 6: interned names and a byte kind.** If Phase 0 shows that name and string comparison is a large cost, intern names as pins and add a byte kind for source text, with lexing as a jet.
+
+*Exit:* the lexer and the parser give the same token and tree output on every program file, and the name cost in the histogram drops to a small share.
+
+**Phase 7: memo and incremental re-check.** Add the memo table for pure calls, with the fuel rule above. Benchmark two runs: a cold check, and a re-check of the same input and then of an input with one declaration changed.
+
+*Exit:* the second run of an unchanged input does near-zero work, a one-declaration change costs work in proportion to that declaration, and fuel is identical with and without the memo.
+
+**Phase 8: check against the speed target.** Run the harness on the reference host, and compare with the targets in "Speed target". Write the result in this README, including the misses.
+
+*Exit:* a results table, a decision on whether the target needs a native host, and a list of what would change the decision.
+
+## Risks
+
+- **Fuel parity with jets and memo.** The fuel rule above is the answer, but a jet whose formula is hard to state will leave its law "work only", and the parity check gets weaker there. Keep the list of such laws short.
+- **Hashing cost in Luau.** Hashing every value could cost more than it saves. The lazy, cached hash limits this, but Phase 7 must show the net gain.
+- **Scope creep into syntax.** The surface stays L2. New syntax waits until the core and the speed target are measured.
+- **Measuring on one host.** Every number is from one machine. The harness records the host, so a second host can be added later.
+- **Luau's ceiling.** On Luau, the step rate caps the design. If the interactive target needs fewer than about 4M steps, the design will need a native host, and Phase 8 has to say so.
+
+<!-- next: decisions -->
