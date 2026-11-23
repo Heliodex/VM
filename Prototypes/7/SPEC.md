@@ -157,7 +157,7 @@ Memoisation changes no result and no fuel. Phase 7 measures what it saves.
 A jet is a native implementation of a law, selected by the law's content hash. Its rules:
 
 - It gives the same result as the law's body on every input. Phase 5 checks this on the test suite.
-- It declares its fuel as a formula in its own definition, which must equal the fuel of the law's body on every input the suite covers. A jet whose fuel cannot be stated this way is marked **work only**: its results are checked, but its fuel is not.
+- It declares its fuel as a formula in its own definition, which must equal the fuel of the law's body on every input the suite covers, and on generated inputs. A law whose fuel cannot be stated as a formula gets no jet. There are no work-only jets (decision 11).
 - A jet never changes an outcome: an input that gives an error or out-of-fuel on the body must give the same on the jet.
 
 A jet is an optimisation of a law, not a change to the language.
@@ -229,7 +229,7 @@ These are left out on purpose, and each one has a place in a later phase:
 These are the defaults this spec takes. Each can be changed, and a change is recorded here with its reason.
 
 1. **Laziness is explicit.** `delay` and `force` are forms, so the cost of each thunk is in the fuel. The alternative (lazy by default) would hide that cost.
-2. **Jet fuel is a declared formula** (option A in the plan). A jet that cannot state one is "work only".
+2. **Jet fuel is a declared formula.** A law whose fuel cannot be stated as one gets no jet (decision 11).
 3. **Strings stay lists of integers** in the core. A byte kind waits for Phase 6.
 4. **Pins are wrappers** with their own kind, read through `unpin`. A pin is transparent to nothing: it is a value whose identity is its content, which is what a memo key needs.
 5. **Errors end the run** and are not values. The surface language adds `Result` on top, by testing before the primitive.
@@ -238,6 +238,7 @@ These are the defaults this spec takes. Each can be changed, and a change is rec
 8. **Integers are unbounded.** The VM's integers have no size limit, and the ±(2^53 − 1) bound of Prototypes 5 and 6 is a limit of the Luau host (doubles), not of the VM. The reason: a bound in the VM would make the answer depend on the host. Consequence for Phase 3: the Luau reference needs a bignum representation for integers, and its tests must include values beyond 2^53.
 9. **Constructor tags are read by primitives.** `tagof` and `payload` are primitives 12 and 13, not forms. Phase 3 found this gap: Prototype 6 reads a constructor's tag with forms, but a `case` cannot read a tag for an open set of tags, so the core needs a way to get the tag as a number. Adding two primitives keeps the form count at eleven.
 10. **A suspended expression is a thunk, kind 6.** Kind 4 is for pins: values in normal form, held by content hash. Prototype 5 reports a suspended expression as kind 4, and its example expects that; the core does not, so the example is superseded for the core. A thunk is not data (it has no binary form, and `pin` refuses it), so giving it the pin's kind would make `kind` unable to tell a stored value from an unevaluated call.
+11. **Jets are fuel-exact.** Every jet declares a fuel formula equal to the fuel of the law it replaces, and there are no work-only jets. Fuel is therefore the same on every machine, with or without jets. A work-only jet would make steps and out-of-fuel depend on which jets are installed, and jets are the part of the design most likely to make a run depend on something other than the spec. Jets are pure, and a jet that cannot match its law's fuel is not a jet.
 
 ## 12. Binary format
 
