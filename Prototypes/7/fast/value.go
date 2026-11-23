@@ -16,6 +16,10 @@ type (
 		// hash is the content hash, kept once LawHash has computed it (hash.go).
 		hash [32]byte
 		hashed bool
+
+		// jet is the law's jet, looked up once (jets.go): the table is fixed after init, so the answer does not change.
+		jet jetFn
+		jetKnown bool
 	}
 
 	// NilT is the nil value, the empty list. There is one.

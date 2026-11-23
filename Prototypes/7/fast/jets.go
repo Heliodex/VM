@@ -24,8 +24,14 @@ var (
 	jets = map[[32]byte]jetFn{}
 )
 
-// jetFor is the jet of a law, or nil when the law has none.
+// jetFor is the jet of a law, or nil when the law has none. The answer is kept on the law: a law is looked up once, and the table is not changed after init.
 func jetFor(l *Law) jetFn {
+	if l.jetKnown {
+		return l.jet
+	}
+
+	l.jetKnown = true
+
 	if len(jets) == 0 {
 		return nil
 	}
@@ -35,7 +41,9 @@ func jetFor(l *Law) jetFn {
 		return nil
 	}
 
-	return jets[h]
+	l.jet = jets[h]
+
+	return l.jet
 }
 
 func register(lawHash string, fn jetFn) {
