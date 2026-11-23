@@ -46,7 +46,7 @@ type Expr =
 	| EUntyped (Expr . (Int . Int))
 	| ERec ([Int] . ([([Int] . (Expr . (Int . Int)))] . (Int . Int)))
 	| EWith (Expr . ([([Int] . (Expr . (Int . Int)))] . (Int . Int)))
-type Tr = TEmpty | TNode (Bind . (Tr . Tr))
+type Tr = TEmpty | TNode (Bind . (Tr . (Tr . (Tr . Tr))))
 type Pat =
 	| PCon ([Int] . ([Int] . (Int . Int)))
 	| PBind ([Int] . (Int . Int))
@@ -102,24 +102,47 @@ letrec snoc = fn (l x)
 			Err e -> (cons x ~)
 let addErr = fn (st msg)
 	(mkSt (nextOf st) (bindsOf st) (snoc (errsOf st) msg))
-let halfOf = fn n
-	match (/ n 2)
+; The binding store is a radix-4 trie on the id. A node holds the binding of the id that is 0 at that node (the node's own), and four children, one for each remainder r = id mod 4; a child is reached with id div 4. So a lookup takes about log4 of the id in levels, each with one division, where the binary trie it replaces took log2 with two. The children are a nest of pairs (c0 . (c1 . (c2 . c3))), read with fst and snd, so no list is walked.
+let q4 = fn n
+	match (/ n 4)
 		Ok q -> q
 		Err e -> 0
-let oddOf = fn n
-	match (% n 2)
-		Ok r -> r
-		Err e -> 0
-let pickSide = fn (lr b)
-	(if (= b 1) (snd lr) (fst lr))
 letrec findB = fn (bs id)
 	match bs
 		TEmpty -> (Unbound 0)
-		TNode p -> (if (= id 0) (fst p) (findB (pickSide (snd p) (oddOf id)) (halfOf id)))
-letrec setB = fn (bs id b)
-	match bs
-		TEmpty -> (setB (TNode ((Unbound 0) . (TEmpty . TEmpty))) id b)
-		TNode p -> (if (= id 0) (TNode (b . (snd p))) (if (= (oddOf id) 1) (TNode ((fst p) . ((fst (snd p)) . (setB (snd (snd p)) (halfOf id) b)))) (TNode ((fst p) . ((setB (fst (snd p)) (halfOf id) b) . (snd (snd p)))))))
+		TNode p ->
+			if (= id 0)
+				fst p
+			else
+				let q = (q4 id)
+				let r = (- id (* 4 q))
+				let kids = (snd p)
+				if (< r 2)
+					(if (= r 0) (findB (fst kids) q) (findB (fst (snd kids)) q))
+				elseif (= r 2)
+					findB (fst (snd (snd kids))) q
+				else
+					findB (snd (snd (snd kids))) q
+letrec
+	setB = fn (bs id b)
+		match bs
+			TEmpty -> (setB (TNode ((Unbound 0) . (TEmpty . (TEmpty . (TEmpty . TEmpty))))) id b)
+			TNode p ->
+				if (= id 0)
+					TNode (b . (snd p))
+				else
+					let q = (q4 id)
+					let r = (- id (* 4 q))
+					TNode ((fst p) . (setSlot (snd p) r q b))
+	setSlot = fn (kids r q b)
+		if (= r 0)
+			((setB (fst kids) q b) . (snd kids))
+		elseif (= r 1)
+			((fst kids) . ((setB (fst (snd kids)) q b) . (snd (snd kids))))
+		elseif (= r 2)
+			((fst kids) . ((fst (snd kids)) . ((setB (fst (snd (snd kids))) q b) . (snd (snd (snd kids))))))
+		else
+			((fst kids) . ((fst (snd kids)) . ((fst (snd (snd kids))) . (setB (snd (snd (snd kids))) q b))))
 let levelOf = fn b
 	match b
 		Unbound lv -> lv
