@@ -37,16 +37,15 @@ Conclusions that shape this plan:
 
 The target has three parts. Each one is measured on a fixed reference host, and the harness records the host and the Luau version with every result.
 
-**1. A user-facing time budget.** This is the only part that needs a decision from the project owner. Proposed, not agreed:
+**1. The user-facing time budget (agreed).** A build of 2,500 lines of L2 takes under 1 s on the reference host. A build is lex, parse, check and desugar of the program. Running the program's tests is not part of the build. Interactive re-check is not a target for now.
 
-- Interactive: checking a 500-line L2 program in under 200 ms on the reference host.
-- Batch: a full build of a 5,000-line program (lex, parse, check, desugar, run its tests) in under 5 s.
+**The build corpus.** A fixed set of L2 source, 2,500 lines in total. The proposed corpus is the L2 compiler's own sources in L2 (`Prototypes/6/L2/programs/boot/*.l2`, 2,235 lines), topped up with library programs to 2,500. The size is the project owner's figure. The exact files are a proposal. Note that Prototype 5's Luau L2 implementation is 4,478 lines in nine files (about 3,400 in the lexer, parser, layout, checker, desugarer and driver), so 2,500 lines is smaller than the old implementation.
 
 **2. A step budget, derived from the time budget.** Convert seconds into steps using the throughput the host actually achieves:
 
     steps budget = time budget × measured steps per second
 
-At the hybrid's 18.5M steps/s, the interactive budget is about 3.7M steps for 500 lines, about 7,400 steps per line. The current checker spends about 330,000 steps per line (299.6M / 913), so the gap is about 45×. This assumes checking cost is linear in the input. Phase 0 tests that assumption.
+At the hybrid's 18.5M steps/s, the budget is about 18.5M steps for 2,500 lines, about 7,400 steps per line. The current checker alone spends about 330,000 steps per line (299.6M / 913), so the gap is about 44×. Lex, parse and desugar are not counted in that figure and are not measured yet, so the real gap is at least this large. This assumes cost is linear in the input. Phase 0 tests that assumption.
 
 **3. A relative check that does not depend on the host.** Steps and fuel are host-independent, so they are the primary numbers. Add two ratios so that a result has meaning even when the host changes:
 
@@ -55,10 +54,10 @@ At the hybrid's 18.5M steps/s, the interactive budget is about 3.7M steps for 50
 
 **Harness rules.** The benchmark runs each workload several times and reports the median. It reports steps, fuel, allocations (counted by the machine), host time, and the two ratios. A second run of the same input is a separate benchmark: with memoisation it should do near-zero work, and that is measured too (Phase 7).
 
-**Open decisions for the speed target** (listed again in "Decisions" below):
+**Open questions for the speed target** (listed again in "Decisions" below):
 
-- Which workload is the user-facing one: interactive re-check after an edit, a full batch build, or a long-running service?
-- Does the target need to hold on Luau, or only on a future native host? On Luau, the step rate is capped near 18M steps/s, so a 200 ms budget needs fewer than about 4M steps. That may force a native host.
+- Does the target need to hold on Luau, or only on a future native host? On Luau the step rate is about 18M steps/s, so the budget is about 18M steps. That is reachable only if the 44× reduction comes from algorithms and jets, not the machine. If it cannot be reached, the target needs a native host.
+- Is the corpus right? The 2,500 lines and the file choice are proposals.
 
 ## Core design (draft)
 
