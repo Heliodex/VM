@@ -10,6 +10,7 @@
 
 const ProgramFile = require "../../../6/L2/programfile"
 const Compile = require "../../measure/compile"
+const V = require "../../measure/vm_values"
 const Format = require "../../reference/format"
 const Interp = require "../../reference/interp"
 const Lower = require "../../reference/lower"
@@ -56,8 +57,11 @@ const function bytesValue(s: string): Value
 	return v
 end
 
-const function program(c: Compile.Compiled): string
-	const body: Form = { op = "call", f = Lower.expr(c.expr, nil), args = { { op = "arg", index = 1 } } }
+-- The laws of a program, with their owners (the function each lambda belongs to), for the corpus profile: one line per law.
+const function program(c: Compile.Compiled, name: string): string
+	const body: Form = { op = "call", f = Lower.expr(c.expr, function(e, l)
+		print(`# law {name}:{V.ownerOf(e)} {l.arity} {hex(Format.encodeValue(l) :: string)}`)
+	end), args = { { op = "arg", index = 1 } } }
 	const bytes = Format.encodeProgram { kind = "law", arity = 1, body = body }
 
 	return bytes :: string
@@ -102,10 +106,10 @@ const layoutC = Compile.compile(readFile "boot/layout.l2", "boot/layout.l2")
 const lexC = Compile.compile(readFile(BOOT6 .. "lex.l2"), "lex.l2")
 const parseC = Compile.compile(readFile(BOOT6 .. "parse.l2"), "parse.l2")
 const checkC = Compile.compile(readFile "boot/types.l2", "boot/types.l2")
-print(`# program layout {hex(program(layoutC))}`)
-print(`# program lex {hex(program(lexC))}`)
-print(`# program parse {hex(program(parseC))}`)
-print(`# program check {hex(program(checkC))}`)
+print(`# program layout {hex(program(layoutC, "layout"))}`)
+print(`# program lex {hex(program(lexC, "lex"))}`)
+print(`# program parse {hex(program(parseC, "parse"))}`)
+print(`# program check {hex(program(checkC, "check"))}`)
 -- The corpus: the same four files as the Phase 0 harness.
 const corpus = { "lex.l2", "parse.l2", "layout.l2", "types.l2" }
 local lines = 0
