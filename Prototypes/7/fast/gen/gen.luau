@@ -484,7 +484,6 @@ do
 end
 
 -- ---- 8. the name comparison, same (measure/boot/types.l2): two lists, compared a byte at a time. Random names, equal names, names that differ in their last byte, non-lists, and elements that are not integers (which the body refuses, so the jet must give up there).
-
 do
 	math.randomseed(11)
 	const SAME = jetLaws["same@39"]
@@ -517,7 +516,7 @@ do
 			end
 		end
 
-		emit(`jet same@39 {i}`, "body", law(1, call(lit(SAME), arg(1), lit(listOf(b)))), listOf(a), 1000000)
+		emit(`jet same@39 {i}`, "body", law(1, call(lit(SAME), arg(1), lit(listOf(b)))), listOf(a), 1e6)
 	end
 
 	emit("jet same@39 nil and nil", "body", law(1, call(lit(SAME), arg(1), lit(NIL))), NIL, 1000)
@@ -527,11 +526,9 @@ do
 	emit("jet same@39 a list and a number", "body", law(1, call(lit(SAME), arg(1), lit(7))), list(1), 1000)
 	emit("jet same@39 a big element", "body", law(1, call(lit(SAME), arg(1), lit(list(1, 2)))), list(Int.fromMagnitude(false, { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16 })), 1000)
 	emit("jet same@39 a cell element", "body", law(1, call(lit(SAME), arg(1), lit(list(1)))), list({ kind = "cell", head = 1, tail = 2 } :: Value), 1000)
-
 	-- the fuel edges, on a name that recurses
-	const deep = listOf({ 0, 1, 2, 0, 1 })
-	const outcome = Interp.runForm(call(lit(SAME), arg(1), lit(deep)), deep, 1000000)
+	const deep = listOf { 0, 1, 2, 0, 1 }
+	const outcome = Interp.runForm(call(lit(SAME), arg(1), lit(deep)), deep, 1e6)
 	emit("jet same@39 edge exact", "body", law(1, call(lit(SAME), arg(1), lit(deep))), deep, outcome.steps)
 	emit("jet same@39 edge one less", "body", law(1, call(lit(SAME), arg(1), lit(deep))), deep, outcome.steps - 1)
 end
-

@@ -22,8 +22,8 @@ const (
 var (
 	// The costs of the arms, in steps, counting the entry of the law (fitted; see trie_test.go).
 
-	costFindB = [6]int64{50, 68, 100, 101, 102, 102}
-	costSetB = [6]int64{70, 75, 111, 120, 130, 130}
+	costFindB = [6]int64{47, 64, 89, 90, 91, 91}
+	costSetB = [6]int64{67, 71, 98, 107, 117, 117}
 	unboundZero Value = &Con{
 		Tag: 0,
 		Payload: Small(0),
@@ -200,7 +200,7 @@ func setBWalk(bs Value, id int64, b Value, w *[6]int64) (Value, bool) {
 
 func init() {
 	// findB (fst of the lowered law of measure/boot/types.l2, owner findB@84): arity 2, the trie and the id. The fuel is the entry and the body, summed over the arms.
-	register("53a241d4f429c776fc8ce3ce609372231d3fe3182c3877f37d913b1d682fd44e", func(args []Value) (Value, int64, bool) {
+	register("00d9e64887d0dd3b95ea66d5bdc42a6642f6440ea6e3fe6f725ca428e351ba4c", func(args []Value) (Value, int64, bool) {
 		id, ok := args[1].(Small)
 		if !ok {
 			return nil, 0, false
@@ -217,7 +217,7 @@ func init() {
 	})
 
 	// setB (owner setB@100): arity 3, the trie, the id and the binding.
-	register("83663ed16315c96d4e95165d41c7cf939139c5712081152d78f531d0820ef125", func(args []Value) (Value, int64, bool) {
+	register("47fa32103b44a7ebec987866d32821962a874d9e3f37a54a71eaeab4d910b572", func(args []Value) (Value, int64, bool) {
 		id, ok := args[1].(Small)
 		if !ok || id < 0 {
 			return nil, 0, false

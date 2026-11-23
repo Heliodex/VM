@@ -52,34 +52,34 @@ func register(lawHash string, fn jetFn) {
 }
 
 func init() {
-	// tl (measure/boot/types.l2, line 24): match (tail l), Ok t -> t, Err -> nil. Measured: a cell takes 27 steps with the entry, nil takes 73.
-	register("4621b889e908273f6d0e41feab9e966ddd9386c393e34e2d1002b7489e241966", func(args []Value) (Value, int64, bool) {
+	// tl (measure/boot/types.l2, line 24): match (tail l), Ok t -> t, Err -> nil. Measured (the lowering of its current law): a cell takes 21 steps with the entry, nil takes 67.
+	register("987f2c202bda2634c97d1860d2918cd6339cc221cfebb7d05d9b24cc51b19128", func(args []Value) (Value, int64, bool) {
 		switch l := args[0].(type) {
 		case *Cell:
-			return l.Tail, 27, true
+			return l.Tail, 23, true
 		case NilT:
-			return NIL, 73, true
+			return NIL, 69, true
 		}
 
 		return nil, 0, false
 	})
 
-	// hdOr (line 14), the inner law of two arguments (the list, then the default): match (head l), Ok x -> x, Err -> dflt. Measured: a cell takes 29 steps with the entry, nil takes 77.
-	register("29999bac5ee3f1d5b7fd4932b4db1e67f94f9517f26c1b24cc27feb980bc6378", func(args []Value) (Value, int64, bool) {
+	// hdOr (line 14), the inner law of two arguments (the list, then the default): match (head l), Ok x -> x, Err -> dflt. Measured (the lowering of its current law): a cell takes 21 steps with the entry, nil takes 67.
+	register("16ea477011fb19fddc3409f69edd6022806b4ae99f15ab75c3c90894808e08e4", func(args []Value) (Value, int64, bool) {
 		switch l := args[0].(type) {
 		case *Cell:
-			return l.Head, 29, true
+			return l.Head, 24, true
 		case NilT:
-			return args[1], 77, true
+			return args[1], 70, true
 		}
 
 		return nil, 0, false
 	})
 
-	// stP (line 63): match st, St p -> p. Measured: a St constructor (tag 0) takes 16 steps with the entry. Any other value is an error in the body, so it is left to the body.
-	register("700b448d63d5635a60e6d892e13ae2a055dcd35950e71d02e34e5c159d8f6d96", func(args []Value) (Value, int64, bool) {
+	// stP (line 63): match st, St p -> p. Measured (the lowering of its current law): a St constructor (tag 0) takes 12 steps with the entry. Any other value is an error in the body, so it is left to the body.
+	register("87121603337b2af406635bb90b72b1649176efdf81b58c3d77a1fe70202e912a", func(args []Value) (Value, int64, bool) {
 		if c, ok := args[0].(*Con); ok && c.Tag == 0 {
-			return c.Payload, 16, true
+			return c.Payload, 14, true
 		}
 
 		return nil, 0, false
