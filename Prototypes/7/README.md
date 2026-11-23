@@ -60,4 +60,56 @@ At the hybrid's 18.5M steps/s, the interactive budget is about 3.7M steps for 50
 - Which workload is the user-facing one: interactive re-check after an edit, a full batch build, or a long-running service?
 - Does the target need to hold on Luau, or only on a future native host? On Luau, the step rate is capped near 18M steps/s, so a 200 ms budget needs fewer than about 4M steps. That may force a native host.
 
-<!-- next: core design -->
+## Core design (draft)
+
+### What is kept, dropped and replaced
+
+| From Prototype 5 and 6 | In Prototype 7 | Why |
+| --- | --- | --- |
+| Integers, nil, cells, constructors (`construct`, `tagof`, `payload`) | Kept. Constructors become one `case` form with a branch per tag | Pattern matching is one dispatch, not a test and then a payload read |
+| `fix` for recursion | Dropped. A law refers to itself by `self` | No wrapper closure per recursive call |
+| Environment chains and de Bruijn lookup | Dropped. Laws are closed, and their only inputs are their arguments and `self` | Lambda lifting is done by the compiler, so lookup is an index into a flat argument array |
+| `pin` as a memoised suspended expression | Split in two: `delay` and `force` for laziness, `pin` for storage identity (hashed, interned) | PLAN keeps these apart, and they need different costs and different rules |
+| The hybrid and arena machines | Dropped. One machine, with an explicit stack | Two code paths are the complexity the project is trying to shed |
+| Lists of bytes for strings and names | Open decision (see "Decisions") | Interned names and a byte kind would make equality and lexing cheap |
+
+### Values
+
+- integer (53-bit, as now), nil, cell (a pair), constructor (a tag and a payload);
+- law: a name hash, an arity, a body, and no free variables;
+- app: a law or closure applied to fewer than its arity arguments;
+- thunk: a saturated app, evaluated at most once (`force`);
+- pin: a value in normal form, interned by its hash so that equal pins are one object.
+
+Every value can be hashed. Hashes are computed lazily and cached on the object (the `mug` approach), so the cost is paid only when a hash is needed.
+
+### Forms
+
+Target: about ten to twelve forms, enforced by the spec. Any addition needs a reason written in the spec.
+
+- `lit n`, `nil`: literals.
+- `arg i`, `self`: the arguments of the current law, and the law itself.
+- `call f e₁ … eₙ`: application, curried in meaning, saturating when it has enough arguments.
+- `cell a b`, `con tag e`: construction.
+- `case e {tag → branch …}`: dispatch on a constructor's tag, with a payload binding. Compiles to a jump table.
+- `prim op a b`: integer and kind primitives, the same table as now.
+- `if c t e`: branch on an integer.
+- `let x = e in b`: evaluate once, so that a shared value is not recomputed.
+- `delay e`, `force e`: a thunk, and its evaluation.
+- `pin e`: evaluate to normal form and intern.
+
+Fuel: one unit per form evaluated, as in the reference. A `call` costs one unit more than its body's forms. This keeps the reference's fuel rule, so `out_of_fuel` stays deterministic.
+
+### Fuel, jets and memo
+
+These three features change the work done. They must not change the answer, and they must say what they do to fuel. The rules:
+
+- **Memo.** A memo entry stores the result of a call and the fuel that call used. A hit charges that stored fuel and does no work. So the fuel is exactly what the reference would have charged, and only the work drops. The memo key is the law's hash and the hashes of its arguments.
+- **Jets.** A jet replaces a law, matched by the law's hash, with native code. It must return the same result as the reference body on every input. Its fuel is a declared formula in the jet's own definition, not the reference step count. The formula is checked on the test suite against the reference. A jet whose fuel cannot be made to match is marked as "work only", and the parity check then compares results but not fuel for that law.
+- **Work.** A separate counter counts real host operations (allocations, table reads, jet calls). Fuel and work are reported side by side. The step parity invariant of Prototypes 5 and 6 becomes: fuel is identical, and results are identical. Work is measured, not checked.
+
+### Execution
+
+One machine, with an explicit stack and a single dispatch loop. Compiling each law to Luau closures (as `runDirect` did) is an optimisation for leaf forms only, and it may not add a second machine. The stack overflow that forced the hybrid is avoided because the stack is explicit.
+
+<!-- next: phases -->
