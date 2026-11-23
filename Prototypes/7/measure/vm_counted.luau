@@ -560,9 +560,17 @@ const function runReference(program: Expr, fuel: number, initialEnv: Binding?): 
 			end
 
 			steps += 1
+			const hook = PROBE.profile
 
-			if PROBE.profile ~= nil then
-				PROBE.profile(expr, returning, if returning then stack[depth] else nil)
+			if hook ~= nil then
+				hook(
+					expr,
+					returning,
+					if returning then
+						stack[depth]
+					else
+						nil
+				)
 			end
 
 			if not returning then
@@ -820,7 +828,6 @@ end
 -- Each expression is compiled into a Luau closure that evaluates its children by calling them. The machine's steps are counted at the same points as in runReference: each node's evaluation is one step, and each hand-over of a value to a waiting frame is one step (the final value is one too). So a run has the same steps, the same fuel behaviour and the same errors.
 --
 -- The cost of this form is the Luau stack: a program's recursion becomes Luau recursion, so a deep program can run out of stack, where the stack machine cannot.
-
 -- Raised to stop a run: the fuel is used up, or a step fails with a message.
 const DIRECT_OUT_OF_FUEL = {}
 local directSteps = 0
@@ -841,10 +848,8 @@ end
 
 -- Compiled code: a function from an environment to a value.
 type Code = (Binding?) -> Value
-
 local directMemo: { [any]: Code } = setmetatable({}, { __mode = "k" })
 local compileDirect: (Expr) -> Code
-
 compileDirect = function(e: Expr): Code
 	const known = directMemo[e]
 
@@ -908,7 +913,6 @@ compileDirect = function(e: Expr): Code
 			tick()
 			local value = inner(env)
 			tick()
-
 			-- The steps of the address, low bit first, applied from the high end.
 			local path: { number } = {}
 			local m = n
@@ -920,10 +924,21 @@ compileDirect = function(e: Expr): Code
 
 			for i = #path, 1, -1 do
 				if type(value) ~= "table" or (value :: any).kind ~= "cell" then
-					directFail((if path[i] == 0 then "head" else "tail") .. " of a non-cell")
+					directFail(
+						(
+							if path[i] == 0 then
+								"head"
+							else
+								"tail"
+						) .. " of a non-cell"
+					)
 				end
 
-				value = if path[i] == 0 then (value :: any).head else (value :: any).tail
+				value =
+					if path[i] == 0 then
+						(value :: any).head
+					else
+						(value :: any).tail
 			end
 
 			return value
@@ -936,7 +951,7 @@ compileDirect = function(e: Expr): Code
 			tick()
 
 			if type(v) ~= "table" or (v :: any).kind ~= "pin" then
-				directFail("forcing a non-pin")
+				directFail "forcing a non-pin"
 			end
 
 			const pin = v :: any
@@ -946,7 +961,7 @@ compileDirect = function(e: Expr): Code
 			end
 
 			if pin.busy then
-				directFail("a pin forced itself")
+				directFail "a pin forced itself"
 			end
 
 			pin.busy = true
@@ -968,7 +983,7 @@ compileDirect = function(e: Expr): Code
 			tick()
 
 			if type(c) ~= "number" then
-				directFail("if needs an integer condition")
+				directFail "if needs an integer condition"
 			end
 
 			if c ~= 0 then
@@ -986,7 +1001,7 @@ compileDirect = function(e: Expr): Code
 			tick()
 
 			if type(f) ~= "table" or (f :: any).kind ~= "closure" then
-				directFail("applying a non-function")
+				directFail "applying a non-function"
 			end
 
 			const closure = f :: any
@@ -994,7 +1009,7 @@ compileDirect = function(e: Expr): Code
 			tick()
 			const bodyCode: Code = closure.code or compileDirect(closure.body)
 
-			return bodyCode({ value = a, rest = closure.env })
+			return bodyCode { value = a, rest = closure.env }
 		end
 	elseif e.op == "construct" then
 		const inner = compileDirect(e.e)
@@ -1013,7 +1028,11 @@ compileDirect = function(e: Expr): Code
 			const v = inner(env)
 			tick()
 
-			return if type(v) == "table" and (v :: any).kind == "con" then (v :: any).tag else -1
+			return
+				if type(v) == "table" and (v :: any).kind == "con" then
+					(v :: any).tag
+				else
+					-1
 		end
 	elseif e.op == "payload" then
 		const inner = compileDirect(e.e)
@@ -1023,7 +1042,7 @@ compileDirect = function(e: Expr): Code
 			tick()
 
 			if type(v) ~= "table" or (v :: any).kind ~= "con" then
-				directFail("a payload of a non-constructor")
+				directFail "a payload of a non-constructor"
 			end
 
 			return (v :: any).payload
@@ -1070,7 +1089,6 @@ const function runDirect(program: Expr, fuel: number, initialEnv: Binding?): Out
 	const code = compileDirect(program)
 	directSteps = 0
 	directFuel = fuel
-
 	const ok, result = pcall(function(): Value
 		const v = code(initialEnv)
 		-- The final value is handed back, which is a step of its own.
@@ -1349,7 +1367,6 @@ end
 -- The indices below are counted from each variable's own binder: inside λx, f is 1; inside λv, x is 1 and v is 0.
 const inner = M.lam(M.app(M.var(1), M.lam(M.app(M.var(1), M.var(1), M.var(0)))))
 M.fix = M.lam(M.app(inner, inner))
-
 M.probe = PROBE
 
 return M

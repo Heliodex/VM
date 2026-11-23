@@ -5,16 +5,15 @@
 --
 -- The raw program section is kept too. The VM's layout stage reads the raw section, so it is what a VM build starts from. The host layout is run here on the same section, and the two results are compared by the driver.
 
-const fs = require "@lute/fs"
-const VM = require "../../6/interpreter/vm"
-const ProgramFile = require "../../6/L2/programfile"
+const Checker = require "../../6/L2/checker"
 const Layout = require "../../6/L2/layout"
 const Parser = require "../../6/L2/parser"
-const Checker = require "../../6/L2/checker"
+const ProgramFile = require "../../6/L2/programfile"
+const VM = require "../../6/interpreter/vm"
 const Desugar = require "./desugar_named"
+const fs = require "@lute/fs"
 
 const PROGRAMS = "../../6/L2/programs/"
-
 export type Timings = {
 	layout: number,
 	parse: number,
@@ -23,7 +22,6 @@ export type Timings = {
 	-- The host time of every imported file, compiled inside this one.
 	imports: number,
 }
-
 export type Compiled = {
 	expr: any,
 	scheme: any,
@@ -100,15 +98,12 @@ compileFile = function(text: string, name: string, stack: { string }): Compiled
 	-- A name that does not end in .l2 means the program section is not laid out by ProgramFile, so it is the raw indented text.
 	const file = ProgramFile.parse(text, nil)
 	const raw = file.program :: string
-
 	const layoutStart = os.clock()
 	const laidOut = Layout.layout(raw)
 	const layoutTime = os.clock() - layoutStart
-
 	const parseStart = os.clock()
 	const program = Parser.parse(laidOut)
 	const parseTime = os.clock() - parseStart
-
 	const names: { string } = {}
 	const values: { any } = {}
 	local importSchemes: { { name: string, scheme: any } } = {}
@@ -138,11 +133,9 @@ compileFile = function(text: string, name: string, stack: { string }): Compiled
 	const checkStart = os.clock()
 	const checked = Checker.check(program, importSchemes, name)
 	const checkTime = os.clock() - checkStart
-
 	const desugarStart = os.clock()
 	const expr = Desugar.boundary(Desugar.wrapImports(Desugar.desugarProgram(checked.expr, names, ctors), values), checked.input, checked.inputExpect)
 	const desugarTime = os.clock() - desugarStart
-
 	annotate(expr)
 
 	return {
@@ -160,7 +153,7 @@ compileFile = function(text: string, name: string, stack: { string }): Compiled
 	}
 end
 
-local function compile(text: string, name: string): Compiled
+const function compile(text: string, name: string): Compiled
 	return compileFile(text, name, {})
 end
 

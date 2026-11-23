@@ -22,9 +22,9 @@
 --   Desugar.wrapImports(expr, importExprs): VM.Expr
 --   Desugar.boundary(expr, test, expect): VM.Expr               the program, with its input checked when it is run
 
+const Parser = require "../../6/L2/parser"
 const Primitives = require "../../6/interpreter/primitives"
 const M = require "../../6/interpreter/vm"
-const Parser = require "../../6/L2/parser"
 
 type Expr = Parser.Expr
 type Arm = Parser.Arm
@@ -531,7 +531,11 @@ end
 -- The name of a function bound by let or letrec, with its line, on its outer lambda. Only a lambda takes a label.
 local function labelLam(e: M.Expr, name: string, at: any)
 	if e.op == "lam" then
-		(e :: any).label = if type(at) == "table" and at.line ~= nil then `{name}@{at.line}` else name
+		(e :: any).label =
+			if type(at) == "table" and at.line ~= nil then
+				`{name}@{at.line}`
+			else
+				name
 	end
 end
 

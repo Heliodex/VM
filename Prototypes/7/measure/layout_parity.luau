@@ -5,13 +5,17 @@
 --
 --   lute run layout_parity.luau
 
-const fs = require "@lute/fs"
-const VM = require "../../6/interpreter/vm"
-const Lifecycle = require "../../6/interpreter/lifecycle"
-const Compile = require "./compile"
-const ProgramFile = require "../../6/L2/programfile"
 const Layout = require "../../6/L2/layout"
+const ProgramFile = require "../../6/L2/programfile"
+const Lifecycle = require "../../6/interpreter/lifecycle"
+const VM = require "../../6/interpreter/vm"
+const Compile = require "./compile"
+const O = require "./outcomes"
+const V = require "./vm_values"
+const fs = require "@lute/fs"
 
+const bytesValue = V.bytesValue
+const textOf = V.textOf
 const PROGRAMS = "../../6/L2/programs/"
 
 const function readFile(path: string): string
@@ -22,31 +26,8 @@ const function readFile(path: string): string
 	return text :: string
 end
 
-const function bytesValue(s: string): any
-	local v: any = VM.NIL
-
-	for i = #s, 1, -1 do
-		v = { kind = "cell", head = string.byte(s, i), tail = v }
-	end
-
-	return v
-end
-
-const function textOf(v: any): string
-	local out: { string } = {}
-	local cur = v
-
-	while type(cur) == "table" and cur.kind == "cell" do
-		table.insert(out, string.char(cur.head))
-		cur = cur.tail
-	end
-
-	return table.concat(out)
-end
-
 const layoutC = Compile.compile(readFile "boot/layout.l2", "boot/layout.l2")
 const names = readFile "results/layout_files.txt"
-
 local total = 0
 local agreed = 0
 local bothErrors = 0
@@ -63,20 +44,19 @@ for name in string.gmatch(names, "[^\n]+") do
 
 	if raw ~= nil then
 		total += 1
-
 		local hostOk, hostResult = pcall(Layout.layout, raw)
 		const vm = Lifecycle.run(layoutC.expr, bytesValue(raw), 1e10)
 
 		if vm.status ~= "value" then
 			table.insert(boundaryFailures, `{name}: the VM gave {vm.status} after {vm.steps} steps`)
 		elseif hostOk then
-			if vm.value.tag == 0 and textOf(vm.value.payload) == hostResult then
+			if O.tagOf(O.valueOf(vm)) == 0 and textOf(O.payloadOf(O.valueOf(vm))) == hostResult then
 				agreed += 1
 			else
 				table.insert(mismatches, `{name}: the VM and the host give different text`)
 			end
 		else
-			if vm.value.tag == 1 and textOf(vm.value.payload) == tostring(hostResult) then
+			if O.tagOf(O.valueOf(vm)) == 1 and textOf(O.payloadOf(O.valueOf(vm))) == tostring(hostResult) then
 				agreed += 1
 				bothErrors += 1
 			else
@@ -108,23 +88,22 @@ for _, case in extra do
 	if vm.status ~= "value" then
 		table.insert(boundaryFailures, `{case[1]}: the VM gave {vm.status}`)
 	elseif hostOk then
-		if vm.value.tag == 0 and textOf(vm.value.payload) == hostResult then
+		if O.tagOf(O.valueOf(vm)) == 0 and textOf(O.payloadOf(O.valueOf(vm))) == hostResult then
 			agreed += 1
 		else
 			table.insert(mismatches, `{case[1]}: the VM and the host give different text`)
 		end
-	elseif vm.value.tag == 1 and textOf(vm.value.payload) == tostring(hostResult) then
+	elseif O.tagOf(O.valueOf(vm)) == 1 and textOf(O.payloadOf(O.valueOf(vm))) == tostring(hostResult) then
 		agreed += 1
 		bothErrors += 1
 	else
-		table.insert(mismatches, `{case[1]}: the host refuses ({tostring(hostResult)}) and the VM does not agree ({textOf(vm.value.payload)})`)
+		table.insert(mismatches, `{case[1]}: the host refuses ({tostring(hostResult)}) and the VM does not agree ({textOf(O.payloadOf(O.valueOf(vm)))})`)
 	end
 end
 
 for _, n in { 25, 100, 400, 800 } do
 	const text = "fn x\n"
 	local body = {}
-
 	table.insert(body, "\tlet f0 = fn y")
 	table.insert(body, "\t\ty")
 
@@ -139,7 +118,7 @@ for _, n in { 25, 100, 400, 800 } do
 	const vm = Lifecycle.run(layoutC.expr, bytesValue(raw), 1e10)
 	total += 1
 
-	if vm.status == "value" and vm.value.tag == 0 and textOf(vm.value.payload) == hostResult then
+	if vm.status == "value" and O.tagOf(O.valueOf(vm)) == 0 and textOf(O.payloadOf(O.valueOf(vm))) == hostResult then
 		agreed += 1
 	else
 		table.insert(mismatches, `synthetic {n}: {vm.status}`)

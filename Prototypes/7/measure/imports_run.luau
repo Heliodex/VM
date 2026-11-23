@@ -7,15 +7,20 @@
 --
 --   lute run imports_run.luau     (from this folder)
 
-const fs = require "@lute/fs"
-const VM = require "../../6/interpreter/vm"
-const Lifecycle = require "../../6/interpreter/lifecycle"
-const Compile = require "./compile"
-const ProgramFile = require "../../6/L2/programfile"
+const Checker = require "../../6/L2/checker"
 const Layout = require "../../6/L2/layout"
 const Parser = require "../../6/L2/parser"
-const Checker = require "../../6/L2/checker"
+const ProgramFile = require "../../6/L2/programfile"
+const Lifecycle = require "../../6/interpreter/lifecycle"
+const VM = require "../../6/interpreter/vm"
+const Compile = require "./compile"
+const O = require "./outcomes"
+const V = require "./vm_values"
+const fs = require "@lute/fs"
 
+const bytesValue = V.bytesValue
+const textOf = V.textOf
+const itemsOf = V.itemsOf
 const P6 = "../../6/L2/programs/"
 const P6BOOT = P6 .. "boot/"
 
@@ -27,41 +32,7 @@ const function readFile(path: string): string
 	return text :: string
 end
 
-const function bytesValue(s: string): any
-	local v: any = VM.NIL
-
-	for i = #s, 1, -1 do
-		v = { kind = "cell", head = string.byte(s, i), tail = v }
-	end
-
-	return v
-end
-
-const function textOf(v: any): string
-	local out: { string } = {}
-	local cur = v
-
-	while type(cur) == "table" and cur.kind == "cell" do
-		table.insert(out, string.char(cur.head))
-		cur = cur.tail
-	end
-
-	return table.concat(out)
-end
-
 -- The items of a VM list, in order.
-const function itemsOf(v: any): { any }
-	local out: { any } = {}
-	local cur = v
-
-	while type(cur) == "table" and cur.kind == "cell" do
-		table.insert(out, cur.head)
-		cur = cur.tail
-	end
-
-	return out
-end
-
 -- Renames type variables by where they first appear, so that two checkers which number them differently agree.
 const function canon(s: string): string
 	local names: { [string]: string } = {}
@@ -89,35 +60,34 @@ const parser = Compile.compile(readFile(P6BOOT .. "parse.l2"), "boot/parse.l2")
 const checker = Compile.compile(readFile "boot/types.l2", "boot/types.l2")
 
 -- The VM's front end on a raw program section: layout, lex, parse. Gives the parsed program, or the message of the stage that refuses.
-local function vmParse(raw: string): (any?, string?)
+const function vmParse(raw: string): (any?, string?)
 	const laid = Lifecycle.run(layoutC.expr, bytesValue(raw), 1e10)
 
-	if laid.status ~= "value" or laid.value.tag ~= 0 then
+	if laid.status ~= "value" or O.tagOf(O.valueOf(laid)) ~= 0 then
 		return nil, "layout " .. laid.status
 	end
 
-	const lexed = Lifecycle.run(lexer.expr, laid.value.payload, 1e8)
+	const lexed = Lifecycle.run(lexer.expr, O.payloadOf(O.valueOf(laid)), 1e8)
 
 	if lexed.status ~= "value" then
 		return nil, "lex " .. lexed.status
 	end
 
-	const parsed = Lifecycle.run(parser.expr, lexed.value.payload, 5e8)
+	const parsed = Lifecycle.run(parser.expr, O.payloadOf(O.valueOf(lexed)), 5e8)
 
-	if parsed.status ~= "value" or parsed.value.tag ~= 0 then
+	if parsed.status ~= "value" or O.tagOf(O.valueOf(parsed)) ~= 0 then
 		return nil, "parse " .. parsed.status
 	end
 
-	return parsed.value.payload, nil
+	return O.payloadOf(O.valueOf(parsed)), nil
 end
 
 local failures = 0
 
-local function checkFile(name: string)
+const function checkFile(name: string)
 	const text = readFile(P6BOOT .. name)
 	const file = ProgramFile.parse(text, nil)
 	const raw = file.program :: string
-
 	-- The VM: each import's parsed program, then the request.
 	local importCells: any = VM.NIL
 	local libraries: { { name: string, laid: string } } = {}
@@ -163,10 +133,10 @@ local function checkFile(name: string)
 		return
 	end
 
-	const vmText = textOf(result.value.head)
+	const vmText = textOf(O.headOf(O.valueOf(result)))
 	local vmErrors: { string } = {}
 
-	for _, e in itemsOf(result.value.tail) do
+	for _, e in itemsOf(O.tailOf(O.valueOf(result))) do
 		table.insert(vmErrors, textOf(e))
 	end
 
@@ -181,7 +151,6 @@ local function checkFile(name: string)
 
 	local luauText = ""
 	local luauOk = true
-
 	const parsedLuau = Parser.parse(Layout.layout(raw))
 	const okCheck, res = pcall(Checker.check, parsedLuau, importSchemes, name)
 
@@ -203,11 +172,39 @@ local function checkFile(name: string)
 	end
 
 	print(`{name}: {#libraries} imports`)
-	print(`  VM:   {if #vmErrors == 0 then "no errors" else table.concat(vmErrors, "; ")}`)
+	print(
+		`  VM:   {
+			if #vmErrors == 0 then
+				"no errors"
+			else
+				table.concat(vmErrors, "; ")
+		}`
+	)
 	print(`        type {vmText}`)
-	print(`  Luau: {if luauOk then "no errors" else luauText}`)
-	print(`        type {if luauOk then luauType else "(none)"}`)
-	print(`  {if agree then "AGREE" else "DISAGREE"}`)
+	print(
+		`  Luau: {
+			if luauOk then
+				"no errors"
+			else
+				luauText
+		}`
+	)
+	print(
+		`        type {
+			if luauOk then
+				luauType
+			else
+				"(none)"
+		}`
+	)
+	print(
+		`  {
+			if agree then
+				"AGREE"
+			else
+				"DISAGREE"
+		}`
+	)
 
 	if not agree then
 		failures += 1
@@ -218,5 +215,4 @@ checkFile "lex.l2"
 checkFile "parse.l2"
 checkFile "layout.l2"
 checkFile "types.l2"
-
 print(`{failures} failures`)

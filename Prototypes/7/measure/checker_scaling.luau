@@ -7,10 +7,14 @@
 --
 --   lute run checker_scaling.luau     (from this folder; about a minute and a half)
 
-const fs = require "@lute/fs"
-const VM = require "../../6/interpreter/vm"
 const Lifecycle = require "../../6/interpreter/lifecycle"
+const VM = require "../../6/interpreter/vm"
 const Compile = require "./compile"
+const O = require "./outcomes"
+const V = require "./vm_values"
+const fs = require "@lute/fs"
+
+const bytesValue = V.bytesValue
 
 const function readFile(path: string): string
 	const handle = fs.open(path)
@@ -18,16 +22,6 @@ const function readFile(path: string): string
 	fs.close(handle)
 
 	return text :: string
-end
-
-const function bytesValue(s: string): any
-	local v: any = VM.NIL
-
-	for i = #s, 1, -1 do
-		v = { kind = "cell", head = string.byte(s, i), tail = v }
-	end
-
-	return v
 end
 
 const function commas(n: number): string
@@ -62,21 +56,20 @@ const parser = Compile.compile(readFile "../../6/L2/programs/boot/parse.l2", "bo
 const checker = Compile.compile(readFile "boot/types.l2", "boot/types.l2")
 
 -- The checker's steps for one program file text: its raw program section goes through the VM's layout, lex and parse, then the checker.
-local function checkerSteps(text: string): (number, string)
+const function checkerSteps(text: string): (number, string)
 	const raw = Compile.compile(text, "probe").raw
 	const laid = Lifecycle.run(layoutC.expr, bytesValue(raw), 1e10)
-	const lexed = Lifecycle.run(lexer.expr, laid.value.payload, 1e8)
-	const parsed = Lifecycle.run(parser.expr, lexed.value.payload, 5e8)
-	const result = Lifecycle.run(checker.expr, { kind = "con", tag = 3, payload = parsed.value.payload }, 1e10)
+	const lexed = Lifecycle.run(lexer.expr, O.payloadOf(O.valueOf(laid)), 1e8)
+	const parsed = Lifecycle.run(parser.expr, O.payloadOf(O.valueOf(lexed)), 5e8)
+	const result = Lifecycle.run(checker.expr, { kind = "con", tag = 3, payload = O.payloadOf(O.valueOf(parsed)) }, 1e10)
 
 	return result.steps, result.status
 end
 
 local typesSteps, typesStatus = checkerSteps(readFile "../../6/L2/programs/boot/types.l2")
 print(`types.l2 (Prototype 6's): checker {commas(typesSteps)} steps ({typesStatus})`)
-
-print("")
-print("functions  checker steps  steps per function  ratio to the previous size")
+print ""
+print "functions  checker steps  steps per function  ratio to the previous size"
 local previous: number? = nil
 local previousN: number? = nil
 
