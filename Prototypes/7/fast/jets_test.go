@@ -53,9 +53,16 @@ func TestJetHashesAreInTheChecker(t *testing.T) {
 
 		laws(t, prog.Body, seen)
 
+		// The corpus's helpers (corpusjets.go) are laws of the corpus's stage programs, not of the checker's, so a jet may name a law of either.
+		data := readCorpus(t)
+
+		for _, p := range data.programs {
+			laws(t, p.Body, seen)
+		}
+
 		for h := range jets {
 			if !seen[h] {
-				t.Errorf("the jet for %s names no law of the checker's program", hex.EncodeToString(h[:4]))
+				t.Errorf("the jet for %s names no law of the checker's or the corpus's programs", hex.EncodeToString(h[:4]))
 			}
 		}
 

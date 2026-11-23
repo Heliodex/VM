@@ -532,3 +532,51 @@ do
 	emit("jet same@39 edge exact", "body", law(1, call(lit(SAME), arg(1), lit(deep))), deep, outcome.steps)
 	emit("jet same@39 edge one less", "body", law(1, call(lit(SAME), arg(1), lit(deep))), deep, outcome.steps - 1)
 end
+
+-- ---- 9. the corpus helpers that take most of the interpreted steps: first (the checker's and the parser's), hd (the layout's) and kn (the parser's token kinds). Each is a law of one argument, so its jet is a walk of one match, and its cost is one number per arm.
+
+do
+	const wanted: { [string]: number } = { ["check:first@19"] = 1, ["layout:hd@11"] = 1, ["parse:kn@22"] = 1 }
+	const found: { [string]: Law } = {}
+
+	const function collect(c: Compile.Compiled, stage: string)
+		Lower.expr(c.expr, function(e, l)
+			const key = `{stage}:{V.ownerOf(e)}`
+
+			if wanted[key] == l.arity then
+				found[key] = l
+			end
+		end)
+	end
+
+	collect(Compile.compile(readFile("boot/layout.l2"), "boot/layout.l2"), "layout")
+	collect(Compile.compile(readFile(BOOT6 .. "parse.l2"), "parse.l2"), "parse")
+	collect(Compile.compile(readFile("boot/types.l2"), "boot/types.l2"), "check")
+
+	const firstLaw = found["check:first@19"]
+	const hdLaw = found["layout:hd@11"]
+	const knLaw = found["parse:kn@22"]
+
+	const inputs: { Value } = {
+		NIL,
+		{ kind = "cell", head = 1, tail = NIL },
+		{ kind = "cell", head = { kind = "cell", head = 1, tail = 2 }, tail = 3 },
+		{ kind = "cell", head = NIL, tail = NIL },
+		5,
+		{ kind = "con", tag = 0, payload = 1 },
+	}
+
+	for i, v in inputs do
+		emit(`jet check:first@19 {i}`, "body", law(1, call(lit(firstLaw), arg(1))), v, 1000)
+		emit(`jet layout:hd@11 {i}`, "body", law(1, call(lit(hdLaw), arg(1))), v, 1000)
+	end
+
+	for k = 0, 17 do
+		const token: Value = { kind = "cell", head = { kind = "con", tag = k, payload = NIL }, tail = NIL }
+		emit(`jet parse:kn@22 tag {k}`, "body", law(1, call(lit(knLaw), arg(1))), token, 1000)
+	end
+
+	emit("jet parse:kn@22 not a token", "body", law(1, call(lit(knLaw), arg(1))), 5, 1000)
+	emit("jet parse:kn@22 nil", "body", law(1, call(lit(knLaw), arg(1))), NIL, 1000)
+end
+
