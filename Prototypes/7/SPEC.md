@@ -240,6 +240,7 @@ These are the defaults this spec takes. Each can be changed, and a change is rec
 10. **A suspended expression is a thunk, kind 6.** Kind 4 is for pins: values in normal form, held by content hash. Prototype 5 reports a suspended expression as kind 4, and its example expects that; the core does not, so the example is superseded for the core. A thunk is not data (it has no binary form, and `pin` refuses it), so giving it the pin's kind would make `kind` unable to tell a stored value from an unevaluated call.
 11. **Jets are fuel-exact.** Every jet declares a fuel formula equal to the fuel of the law it replaces, and there are no work-only jets. Fuel is therefore the same on every machine, with or without jets. A work-only jet would make steps and out-of-fuel depend on which jets are installed, and jets are the part of the design most likely to make a run depend on something other than the spec. Jets are pure, and a jet that cannot match its law's fuel is not a jet.
 12. **Jets replace laws only; primitives stay primitives.** A primitive is already one step of native work, and a jet would add a law entry and its argument forms to every use, raising the fuel for no gain, so a primitive gets no jet. A jet is for a law built from several forms. Work that fuel does not count (for example, `pin` encoding a whole value, or a big integer's size) is a known gap, and it is closed by a spec change, not by a jet. A new primitive also needs a spec change, with its reason.
+13. **Compound values are hashed from their parts.** The content hash of a cell, a constructor, a partial application or a pin is computed from its parts' hashes, not from its whole encoding (section 12.7), so a memo key (section 7) costs one hash per new node rather than a walk of the whole value on every call. Integers, nil and laws keep the hash of their encoding, so law hashes and the jets are unchanged. Phase 7's memo needs this; the spec's rules about the memo are unchanged.
 
 ## 12. Binary format
 
@@ -352,9 +353,14 @@ A writer refuses a thunk, a pin of a thunk, and any other value without a binary
 
 ### 12.7 Content hash
 
-The content hash of a value that has a binary form is the SHA-256 of its encoding in section 12.3, without the header byte. It is 32 bytes. A law's hash is the hash of its own encoding: its tag, its arity and its body.
+The content hash of a value that has a binary form is 32 bytes, and two values have the same hash exactly when they have the same binary form (with overwhelming probability).
 
-The hash is the one identity that the rules of the spec use: a law's name (section 1), a memo key (section 7), the law a jet replaces (section 3), and an interned pin (primitive 10). Two values have the same hash exactly when they have the same binary form, so every implementation that writes section 12 the same way computes the same hashes. A value with no binary form (a thunk, or a pin of one) has no hash, and a primitive that needs one is an error.
+- An integer, nil or a law: the SHA-256 of the value's encoding in section 12.3, without the header byte. A law's hash is that of its own encoding: its tag, its arity and its body.
+- A cell, a constructor, a partial application or a pin: the SHA-256 of a one-byte tag and the content hashes of its parts, so a new node costs one hash once its parts' hashes are known. The tags are `C` for a cell (head, then tail), `K` for a constructor (its tag as a magnitude, then its payload), `A` for a partial application (the law, then the arguments in order, each preceded by the count) and `P` for a pin (its value).
+
+A value with no binary form (a thunk, or a pin of one) has no hash, and a primitive that needs one is an error.
+
+The hash is the one identity that the rules of the spec use: a law's name (section 1), a memo key (section 7), the law a jet replaces (section 3), and an interned pin (primitive 10). Hashing the parts keeps the memo's keys cheap on large values: a trie or a list is hashed once per new node, not once per call (decision 13).
 
 The header byte is left out so that a value's hash is the same whether it is written alone or inside another value. Example: the law `inc` (section 3) is `05 01 1a 00 11 01 10 02 01`, and its hash is `1b4ec34d dd5d101a ad9fd988 9cdf35b5 68a2b93f 2a2061cc 9819af67 768bb2dd`.
 
