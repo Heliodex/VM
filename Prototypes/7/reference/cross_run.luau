@@ -9,9 +9,9 @@
 
 const P5Examples = require "../../5/examples/examples"
 const P5VM = require "../../5/interpreter/vm"
-const P6VM = require "../../6/interpreter/vm"
 const L2 = require "../../6/L2/l2"
 const ProgramFile = require "../../6/L2/programfile"
+const P6VM = require "../../6/interpreter/vm"
 const Format = require "./format"
 const Int = require "./int"
 const Interp = require "./interp"
