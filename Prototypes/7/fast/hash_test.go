@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// The vectors are SHA-256 of the bytes of each law's value encoding, computed with sha256sum (SPEC.md section 12.7), not by this package.
+// The vectors are SHA-256 of the bytes of each law's value encoding, computed with sha256sum (fast/README.md "Keys"), not by this package.
 func TestHashVectors(t *testing.T) {
 	cases := []struct {
 		name,

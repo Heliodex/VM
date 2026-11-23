@@ -20,7 +20,7 @@ Every value is one of these kinds. The kind number is what the primitive `kind` 
 
 The integer kind is arbitrary precision. It is a property of the VM, not of any host: an integer of a thousand digits is as much an integer as 3. The bound of ±(2^53 − 1) that Prototypes 5 and 6 had is a limit of the Luau host, whose numbers are doubles. It is not part of the design, and an implementation on a host with a different limit must not reintroduce it.
 
-A **law** is a closed function: `law name arity body`. It has a name (its content hash), an arity (a number from 1 up), and a body (a form). A law has no free variables. Everything it uses is an argument, the law itself (`arg 0`), or a value it builds. Laws are values, so a law can be passed and returned, and a lifted lambda is a law with its free variables as extra arguments.
+A **law** is a closed function: `law arity body`. It has an arity (a number from 1 up), and a body (a form). The examples name a law (`law inc 1 …`) only to read better: the name is not part of the law. A law has no free variables. Everything it uses is an argument, the law itself (`arg 0`), or a value it builds. Laws are values, so a law can be passed and returned, and a lifted lambda is a law with its free variables as extra arguments.
 
 A **partial application** is a law with some arguments already given. Applying it to more arguments runs the law once it has its full arity. A law is `function` kind, and so is a partial application.
 
@@ -135,25 +135,17 @@ When the fuel is used up, the run stops with `out_of_fuel`. Fuel is checked befo
 
 The step count of a run is its fuel used. A run's steps are the same whatever the order in which an implementation does its work, because evaluation order is fixed by the rules in section 3.
 
-## 7. Memoisation
+## 7. Shortcuts: memo and jets
 
-A call may be memoised, in the sense of a table from its key to its result. The key is the function's content hash and the hashes of its arguments.
+An implementation may compute a call without running its body, in one of two ways: from a table of results it has already computed (a memo), or by a native routine for the law (a jet). A shortcut must give, for every input:
 
-- A call is memoised when every argument has a content hash (section 12.7): that is, every argument except a thunk. A thunk is a delayed call with no binary form, so a call with a thunk argument is not memoised. A function is a law or a partial application, and it is a valid part of a key: a law is closed, so its content determines what it does (decision 14).
-- A memo entry stores the call's result and the fuel the call used.
-- A memo hit **charges the stored fuel**. It does no work. So the fuel of a run is the same with the memo as without it, and only the work done differs.
+- the body's result, or the body's error, or `out_of_fuel` at the step where the body would stop;
+- the body's fuel, exactly: a hit charges the fuel the call used when it was first computed, and a native routine declares the fuel the body uses, counting the entry (fuel-exact, decision 11). A shortcut that charges less is a change of the spec, not an optimisation.
+- the body's answer on an input that makes the body fail: a shortcut that cannot answer exactly as the body does gives up, and the body runs.
 
-Memoisation changes no result and no fuel. Phase 7 measures what it saves.
+So a run's outcome and its fuel are the same with the shortcuts as without them. Which calls get a shortcut, and how a table of results or a routine is keyed and chosen, are the implementation's business: the spec defines no key (decision 18). Phase 5 (jets) and Phase 7 (memo) measure what they save.
 
-## 8. Jets
-
-A jet is a native implementation of a law, selected by the law's content hash. Its rules:
-
-- It gives the same result as the law's body on every input. Phase 5 checks this on the test suite.
-- It declares its fuel as a formula in its own definition, which must equal the fuel of the law's body on every input the suite covers, and on generated inputs. A law whose fuel cannot be stated as a formula gets no jet. There are no work-only jets (decision 11).
-- A jet never changes an outcome: an input that gives an error or out-of-fuel on the body must give the same on the jet.
-
-A jet is an optimisation of a law, not a change to the language.
+## 8. (Removed: the jets are in section 7, and the numbering of the rest is kept.)
 
 ## 9. Examples
 
@@ -233,13 +225,15 @@ These are the defaults this spec takes. Each can be changed, and a change is rec
 10. **A suspended expression is a thunk, kind 6.** Kind 4 was for pins (decision 16 removed them, and reserves the number). Prototype 5 reports a suspended expression as kind 4, and its example expects that; the core does not, so the example is superseded for the core. A thunk is not data (it has no binary form, and `pin` refuses it), so giving it the pin's kind would make `kind` unable to tell a stored value from an unevaluated call.
 11. **Jets are fuel-exact.** Every jet declares a fuel formula equal to the fuel of the law it replaces, and there are no work-only jets. Fuel is therefore the same on every machine, with or without jets. A work-only jet would make steps and out-of-fuel depend on which jets are installed, and jets are the part of the design most likely to make a run depend on something other than the spec. Jets are pure, and a jet that cannot match its law's fuel is not a jet.
 12. **Jets replace laws only; primitives stay primitives.** A primitive is already one step of native work, and a jet would add a law entry and its argument forms to every use, raising the fuel for no gain, so a primitive gets no jet. A jet is for a law built from several forms. Work that fuel does not count (for example, the encoding of a whole value, or a big integer's size) is a known gap, and it is closed by a spec change, not by a jet. A new primitive also needs a spec change, with its reason.
-13. **Compound values are hashed from their parts.** The content hash of a cell, a constructor or a partial application is computed from its parts' hashes, not from its whole encoding (section 12.7), so a memo key (section 7) costs one hash per new node rather than a walk of the whole value on every call. Integers, nil and laws keep the hash of their encoding, so law hashes and the jets are unchanged. Phase 7's memo needs this; the spec's rules about the memo are unchanged.
-14. **Functions are memo keys.** A law has no free variables, and a partial application is a law and its arguments, so the content hash of a function determines what it does. Excluding functions from the memo, as the first draft of section 7 did, left a one-declaration change re-checking about 90% of the checker's work, because the calls that pass a continuation or a partial application never hit. Including them, the same change re-checks 129 calls and about 5,000 steps of work, against 108 million for a cold run. The fuel rules of section 7 are unchanged.
+13. *Moved out of the spec by decision 18.* Compound values are hashed from their parts, so a memo key costs one hash per new node. The Go implementation keeps this, in `fast/README.md`.
+14. *Moved out of the spec by decision 18.* Functions are memo keys: a law is closed, so its content decides what it does, and a partial application is a law and its arguments.
 15. **`cell` is a primitive.** A cell is built by a primitive, `cons` (tag 14 when it was added; tag 12 after decision 16), and not by a form. The two are the same to the machine: each is one step, then its two arguments in order, so every step count is unchanged. A form that only builds a value is one more case in every reader and every machine, and `cons` sits beside `head` and `tail`, which read the same values. The forms go from eleven to ten, and the primitives from fourteen to fifteen (thirteen after decision 16). Form tag 19 is unused, so the other tags keep their values.
 
 16. **Pins are removed.** A pin was a wrapper that interned a value by its content and had its own kind. Decision 13 hashes compound values from their parts, so the memo and the jets need no interning, and a program cannot observe a pin except through its kind (4) and its errors. The lowering of Prototypes 5 and 6 never made a pin primitive: their `pin` expression is a `delay` (decision 1). So the `pin` and `unpin` primitives go, the primitives go from fifteen to thirteen, and the three after them are renumbered (`tagof` 12 to 10, `payload` 13 to 11, `cons` 14 to 12). Kind 4 is reserved, so the other kinds keep their numbers, and the binary format's tag 7 (a pin) is reserved and refused. Every law that uses a renumbered primitive has a new content hash, so the jets are re-hashed; their fuel is unchanged, as every step count is.
 
 17. **`case` is removed.** The form read a constructor by its tag, and gave the payload as the next slot. Nothing in the pipeline builds it: the lowering of Prototypes 5 and 6 reads constructors with `tagof` and `payload` (decision 9), and their matches are chains of tests, so a `case` appears only in hand-written examples. Keeping it cost a rule, a reader, a writer and a machine case. A jump table would save a few steps per match (about 3% of the checker's steps, measured), and it can come back as a spec change with that measurement as its reason. The forms go from ten to nine. Form tag 21 is reserved, and a reader refuses it. The `case` mentioned in decisions 9 and 15 is this form.
+
+18. **Shortcuts are not part of the spec.** The content hash (once section 12.7) was the key of the memo and of the jet table, and the spec defined it only because they did. No result and no fuel depends on the hash: the rules that do are the fuel rules of section 7, which stay. So the hash, its SHA-256 definition and the law's name leave the spec, and `law` has an arity and a body. The Go implementation keeps the definition in `fast/README.md`, with its memo and its jets. The spec is shorter by a hash function and a section of keys.
 
 ## 12. Binary format
 
@@ -348,19 +342,6 @@ A reader refuses, with a message that gives the reason:
 The reader and writer have no limit on the depth of a program: both keep their own stack, as the machine does (the Luau reference tests a program 20,000 forms deep).
 
 A writer refuses a thunk, and any other value without a binary form.
-
-### 12.7 Content hash
-
-The content hash of a value that has a binary form is 32 bytes, and two values have the same hash exactly when they have the same binary form (with overwhelming probability).
-
-- An integer, nil or a law: the SHA-256 of the value's encoding in section 12.3, without the header byte. A law's hash is that of its own encoding: its tag, its arity and its body.
-- A cell, a constructor or a partial application: the SHA-256 of a one-byte tag and the content hashes of its parts, so a new node costs one hash once its parts' hashes are known. The tags are `C` for a cell (head, then tail), `K` for a constructor (its tag as a magnitude, then its payload) and `A` for a partial application (the law, then the arguments in order, each preceded by the count).
-
-A value with no binary form (a thunk) has no hash, and a primitive that needs one is an error.
-
-The hash is the one identity that the rules of the spec use: a law's name (section 1), a memo key (section 7), and the law a jet replaces (section 3). Hashing the parts keeps the memo's keys cheap on large values: a trie or a list is hashed once per new node, not once per call (decision 13).
-
-The header byte is left out so that a value's hash is the same whether it is written alone or inside another value. Example: the law `inc` (section 3) is `05 01 1a 00 11 01 10 02 01`, and its hash is `1b4ec34d dd5d101a ad9fd988 9cdf35b5 68a2b93f 2a2061cc 9819af67 768bb2dd`.
 
 ## 13. Form count
 

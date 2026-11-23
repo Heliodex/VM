@@ -347,7 +347,7 @@ do
 end
 
 -- ---- 5. the jets: each law a jet replaces, called on a range of inputs. The reference's steps are the fuel a jet must declare.
--- Each jet's law, as the value's bytes with the header (sha256 of them without the first byte is the content hash, SPEC.md 12.7).
+-- Each jet's law, as the value's bytes with the header (sha256 of them without the first byte is the content hash, fast/README.md "Keys").
 for owner, l in jetLaws do
 	print(`# jet {owner} lawvalue {hex(Format.encodeValue(l) :: string)}`)
 end

@@ -40,7 +40,7 @@ func leb(n uint64) []byte {
 	return w.buf
 }
 
-// The content hash of a value (SPEC.md section 12.7). An integer, nil or a law is the SHA-256 of its binary encoding without the header byte. A cell, a constructor, a partial application or a pin is the SHA-256 of a tag byte and its parts' hashes, so a new node costs one hash, once its parts are hashed; the result is kept on the node.
+// The content hash of a value (this implementation's key, fast/README.md "Keys"). An integer, nil or a law is the SHA-256 of its binary encoding without the header byte. A cell, a constructor, a partial application or a pin is the SHA-256 of a tag byte and its parts' hashes, so a new node costs one hash, once its parts are hashed; the result is kept on the node.
 //
 // Each hash also tells whether the value is data (SPEC.md section 7): an integer, nil, a cell or constructor of data, or a pin. A law, a partial application or a thunk is not data.
 
@@ -128,7 +128,7 @@ func hashOf(v Value) ([32]byte, bool, error) {
 	return [32]byte{}, false, errors.New("binary: a value of no kind")
 }
 
-// Hash is the content hash of a value (SPEC.md section 12.7).
+// Hash is the content hash of a value (fast/README.md "Keys").
 func Hash(v Value) ([32]byte, error) {
 	h, _, err := hashOf(v)
 

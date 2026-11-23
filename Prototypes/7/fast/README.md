@@ -19,7 +19,7 @@ The core of `SPEC.md`, run on Go. It reads the binary format of section 12, and 
 - `same.go`, `same_test.go`: the jet for the name comparison `same`, and the fit of its arm costs.
 - `corpusjets.go`: the jets for the corpus's helpers `first`, `hd` and `kn`.
 - `jets.go` also keeps each law's jet on the law, looked up once.
-- `hash.go`: the content hash (SPEC.md section 12.7).
+- `hash.go`: the content hash, the implementation's keys (see "Keys" below).
 - `memo.go`, `memo_test.go`: the memo (SPEC.md section 7), and the incremental measurement.
 - `corpus_test.go`: the corpus build (Phase 8), against `testdata/corpus.txt`.
 - `profile_test.go`: the core's profile of the checker (`PROFILE=1`).
@@ -49,7 +49,7 @@ Each line of `testdata/cases.txt` is one case: a name, a mode (`body`: the body 
 
 ## Jets
 
-A jet is native code that replaces one law's body (SPEC.md section 3, decision 11). The machine picks it by the law's content hash (section 12.7), so a program never names a jet. A jet:
+A jet is native code that replaces one law's body (SPEC.md section 3, decision 11). The machine picks it by the law's content hash (fast/README.md "Keys"), so a program never names a jet. A jet:
 
 - declares the fuel of the body it replaces, counting the entry, and the machine charges that fuel in one go;
 - handles only the inputs it has checked, and gives up on anything else, so errors and out-of-fuel points stay the spec's;
@@ -79,3 +79,15 @@ The steps are unchanged, by design. The checker takes 68,125,825 core steps and 
 The corpus is the four boot files and the 20 standard-library files (24 files, 2,590 lines). The build runs each through its imports and then layout, lex, parse and check, on four core programs, and checks every stage against the reference. It takes 263,212,747 core steps and about 0.94 s here (best of five), with the jets on (2.46 s with them off), against a 1 s target for 2,500 lines, which the 2,590-line build meets by linear extrapolation (about 0.91 s at 2,500 lines; see the plan, Phase 8). With the memo on, a cold build takes 2.5 s, and an unchanged rebuild takes 0.04 s.
 
 The memo (decisions 13 and 14) is off by default. Turn it on with `MemoOn`, and it stores only calls of at least `MemoMinFuel` (1,000) steps. A one-declaration change to the checker re-checks 270 calls.
+
+## Keys: the content hash
+
+The memo and the jet table (SPEC.md section 7) are keyed by the content hash of a value, which the spec does not define (decision 18). This implementation defines it as follows (`hash.go`, the vectors in `hash_test.go`):
+
+- The content hash of a value that has a binary form is 32 bytes, and two values have the same hash exactly when they have the same binary form (with overwhelming probability).
+- An integer, nil or a law: the SHA-256 of the value's encoding in SPEC.md section 12.3, without the header byte. A law's hash is that of its own encoding: its tag, its arity and its body.
+- A cell, a constructor or a partial application: the SHA-256 of a one-byte tag and the content hashes of its parts, so a new node costs one hash once its parts' hashes are known. The tags are `C` for a cell (head, then tail), `K` for a constructor (its tag as a magnitude, then its payload) and `A` for a partial application (the law, then the arguments in order, each preceded by the count).
+- A value with no binary form (a thunk) has no hash, and a primitive that needs one is an error.
+- The header byte is left out so that a value's hash is the same whether it is written alone or inside another value. Example: the law `inc` (SPEC.md section 9) is `05 01 1a 00 11 01 10 02 01`, and its hash is `1b4ec34d dd5d101a ad9fd988 9cdf35b5 68a2b93f 2a2061cc 9819af67 768bb2dd`.
+
+A memo key is the law's hash and the hashes of its arguments (memo.go). A jet is picked by the law's hash (jets.go).

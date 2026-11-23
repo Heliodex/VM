@@ -2,7 +2,7 @@ package fast
 
 import "encoding/hex"
 
-// Jets (SPEC.md section 3, decision 11). A jet is native code that replaces the body of one law. The machine chooses it by the law's content hash (section 12.7), so a program never names a jet: it has the law or it does not.
+// Jets (SPEC.md section 3, decision 11). A jet is native code that replaces the body of one law. The machine chooses it by the law's content hash (fast/README.md "Keys"), so a program never names a jet: it has the law or it does not.
 //
 // The rules that keep a jet exact (decision 11):
 //
