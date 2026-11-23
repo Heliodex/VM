@@ -13,13 +13,17 @@ type (
 
 	contKind uint8
 
-	// cont is a continuation: what to do with the next value. Each kind uses the fields it names.
+	// cont is a continuation: what to do with the next value. Each kind uses the fields it names. It is kept small, since every form that has children pushes one: the rarer kinds keep their fields in ext.
 	cont struct {
 		kind contKind
 		node *Node
-		env []Value
-		vbase, i, n int
-		rest []Value
+		env []Value // kItems: the frame; kApplyRest: the arguments over the arity
+		vbase, i int
+		ext *contExt
+	}
+
+	// contExt holds the fields of the continuations that are rarely pushed: a thunk to store into (kForce), and a memoised call's key and the step it began at (kMemo).
+	contExt struct {
 		th *Thunk
 		key string
 		start int64
@@ -32,6 +36,10 @@ const (
 	mEval mode = iota
 	mRet
 	mApply
+	// mItems: the children of node, from index i, are evaluated. A leaf (lit, arg) is evaluated in place, as its own step, and a form with children is evaluated with a continuation.
+	mItems
+	// mFinish: every child of node is done, and its values are vs[vbase:]. The form is finished.
+	mFinish
 )
 
 const (
@@ -63,6 +71,7 @@ func machine(m mode, node *Node, env []Value, fv Value, args []Value, fuel int64
 		vs []Value
 		steps int64
 		value Value
+		vbase, i int // mItems and mFinish: where node's operands start, and the next child
 	)
 
 	for {
@@ -93,14 +102,160 @@ func machine(m mode, node *Node, env []Value, fv Value, args []Value, fuel int64
 				value = env[node.Index]
 				m = mRet
 			default:
-				k = append(k, cont{
-					kind: kItems,
-					node: node,
-					env: env,
-					vbase: len(vs),
-				})
-				node = node.items()[0]
+				vbase = len(vs)
+				i = 0
+				m = mItems
 			}
+		case mItems:
+			items := node.items()
+
+			var pending bool
+
+			for ; i < len(items); i++ {
+				c := items[i]
+				if c.Op != OpLit && c.Op != OpArg {
+					// A form with children: its continuation records where its operands start and which child it waits for.
+					k = append(k, cont{
+						kind: kItems,
+						node: node,
+						env: env,
+						vbase: vbase,
+						i: i,
+					})
+					node = c
+					m = mEval
+					pending = true
+
+					break
+				}
+
+				// A leaf is a step of its own, as in mEval, so the fuel and the steps are the same as with a continuation.
+				if steps >= fuel {
+					return Outcome{
+						Status: "out_of_fuel",
+						Steps: steps,
+					}
+				}
+
+				steps++
+
+				if StepHook != nil {
+					StepHook(env[0])
+				}
+
+				if c.Op == OpLit {
+					vs = append(vs, c.Lit)
+					continue
+				}
+
+				if c.Index < 0 || c.Index >= len(env) {
+					return fail(fmt.Sprintf("no slot %d in the frame", c.Index), steps)
+				}
+
+				vs = append(vs, env[c.Index])
+			}
+
+			if !pending {
+				m = mFinish
+			}
+		case mFinish:
+			cnode := node
+			vals := vs[vbase:]
+			m = mRet
+
+			switch cnode.Op {
+			case OpCall:
+				fv = vals[0]
+				// The arguments alias the operands, which are cut back below. They are read once, to build the frame or a partial application (which copies them), so nothing outlives the operands.
+				args = vals[1:]
+				m = mApply
+			case OpCon:
+				value = &Con{
+					Tag: cnode.Tag,
+					Payload: vals[0],
+				}
+			case OpCase:
+				con, ok := vals[0].(*Con)
+				if !ok {
+					return fail("case of a value that is not a constructor", steps)
+				}
+
+				var branch *Node
+
+				pushed := vals[0]
+
+				for _, a := range cnode.Alts {
+					if a.Tag == con.Tag {
+						branch = a.Body
+						pushed = con.Payload
+
+						break
+					}
+				}
+
+				if branch == nil {
+					if cnode.Else == nil {
+						return fail(fmt.Sprintf("no branch for the constructor's tag %d", con.Tag), steps)
+					}
+
+					branch = cnode.Else
+				}
+
+				node = branch
+
+				env = append(env, pushed)
+				m = mEval
+			case OpIf:
+				if !isInt(vals[0]) {
+					return fail("if needs an integer condition", steps)
+				}
+
+				if sign(vals[0]) != 0 {
+					node = cnode.Kids[1]
+				} else {
+					node = cnode.Kids[2]
+				}
+
+				m = mEval
+			case OpLet:
+				node = cnode.Kids[1]
+
+				env = append(env, vals[0])
+				m = mEval
+			case OpDelay:
+				value = &Thunk{
+					F: vals[0],
+					Args: append([]Value(nil), vals[1:]...),
+				}
+			case OpForce:
+				th, ok := vals[0].(*Thunk)
+				if !ok {
+					return fail("force of a value that is not a thunk", steps)
+				}
+
+				if th.Done {
+					value = th.Result
+				} else {
+					k = append(k, cont{
+						kind: kForce,
+						ext: &contExt{
+							th: th,
+						},
+					})
+					fv = th.F
+					args = th.Args
+					m = mApply
+				}
+			case OpPrim:
+				res, msg := prim(cnode.Tag, vals)
+				if msg != "" {
+					return fail(msg, steps)
+				}
+
+				value = res
+			}
+
+			vs = vs[:vbase]
 		case mApply:
 			var (
 				law *Law
@@ -206,15 +361,17 @@ func machine(m mode, node *Node, env []Value, fv Value, args []Value, fuel int64
 			if memoOn {
 				k = append(k, cont{
 					kind: kMemo,
-					key: memoKeyOf,
-					start: start,
+					ext: &contExt{
+						key: memoKeyOf,
+						start: start,
+					},
 				})
 			}
 
 			if len(extra) > 0 {
 				k = append(k, cont{
 					kind: kApplyRest,
-					rest: append([]Value(nil), extra...),
+					env: append([]Value(nil), extra...),
 				})
 			}
 
@@ -239,131 +396,27 @@ func machine(m mode, node *Node, env []Value, fv Value, args []Value, fuel int64
 
 			switch c.kind {
 			case kItems:
-				// The fields are copied out first: the record is popped below, and its slot may be reused by a push.
-				cnode, cenv, cvbase, ci := c.node, c.env, c.vbase, c.i
 				// The child at c.i has finished with value. Its operands are the ones before it, so the operands are cut back to that point before it is added.
+				cnode, cenv, cvbase, ci := c.node, c.env, c.vbase, c.i
 				vs = append(vs[:cvbase+ci], value)
-
-				if items := cnode.items(); ci+1 < len(items) {
-					k[len(k)-1].i = ci + 1
-					node = items[ci+1]
-					env = cenv
-					m = mEval
-
-					continue
-				}
-
 				k = k[:len(k)-1]
-				vals := vs[cvbase:]
-				m = mRet
-
-				switch cnode.Op {
-				case OpCall:
-					fv = vals[0]
-					// The arguments alias the operands, which are cut back below. They are read once, to build the frame or a partial application (which copies them), so nothing outlives the operands.
-					args = vals[1:]
-					m = mApply
-				case OpCon:
-					value = &Con{
-						Tag: cnode.Tag,
-						Payload: vals[0],
-					}
-				case OpCase:
-					con, ok := vals[0].(*Con)
-					if !ok {
-						return fail("case of a value that is not a constructor", steps)
-					}
-
-					var branch *Node
-
-					pushed := vals[0]
-
-					for _, a := range cnode.Alts {
-						if a.Tag == con.Tag {
-							branch = a.Body
-							pushed = con.Payload
-
-							break
-						}
-					}
-
-					if branch == nil {
-						if cnode.Else == nil {
-							return fail(fmt.Sprintf("no branch for the constructor's tag %d", con.Tag), steps)
-						}
-
-						branch = cnode.Else
-					}
-
-					node = branch
-
-					env = append(cenv, pushed)
-					m = mEval
-				case OpIf:
-					if !isInt(vals[0]) {
-						return fail("if needs an integer condition", steps)
-					}
-
-					if sign(vals[0]) != 0 {
-						node = cnode.Kids[1]
-					} else {
-						node = cnode.Kids[2]
-					}
-
-					env = cenv
-					m = mEval
-				case OpLet:
-					node = cnode.Kids[1]
-
-					env = append(cenv, vals[0])
-					m = mEval
-				case OpDelay:
-					value = &Thunk{
-						F: vals[0],
-						Args: append([]Value(nil), vals[1:]...),
-					}
-				case OpForce:
-					th, ok := vals[0].(*Thunk)
-					if !ok {
-						return fail("force of a value that is not a thunk", steps)
-					}
-
-					if th.Done {
-						value = th.Result
-					} else {
-						k = append(k, cont{
-							kind: kForce,
-							th: th,
-						})
-						fv = th.F
-						args = th.Args
-						m = mApply
-					}
-				case OpPrim:
-					res, msg := prim(cnode.Tag, vals)
-					if msg != "" {
-						return fail(msg, steps)
-					}
-
-					value = res
-				}
-
-				vs = vs[:cvbase]
+				node, env, vbase, i = cnode, cenv, cvbase, ci+1
+				m = mItems
 			case kApplyRest:
 				fv = value
-				args = c.rest
+				args = c.env
 				m = mApply
 				k = k[:len(k)-1]
 			case kForce:
-				c.th.Done = true
-				c.th.Result = value
+				c.ext.th.Done = true
+				c.ext.th.Result = value
 				k = k[:len(k)-1]
 			case kMemo:
 				// A call that used little fuel saves little work, and an entry for it costs memory: only calls of at least MemoMinFuel steps are stored (memo.go). The fuel is the same either way.
-				if steps-c.start >= MemoMinFuel {
-					memo[c.key] = memoEntry{
+				if steps-c.ext.start >= MemoMinFuel {
+					memo[c.ext.key] = memoEntry{
 						value: value,
-						fuel: steps - c.start,
+						fuel: steps - c.ext.start,
 					}
 					MemoCounts.Stores++
 				}
