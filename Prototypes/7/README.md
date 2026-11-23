@@ -193,7 +193,7 @@ The two costs Phase 1 measured are answered in the core: recursion is `arg 0` (n
 
 **Phase 8: check against the speed target.** Run the harness on the reference host, and compare with the targets in "Speed target". Write the result in this README, including the misses.
 
-*Result: the target is not met, on the Go machine (`fast/corpus_test.go`, `fast/testdata/corpus.txt`).* The corpus is the four boot files (2,235 lines, 82,118 bytes). Each goes through its imports, then layout, lex, parse and check, on the four stage programs, as the Phase 0 harness does. Every stage of every file matches the reference. The build takes 441,584,946 core steps, and 6.7 to 6.9 s on this host (1.2 s for the type checker's share of the big file, 3.2 s of it in the checker). Without the jets it takes 10.2 s, and a warm rebuild of the same corpus with the memo takes 0.04 s.
+*Result: the target is not met, on the Go machine (`fast/corpus_test.go`, `fast/testdata/corpus.txt`).* The corpus is the four boot files (2,235 lines, 82,118 bytes). Each goes through its imports, then layout, lex, parse and check, on the four stage programs, as the Phase 0 harness does. Every stage of every file matches the reference. The build takes 441,584,946 core steps, and 6.7 to 6.9 s on this host. Per file, with its imports: lex.l2 0.5 s, parse.l2 2.0 s, layout.l2 1.0 s, types.l2 3.2 s. Without the jets it takes 10.2 s, and a warm rebuild of the same corpus with the memo takes 0.04 s.
 
 Against the target (2,500 lines under 1 s): the build is about 7 times too slow, and the corpus is 265 lines short of the target size, so the miss is about 7.7 times at 2,500 lines, assuming linear growth (Phase 0 measured near-linear growth on generated programs). The misses, in order of size:
 
