@@ -114,6 +114,29 @@ end
 -- The hook that expr may set: it is told each law as the law is made, closed or not, with the lambda it came from. The jet tests use it to find the laws the jets replace (the lambda's owner says which function it is).
 local lawHook: ((Expr, Law) -> ())? = nil
 local lower: (e: Expr, depth: number, map: { number }) -> Form
+local lowerFix: (e: Expr, depth: number, map: { number }) -> Form
+
+-- The form that gives a slot of the current law's frame. Slot 0 is the recursive function itself, which is the law applied to the outer variables it uses (map[-1] counts them, and they are its first arguments), so a partial application of the law, not the law alone. With no outer variables, it is the law.
+const function slotForm(slot: number, map: { number }): Form
+	if slot ~= 0 then
+		return { op = "arg"; index = slot }
+	end
+
+	const count = map[-1] or 0
+
+	if count == 0 then
+		return { op = "arg"; index = 0 }
+	end
+
+	local args: { Form } = {}
+
+	for i = 1, count do
+		const a: Form = { op = "arg"; index = i }
+		table.insert(args, a)
+	end
+
+	return { op = "call"; f = { op = "arg"; index = 0 }; args = args }
+end
 
 -- The arguments that hold the given levels in the current law's frame.
 const function argsOf(levels: { number }, map: { number }): { Form }
@@ -126,11 +149,47 @@ const function argsOf(levels: { number }, map: { number }): { Form }
 			error(`lower: a free variable at level {lvl} is not in the law's frame`, 0)
 		end
 
-		const arg: Form = { op = "arg"; index = slot }
-		table.insert(args, arg)
+		table.insert(args, slotForm(slot, map))
 	end
 
 	return args
+end
+
+-- A recursive function, written as fix applied to a lambda that binds the function itself (the desugarer's letrec). Inside its body the function is arg 0, the law itself, applied to the outer variables it uses. So there is no fixed point: a recursive call is a call of the law, and the law is one law. The lambda's own argument is the law's first argument after the outer variables.
+-- e is the lambda that binds the function (at level depth); its body is the function's own lambda (at depth + 1), whose body is at depth + 2.
+lowerFix = function(e: Expr, depth: number, map: { number }): Form
+	if e.op ~= "lam" then
+		error("lower: a fixed point of something that is not a lambda", 0)
+	end
+
+	const value = e.body
+
+	if value.op ~= "lam" then
+		error("lower: a recursive function that is not a lambda", 0)
+	end
+
+	const body = value.body
+	const free = sortedFree(body, depth + 2, depth)
+	local inner: { number } = {}
+
+	for i, lvl in free do
+		inner[lvl] = i
+	end
+
+	inner[depth] = 0
+	inner[depth + 1] = #free + 1
+	inner[-1] = #free
+	const law: Law = { kind = "law"; arity = #free + 1; body = lower(body, depth + 2, inner) }
+
+	if lawHook ~= nil then
+		lawHook(value, law)
+	end
+
+	if #free == 0 then
+		return { op = "lit"; value = law }
+	end
+
+	return { op = "call"; f = { op = "lit"; value = law }; args = argsOf(free, map) }
 end
 
 lower = function(e: Expr, depth: number, map: { number }): Form
@@ -153,7 +212,7 @@ lower = function(e: Expr, depth: number, map: { number }): Form
 			return { op = "arg"; index = 2 ^ 40 }
 		end
 
-		return { op = "arg"; index = slot }
+		return slotForm(slot, map)
 	elseif e.op == "lam" then
 		const free = sortedFree(e.body, depth + 1, depth)
 		local inner: { number } = {}
@@ -212,6 +271,8 @@ lower = function(e: Expr, depth: number, map: { number }): Form
 		return { op = "force"; e = lower(e.e, depth, map) }
 	elseif e.op == "if" then
 		return { op = "if"; c = lower(e.c, depth, map); t = lower(e.t, depth, map); e = lower(e.e, depth, map) }
+	elseif e.op == "apply" and e.f == VM.fix and e.arg.op == "lam" and e.arg.body.op == "lam" then
+		return lowerFix(e.arg, depth, map)
 	elseif e.op == "apply" then
 		return { op = "call"; f = lower(e.f, depth, map); args = { lower(e.arg, depth, map) } }
 	elseif e.op == "prim" then
