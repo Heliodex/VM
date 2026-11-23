@@ -1,6 +1,6 @@
 # Prototype 7: a cost-first core
 
-Status: plan. Nothing is implemented yet. The plan is written in order of work: the measurements come first, and each phase has an exit test.
+Status: implemented through Phase 8, and the speed target is met on this host, with a thin margin (see Phase 8). The plan is written in order of work: the measurements come first, and each phase has an exit test.
 
 ## Goal
 
@@ -48,7 +48,7 @@ The build's stages, as they stand:
 
 So the target as stated is for a *bootstrapped front end*, layout through check. The full-compiler target waits for desugar to be bootstrapped.
 
-**The build corpus.** The four boot files, which are the bootstrapped front end today (`Prototypes/6/L2/programs/boot/`: `layout.l2`, `lex.l2`, `parse.l2`, `types.l2`, 2,235 lines in all). The target size is 2,500 lines, so the corpus is 265 lines short. The top-up with library programs is not done. The corpus is re-measured when the bootstrapped compiler gains desugar, so the full compiler is measured as one piece. The size 2,500 is the project owner's figure. Note that Prototype 5's Luau L2 implementation is 4,478 lines in nine files, and the Luau pieces that the bootstrap replaces (lexer, parser, layout, checker, desugarer) total about 3,700 of those lines, so 2,500 lines is smaller than the old implementation.
+**The build corpus.** The four boot files, which are the bootstrapped front end today (`Prototypes/6/L2/programs/boot/`: `layout.l2`, `lex.l2`, `parse.l2`, `types.l2`, 2,235 lines in all). The target size is 2,500 lines, so the corpus is 265 lines short. The top-up is done: the standard library (Prototype 6's `lib` folder, 20 files, 355 lines) makes the corpus 24 files and 2,590 lines, so it is larger than the target. The corpus is re-measured when the bootstrapped compiler gains desugar, so the full compiler is measured as one piece. The size 2,500 is the project owner's figure. Note that Prototype 5's Luau L2 implementation is 4,478 lines in nine files, and the Luau pieces that the bootstrap replaces (lexer, parser, layout, checker, desugarer) total about 3,700 of those lines, so 2,500 lines is smaller than the old implementation.
 
 **2. A step budget, derived from the time budget.** Convert seconds into steps using the throughput the host actually achieves:
 
@@ -77,7 +77,7 @@ At the hybrid's 18.5M steps/s, the budget is about 18.5M steps for 2,500 lines, 
 | Integers, nil, cells, constructors (`construct`, `tagof`, `payload`) | Kept. Constructors become one `case` form with a branch per tag | Pattern matching is one dispatch, not a test and then a payload read |
 | `fix` for recursion | Dropped. A law refers to itself by `self` | No wrapper closure per recursive call |
 | Environment chains and de Bruijn lookup | Dropped. Laws are closed, and their only inputs are their arguments and `self` | Lambda lifting is done by the compiler, so lookup is an index into a flat argument array |
-| `pin` as a memoised suspended expression | Split in two: `delay` and `force` for laziness, `pin` for storage identity (hashed, interned) | PLAN keeps these apart, and they need different costs and different rules |
+| `pin` as a memoised suspended expression | Split in two: `delay` and `force` for laziness; `pin` for storage identity was removed later (SPEC.md decision 16) | PLAN keeps these apart, and they need different costs and different rules |
 | The hybrid and arena machines | Dropped. One machine, with an explicit stack | Two code paths are the complexity the project is trying to shed |
 | Lists of bytes for strings and names | Open decision (see "Decisions") | Interned names and a byte kind would make equality and lexing cheap |
 
@@ -87,7 +87,7 @@ At the hybrid's 18.5M steps/s, the budget is about 18.5M steps for 2,500 lines, 
 - law: a name hash, an arity, a body, and no free variables;
 - app: a law or closure applied to fewer than its arity arguments;
 - thunk: a saturated app, evaluated at most once (`force`);
-- pin: a value in normal form, interned by its hash so that equal pins are one object.
+- pin: removed (SPEC.md decision 16). A pin was a value in normal form, interned by its hash; the content hash of a compound value (decision 13) gives the same identity without it.
 
 Every value can be hashed. Hashes are computed lazily and cached on the object (the `mug` approach), so the cost is paid only when a hash is needed.
 
@@ -104,7 +104,7 @@ Target: about ten to twelve forms, enforced by the spec. Any addition needs a re
 - `if c t e`: branch on an integer.
 - `let x = e in b`: evaluate once, so that a shared value is not recomputed.
 - `delay e`, `force e`: a thunk, and its evaluation.
-- `pin e`: evaluate to normal form and intern.
+- `pin e`: removed (SPEC.md decision 16). A pin of a value is not a form: a suspended expression is `delay`, and its value is `force`.
 
 Fuel: one unit per form evaluated, as in the reference. A `call` costs one unit more than its body's forms. This keeps the reference's fuel rule, so `out_of_fuel` stays deterministic.
 
@@ -193,18 +193,21 @@ The two costs Phase 1 measured are answered in the core: recursion is `arg 0` (n
 
 **Phase 8: check against the speed target.** Run the harness on the reference host, and compare with the targets in "Speed target". Write the result in this README, including the misses.
 
-*Result: the target is not met, on the Go machine (`fast/corpus_test.go`, `fast/testdata/corpus.txt`).* The corpus is the four boot files (2,235 lines, 82,118 bytes). Each goes through its imports, then layout, lex, parse and check, on the four stage programs, as the Phase 0 harness does. Every stage of every file matches the reference. The build takes 317,243,361 core steps (about 142,000 per line) and about 2.8 s on this host, with the jets on. Per file, with its imports: lex.l2 20,667,186 steps, parse.l2 94,820,977, layout.l2 47,747,511, types.l2 154,007,687.
+*Result: the target is met on this host, with a thin margin (`fast/corpus_test.go`, `fast/testdata/corpus.txt`).* The corpus is the four boot files and the 20 standard-library files: 24 files, 2,590 lines, 89,501 bytes. Each goes through its imports, then layout, lex, parse and check, on the four stage programs. Every stage of every file matches the reference, and the corpus's expect lines are the reference's outcomes. The build takes 303,047,553 core steps (about 117,000 per line). On this host, with the jets on, it takes 0.97 s at best of five and 1.02 s at the median. The stages are linear in lines (Phase 1), so the 2,500-line build is about 0.95 to 0.99 s. That is inside the target, but the run-to-run noise (about 4%) is as large as the margin.
 
-Against the target (2,500 lines under 1 s): at linear growth the build is about 3.1 s at 2,500 lines, so it is about 3.1 times too slow. The corpus is 265 lines short of the target size, so the 2,500-line figure is an extrapolation (Phase 0 measured near-linear growth on generated programs). The misses, in order of size:
+Against the target (2,500 lines under 1 s), the measured numbers, all on the same corpus:
 
-- **The step count.** About 142,000 core steps per line. Before the three corpus jets were added (see the experiments), 194.8 million of the 317.2 million steps were interpreted.
-- **The step rate.** The interpreter is a single loop over resolved nodes. A native host in the usual sense (a faster compiled language) would speed up each step by a small factor, not 3 times.
-- **The memo** does not help a cold build (5.9 s, against 2.8 s without it), so it is a re-check tool only.
-- **The scope.** The corpus is not the full compiler: desugar is not bootstrapped (it runs on the host, and is not counted), and the corpus is 2,235 lines against the 2,500 of the target.
+| Configuration | Core steps | Time (2,590 lines) | At 2,500 lines (linear) |
+| --- | ---: | ---: | --- |
+| Jets on, memo off (default) | 303,047,553 | 0.97 s (best of 5), 1.02 s (median) | about 0.95 to 0.99 s: met, thin margin |
+| Jets off, memo off | 303,047,553 | 2.85 s | about 2.7 s: not met |
+| Memo on, cold | 303,047,553 | 2.51 s | not met (the memo costs a cold build) |
+| Memo on, warm (same corpus again) | 303,047,553 | 0.044 s | met, but only for an unchanged input |
+| Jets on, `GOGC=400` (a host setting) | 303,047,553 | 0.93 to 0.96 s | about 0.91 to 0.94 s: met |
 
-Decision on the native host: the Go machine already is the native host, and a faster host would not close a 3 times gap on its own. The target needs about three times less work per line (about 47,000 core steps per line, from 142,000), or about three times the rate on the same work, or both. The options are more jets on the interpreted steps, or a machine that compiles law bodies to native code (the plan's "leaf forms may be closures", in Go). This is a judgement from one host, not a measurement, and the next step measures it.
+The checker alone (types.l2, jets on): 76,283,777 steps in about 0.18 s, against 0.53 s at the start of this run.
 
-*Exit:* a results table, a decision on whether the target needs a native host, and a list of what would change the decision.
+*Decision.* The target is met on this host, by the measurement above, which is extrapolated from 2,590 lines to 2,500. The margin is thin. Before this run, the build was about 2.9 times the target, and the work that closed the gap was: the evaluator (about a quarter of the time), the bindings of top-level functions as constants and the mutual group's lowering (the steps, and the frames that were copied on each call), jets for five hot list and trie laws, and the cache of a law's jet. The steps per line fell from 142,000 to 117,000 in this run, and the interpreted steps are now 30% of the corpus's steps (91 million of 303 million); the rest is jets. A native host is not needed for the target on this host. Whether the target should hold on a slower host is not measured.
 
 ## Risks
 
@@ -224,47 +227,31 @@ These need an answer from the project owner before the phase that depends on the
 1a. **Resolved:** imports are part of the bootstrapped build. The checker's request must carry the imported names and their schemes, so a file that imports library code is fully checked on the VM. This is new work in the checker (Phase 1).
 2. **Host: decided.** Luau through Phase 3 (the reference interpreter, the binary format and the front end). Go from Phase 4, for the fast machine, with the Go implementation reading the same binary format and checked against the Luau reference on the spec's examples and fuel. The front end (boot L2 and the Luau desugarer) stays in Luau, and it serialises core programs for the Go machine. Go's `math/big` is the reason; the small-integer fast path keeps the common case fast in either language.
 3. **Resolved: fuel of jets.** Every jet declares a fuel formula, checked against the reference on the suite and on generated inputs. There are no work-only jets, so a law whose fuel cannot be stated gets no jet (SPEC.md decision 11). The reason is determinism: a work-only jet would make steps and out-of-fuel depend on which jets are installed.
-4. **Strings and names** (before Phase 6). Option A: keep lists of bytes, and rely on interning and jets. Option B: a byte kind backed by the host's strings. The plan assumes B, but it waits for Phase 0 to show whether text is a large cost.
+4. **Resolved: strings and names stay lists of integers (option A).** Phase 6 was measured and not done (name comparison is 3% of the checker's steps, and the jet on `same` covers it). A byte kind would change the lexer, the parser and their fuel, and the corpus does not need it.
 5. **Laziness.** Whether the core keeps `delay` and `force` as explicit forms, as drafted, or makes evaluation lazy by default. The plan assumes explicit forms, so that the cost of each thunk is visible in the fuel and work counts.
 6. **Resolved: the content hash.** It is SHA-256 of a value's binary encoding without the header byte (SPEC.md section 12.7). It names a law, keys a memo, selects a jet, and interns a pin. Jets are chosen by the hash of the law, so no hint from a program is needed.
 7. **Resolved: jets are for laws only.** Primitives stay primitives: a jet on one would add a law entry to its fuel for no gain. A new primitive needs a spec change with its reason (SPEC.md decision 12). Work that fuel does not count, such as `pin` encoding a whole value, is a known gap, closed by a spec change rather than a jet.
+8. **Resolved (this run): the machine is recursive.** The explicit-stack machine (Phase 4) was replaced by a recursive evaluator with the same steps, form for form, and a loop for tail calls (`fast/eval.go`). It is about a quarter faster. The one cost is a host limit: a run nested deeper than `MaxNesting` (400,000 evaluations) ends with the status `host_limit`, which the spec does not have, instead of the Go stack overflowing. The spec asks for no depth limit; the host limit is documented in `fast/README.md`. The owner may prefer the iterative machine back if deep programs matter more than speed.
+9. **Resolved (this run): pins are removed** (SPEC.md decision 16): the pin and unpin primitives, the pin value and its binary part. The spec has thirteen primitives.
+10. **Open for the owner: the host's collector setting.** `GOGC=400` gives about 6% on the corpus (0.93 to 0.96 s against 0.97 to 1.02 s). It is a runtime setting of the host, not of the library, so it is not set in the code; a host that runs the VM can set it.
 
-## Phase 8 results table (current code)
+## Speed experiments
 
-Corpus build (four boot files, 2,235 lines, 82,118 bytes; each file with its imports; the reference host is this machine, one Latitude 5440, i7-1355U). The jets-on run is the best of three; the others are single runs, with noise of about 3%.
+The corpus build on the Go machine, on this host, with the steps (core steps) and the time. The corpus has 2,590 lines. Each entry is a single change, measured as the corpus time before and after.
 
-| Configuration | Core steps | Time | Against the target (2,500 lines, 1 s) |
-| --- | ---: | ---: | --- |
-| Jets on, memo off (default) | 317,243,361 | 2.8 s | about 3.1 times too slow (linear scaling to 2,500 lines) |
-| Jets off, memo off | 317,243,361 | 5.2 s | about 5.2 times too slow |
-| Memo on, cold | 317,243,361 | 5.9 s | slower: about 2.1 times the jets-on build |
-| Memo on, warm (same corpus again) | 317,243,361 | 0.04 s | met, but only for an unchanged input |
+- **Machine, this run.** A continuation kept only its node, frame and child index; a leaf operand (lit or arg) is evaluated in place, as its own step; a node's children are read into pools; a law's jet is cached on the law (the lookup hashed 32 bytes on every call, about 7%). The explicit-stack loop was replaced by a recursive evaluator (about 26% faster on the corpus), with tail calls in a loop. Each of these keeps the steps: the suite (cases, the corpus's expect lines, the memo and the jets on and off) passes unchanged.
+- **Lowering: constants.** A variable bound to a closed value (a top-level function, or an integer) is a constant, not a frame slot, so a law no longer carries every top-level function it calls as an argument. The mutual group of the parser had 42 arguments per call; now it has 15. The corpus goes from 317.3 million steps to 307.4 million (with the mutual group below) and from 1.8 s to 1.43 s.
+- **Desugar: mutual groups** (the measurement's copy of the desugarer; Prototype 6's is unchanged). A member's branch binds only the names of the group its body mentions (332.0 million steps to 317.3 million), and the dispatch on the member is a balanced tree of tests, not a chain (to 303.0 million). The expect lines of all 24 files are unchanged.
+- **Jets, four list helpers** (`lenOf`, `envKid`, `envPut` and the parser's `same`): 1.37 s to 1.17 s, steps unchanged. **A jet for `prune`**: the corpus to 1.04 s, the checker from 0.36 s to 0.19 s.
+- **Pins removed** (SPEC.md decision 16): the steps are unchanged; the three renumbered primitives change the law hashes, so the fourteen jets are re-hashed from the corpus.
+- **Collector setting** (host, not adopted): `GOGC=400` gives 6%. `GOGC=off` is slower than the default, because of page faults.
+- **Tried or measured and not adopted:** the flat program layout (Phase 4, about 7% slower); a table of preboxed small integers (no change); a cheaper continuation without the leaf inlining (no change until the leaves were inlined).
 
-The checker alone (types.l2, jets on): 77,805,895 steps in about 0.53 s.
-
-Decision (unchanged): the target is not met on the Go machine, and it is not a native-host question alone, since the Go machine is already native. The remaining gap is the interpreted steps. Before the corpus jets, the corpus had 194.8 million interpreted steps out of 317.2 million. By owner, the largest were: laws with no name of their own in the parser (17.8%), `kn` (11.8%, now a jet), the checker's `first` (6.9%, now a jet), the checker's `envKid` (6.7%), the layout's `hd` (5.7%, now a jet), the checker's `prune` (4.1%) and `envPut` (2.0%). `envKid`, `prune` and `envPut` are the next candidates, each needing a walk over a letrec whose recursive law takes the outer variables as arguments.
-
-## Speed experiments (after the plan)
-
-The corpus build on the Go machine, on this host (441.6 million core steps, jets on; the figures are single runs, with noise of about 3%):
-
-- **Baseline:** 6.85 s. Without the jets, 10.2 s.
-- **Profile:** the collector takes about 40% of the time, the machine's own loop about 30%. Allocation is mostly frames (the slots of each call, about 27% of bytes) and partial applications with the argument lists they copy (about 37%). The decoded programs are 16 MB, with 163,580 pointer objects, and the collector rescans them each cycle.
-- **Kept:** frames built straight from the function's arguments and the new ones, with no intermediate list: 6.85 s to about 6.1 s.
-- **Rejected:** a table of preboxed small integers, to avoid the allocation when an integer becomes a value: no change (6.2 s both ways), so it is reverted.
-- **Collector setting:** GOGC=400 on the same code gives 5.15 s, 17% less. It is a runtime setting that trades memory for time; the live heap is small, so the cost is modest. Not adopted in the library, which should not set the collector; a host can.
-- **Frames as slices:** a frame is a slice, and a let or a case appends to its own copy, so the environment type and the restore record go. The corpus build goes to about 5.5 s, with the same steps. This is a simplification as well as a speed gain.
-- **Tried and reverted:** a flat program layout (the node tree as integer arrays, so the collector has nothing to scan). It made the machine about 7% slower: the collector mostly runs on other cores, so the single-threaded loop is the critical path, and the flat layout slowed the loop.
-- **Simplification (decision 15):** `cell` is a primitive, `cons`, not a form. Every step count is the same, the spec has ten forms and fifteen primitives, and the readers and the machine each lose a case. The checker takes 108,352,804 steps and the corpus build 441,584,946, as before.
-
-Together, the frame change and GOGC=400 give about 5.1 s on the corpus, still about five times the 1 s target. The speed target needs the step count (about 198,000 core steps per line) to fall, or most of the interpreted steps to become jets, as the Phase 8 decision said; the experiments here only trim the constant.
-
-Since then, the work has been on the steps themselves:
-
-- **A let for an immediately applied lambda** (`reference/lower.luau`, commits aed7bce and 17d7a29). An application of a lambda is a core `let` when no lambda in its body captures the law's own function. A call of a call is one call with all its arguments. The checker goes from 108,537,918 to 77,805,895 core steps, its output on types.l2 is byte-identical, and the corpus from 441,584,946 to 317,243,361. Two rules were measured and not kept. Refusing every `let` whose body makes a lambda gave 400,859,240 corpus steps. The reason for the other refusal is that a closure which captures the recursive law's own function rebuilds its partial application from every outer variable each time the closure is made.
-- **Jets follow the lowering** (commits 74bf00a and cdedda4): the hashes and the fitted costs are re-read. The corpus build went from 4.3 s to 3.55 s.
-- **Jets for three corpus helpers** (`fast/corpusjets.go`, commit 8e77609): `first` and `hd` (a match on a cell, 21 steps; otherwise 67) and `kn` (the token kind's arm, 10 + 5k). The steps are unchanged, and the corpus build goes from 3.55 s to about 2.8 s. The corpus records each law's owner (commit 33ec6cf), so the profile is by function.
+**Not done, and measured as the next candidates.**
+- The desugarer builds each `head` and `tail` as a checked `Ok` or `Err` constructor and then matches it. A direct test on the list's kind would skip the allocation and the tag test, about 7 steps per use, and an estimated 5% of the steps. It changes the law bodies, so the jets that match on `head` or `tail` (`first`, `hd`, `tl`, `hdOr`, `same`, `envKid`, `envPut`, `lenOf`) would be re-fitted.
+- A `match` over a large sum is a chain of tag tests. A balanced tree of tests, as for the mutual group, is about 1%.
+- The parser's largest unnamed law (about 5% of the steps) is a large anonymous match on the token structure; it is not a jet candidate without a name.
 
 ## Next step
 
-Phases 1 to 8 are done, with the misses written above. Since the last note: the lowering makes a let of an immediately applied lambda, the jets follow it, and three corpus helpers have jets. The corpus build takes about 2.8 s, about 3.1 times the 1 s target at 2,500 lines. The open work is the speed target: re-profile the corpus with the current code, then take the next jets (the checker's `envKid`, `prune` and `envPut`, and the parser's anonymous laws if they are small enough to walk), each keeping its fuel. The lowering's cost on closures that capture the recursive law is the other open item. A simplification pass on the spec is also open.
+Phases 1 to 8 are done, and the speed target is met on this host with a thin margin. The spec has thirteen primitives after pins were removed (decision 16). Open work: the `head` and `tail` desugar change above (about 5%); the parser's anonymous laws; and the owner's decision on the host's collector setting (decision 10 in "Decisions"). The corpus's 2,500-line figure is an extrapolation until a 2,500-line corpus is measured directly.

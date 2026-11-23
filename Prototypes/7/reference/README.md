@@ -18,8 +18,8 @@ Run each from this folder with `lute run <file>`. The outputs are in `*.txt` bes
 
 ## Results
 
-- `interp_run.luau`: **40 of 40** checks pass. The step count of `call (lit inc) (lit 41)` is 7, worked out by hand.
-- `format_run.luau`: **51 of 51** checks pass.
+- `interp_run.luau`: **37 of 37** checks pass (the pin checks went with decision 16). The step count of `call (lit inc) (lit 41)` is 7, worked out by hand.
+- `format_run.luau`: **49 of 49** checks pass.
 - `cross_run.luau`: **193 agree**, 4 differ on purpose (named below), **0 disagree**. Prototype 5's 50 examples and Prototype 6's 147 L2 program tests (all 44 files) are covered.
 
 ## What differs, and why
@@ -27,7 +27,7 @@ Run each from this folder with `lute run <file>`. The outputs are in `*.txt` bes
 Four comparisons disagree on purpose. Each is recorded in `cross_run.luau` with its reason, and none is hidden:
 
 1. **The integer range** (three examples). Prototype 5 gives an "out of range" error for add, sub and mul past 2^53. The spec removes that limit (SPEC.md section 1 and decision 8), so the reference gives the exact result. Those three Prototype 5 examples expect the old behaviour, and they are superseded by the spec.
-2. **The kind of a pin** (one example). Prototype 5 reports a pin as kind 4. A Prototype 5 pin is a suspended expression: creating one does not run it, and forcing runs it once. The core models that as a thunk, kind 6. The spec gives pins their own kind 4 for stored values (decision 4), so a suspended expression is a thunk. This is decided: SPEC.md decision 10 keeps kind 6.
+2. **The kind of a pin** (one example). Prototype 5 reports a pin as kind 4. A Prototype 5 pin is a suspended expression: creating one does not run it, and forcing runs it once. The core models that as a thunk, kind 6. The spec gives pins their own kind 4 for stored values (decision 4), so a suspended expression is a thunk. This is decided: SPEC.md decision 10 keeps kind 6. Since decision 16 the core has no pins: kind 4 is reserved, and the `pin` and `unpin` primitives are gone.
 
 ## Fuel
 

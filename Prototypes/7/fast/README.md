@@ -11,11 +11,14 @@ The core of `SPEC.md`, run on Go. It reads the binary format of section 12, and 
 - `machine.go`: the outcome type, `Run` and `RunBody`, and the step hook the profile uses.
 - `eval_test.go`: a tail loop of three million calls, a call nested a hundred thousand deep, and the nesting limit.
 - `corpus_profile_test.go`: the corpus's profile by owner (`PROFILE_CORPUS=1`).
-- `prim.go`: the fourteen primitives, and the pin table (interned by the value's binary form).
+- `prim.go`: the thirteen primitives (pins were removed, SPEC.md decision 16).
 - `jets.go`: the jet table, and the helper jets (see "Jets" below).
 - `trie.go`, `trie_test.go`: the jets for `findB` and `setB`, and the fit of their arm costs.
+- `prune.go`, `prune_test.go`: the jet for `prune`, the checker's chase of a type variable, with the fit of its own arms (the `findB` calls are costed by the trie's table).
+- `listjets.go`, `listjets_test.go`: the jets for `lenOf`, `envKid`, `envPut` and the parser's `same`, and the fit of their arm costs.
 - `same.go`, `same_test.go`: the jet for the name comparison `same`, and the fit of its arm costs.
 - `corpusjets.go`: the jets for the corpus's helpers `first`, `hd` and `kn`.
+- `jets.go` also keeps each law's jet on the law, looked up once.
 - `hash.go`: the content hash (SPEC.md section 12.7).
 - `memo.go`, `memo_test.go`: the memo (SPEC.md section 7), and the incremental measurement.
 - `corpus_test.go`: the corpus build (Phase 8), against `testdata/corpus.txt`.
@@ -39,7 +42,7 @@ To regenerate the cases (from the measurement folder, because the L2 compiler re
 
 Each line of `testdata/cases.txt` is one case: a name, a mode (`body`: the body with the frame `[NIL, input]`, as the reference's `runForm`; or `run`: the law applied to the input, one entry), the program bytes, the input bytes, the fuel, and the reference's outcome.
 
-- 50 hand-written cases: one for each rule of section 3, each primitive and its errors, partial and over-application, self-reference, out of fuel, big integers, pins, and a program 20,000 forms deep.
+- 50 hand-written cases: one for each rule of section 3, each primitive and its errors, partial and over-application, self-reference, out of fuel, big integers, and a program 20,000 forms deep.
 - 50 Prototype 5 examples, with the budget `cross_run` gives them.
 - 147 tests of the Prototype 6 L2 programs, with the same budgets.
 - The checker: the variant `types.l2` (`measure/boot/`) on Prototype 6's `types.l2`, the Phase 0 benchmark.
@@ -53,14 +56,16 @@ A jet is native code that replaces one law's body (SPEC.md section 3, decision 1
 - is used only when the whole call fits in the fuel left;
 - is fixed in the build. There are no work-only jets.
 
-There are six jets on the checker, and three on the corpus's helpers:
+There are seven jets on the checker and on the corpus's helpers, and nine more on the corpus's list helpers (below):
 
 - `tl`, `hdOr` and `stP`, the small helpers, with their fuel measured on the reference.
 - `same`, the name comparison: a walk of two lists of bytes, with the arm costs fitted to the reference's steps (`same_test.go`).
 - `first` (the checker's and the parser's) and `hd` (the layout's), a match on a cell, 21 steps, and 67 on anything else; `kn` (the parser's token kinds), 10 + 5k for kind k, and it gives up past 15 (`corpusjets.go`).
+- `prune`, the checker's chase of a type variable through the trie (`prune.go`): its own arms are a constructor (22 steps), an unbound variable (35) and a bound one (33), and each `findB` it calls is costed by the trie's table.
+- `lenOf` (the checker's length), `envKid` and `envPut` (the name environment's lookup and insertion), and the parser's `same` (a different body from the checker's `same`: its test on a list is a nil test, so a value that is not a list is refused): each walks its list and counts its arms (`listjets.go`).
 - `findB` and `setB`, the radix-4 trie's lookup and update. Each is a whole recursion, not one level: a walk takes the same path as the body and counts the six arms (empty, a zero id, and the four children). The arm costs are fitted to the reference's steps (`trie_test.go`), and the fit is exact on every case, including the fuel edges (exactly the call's steps, and one less).
 
-The steps are unchanged, by design. The checker takes 77,805,895 core steps and about 0.53 s with the jets, on one host (the figures for the checker alone are in the plan's Phase 8 section).
+The steps are unchanged, by design. The checker takes 76,283,777 core steps and about 0.18 s with the jets, on one host (the figures for the checker alone are in the plan's Phase 8 section).
 
 ## Limits of this version
 
@@ -71,6 +76,6 @@ The steps are unchanged, by design. The checker takes 77,805,895 core steps and 
 
 ## The corpus build and the memo
 
-The corpus is the four boot files (2,235 lines). The build runs each through its imports and then layout, lex, parse and check, on four core programs, and checks every stage against the reference. It takes 317,243,361 core steps and about 2.8 s here, with the jets on (5.2 s with them off), against a 1 s target for 2,500 lines (see the plan, Phase 8). With the memo on, a cold build takes 5.9 s, and an unchanged rebuild takes 0.04 s.
+The corpus is the four boot files and the 20 standard-library files (24 files, 2,590 lines). The build runs each through its imports and then layout, lex, parse and check, on four core programs, and checks every stage against the reference. It takes 303,047,553 core steps and about 1.0 s here (0.97 s best of five), with the jets on (2.85 s with them off), against a 1 s target for 2,500 lines, which the 2,590-line build meets by linear extrapolation with a thin margin (see the plan, Phase 8). With the memo on, a cold build takes 2.5 s, and an unchanged rebuild takes 0.04 s.
 
 The memo (decisions 13 and 14) is off by default. Turn it on with `MemoOn`, and it stores only calls of at least `MemoMinFuel` (1,000) steps. A one-declaration change to the checker re-checks 270 calls.
