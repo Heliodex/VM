@@ -16,6 +16,8 @@ type (
 		vs []Value
 		tailFv Value
 		tailArgs []Value
+		// frames is the pool of frames no body uses any more, by their length (see getFrame).
+		frames [maxPooledFrame][][]Value
 	}
 
 	// stopRun is the panic that ends a run with an outcome other than a value.
@@ -24,24 +26,11 @@ type (
 	}
 )
 
+// maxPooledFrame is the longest frame that is recycled; a longer one is left to the collector.
+const maxPooledFrame = 32
+
 // MaxNesting is the deepest a run may nest its evaluations (a form inside a form, a call inside a call). It bounds the Go stack: a nested evaluation takes about a kilobyte of it, and the default Go stack is one gigabyte. A run that goes deeper ends with the status "host_limit".
 var MaxNesting = 400000
-
-// makeFrame is the frame of a saturated entry of law: slot 0 is the law, then the arguments the law already had, then the new ones (the first arity - len(have) of args). The arguments after those are returned as extra, to apply to the result.
-func makeFrame(law *Law, have, args []Value) (slots, extra []Value) {
-	from := law.Arity - len(have)
-	slots = make([]Value, law.Arity+1)
-	slots[0] = law
-
-	copy(slots[1:], have)
-	copy(slots[1+len(have):], args[:from])
-
-	if len(args) > from {
-		extra = append([]Value(nil), args[from:]...)
-	}
-
-	return slots, extra
-}
 
 // partial gives the partial application of law to the arguments it has, when they are fewer than its arity: the law itself when there are none, otherwise an application. It is not an entry, so it costs nothing.
 func partial(law *Law, have, args []Value) Value {
@@ -93,6 +82,44 @@ func (r *recRun) argOf(node *Node, env []Value) Value {
 	}
 
 	return env[node.Index]
+}
+
+// getFrame gives a frame of n slots, from the pool when there is one. Its slots are not cleared: the caller writes all of them.
+func (r *recRun) getFrame(n int) []Value {
+	if n < maxPooledFrame {
+		if p := r.frames[n]; len(p) > 0 {
+			f := p[len(p)-1]
+			r.frames[n] = p[:len(p)-1]
+
+			return f
+		}
+	}
+
+	return make([]Value, n)
+}
+
+func (r *recRun) makeFrame(law *Law, have, args []Value) (slots, extra []Value) {
+	from := law.Arity - len(have)
+	slots = r.getFrame(law.Arity + 1)
+	slots[0] = law
+
+	copy(slots[1:], have)
+	copy(slots[1+len(have):], args[:from])
+
+	if len(args) > from {
+		extra = append([]Value(nil), args[from:]...)
+	}
+
+	return slots, extra
+}
+
+// putFrame gives a frame back to the pool. Its slots are cleared, so the pool keeps no value alive. A frame is given back once, by the body that owns it (runBody), when nothing refers to it any more.
+func (r *recRun) putFrame(f []Value) {
+	if n := len(f); n < maxPooledFrame {
+		clear(f)
+
+		r.frames[n] = append(r.frames[n], f[:n:n])
+	}
 }
 
 // resolve gives the law of a function value and the arguments it already has. A value that is not a function fails. It is charged nothing.
@@ -351,7 +378,7 @@ func (r *recRun) apply(fv Value, args []Value) Value {
 			}
 		}
 
-		slots, extra := makeFrame(law, have, args)
+		slots, extra := r.makeFrame(law, have, args)
 		if len(extra) > 0 {
 			// Over-applied: the law is entered, and its result is applied to the rest.
 			r.entry(law)
@@ -410,19 +437,25 @@ func (r *recRun) enterAndRun(law *Law, slots []Value) Value {
 	return r.runBody(law, slots)
 }
 
-// runBody gives the value of law's body in its frame. A tail call the body makes is applied here, in a loop: a saturated call of a law with a jet may take the jet, and a call that is over-applied is applied to its rest after its law's body. A tail call is not memoised (the memo is for calls that are not in a loop).
+// runBody gives the value of law's body in its frame. A tail call the body makes is applied here, in a loop: a saturated call of a law with a jet may take the jet, and a call that is over-applied is applied to its rest after its law's body. A tail call is not memoised (the memo is for calls that are not in a loop). runBody owns its frame: it gives the frame back to the pool when the frame is done with.
 func (r *recRun) runBody(law *Law, frame []Value) Value {
 	for {
 		if v, tail := r.eval(law.Body, frame, true); !tail {
+			r.putFrame(frame)
 			return v
 		}
 
+		// The arguments of the tail call are read from the operands, not from the frame, so the frame is done with once they are read.
 		fv, args := r.tailFv, r.tailArgs
 		r.tailFv, r.tailArgs = nil, nil
 		next, have := r.resolve(fv)
 
 		if len(have)+len(args) < next.Arity {
-			return partial(next, have, args)
+			res := partial(next, have, args)
+
+			r.putFrame(frame)
+
+			return res
 		}
 
 		if JetsOn && len(have) == 0 && len(args) == next.Arity {
@@ -430,16 +463,20 @@ func (r *recRun) runBody(law *Law, frame []Value) Value {
 				if res, cost, ok := fn(args); ok && r.steps+cost <= r.fuel {
 					r.steps += cost
 
+					r.putFrame(frame)
+
 					return res
 				}
 			}
 		}
 
-		slots, extra := makeFrame(next, have, args)
+		slots, extra := r.makeFrame(next, have, args)
 		if len(extra) > 0 {
 			r.entry(next)
 
 			res := r.runBody(next, slots)
+
+			r.putFrame(frame)
 
 			return r.apply(res, extra)
 		}
@@ -449,12 +486,16 @@ func (r *recRun) runBody(law *Law, frame []Value) Value {
 				if res, cost, ok := fn(slots[1:]); ok && r.steps+cost <= r.fuel {
 					r.steps += cost
 
+					r.putFrame(slots)
+					r.putFrame(frame)
+
 					return res
 				}
 			}
 		}
 
 		r.entry(next)
+		r.putFrame(frame)
 
 		law, frame = next, slots
 	}
