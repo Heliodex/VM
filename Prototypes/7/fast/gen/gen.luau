@@ -34,7 +34,7 @@ type Law = Types.Law
 const NIL = Format.NIL
 -- The helpers that have jets (the owner names of measure/boot/types.l2 at its present lines).
 -- Each helper, with the arity of the law that a jet replaces. hdOr is curried, so its jet is the inner law of two arguments (the outer law of one argument has the list as a free variable of the inner one).
-const JET_ARITY: { [string]: number } = { ["tl@24"] = 1, ["hdOr@14"] = 2, ["stP@63"] = 1, ["findB@84"] = 2, ["setB@100"] = 3 }
+const JET_ARITY: { [string]: number } = { ["tl@24"] = 1, ["hdOr@14"] = 2, ["stP@63"] = 1, ["findB@84"] = 2, ["setB@100"] = 3, ["same@39"] = 2 }
 -- The laws of those helpers, as the checker's lowering makes them (filled by the benchmark below).
 const jetLaws: { [string]: Law } = {}
 const P6_PROGRAMS = "../../6/L2/programs/"
@@ -482,3 +482,56 @@ do
 	print(`# changed declaration: {outcome.status} after {string.format("%d", outcome.steps)} steps`)
 	line("checker: variant types.l2 with div10 changed", "body", law(1, body), input, 1e10, outcome)
 end
+
+-- ---- 8. the name comparison, same (measure/boot/types.l2): two lists, compared a byte at a time. Random names, equal names, names that differ in their last byte, non-lists, and elements that are not integers (which the body refuses, so the jet must give up there).
+
+do
+	math.randomseed(11)
+	const SAME = jetLaws["same@39"]
+
+	const function listOf(items: { number }): Value
+		return list(table.unpack(items))
+	end
+
+	const function randomItems(): { number }
+		local items: { number } = {}
+
+		for _ = 1, math.random(0, 4) do
+			table.insert(items, math.random(0, 2))
+		end
+
+		return items
+	end
+
+	for i = 1, 300 do
+		const a = randomItems()
+		local b = randomItems()
+
+		if i % 3 == 0 then
+			b = table.clone(a)
+		elseif i % 3 == 1 then
+			b = table.clone(a)
+
+			if #b > 0 then
+				b[#b] = (b[#b] + 1) % 3
+			end
+		end
+
+		emit(`jet same@39 {i}`, "body", law(1, call(lit(SAME), arg(1), lit(listOf(b)))), listOf(a), 1000000)
+	end
+
+	emit("jet same@39 nil and nil", "body", law(1, call(lit(SAME), arg(1), lit(NIL))), NIL, 1000)
+	emit("jet same@39 nil and a number", "body", law(1, call(lit(SAME), arg(1), lit(5))), NIL, 1000)
+	emit("jet same@39 a number and nil", "body", law(1, call(lit(SAME), arg(1), lit(NIL))), 5, 1000)
+	emit("jet same@39 a number and a list", "body", law(1, call(lit(SAME), arg(1), lit(list(1)))), 5, 1000)
+	emit("jet same@39 a list and a number", "body", law(1, call(lit(SAME), arg(1), lit(7))), list(1), 1000)
+	emit("jet same@39 a big element", "body", law(1, call(lit(SAME), arg(1), lit(list(1, 2)))), list(Int.fromMagnitude(false, { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16 })), 1000)
+	emit("jet same@39 a cell element", "body", law(1, call(lit(SAME), arg(1), lit(list(1)))), list({ kind = "cell", head = 1, tail = 2 } :: Value), 1000)
+
+	-- the fuel edges, on a name that recurses
+	const deep = listOf({ 0, 1, 2, 0, 1 })
+	const outcome = Interp.runForm(call(lit(SAME), arg(1), lit(deep)), deep, 1000000)
+	emit("jet same@39 edge exact", "body", law(1, call(lit(SAME), arg(1), lit(deep))), deep, outcome.steps)
+	emit("jet same@39 edge one less", "body", law(1, call(lit(SAME), arg(1), lit(deep))), deep, outcome.steps - 1)
+end
+
