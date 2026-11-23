@@ -153,6 +153,8 @@ Each change is measured on the same harness, and the variant lives in `measure/b
 
 **Phase 2: the core spec.** Done: `Prototypes/7/SPEC.md`. It has seven kinds of value, eleven forms (within the limit of twelve), twelve primitives with no `Result`, the outcomes, the fuel rule, the memo rule (a hit charges the stored fuel), the jet rule (declared fuel, or "work only"), and examples.
 
+The binary format is part of the spec (section 12), modelled on Prototype 5's. It is implemented and tested in the Luau reference (`reference/format.luau`, with `reference/int.luau` for integers of any size, and `reference/format_run.luau`: 50 checks, including the spec's bytes, round trips of values and programs, a program 20,000 forms deep, and each refusal with its reason). It is iterative, so depth is not a host limit.
+
 *Exit, met:* the spec has eleven forms, each with a rule and an example, and seven examples in section 9 with their expected outcomes. Phase 3 checks the examples by running them.
 
 Decisions taken in the spec (section 11, each revisable): laziness is explicit (`delay`, `force`); jet fuel is a declared formula, or "work only"; strings stay lists of integers; pins are wrappers read through `unpin`; errors end the run and are not values; calls are strict; the step rule is one per form and one per law entry.
@@ -199,7 +201,7 @@ These need an answer from the project owner before the phase that depends on the
 
 1. **Resolved:** the workload is a build, and the target is 2,500 lines of L2 under 1 s on the reference host, for the bootstrapped build on the VM. The corpus is the four boot files, with a top-up to 2,500 and the full compiler to follow (see "Speed target").
 1a. **Resolved:** imports are part of the bootstrapped build. The checker's request must carry the imported names and their schemes, so a file that imports library code is fully checked on the VM. This is new work in the checker (Phase 1).
-2. **Host.** Luau only, or a native host later? On Luau the step rate caps the design (see Risks). Native hosts change the choice of jets and make uniqueness and parallelism worth considering.
+2. **Host: decided.** Luau through Phase 3 (the reference interpreter, the binary format and the front end). Go from Phase 4, for the fast machine, with the Go implementation reading the same binary format and checked against the Luau reference on the spec's examples and fuel. The front end (boot L2 and the Luau desugarer) stays in Luau, and it serialises core programs for the Go machine. Go's `math/big` is the reason; the small-integer fast path keeps the common case fast in either language.
 3. **Fuel of jets** (before Phase 5). Option A: every jet declares a fuel formula and is checked against the reference. Option B: jets are "work only" and the parity check compares results alone. The plan assumes A, and uses B only where A cannot be stated.
 4. **Strings and names** (before Phase 6). Option A: keep lists of bytes, and rely on interning and jets. Option B: a byte kind backed by the host's strings. The plan assumes B, but it waits for Phase 0 to show whether text is a large cost.
 5. **Laziness.** Whether the core keeps `delay` and `force` as explicit forms, as drafted, or makes evaluation lazy by default. The plan assumes explicit forms, so that the cost of each thunk is visible in the fuel and work counts.

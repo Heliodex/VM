@@ -235,6 +235,115 @@ These are the defaults this spec takes. Each can be changed, and a change is rec
 7. **The step rule** is one step per form and one per law entry. Phase 3 writes the step counts of the examples into its tests, so a change to this rule is visible.
 8. **Integers are unbounded.** The VM's integers have no size limit, and the ±(2^53 − 1) bound of Prototypes 5 and 6 is a limit of the Luau host (doubles), not of the VM. The reason: a bound in the VM would make the answer depend on the host. Consequence for Phase 3: the Luau reference needs a bignum representation for integers, and its tests must include values beyond 2^53.
 
-## 12. Form count
+## 12. Binary format
+
+The binary format stores values and programs as bytes, for machines. It is the form the Go implementation (Phase 4) will read, so this section is the contract for both. It follows Prototype 5's format (`Prototypes/5/interpreter/binary.luau`), with the forms and kinds of this spec.
+
+### 12.1 Header
+
+Every string starts with one byte:
+
+| Byte | Holds |
+| ---: | --- |
+| 1 | a value (section 1) |
+| 2 | a program: a law of arity 1 (section 12.4) |
+
+The bytes must be exactly one of these. Anything after the value or program is an error.
+
+### 12.2 Magnitudes
+
+A magnitude is an unsigned LEB128 number of any length: 7 bits per byte, least significant group first, with the top bit set on every byte but the last. The last byte is not zero unless it is the only byte, so every number has one encoding (zero is the single byte `00`). A reader refuses any other encoding of a number.
+
+Magnitudes are how the format writes every whole number: integer magnitudes, tags, counts, arities and indices. Integer values have no fixed size.
+
+Positions are the exception. A tag, index, count or arity is a position in a program, not an integer value, and a reader can only hold a position that its host can index. Every implementation accepts positions up to 2^53 − 1 at least, and refuses a larger one, with a message that says so. This is a limit on positions, not on integers: an integer value (a `lit` of a big integer, or a value in a list) has no size limit.
+
+### 12.3 Values
+
+A value is a prefix sequence of parts. Each part starts with a tag byte:
+
+| Tag | Part | After the tag |
+| ---: | --- | --- |
+| 0 | nil | nothing |
+| 1 | cell | the head, then the tail |
+| 2 | integer, zero or positive | its magnitude |
+| 3 | integer, negative | its magnitude, which is at least 1 |
+| 4 | constructor | its tag (a magnitude), then its payload |
+| 5 | law | its arity (a magnitude, at least 1), then its body (a form, section 12.4) |
+| 6 | partial application | the law, then the number of arguments (a magnitude, at least 1 and less than the law's arity), then the arguments |
+| 7 | pin | the value it holds |
+
+A thunk (kind 6 in section 1) has no binary form, and a writer refuses it; so does a pin of a thunk. A reader refuses a law whose body is not a form of section 12.4.
+
+The integer tags are the only place a sign is written. Zero is always tag 2, so tag 3 with a zero magnitude is refused as negative zero.
+
+Integers have no size limit (section 1), so a magnitude may be as long as the integer needs.
+
+### 12.4 Forms and programs
+
+A law is its arity, then its body. A body is a form, written with one tag byte per form:
+
+| Tag | Form | After the tag |
+| ---: | --- | --- |
+| 16 (`10`) | `lit v` | the value `v`, as a value (section 12.3) |
+| 17 (`11`) | `arg i` | the index `i`, a magnitude |
+| 18 (`12`) | `call f e1 … en` | `n`, a magnitude (zero or more), then `f`, then `e1` to `en` |
+| 19 (`13`) | `cell a b` | `a`, then `b` |
+| 20 (`14`) | `con k e` | the tag `k`, a magnitude, then `e` |
+| 21 (`15`) | `case e` | `e`; then the number of alternatives `k`, a magnitude; then for each alternative its tag (a magnitude) and its body; then a byte `0` if there is no `else` branch, or `1` followed by the `else` body |
+| 22 (`16`) | `if c t e` | `c`, then `t`, then `e` |
+| 23 (`17`) | `let e b` | `e`, then `b` |
+| 24 (`18`) | `delay (call f e1 … en)` | `n`, a magnitude, then `f`, then `e1` to `en`; the call is not a separate form, so it has no tag of its own |
+| 25 (`19`) | `force e` | `e` |
+| 26 (`1a`) | `prim op a1 … an` | the primitive's tag `op` (a magnitude, less than 12), then its arguments; the number of arguments is the primitive's arity (section 4), so it is not written |
+
+Form tags are in their own range, 16 to 26, and never appear as values, so a reader knows from its position whether it is reading a value or a form. A form's parts are read in the order of the table.
+
+A **program** is header 2, then a law of arity 1 (its arity, which must be 1, then its body). A reader refuses a program whose arity is not 1.
+
+Rules a reader enforces, beyond the encoding itself:
+
+- A `delay` form's call has the arguments it declares, and nothing else.
+- The tags in a `case` are distinct.
+- A `prim` tag is less than 12.
+- A partial application has fewer arguments than its law's arity.
+
+A reader does not check frame indices (`arg i` against the frame of its law). An index past the frame is an error of the run (section 5), as it would be for any program that is built in memory.
+
+### 12.5 Examples
+
+These are checked by the format's tests (`Prototypes/7/reference/format_run.luau`).
+
+    the value 0                    01 02 00
+    the value -1                   01 03 01
+    the value nil                  01 00
+    the list (1 2)                 01 01 02 01 01 02 02 00      (cell, 1, cell, 2, nil)
+    the integer 2^53               01 02 80 80 80 80 80 80 80 10    (eight bytes: seven groups of 0 with the top bit set, then the group 16)
+    the program "law inc 1 (prim add (arg 1) (lit 1))"
+                                   02 01 1a 00 11 01 10 02 01
+
+The last line reads: header 2; the arity 01; the form `prim` (1a); the operation `add` (00); the argument `arg 1` (11 01); the argument `lit 1` (10, then the value 1 as 02 01).
+
+The tests compare these bytes with an independent writer, so the examples here are for reading and are not a second source.
+
+### 12.6 Errors
+
+A reader refuses, with a message that gives the reason:
+
+- a header it does not expect;
+- a tag it does not know, in a value or in a form;
+- a magnitude that is not in its shortest form;
+- negative zero;
+- bytes that end before the value or program is complete;
+- bytes after the value or program;
+- a form with a missing part;
+- a duplicate tag in a `case`, a `prim` tag of 12 or more, a partial application with too many arguments, and a program whose arity is not 1;
+- a position past what the implementation can index (at least 2^53 − 1 in every implementation, section 12.2).
+
+The reader and writer have no limit on the depth of a program: both keep their own stack, as the machine does (the Luau reference tests a program 20,000 forms deep).
+
+A writer refuses a thunk, a pin of a thunk, and any other value without a binary form.
+
+## 13. Form count
 
 The forms are `lit`, `arg`, `call`, `cell`, `con`, `case`, `if`, `let`, `delay`, `force` and `prim`. That is eleven, within the limit of twelve in Phase 2's exit test. The twelve primitives are not forms: they are the table in section 4, so the form count does not grow when a primitive is added.
