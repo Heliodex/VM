@@ -38,7 +38,6 @@ const (
 	fLit = 0x10
 	fArg = 0x11
 	fCall = 0x12
-	fCell = 0x13
 	fCon = 0x14
 	fCase = 0x15
 	fIf = 0x16
@@ -279,16 +278,6 @@ func (w *writer) form(n *Node) error {
 		if err := w.pos(len(n.Kids) - 1); err != nil {
 			return err
 		}
-
-		for _, k := range n.Kids {
-			if err := w.form(k); err != nil {
-				return err
-			}
-		}
-
-		return nil
-	case OpCell:
-		w.buf = append(w.buf, fCell)
 
 		for _, k := range n.Kids {
 			if err := w.form(k); err != nil {
@@ -552,21 +541,6 @@ func (r *reader) form() (*Node, error) {
 		return &Node{
 			Op: OpCall,
 			Kids: kids,
-		}, nil
-	case fCell:
-		a, err := r.form()
-		if err != nil {
-			return nil, err
-		}
-
-		b, err := r.form()
-		if err != nil {
-			return nil, err
-		}
-
-		return &Node{
-			Op: OpCell,
-			Kids: []*Node{a, b},
 		}, nil
 	case fCon:
 		tag, err := r.pos("a tag")

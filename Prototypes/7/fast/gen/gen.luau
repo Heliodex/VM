@@ -55,8 +55,9 @@ const function call(f: Form, ...: Form): Form
 	return { op = "call"; f = f; args = args }
 end
 
+-- A cell, built by the primitive cons (tag 14), as the reference's lowering builds it.
 const function cellForm(a: Form, b: Form): Form
-	return { op = "cell"; a = a; b = b }
+	return { op = "prim", tag = 14, args = { a, b } }
 end
 
 const function conForm(tag: number, e: Form): Form

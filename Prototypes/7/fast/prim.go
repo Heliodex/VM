@@ -100,6 +100,11 @@ func prim(tag int, vals []Value) (Value, string) {
 		}
 
 		return Small(-1), ""
+	case 14:
+		return &Cell{
+			Head: vals[0],
+			Tail: vals[1],
+		}, ""
 	case 13:
 		c, ok := vals[0].(*Con)
 		if !ok {

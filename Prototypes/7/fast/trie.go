@@ -200,7 +200,7 @@ func setBWalk(bs Value, id int64, b Value, w *[6]int64) (Value, bool) {
 
 func init() {
 	// findB (fst of the lowered law of measure/boot/types.l2, owner findB@84): arity 2, the trie and the id. The fuel is the entry and the body, summed over the arms.
-	register("d2fdaaf956192038f56048a9263a908b2f03f9e7bd62466bbfbffde57f5b42ce", func(args []Value) (Value, int64, bool) {
+	register("53a241d4f429c776fc8ce3ce609372231d3fe3182c3877f37d913b1d682fd44e", func(args []Value) (Value, int64, bool) {
 		id, ok := args[1].(Small)
 		if !ok {
 			return nil, 0, false
@@ -217,7 +217,7 @@ func init() {
 	})
 
 	// setB (owner setB@100): arity 3, the trie, the id and the binding.
-	register("d2dac5d69d05121a2ceb05b0bad4b064c58c31648eee78322bfe6700b4f769f8", func(args []Value) (Value, int64, bool) {
+	register("83663ed16315c96d4e95165d41c7cf939139c5712081152d78f531d0820ef125", func(args []Value) (Value, int64, bool) {
 		id, ok := args[1].(Small)
 		if !ok || id < 0 {
 			return nil, 0, false

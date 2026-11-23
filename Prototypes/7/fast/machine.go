@@ -263,11 +263,6 @@ func machine(m mode, node *Node, env []Value, fv Value, args []Value, fuel int64
 					// The arguments alias the operands, which are cut back below. They are read once, to build the frame or a partial application (which copies them), so nothing outlives the operands.
 					args = vals[1:]
 					m = mApply
-				case OpCell:
-					value = &Cell{
-						Head: vals[0],
-						Tail: vals[1],
-					}
 				case OpCon:
 					value = &Con{
 						Tag: cnode.Tag,

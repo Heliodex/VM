@@ -53,7 +53,7 @@ func register(lawHash string, fn jetFn) {
 
 func init() {
 	// tl (measure/boot/types.l2, line 24): match (tail l), Ok t -> t, Err -> nil. Measured: a cell takes 27 steps with the entry, nil takes 73.
-	register("946d5f34067872fe9c5fa066e42bc19bafd80f03f99ee40ba1e7e41a5175f1a1", func(args []Value) (Value, int64, bool) {
+	register("4621b889e908273f6d0e41feab9e966ddd9386c393e34e2d1002b7489e241966", func(args []Value) (Value, int64, bool) {
 		switch l := args[0].(type) {
 		case *Cell:
 			return l.Tail, 27, true
@@ -65,7 +65,7 @@ func init() {
 	})
 
 	// hdOr (line 14), the inner law of two arguments (the list, then the default): match (head l), Ok x -> x, Err -> dflt. Measured: a cell takes 29 steps with the entry, nil takes 77.
-	register("752c09cccd9206aa0ce94b38edebd9776174d23f6485121cde4340b0e0dcf20e", func(args []Value) (Value, int64, bool) {
+	register("29999bac5ee3f1d5b7fd4932b4db1e67f94f9517f26c1b24cc27feb980bc6378", func(args []Value) (Value, int64, bool) {
 		switch l := args[0].(type) {
 		case *Cell:
 			return l.Head, 29, true
