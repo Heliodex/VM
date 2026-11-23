@@ -155,6 +155,19 @@ const function argsOf(levels: { number }, map: { number }): { Form }
 	return args
 end
 
+-- A chain of lambdas (a curried function of several arguments) as one law of several arguments: the number of lambdas in the chain, and the body under them.
+const function lamChain(e: Expr): (number, Expr)
+	local n = 0
+	local cur: Expr = e
+
+	while cur.op == "lam" do
+		n += 1
+		cur = cur.body
+	end
+
+	return n, cur
+end
+
 -- A recursive function, written as fix applied to a lambda that binds the function itself (the desugarer's letrec). Inside its body the function is arg 0, the law itself, applied to the outer variables it uses. So there is no fixed point: a recursive call is a call of the law, and the law is one law. The lambda's own argument is the law's first argument after the outer variables.
 -- e is the lambda that binds the function (at level depth); its body is the function's own lambda (at depth + 1), whose body is at depth + 2.
 lowerFix = function(e: Expr, depth: number, map: { number }): Form
@@ -168,8 +181,9 @@ lowerFix = function(e: Expr, depth: number, map: { number }): Form
 		error("lower: a recursive function that is not a lambda", 0)
 	end
 
-	const body = value.body
-	const free = sortedFree(body, depth + 2, depth)
+	-- The function's own lambdas are at depth + 1 onwards, so its body is under n of them.
+	const n, body = lamChain(value)
+	const free = sortedFree(body, depth + 1 + n, depth)
 	local inner: { number } = {}
 
 	for i, lvl in free do
@@ -177,9 +191,13 @@ lowerFix = function(e: Expr, depth: number, map: { number }): Form
 	end
 
 	inner[depth] = 0
-	inner[depth + 1] = #free + 1
+
+	for j = 1, n do
+		inner[depth + j] = #free + j
+	end
+
 	inner[-1] = #free
-	const law: Law = { kind = "law"; arity = #free + 1; body = lower(body, depth + 2, inner) }
+	const law: Law = { kind = "law"; arity = #free + n; body = lower(body, depth + 1 + n, inner) }
 
 	if lawHook ~= nil then
 		lawHook(value, law)
@@ -191,7 +209,6 @@ lowerFix = function(e: Expr, depth: number, map: { number }): Form
 
 	return { op = "call"; f = { op = "lit"; value = law }; args = argsOf(free, map) }
 end
-
 lower = function(e: Expr, depth: number, map: { number }): Form
 	if e.op == "quote" then
 		if type(e.value) == "number" then
@@ -214,15 +231,19 @@ lower = function(e: Expr, depth: number, map: { number }): Form
 
 		return slotForm(slot, map)
 	elseif e.op == "lam" then
-		const free = sortedFree(e.body, depth + 1, depth)
+		const n, body = lamChain(e)
+		const free = sortedFree(body, depth + n, depth)
 		local inner: { number } = {}
 
 		for i, lvl in free do
 			inner[lvl] = i
 		end
 
-		inner[depth] = #free + 1
-		const law: Law = { kind = "law"; arity = #free + 1; body = lower(e.body, depth + 1, inner) }
+		for j = 1, n do
+			inner[depth + j - 1] = #free + j
+		end
+
+		const law: Law = { kind = "law"; arity = #free + n; body = lower(body, depth + n, inner) }
 
 		if lawHook ~= nil then
 			lawHook(e, law)
@@ -274,7 +295,27 @@ lower = function(e: Expr, depth: number, map: { number }): Form
 	elseif e.op == "apply" and e.f == VM.fix and e.arg.op == "lam" and e.arg.body.op == "lam" then
 		return lowerFix(e.arg, depth, map)
 	elseif e.op == "apply" then
-		return { op = "call"; f = lower(e.f, depth, map); args = { lower(e.arg, depth, map) } }
+		-- The arguments of a chain of applications, as one call (the head is not an application, or the fixed point's own application).
+		local args: { Expr } = {}
+		local head: Expr = e
+
+		while head.op == "apply" and head.f ~= VM.fix do
+			table.insert(args, 1, head.arg)
+			head = head.f
+		end
+
+		if head == e then
+			-- A fixed point that is not a lambda of a lambda (not a recursive function): an application of it, as it is.
+			return { op = "call"; f = lower(e.f, depth, map); args = { lower(e.arg, depth, map) } }
+		end
+
+		local forms: { Form } = {}
+
+		for _, a in args do
+			table.insert(forms, lower(a, depth, map))
+		end
+
+		return { op = "call"; f = lower(head, depth, map); args = forms }
 	elseif e.op == "prim" then
 		const name = Primitives.BY_TAG[e.tag].name
 		const tag = CORE_TAG[name]

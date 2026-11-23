@@ -216,10 +216,6 @@ These need an answer from the project owner before the phase that depends on the
 
 ## Next step
 
-Recursion is now one law (`fix` is lowered to self-reference, commit 445f28b): the checker takes 125,455,651 core steps, down from 141,778,148, and `cross_run` still agrees on 193 comparisons. What remains before `findB` and `setB` can be jetted as whole recursions:
+Recursion is one law, and multi-argument functions are one law of several arguments, with calls flattened (commits 445f28b and the uncurry step after it). The checker's core program takes 108,352,804 steps, down from 141,778,148 before the recursion step, and `cross_run` still agrees on 193 comparisons, with 4 named differences and 0 disagreements. The three jets still fire, 493,517 times, with the same results.
 
-- **Uncurry.** An L2 function of several arguments is a chain of one-argument lambdas, so a recursive call is two entries and a closure. Lowering the chain as one law of several arguments makes a recursive call one entry. Results are unchanged; the laws' arities and hashes change, so the jets' hashes are re-read from the regenerated program.
-- **Flatten calls.** `apply (apply f a) b` becomes one `call f a b`. Results are unchanged, but the arguments are evaluated before the application, so when two arguments would both error the message can differ. `cross_run` compares errors, not messages, so it would still pass; the Phase 4 cases check messages, and those would be regenerated.
-- **Then the jets.** `findB` and `setB` each get a fuel formula summed along the path their recursion takes, measured on the reference as the three helpers were.
-
-The first two change the core's arities and evaluation order, so I'd like a go-ahead before starting them.
+Next are the `findB` and `setB` jets, which are about 47% of the profile. Each needs a fuel formula for its whole recursion: the entry, the steps of each level by the branch it takes (the four remainders and the terminal cases), summed along the path. The per-branch costs are measured on the reference, as the helpers' were, and the formula is checked on generated tries and on the checker. The regenerated fixtures already hold the checker's reference steps.
