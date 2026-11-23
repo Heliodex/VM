@@ -349,6 +349,14 @@ The reader and writer have no limit on the depth of a program: both keep their o
 
 A writer refuses a thunk, a pin of a thunk, and any other value without a binary form.
 
+### 12.7 Content hash
+
+The content hash of a value that has a binary form is the SHA-256 of its encoding in section 12.3, without the header byte. It is 32 bytes. A law's hash is the hash of its own encoding: its tag, its arity and its body.
+
+The hash is the one identity that the rules of the spec use: a law's name (section 1), a memo key (section 7), the law a jet replaces (section 3), and an interned pin (primitive 10). Two values have the same hash exactly when they have the same binary form, so every implementation that writes section 12 the same way computes the same hashes. A value with no binary form (a thunk, or a pin of one) has no hash, and a primitive that needs one is an error.
+
+The header byte is left out so that a value's hash is the same whether it is written alone or inside another value. Example: the law `inc` (section 3) is `05 01 1a 00 11 01 10 02 01`, and its hash is `1b4ec34d dd5d101a ad9fd988 9cdf35b5 68a2b93f 2a2061cc 9819af67 768bb2dd`.
+
 ## 13. Form count
 
 The forms are `lit`, `arg`, `call`, `cell`, `con`, `case`, `if`, `let`, `delay`, `force` and `prim`. That is eleven, within the limit of twelve in Phase 2's exit test. The fourteen primitives are not forms: they are the table in section 4, so the form count does not grow when a primitive is added.
