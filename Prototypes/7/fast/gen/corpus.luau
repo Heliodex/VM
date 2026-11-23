@@ -110,15 +110,21 @@ print(`# program layout {hex(program(layoutC, "layout"))}`)
 print(`# program lex {hex(program(lexC, "lex"))}`)
 print(`# program parse {hex(program(parseC, "parse"))}`)
 print(`# program check {hex(program(checkC, "check"))}`)
--- The corpus: the same four files as the Phase 0 harness.
+-- The corpus: the four boot files of the Phase 0 harness, then the standard library (Prototype 6's lib folder, 20 files), which tops the corpus up to 2,500 lines and more. A library file is named by its path from the programs folder (lib/...), and its label is that path.
 const corpus = { "lex.l2", "parse.l2", "layout.l2", "types.l2" }
+
+for _, name in { "abs", "append", "contains", "filter", "fold", "gcd", "insert", "length", "map", "max", "min", "ninefold", "nth", "range", "reverse", "sort", "sum", "take", "triple", "unwrap_or" } do
+	table.insert(corpus, "lib/" .. name .. ".l2")
+end
+
 local lines = 0
 local bytes = 0
 
 for _, file in corpus do
-	const text = readFile(BOOT6 .. file)
+	const isLib = string.sub(file, 1, 4) == "lib/"
+	const text = readFile(if isLib then P6 .. file else BOOT6 .. file)
 	const parsedFile = ProgramFile.parse(text, nil)
-	const raw = Compile.compile(text, "boot/" .. file).raw
+	const raw = Compile.compile(text, if isLib then file else "boot/" .. file).raw
 	bytes += #text
 
 	for _ in string.gmatch(text, "\n") do
