@@ -151,9 +151,13 @@ Each change is measured on the same harness, and the variant lives in `measure/b
 
 *Exit, met:* the checker's steps are linear in the size of the program on generated programs of 25 to 1,600 functions (ratios 1.94 to 2.08 per doubling), the 160 programs of `infer_run` give the same answers as the Luau checker (`measure/results/infer_run_*.txt`), imports agree with the Luau checker and an unimported name is refused by both (`imports_run.luau`, `negative_import_run.luau`), and layout's output equals the host's on 57 inputs (`layout_parity.luau`). The remaining accessor cost is a Phase 1 follow-up, not a blocker for the exit test.
 
-**Phase 2: the core spec.** Write `Prototypes/7/SPEC.md`: the values, the forms, the fuel rule, the jet and memo rules, and the outcomes (`value`, `error`, `out_of_fuel`).
+**Phase 2: the core spec.** Done: `Prototypes/7/SPEC.md`. It has seven kinds of value, eleven forms (within the limit of twelve), twelve primitives with no `Result`, the outcomes, the fuel rule, the memo rule (a hit charges the stored fuel), the jet rule (declared fuel, or "work only"), and examples.
 
-*Exit:* the spec has at most twelve forms, and each one has a rule and at least one example.
+*Exit, met:* the spec has eleven forms, each with a rule and an example, and seven examples in section 9 with their expected outcomes. Phase 3 checks the examples by running them.
+
+Decisions taken in the spec (section 11, each revisable): laziness is explicit (`delay`, `force`); jet fuel is a declared formula, or "work only"; strings stay lists of integers; pins are wrappers read through `unpin`; errors end the run and are not values; calls are strict; the step rule is one per form and one per law entry.
+
+The two costs Phase 1 measured are answered in the core: recursion is `arg 0` (no fixed-point combinator, about 9% of the checker's steps), and `div`, `head` and `tail` are primitives with no `Result` (the program tests first, about 12% of the checker's steps were the accessors).
 
 **Phase 3: the reference interpreter.** A small interpreter of the spec, with an explicit stack. It is the oracle, so it is written for clarity, not speed. Prototype 5's examples are ported to the core, through the L2 desugarer for the L2 programs.
 
