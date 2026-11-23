@@ -146,7 +146,7 @@ The step count of a run is its fuel used. A run's steps are the same whatever th
 
 A call may be memoised, in the sense of a table from its key to its result. The key is the function's content hash and the hashes of its arguments.
 
-- A call is memoised only if every argument is data: an integer, nil, a cell or constructor of data, or a pin. A call with a function, thunk or non-data argument is not memoised.
+- A call is memoised when every argument has a content hash (section 12.7): that is, every argument except a thunk. A thunk is a delayed call with no binary form, so a call with a thunk argument is not memoised. A function is a law or a partial application, and it is a valid part of a key: a law is closed, so its content determines what it does (decision 14).
 - A memo entry stores the call's result and the fuel the call used.
 - A memo hit **charges the stored fuel**. It does no work. So the fuel of a run is the same with the memo as without it, and only the work done differs.
 
@@ -241,6 +241,7 @@ These are the defaults this spec takes. Each can be changed, and a change is rec
 11. **Jets are fuel-exact.** Every jet declares a fuel formula equal to the fuel of the law it replaces, and there are no work-only jets. Fuel is therefore the same on every machine, with or without jets. A work-only jet would make steps and out-of-fuel depend on which jets are installed, and jets are the part of the design most likely to make a run depend on something other than the spec. Jets are pure, and a jet that cannot match its law's fuel is not a jet.
 12. **Jets replace laws only; primitives stay primitives.** A primitive is already one step of native work, and a jet would add a law entry and its argument forms to every use, raising the fuel for no gain, so a primitive gets no jet. A jet is for a law built from several forms. Work that fuel does not count (for example, `pin` encoding a whole value, or a big integer's size) is a known gap, and it is closed by a spec change, not by a jet. A new primitive also needs a spec change, with its reason.
 13. **Compound values are hashed from their parts.** The content hash of a cell, a constructor, a partial application or a pin is computed from its parts' hashes, not from its whole encoding (section 12.7), so a memo key (section 7) costs one hash per new node rather than a walk of the whole value on every call. Integers, nil and laws keep the hash of their encoding, so law hashes and the jets are unchanged. Phase 7's memo needs this; the spec's rules about the memo are unchanged.
+14. **Functions are memo keys.** A law has no free variables, and a partial application is a law and its arguments, so the content hash of a function determines what it does. Excluding functions from the memo, as the first draft of section 7 did, left a one-declaration change re-checking about 90% of the checker's work, because the calls that pass a continuation or a partial application never hit. Including them, the same change re-checks 129 calls and about 5,000 steps of work, against 108 million for a cold run. The fuel rules of section 7 are unchanged.
 
 ## 12. Binary format
 
