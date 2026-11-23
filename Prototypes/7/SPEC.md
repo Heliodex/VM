@@ -237,6 +237,7 @@ These are the defaults this spec takes. Each can be changed, and a change is rec
 7. **The step rule** is one step per form and one per law entry. Phase 3 writes the step counts of the examples into its tests, so a change to this rule is visible.
 8. **Integers are unbounded.** The VM's integers have no size limit, and the ±(2^53 − 1) bound of Prototypes 5 and 6 is a limit of the Luau host (doubles), not of the VM. The reason: a bound in the VM would make the answer depend on the host. Consequence for Phase 3: the Luau reference needs a bignum representation for integers, and its tests must include values beyond 2^53.
 9. **Constructor tags are read by primitives.** `tagof` and `payload` are primitives 12 and 13, not forms. Phase 3 found this gap: Prototype 6 reads a constructor's tag with forms, but a `case` cannot read a tag for an open set of tags, so the core needs a way to get the tag as a number. Adding two primitives keeps the form count at eleven.
+10. **A suspended expression is a thunk, kind 6.** Kind 4 is for pins: values in normal form, held by content hash. Prototype 5 reports a suspended expression as kind 4, and its example expects that; the core does not, so the example is superseded for the core. A thunk is not data (it has no binary form, and `pin` refuses it), so giving it the pin's kind would make `kind` unable to tell a stored value from an unevaluated call.
 
 ## 12. Binary format
 
