@@ -528,29 +528,29 @@ do
 end
 
 -- ---- 9. the corpus helpers that take most of the interpreted steps: first (the checker's and the parser's), hd (the layout's) and kn (the parser's token kinds). Each is a law of one argument, so its jet is a walk of one match, and its cost is one number per arm.
-
 do
 	const wanted: { [string]: number } = { ["check:first@19"] = 1, ["layout:hd@11"] = 1, ["parse:kn@22"] = 1 }
 	const found: { [string]: Law } = {}
 
 	const function collect(c: Compile.Compiled, stage: string)
-		Lower.expr(c.expr, function(e, l)
-			const key = `{stage}:{V.ownerOf(e)}`
+		Lower.expr(
+			c.expr,
+			function(e, l)
+				const key = `{stage}:{V.ownerOf(e)}`
 
-			if wanted[key] == l.arity then
-				found[key] = l
+				if wanted[key] == l.arity then
+					found[key] = l
+				end
 			end
-		end)
+		)
 	end
 
-	collect(Compile.compile(readFile("boot/layout.l2"), "boot/layout.l2"), "layout")
+	collect(Compile.compile(readFile "boot/layout.l2", "boot/layout.l2"), "layout")
 	collect(Compile.compile(readFile(BOOT6 .. "parse.l2"), "parse.l2"), "parse")
-	collect(Compile.compile(readFile("boot/types.l2"), "boot/types.l2"), "check")
-
+	collect(Compile.compile(readFile "boot/types.l2", "boot/types.l2"), "check")
 	const firstLaw = found["check:first@19"]
 	const hdLaw = found["layout:hd@11"]
 	const knLaw = found["parse:kn@22"]
-
 	const inputs: { Value } = {
 		NIL,
 		{ kind = "cell", head = 1, tail = NIL },
@@ -575,25 +575,26 @@ do
 end
 
 -- ---- 10. the list helpers the corpus runs most, in the checker and the parser: lenOf (the checker's length), envKid and envPut (the checker's name environment, a list of (byte . node) pairs), and same as the parser has it (a different body from the checker's: its test on a list is a nil test, so a number is not a cell, and the walk gives up on that). Each is found by its owner and arity, as in section 9, and called on lists, with the arguments of the call read from one pair (or a triple of pairs), so every arm of each body is taken: a list that ends, a key found or not, a number and a nil, a non-number key that the body refuses.
-
 do
 	math.randomseed(23)
 	const wanted: { [string]: number } = { ["check:lenOf@55"] = 1, ["check:envKid@292"] = 2, ["check:envPut@302"] = 3, ["parse:same@20"] = 2 }
 	const found: { [string]: Law } = {}
 
 	const function collect(c: Compile.Compiled, stage: string)
-		Lower.expr(c.expr, function(e, l)
-			const key = `{stage}:{V.ownerOf(e)}`
+		Lower.expr(
+			c.expr,
+			function(e, l)
+				const key = `{stage}:{V.ownerOf(e)}`
 
-			if wanted[key] == l.arity then
-				found[key] = l
+				if wanted[key] == l.arity then
+					found[key] = l
+				end
 			end
-		end)
+		)
 	end
 
-	collect(Compile.compile(readFile("boot/types.l2"), "boot/types.l2"), "check")
+	collect(Compile.compile(readFile "boot/types.l2", "boot/types.l2"), "check")
 	collect(Compile.compile(readFile(BOOT6 .. "parse.l2"), "parse.l2"), "parse")
-
 	const LEN = found["check:lenOf@55"]
 	const KID = found["check:envKid@292"]
 	const PUT = found["check:envPut@302"]
@@ -646,8 +647,8 @@ do
 
 	emit("jet check:envKid@292 no list", "body", law(1, call(lit(KID), prim(8, arg(1)), prim(9, arg(1)))), cellV(5, 1), 1000)
 	emit("jet check:envKid@292 nil", "body", law(1, call(lit(KID), prim(8, arg(1)), prim(9, arg(1)))), cellV(NIL, 1), 1000)
-	emit("jet check:envKid@292 a key that is not a number", "body", law(1, call(lit(KID), prim(8, arg(1)), prim(9, arg(1)))), cellV(listOfV({ cellV({ kind = "con", tag = 0, payload = 1 }, 2) }), 1), 1000)
-	emit("jet check:envKid@292 a non-number b", "body", law(1, call(lit(KID), prim(8, arg(1)), prim(9, arg(1)))), cellV(listOfV({ cellV(1, 2) }), { kind = "con", tag = 0, payload = 1 }), 1000)
+	emit("jet check:envKid@292 a key that is not a number", "body", law(1, call(lit(KID), prim(8, arg(1)), prim(9, arg(1)))), cellV(listOfV { cellV({ kind = "con", tag = 0, payload = 1 }, 2) }, 1), 1000)
+	emit("jet check:envKid@292 a non-number b", "body", law(1, call(lit(KID), prim(8, arg(1)), prim(9, arg(1)))), cellV(listOfV { cellV(1, 2) }, { kind = "con", tag = 0, payload = 1 }), 1000)
 
 	-- envPut: (kids . (b . child)), the same kids, and a child that is a number.
 	for i = 1, 60 do
@@ -675,7 +676,7 @@ do
 			b = table.clone(a)
 
 			if #b > 0 then
-				b[#b] = ((b[#b] :: number) + 1) % 3
+				b[#b] = (b[#b] :: number + 1) % 3
 			end
 		else
 			b = randInts(math.random(0, 4), 2)
@@ -685,11 +686,11 @@ do
 	end
 
 	emit("jet parse:same@20 nil and nil", "body", law(1, call(lit(SAME), prim(8, arg(1)), prim(9, arg(1)))), cellV(NIL, NIL), 1000)
-	emit("jet parse:same@20 nil and a list", "body", law(1, call(lit(SAME), prim(8, arg(1)), prim(9, arg(1)))), cellV(NIL, listOfV({ 1 })), 1000)
-	emit("jet parse:same@20 a list and nil", "body", law(1, call(lit(SAME), prim(8, arg(1)), prim(9, arg(1)))), cellV(listOfV({ 1 }), NIL), 1000)
+	emit("jet parse:same@20 nil and a list", "body", law(1, call(lit(SAME), prim(8, arg(1)), prim(9, arg(1)))), cellV(NIL, listOfV { 1 }), 1000)
+	emit("jet parse:same@20 a list and nil", "body", law(1, call(lit(SAME), prim(8, arg(1)), prim(9, arg(1)))), cellV(listOfV { 1 }, NIL), 1000)
 	emit("jet parse:same@20 a number and nil", "body", law(1, call(lit(SAME), prim(8, arg(1)), prim(9, arg(1)))), cellV(5, NIL), 1000)
 	emit("jet parse:same@20 nil and a number", "body", law(1, call(lit(SAME), prim(8, arg(1)), prim(9, arg(1)))), cellV(NIL, 5), 1000)
-	emit("jet parse:same@20 a non-number element", "body", law(1, call(lit(SAME), prim(8, arg(1)), prim(9, arg(1)))), cellV(listOfV({ { kind = "con", tag = 0, payload = 1 } }), listOfV({ 1 })), 1000)
+	emit("jet parse:same@20 a non-number element", "body", law(1, call(lit(SAME), prim(8, arg(1)), prim(9, arg(1)))), cellV(listOfV { { kind = "con", tag = 0, payload = 1 } }, listOfV { 1 }), 1000)
 end
 
 -- ---- 11. prune (the checker's chase of a type variable through the trie's bindings): random tries of bindings, Unbound or Bound to a type variable of a larger id (so the chase ends) or to a constructor, built as the checker builds them (section 6's layout), and types that are variables and constructors, with the edge inputs the jet must refuse.
@@ -697,13 +698,14 @@ do
 	math.randomseed(31)
 	const PRUNE_ARITY = 2
 	const found: { [string]: Law } = {}
-
-	Lower.expr((Compile.compile(readFile("boot/types.l2"), "boot/types.l2")).expr, function(e, l)
-		if V.ownerOf(e) == "prune@126" and l.arity == PRUNE_ARITY then
-			found["prune"] = l
+	Lower.expr(
+		Compile.compile(readFile "boot/types.l2", "boot/types.l2").expr,
+		function(e, l)
+			if V.ownerOf(e) == "prune@126" and l.arity == PRUNE_ARITY then
+				found["prune"] = l
+			end
 		end
-	end)
-
+	)
 	const PRUNE = found["prune"]
 	const EMPTY: Value = { kind = "con", tag = 0, payload = NIL }
 
@@ -732,7 +734,7 @@ do
 			if e.id == 0 then
 				root = e.b
 			else
-				table.insert(subs[(e.id % 4) + 1], { id = e.id // 4, b = e.b })
+				table.insert(subs[e.id % 4 + 1], { id = e.id // 4, b = e.b })
 			end
 		end
 
@@ -785,4 +787,3 @@ do
 	emit("jet check:prune@126 a constructor of tag 2", "body", law(1, callPrune()), cellV(EMPTY, { kind = "con", tag = 2, payload = 0 }), 1000)
 	emit("jet check:prune@126 a variable in an empty trie", "body", law(1, callPrune()), cellV(EMPTY, tvar(7)), 1000)
 end
-

@@ -297,7 +297,6 @@ do
 end
 
 -- 3. (Pins were removed: decision 16 of the spec.)
-
 -- 4. Errors, each with its message.
 do
 	local o = Interp.runForm(prim(8, lit(3)), NIL, 100)

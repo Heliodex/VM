@@ -472,7 +472,6 @@ local function mutualSurface(bindings: { Binding }, body: Expr, at: Pos): Expr
 	end
 
 	local chain = tree(1, n)
-
 	const dispatch = fnE({ " self" }, fnE({ " tag" }, fnE({ " x" }, chain, at), at), at)
 	local groupBody = body
 
@@ -966,7 +965,11 @@ local function desugarHeadMatch(name: string, arg: Expr, okArm: Arm, errArm: Arm
 
 	if okBind ~= nil then
 		checkBinder(okBind, okArm.pat.at)
-		const part = if name == "head" then M.head(M.var(0)) else M.tail(M.var(0))
+		const part =
+			if name == "head" then
+				M.head(M.var(0))
+			else
+				M.tail(M.var(0))
 		okBranch = M.app(M.lam(desugar(okArm.body, withNames(inner, { okBind }), ctors)), part)
 	else
 		okBranch = desugar(okArm.body, inner, ctors)
@@ -974,7 +977,11 @@ local function desugarHeadMatch(name: string, arg: Expr, okArm: Arm, errArm: Arm
 
 	local errBranch: M.Expr
 	const errBind = (errArm.pat :: any).bind :: string?
-	const reason = if name == "head" then "head of an empty list" else "tail of an empty list"
+	const reason =
+		if name == "head" then
+			"head of an empty list"
+		else
+			"tail of an empty list"
 
 	if errBind ~= nil then
 		checkBinder(errBind, errArm.pat.at)

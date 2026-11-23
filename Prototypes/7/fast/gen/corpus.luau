@@ -59,9 +59,16 @@ end
 
 -- The laws of a program, with their owners (the function each lambda belongs to), for the corpus profile: one line per law.
 const function program(c: Compile.Compiled, name: string): string
-	const body: Form = { op = "call", f = Lower.expr(c.expr, function(e, l)
-		print(`# law {name}:{V.ownerOf(e)} {l.arity} {hex(Format.encodeValue(l) :: string)}`)
-	end), args = { { op = "arg", index = 1 } } }
+	const body: Form = {
+		op = "call",
+		f = Lower.expr(
+			c.expr,
+			function(e, l)
+				print(`# law {name}:{V.ownerOf(e)} {l.arity} {hex(Format.encodeValue(l) :: string)}`)
+			end
+		),
+		args = { { op = "arg", index = 1 } },
+	}
 	const bytes = Format.encodeProgram { kind = "law", arity = 1, body = body }
 
 	return bytes :: string
@@ -122,9 +129,20 @@ local bytes = 0
 
 for _, file in corpus do
 	const isLib = string.sub(file, 1, 4) == "lib/"
-	const text = readFile(if isLib then P6 .. file else BOOT6 .. file)
+	const text = readFile(
+		if isLib then
+			P6 .. file
+		else
+			BOOT6 .. file
+	)
 	const parsedFile = ProgramFile.parse(text, nil)
-	const raw = Compile.compile(text, if isLib then file else "boot/" .. file).raw
+	const raw = Compile.compile(
+		text,
+		if isLib then
+			file
+		else
+			"boot/" .. file
+	).raw
 	bytes += #text
 
 	for _ in string.gmatch(text, "\n") do

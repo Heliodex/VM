@@ -117,7 +117,6 @@ end
 local lawHook: ((Expr, Law) -> ())? = nil
 local lower: (e: Expr, depth: number, map: { number }) -> Form
 local lowerFix: (e: Expr, depth: number, map: { number }) -> Form
-
 -- A constant: a variable bound to a closed value (a law or an integer, a form that is a lit) is not a slot of the frame, and is not passed to the laws that use it. Its map entry is CONST_BASE - k, where constForms[k] is the form it stands for. A top-level function of the program is such a constant, so a law that calls one does not carry it as an argument.
 local CONST_BASE = -1000
 local constForms: { Form } = {}
@@ -328,6 +327,7 @@ lowerFix = function(e: Expr, depth: number, map: { number }): Form
 
 	return { op = "call"; f = { op = "lit"; value = law }; args = argsOf(free, map) }
 end
+
 -- An application of a lambda to a closed value, when the value lowers to a lit: the lambda's variable is that constant, and the body is lowered in this frame (no slot, no law). It is tried first, since a top-level binding of the program is such an application. nil when it does not apply.
 const function tryConstLet(e: Expr, depth: number, map: { number }): Form?
 	if e.op ~= "apply" then
