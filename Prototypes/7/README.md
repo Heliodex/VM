@@ -181,13 +181,28 @@ The two costs Phase 1 measured are answered in the core: recursion is `arg 0` (n
 
 **Phase 6: interned names and a byte kind.** Phase 0 measured name comparison (`same`) at 4.3% of the checker's steps on `types.l2`, and its share grows with the environment. Phase 1 removes most of the environment search, so Phase 6 is worth doing only if its share is still large after Phase 1. If it is, intern names as pins and add a byte kind for source text, with lexing as a jet. Lexing is linear already (565–706 steps per byte), so the byte kind is for speed, not for growth.
 
+*Decision: not done (measured).* The core's profile of the checker (Phase 6 measurement, `fast/profile_test.go`) has name comparison (`same`) at 7.0% of the steps, and the environment's own operations at about 11% more. Interning names would remove the comparison, and nothing near that: the corpus build (Phase 8) takes about 6.9 s against a 1 s target, so removing 7% of the steps cannot close the gap. It would also change the lexer, the parser and the fuel of every name operation (a spec change and a rewrite of the boot programs). The name operations are better left as they are until the speed target needs them, and then the first step is a jet on `same`, which keeps the fuel.
+
 *Exit:* the lexer and the parser give the same token and tree output on every program file, and the name cost in the histogram drops to a small share.
 
 **Phase 7: memo and incremental re-check.** Add the memo table for pure calls, with the fuel rule above. Benchmark two runs: a cold check, and a re-check of the same input and then of an input with one declaration changed.
 
+*Result, met (`fast/memo.go`, `fast/memo_test.go`, decisions 13 and 14):* the memo keys a saturated call by its law's content hash and the content hashes of its arguments, and a hit charges the stored fuel. The fuel is identical with and without it on every case, cold and warm. Two spec changes were needed: compound values are hashed from their parts (decision 13), and functions may be keys (decision 14). The second matters: with the memo keyed on data only, a one-declaration change still re-checked 90% of the checker's work, because the calls that pass a continuation never hit. With functions in the key, the changed declaration re-checks 270 calls (8,009 steps of work, against 108 million for a cold run); an unchanged input re-checks in 3 steps. The price is on the cold run: 1.15 s without the memo and about 2.5 s with it, and the memo stores a bounded set of entries (calls of at least 1,000 steps, `MemoMinFuel`), since without the threshold a cold corpus build stored 9.3 million entries and used 4.7 GB. The memo is off unless turned on.
+
 *Exit:* the second run of an unchanged input does near-zero work, a one-declaration change costs work in proportion to that declaration, and fuel is identical with and without the memo.
 
 **Phase 8: check against the speed target.** Run the harness on the reference host, and compare with the targets in "Speed target". Write the result in this README, including the misses.
+
+*Result: the target is not met, on the Go machine (`fast/corpus_test.go`, `fast/testdata/corpus.txt`).* The corpus is the four boot files (2,235 lines, 82,118 bytes). Each goes through its imports, then layout, lex, parse and check, on the four stage programs, as the Phase 0 harness does. Every stage of every file matches the reference. The build takes 441,584,946 core steps, and 6.7 to 6.9 s on this host (1.2 s for the type checker's share of the big file, 3.2 s of it in the checker). Without the jets it takes 10.2 s, and a warm rebuild of the same corpus with the memo takes 0.04 s.
+
+Against the target (2,500 lines under 1 s): the build is about 7 times too slow, and the corpus is 265 lines short of the target size, so the miss is about 7.7 times at 2,500 lines, assuming linear growth (Phase 0 measured near-linear growth on generated programs). The misses, in order of size:
+
+- **The step count.** About 198,000 core steps per line. 36.5% of them are jet steps, which run natively; the other 281 million steps are interpreted, at about 40 million per second.
+- **The step rate.** The interpreter is a single loop over resolved nodes. A native host in the usual sense (a faster compiled language) would speed up each step by a small factor, not 7 times.
+- **The memo** does not help a cold build (it roughly doubles it), so it is a re-check tool only.
+- **The scope.** The corpus is not the full compiler: desugar is not bootstrapped (it runs on the host, and is not counted), and the corpus is 2,235 lines against the 2,500 of the target.
+
+Decision on the native host: the Go machine already is the native host, and the miss is about 7 times, which a faster host would not close on its own. What would change the decision: a front end at about 50,000 core steps per line (a 4 times cut in steps), with the jets covering more of them; or a machine that compiles law bodies to native code (the plan's "leaf forms may be closures", in Go) and runs the interpreted steps at 3 times the rate or more. Each of those is worth about 3 to 4 times, so the target needs two of them. This is a judgement from one host, not a measurement, and the next step measures it.
 
 *Exit:* a results table, a decision on whether the target needs a native host, and a list of what would change the decision.
 
@@ -216,4 +231,4 @@ These need an answer from the project owner before the phase that depends on the
 
 ## Next step
 
-Phase 5 is complete. The next phase to look at is Phase 6, the interned names and the byte kind, which the plan says is worth doing only if the name comparison is still a large share of the steps. The last measured share (`same`, run 8) was 6% of the Prototype 6 profile, so I'd measure the core's own profile before deciding. Phase 7 (the memo) and Phase 8 (the speed target against the 2,500-line corpus, and desugar) come after it.
+Phases 1 to 8 are done, with the misses written above (the speed target is not met: about 7 times). The remaining work is the experiments on simplicity and speed that the user asked for: the first is to measure the interpreted step rate with a compiled-closure machine, against the 3 times the decision above needs, and the second is to look for steps the front end can drop without changing its results.
