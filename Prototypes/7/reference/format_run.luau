@@ -5,8 +5,9 @@
 --
 --   lute run format_run.luau     (from Prototypes/7/reference)
 
-const Int = require "./int"
 const Format = require "./format"
+const Int = require "./int"
+const Types = require "./types"
 
 local failures = 0
 local total = 0
@@ -57,12 +58,12 @@ const function leb(n: number): string
 end
 
 -- Whether two values are the same, following every table, so a round trip is checked deeply.
-local function isInt(v: any): boolean
+const function isInt(v: any): boolean
 	return type(v) == "number" or Int.isBig(v)
 end
 
 -- Iterative, so a deep program does not overflow the call stack of the test.
-local function same(a: any, b: any): boolean
+const function same(a: any, b: any): boolean
 	local pending: { { any } } = { { a, b } }
 
 	while #pending > 0 do
@@ -99,31 +100,31 @@ local function same(a: any, b: any): boolean
 end
 
 -- Builders, so the tests read like the spec.
-const function lit(v: any): any
+const function lit(v: Types.Value): Types.Form
 	return { op = "lit", value = v }
 end
 
-const function arg(i: number): any
+const function arg(i: number): Types.Form
 	return { op = "arg", index = i }
 end
 
-const function call(f: any, ...: any): any
+const function call(f: Types.Form, ...: Types.Form): Types.Form
 	return { op = "call", f = f, args = { ... } }
 end
 
-const function prim(tag: number, ...: any): any
+const function prim(tag: number, ...: Types.Form): Types.Form
 	return { op = "prim", tag = tag, args = { ... } }
 end
 
-const function law(arity: number, body: any): any
+const function law(arity: number, body: Types.Form): Types.Law
 	return { kind = "law", arity = arity, body = body }
 end
 
-const function cell(a: any, b: any): any
+const function cell(a: Types.Value, b: Types.Value): Types.Cell
 	return { kind = "cell", head = a, tail = b }
 end
 
-const function list(...: any): any
+const function list(...: Types.Value): Types.Value
 	local items = { ... }
 	local v: any = Format.NIL
 
@@ -156,7 +157,7 @@ do
 
 	-- The groups of 2^53 agree with the separate encoder: seven groups of zero, then the group 16, which is eight bytes in all.
 	const groups = Int.lebGroups(Int.magnitudeBytes(TWO_53))
-	const separate = leb(9007199254740992)
+	const separate = leb(0x20000000000000)
 	check("2^53's groups match the separate encoder's bytes", #separate == #groups and string.byte(separate, #separate) == groups[#groups] and #groups == 8, `{#groups} groups, separate encoder {#separate} bytes`)
 end
 
@@ -172,15 +173,18 @@ do
 		{ name = "2^100", value = Int.fromMagnitude(false, { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16 }) },
 		{ name = "-(2^100 + 7)", value = Int.fromMagnitude(true, { 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16 }) },
 		{ name = "nil", value = Format.NIL },
-		{ name = "a list of 5000 integers", value = (function()
-			local items: { any } = {}
+		{
+			name = "a list of 5000 integers",
+			value = (function()
+				local items: { any } = {}
 
-			for i = 1, 5000 do
-				items[i] = i * 1000000007
-			end
+				for i = 1, 5000 do
+					items[i] = i * 1000000007
+				end
 
-			return list(table.unpack(items))
-		end)() },
+				return list(table.unpack(items))
+			end)(),
+		},
 		{ name = "a constructor", value = { kind = "con", tag = 3, payload = cell(-5, Format.NIL) } },
 		{ name = "a law", value = law(2, prim(0, arg(1), arg(2))) },
 		{ name = "a partial application", value = { kind = "app", law = law(3, arg(3)), args = { 1, cell(2, 3) } } },
@@ -191,8 +195,14 @@ do
 		local ok, out = pcall(function()
 			return Format.decodeValue(Format.encodeValue(v.value))
 		end)
-
-		check(`round trip: {v.name}`, ok and same(out, v.value), if ok then "same" else tostring(out))
+		check(
+			`round trip: {v.name}`,
+			ok and same(out, v.value),
+			if ok then
+				"same"
+			else
+				tostring(out)
+		)
 	end
 end
 
@@ -201,36 +211,42 @@ do
 	const inc = law(1, prim(0, arg(1), lit(1)))
 	const incBytes = Format.encodeProgram(inc)
 	check("the program inc is written as the spec says", incBytes == "\2\1\26\0\17\1\16\2\1", hex(incBytes))
-
-	const length = law(1, {
-		op = "if",
-		c = prim(6, prim(7, arg(1)), lit(1)),
-		t = lit(0),
-		e = prim(0, lit(1), call(arg(0), prim(9, arg(1)))),
-	})
-
-	const safediv = law(1, {
-		op = "if",
-		c = prim(6, prim(9, arg(1)), lit(0)),
-		t = { op = "con", tag = 1, e = lit(Format.NIL) },
-		e = { op = "con", tag = 0, e = prim(3, prim(8, arg(1)), prim(9, arg(1))) },
-	})
-
-	const unwrap = law(1, {
-		op = "case",
-		e = arg(1),
-		alts = { { tag = 0, body = arg(2) }, { tag = 1, body = lit(0) } },
-		elseBody = lit(0),
-	})
-
-	const laziness = law(1, {
-		op = "let",
-		e = { op = "delay", call = { op = "call", f = lit(inc), args = { lit(1) } } },
-		body = prim(0, { op = "force", e = arg(2) }, { op = "force", e = arg(2) }),
-	})
-
+	const length = law(
+		1,
+		{
+			op = "if",
+			c = prim(6, prim(7, arg(1)), lit(1)),
+			t = lit(0),
+			e = prim(0, lit(1), call(arg(0), prim(9, arg(1)))),
+		}
+	)
+	const safediv = law(
+		1,
+		{
+			op = "if",
+			c = prim(6, prim(9, arg(1)), lit(0)),
+			t = { op = "con", tag = 1, e = lit(Format.NIL) },
+			e = { op = "con", tag = 0, e = prim(3, prim(8, arg(1)), prim(9, arg(1))) },
+		}
+	)
+	const unwrap = law(
+		1,
+		{
+			op = "case",
+			e = arg(1),
+			alts = { { tag = 0, body = arg(2) }, { tag = 1, body = lit(0) } },
+			elseBody = lit(0),
+		}
+	)
+	const laziness = law(
+		1,
+		{
+			op = "let",
+			e = { op = "delay", call = { op = "call", f = lit(inc), args = { lit(1) } } },
+			body = prim(0, { op = "force", e = arg(2) }, { op = "force", e = arg(2) }),
+		}
+	)
 	const loop = law(1, call(arg(0), arg(1)))
-
 	const programs: { { name: string, p: any } } = {
 		{ name = "inc", p = inc },
 		{ name = "length", p = length },
@@ -245,8 +261,14 @@ do
 		local ok, out = pcall(function()
 			return Format.decodeProgram(Format.encodeProgram(pr.p))
 		end)
-
-		check(`round trip program: {pr.name}`, ok and same(out, pr.p), if ok then "same" else tostring(out))
+		check(
+			`round trip program: {pr.name}`,
+			ok and same(out, pr.p),
+			if ok then
+				"same"
+			else
+				tostring(out)
+		)
 	end
 
 	-- A program nested 20,000 deep: a chain of lets, each binding a literal.
@@ -260,8 +282,14 @@ do
 	local ok, out = pcall(function()
 		return Format.decodeProgram(Format.encodeProgram(deepLaw))
 	end)
-
-	check("round trip: a program 20,000 forms deep", ok and same(out, deepLaw), if ok then "same" else tostring(out))
+	check(
+		"round trip: a program 20,000 forms deep",
+		ok and same(out, deepLaw),
+		if ok then
+			"same"
+		else
+			tostring(out)
+	)
 end
 
 -- 4. The bytes that are refused, each with its reason.
@@ -270,7 +298,7 @@ do
 		{ name = "an empty string", bytes = "", want = "not a value", decodeAs = "value" },
 		{ name = "a program read as a value", bytes = "\2\1\26\0\17\1\16\2\1", want = "not a value", decodeAs = "value" },
 		{ name = "a value read as a program", bytes = "\1\2\0", want = "not a program", decodeAs = "program" },
-		{ name = "an unknown value tag", bytes = "\1\9", want = "tag 9 is not a value", decodeAs = "value" },
+		{ name = "an unknown value tag", bytes = "\1\t", want = "tag 9 is not a value", decodeAs = "value" },
 		{ name = "negative zero", bytes = "\1\3\0", want = "negative zero", decodeAs = "value" },
 		{ name = "a magnitude with a zero last group", bytes = "\1\2\128\0", want = "shortest form", decodeAs = "value" },
 		{ name = "a magnitude cut short", bytes = "\1\2\128", want = "end", decodeAs = "value" },
@@ -293,22 +321,21 @@ do
 
 			return Format.decodeProgram(c.bytes)
 		end)
-
 		check(`refused: {c.name}`, not ok and string.find(tostring(err), c.want, 1, true) ~= nil, tostring(err))
 	end
 end
 
 -- 5. The writer refuses what has no binary form.
 do
-	local ok, err = pcall(Format.encodeValue, { kind = "thunk" })
+	const thunkValue: Types.Thunk = { kind = "thunk", f = Format.NIL, args = {}, done = false, result = nil }
+	local ok, err = pcall(Format.encodeValue, thunkValue)
 	check("a thunk has no binary form", not ok and string.find(tostring(err), "thunk", 1, true) ~= nil, tostring(err))
-
-	ok, err = pcall(Format.encodeValue, { kind = "pin", value = { kind = "thunk" } })
+	const pinOfThunk: Types.Thunk = { kind = "thunk", f = Format.NIL, args = {}, done = false, result = nil }
+	const pinValue: Types.Pin = { kind = "pin", value = pinOfThunk }
+	ok, err = pcall(Format.encodeValue, pinValue)
 	check("a pin of a thunk has no binary form", not ok and string.find(tostring(err), "pin of a thunk", 1, true) ~= nil, tostring(err))
-
 	ok, err = pcall(Format.encodeProgram, law(2, lit(0)))
 	check("a program must be a law of arity 1", not ok and string.find(tostring(err), "arity 1", 1, true) ~= nil, tostring(err))
-
 	ok, err = pcall(Format.encodeProgram, law(1, prim(0, lit(1))))
 	check("a prim with the wrong number of arguments is refused", not ok and string.find(tostring(err), "takes 2 arguments", 1, true) ~= nil, tostring(err))
 end

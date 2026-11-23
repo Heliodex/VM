@@ -7,19 +7,29 @@
 --
 --   lute run cross_run.luau     (from Prototypes/7/reference)
 
-const fs = require "@lute/fs"
+const P5Examples = require "../../5/examples/examples"
+const P5VM = require "../../5/interpreter/vm"
+const L2 = require "../../6/L2/l2"
+const ProgramFile = require "../../6/L2/programfile"
+const Format = require "./format"
 const Int = require "./int"
 const Interp = require "./interp"
 const Lower = require "./lower"
-const Format = require "./format"
-const P5VM = require "../../5/interpreter/vm"
-const P5Examples = require "../../5/examples/examples"
-const L2 = require "../../6/L2/l2"
-const ProgramFile = require "../../6/L2/programfile"
+const Types = require "./types"
+const fs = require "@lute/fs"
 
 const NIL = Format.NIL
-const P6_PROGRAMS = "../../6/L2/programs/"
 
+-- The message of an error outcome, or the empty string for another outcome.
+const function messageOf(o: Types.Outcome): string
+	if o.status == "error" then
+		return o.message
+	end
+
+	return ""
+end
+
+const P6_PROGRAMS = "../../6/L2/programs/"
 local agreed = 0
 local disagreed = 0
 local explainedCount = 0
@@ -35,7 +45,7 @@ const function readFile(path: string): string
 end
 
 -- A machine value, as the reference's: integers, nil, cells and constructors deeply. A function is a marker, and so is a pin.
-local function convert(v: any): any
+const function convert(v: any): any
 	if type(v) == "number" then
 		return v
 	end
@@ -56,7 +66,7 @@ local function convert(v: any): any
 end
 
 -- A test's input, as the reference's value. Unlike a result, a function in an input is a real law: a closed closure lowered (lower.luau). An input closure with an environment is not closed, so it is refused.
-local function convertInput(v: any): any
+const function convertInput(v: any): any
 	if type(v) == "number" then
 		return v
 	end
@@ -79,7 +89,7 @@ local function convertInput(v: any): any
 end
 
 -- Whether a machine value (converted) and a reference value agree. A function agrees with a law or a partial application, a pin with a pin or a thunk.
-local function agree(p: any, r: any): boolean
+const function agree(p: any, r: any): boolean
 	if type(p) == "number" then
 		return (type(r) == "number" or Int.isBig(r)) and Int.compare(p, r) == 0
 	end
@@ -110,7 +120,7 @@ local function agree(p: any, r: any): boolean
 end
 
 -- A disagreement is either a failure, or one of the differences the spec makes on purpose, which is named where it is recorded: the integer range (SPEC.md section 1 and decision 8), and a Prototype 5 pin, which the core models as a thunk (decision 4 and the open question in README.md).
-local function record(name: string, ok: boolean, detail: string, explained: string?)
+const function record(name: string, ok: boolean, detail: string, explained: string?)
 	if ok then
 		agreed += 1
 	elseif explained ~= nil then
@@ -141,15 +151,20 @@ do
 		elseif p5.status == "error" then
 			const r = Interp.runForm(Lower.expr(ex.program), NIL, 20 * ex.fuel)
 			ok = r.status == "error"
-			detail = `machine error {tostring(p5.message)}, reference {r.status} {tostring(r.message)}`
+			detail = `machine error {messageOf(p5)}, reference {r.status} {messageOf(r)}`
 
-			if not ok and r.status == "value" and string.find(tostring(p5.message), "out of range", 1, true) ~= nil then
+			if not ok and r.status == "value" and string.find(messageOf(p5), "out of range", 1, true) ~= nil then
 				explained = "the integer range: the reference has no size limit, so the result is exact"
 			end
 		else
 			const r = Interp.runForm(Lower.expr(ex.program), NIL, 20 * ex.fuel)
 			ok = r.status == "value" and agree(convert(p5.value), r.value)
-			detail = `machine value, reference {r.status} {if r.status == "value" and type(r.value) == "table" then "(" .. tostring(r.value.kind) .. ")" else ""}`
+			detail = `machine value, reference {r.status} {
+				if r.status == "value" and type(r.value) == "table" then
+					"(" .. tostring(r.value.kind) .. ")"
+				else
+					""
+			}`
 			steps5 += p5.steps
 			steps6 += r.steps
 
@@ -179,7 +194,6 @@ do
 	end
 
 	listDir(P6_PROGRAMS, "")
-
 	local tests = 0
 	local steps6 = 0
 	local steps7 = 0
@@ -222,7 +236,7 @@ do
 					detail = `machine not_data, reference {r.status}`
 				elseif p6.status == "error" then
 					ok = r.status == "error"
-					detail = `machine error {tostring(p6.message)}, reference {r.status} {tostring(r.message)}`
+					detail = `machine error {messageOf(p6)}, reference {r.status} {messageOf(r)}`
 				else
 					ok = r.status == "out_of_fuel"
 					detail = `machine {p6.status}, reference {r.status} after {r.steps}`
