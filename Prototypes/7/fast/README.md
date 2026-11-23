@@ -7,7 +7,7 @@ The core of `SPEC.md`, run on Go. It reads the binary format of section 12, and 
 - `value.go`: the values, and the integer operations (`Small` for any integer that fits in int64, `*big.Int` for the rest; a result that fits is always a `Small`).
 - `node.go`: forms, with their parts resolved (children, alternatives, else branch). The reader builds them directly, so a law's body is in this form when it is read.
 - `format.go`: the writer and the reader of section 12, byte for byte the same as `reference/format.luau`, with the same messages.
-- `eval.go`: the evaluator, the one machine. A node is evaluated by a call that returns its value; a call in tail position is returned to a loop (`runBody`), so a loop of any length uses the stack of one call. Operands are kept on one stack. The steps, fuel, errors and outcomes are the spec's, form for form.
+- `eval.go`: the evaluator, the one machine. A node is evaluated by a call that returns its value; a call in tail position is returned to a loop (`runBody`), so a loop of any length uses the stack of one call. Operands are kept on one stack. The steps, fuel, errors and outcomes are the spec's, form for form. A body owns its frame and gives it back to a per-run pool when nothing refers to it any more (`getFrame`, `putFrame`).
 - `machine.go`: the outcome type, `Run` and `RunBody`, and the step hook the profile uses.
 - `eval_test.go`: a tail loop of three million calls, a call nested a hundred thousand deep, and the nesting limit.
 - `corpus_profile_test.go`: the corpus's profile by owner (`PROFILE_CORPUS=1`).
@@ -21,12 +21,12 @@ The core of `SPEC.md`, run on Go. It reads the binary format of section 12, and 
 - `jets.go` also keeps each law's jet on the law, looked up once.
 - `hash.go`: the content hash, the implementation's keys (see "Keys" below).
 - `memo.go`, `memo_test.go`: the memo (SPEC.md section 7), and the incremental measurement.
-- `corpus_test.go`: the corpus build (Phase 8), against `testdata/corpus.txt`.
+- `corpus_test.go`: the corpus build (Phase 8), against `testdata/corpus.txt`, or the file named by `CORPUS` (for example `CORPUS=testdata/corpus2500.txt`, the 2,500-line corpus).
 - `profile_test.go`: the core's profile of the checker (`PROFILE=1`).
 - `fast_test.go`: runs every case in `testdata/cases.txt` with the jets on and off, and times the checker.
 - `jets_test.go`: checks that every jet still names a law of the checker's program or the corpus's.
 - `gen/gen.luau`: writes `testdata/cases.txt` from the reference.
-- `gen/corpus.luau`: writes `testdata/corpus.txt` from the reference, with a `# law` line for each law of the stage programs and its owner.
+- `gen/corpus.luau`: writes `testdata/corpus.txt` from the reference, with a `# law` line for each law of the stage programs and its owner. `gen/corpus2500.luau` is the same for the 2,500-line corpus (`testdata/corpus2500.txt`).
 
 ## Running
 
@@ -76,7 +76,7 @@ The steps are unchanged, by design. The checker takes 68,125,825 core steps and 
 
 ## The corpus build and the memo
 
-The corpus is the four boot files and the 20 standard-library files (24 files, 2,590 lines). The build runs each through its imports and then layout, lex, parse and check, on four core programs, and checks every stage against the reference. It takes 263,212,747 core steps and about 0.94 s here (best of five), with the jets on (2.46 s with them off), against a 1 s target for 2,500 lines, which the 2,590-line build meets by linear extrapolation (about 0.91 s at 2,500 lines; see the plan, Phase 8). With the memo on, a cold build takes 2.5 s, and an unchanged rebuild takes 0.04 s.
+The corpus is the four boot files and the 20 standard-library files (24 files, 2,590 lines); the 2,500-line corpus is the boot files and 13 of the libraries (17 files, `testdata/corpus2500.txt`), and it is the one the speed target is measured on (about 0.87 s here). The build runs each through its imports and then layout, lex, parse and check, on four core programs, and checks every stage against the reference. It takes 263,212,747 core steps and about 0.94 s here (best of five), with the jets on (2.46 s with them off), against a 1 s target for 2,500 lines, which the 2,590-line build meets by linear extrapolation (about 0.91 s at 2,500 lines; see the plan, Phase 8). With the memo on, a cold build takes 2.5 s, and an unchanged rebuild takes 0.04 s.
 
 The memo (decisions 13 and 14) is off by default. Turn it on with `MemoOn`, and it stores only calls of at least `MemoMinFuel` (1,000) steps. A one-declaration change to the checker re-checks 270 calls.
 

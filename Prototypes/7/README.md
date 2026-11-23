@@ -1,6 +1,6 @@
 # Prototype 7: a cost-first core
 
-Status: implemented through Phase 8, and the speed target is met on this host, with a thin margin (see Phase 8). The plan is written in order of work: the measurements come first, and each phase has an exit test.
+Status: implemented through Phase 8. The speed target is met on this host, measured directly on a 2,500-line corpus with a margin of about 13% (see Phase 8). The plan is written in order of work: the measurements come first, and each phase has an exit test.
 
 ## Goal
 
@@ -99,7 +99,7 @@ Target: about ten to twelve forms, enforced by the spec. Any addition needs a re
 - `arg i`, `self`: the arguments of the current law, and the law itself.
 - `call f e₁ … eₙ`: application, curried in meaning, saturating when it has enough arguments.
 - `cell a b`, `con tag e`: construction.
-- `case e {tag → branch …}`: dispatch on a constructor's tag, with a payload binding. Compiles to a jump table.
+- `case e {tag → branch …}`: dispatch on a constructor's tag, with a payload binding. Compiles to a jump table. *Removed (SPEC.md decision 17): nothing built it, and a match is a chain of `tagof` tests.*
 - `prim op a b`: integer and kind primitives, the same table as now.
 - `if c t e`: branch on an integer.
 - `let x = e in b`: evaluate once, so that a shared value is not recomputed.
@@ -151,11 +151,11 @@ Each change is measured on the same harness, and the variant lives in `measure/b
 
 *Exit, met:* the checker's steps are linear in the size of the program on generated programs of 25 to 1,600 functions (ratios 1.94 to 2.08 per doubling), the 160 programs of `infer_run` give the same answers as the Luau checker (`measure/results/infer_run_*.txt`), imports agree with the Luau checker and an unimported name is refused by both (`imports_run.luau`, `negative_import_run.luau`), and layout's output equals the host's on 57 inputs (`layout_parity.luau`). The remaining accessor cost is a Phase 1 follow-up, not a blocker for the exit test.
 
-**Phase 2: the core spec.** Done: `Prototypes/7/SPEC.md`. It has seven kinds of value, eleven forms (within the limit of twelve), twelve primitives with no `Result`, the outcomes, the fuel rule, the memo rule (a hit charges the stored fuel), the jet rule (declared fuel, with no work-only jets), and examples.
+**Phase 2: the core spec.** Done: `Prototypes/7/SPEC.md`. (It was written with eleven forms and twelve primitives; decisions 15 to 17 leave nine forms and thirteen primitives.) It has seven kinds of value, twelve primitives with no `Result` at the time, the outcomes, the fuel rule, the memo rule (a hit charges the stored fuel), the jet rule (declared fuel, with no work-only jets), and examples.
 
 The binary format is part of the spec (section 12), modelled on Prototype 5's. It is implemented and tested in the Luau reference (`reference/format.luau`, with `reference/int.luau` for integers of any size, and `reference/format_run.luau`: 50 checks, including the spec's bytes, round trips of values and programs, a program 20,000 forms deep, and each refusal with its reason). It is iterative, so depth is not a host limit.
 
-*Exit, met:* the spec has eleven forms, each with a rule and an example, and seven examples in section 9 with their expected outcomes. Phase 3 checks the examples by running them.
+*Exit, met (at eleven forms; the count is nine now):* the spec had eleven forms, each with a rule and an example, and seven examples in section 9 with their expected outcomes. Phase 3 checks the examples by running them.
 
 Decisions taken in the spec (section 11, each revisable): laziness is explicit (`delay`, `force`); jet fuel is a declared formula, and there are no work-only jets (decision 11); strings stay lists of integers; pins are wrappers read through `unpin`; errors end the run and are not values; calls are strict; the step rule is one per form and one per law entry.
 
@@ -167,7 +167,7 @@ The two costs Phase 1 measured are answered in the core: recursion is `arg 0` (n
 
 *Decided:* the kind of a suspended expression is 6, the thunk's kind, as the spec has it (SPEC.md decision 10). Prototype 5's example expects 4 and is superseded for the core; the reference records it as a named difference.
 
-**Phase 4: the fast interpreter.** One machine that compiles each law's body to a flat form and runs it in a single loop with an explicit stack. Leaf forms may be Luau closures.
+**Phase 4: the fast interpreter.** One machine that compiles each law's body to a flat form and runs it in a single loop with an explicit stack. *Superseded in this run by a recursive evaluator with the same steps (Decisions, item 8); the result below is for the explicit-stack machine.* Leaf forms may be Luau closures.
 
 *Exit:* the same results and fuel as Phase 3 on every test, and at least 3× the reference machine's steps per second on the checker benchmark.
 
@@ -193,21 +193,41 @@ The two costs Phase 1 measured are answered in the core: recursion is `arg 0` (n
 
 **Phase 8: check against the speed target.** Run the harness on the reference host, and compare with the targets in "Speed target". Write the result in this README, including the misses.
 
-*Result: the target is met on this host, with a margin of about 9% (`fast/corpus_test.go`, `fast/testdata/corpus.txt`).* The corpus is the four boot files and the 20 standard-library files: 24 files, 2,590 lines, 89,501 bytes. Each goes through its imports, then layout, lex, parse and check, on the four stage programs. Every stage of every file matches the reference, and the corpus's expect lines are the reference's outcomes. The build takes 263,212,747 core steps (about 102,000 per line). On this host, with the jets on, it takes 0.94 s at best of five, and 0.94 to 0.96 s over five runs. The stages are linear in lines (Phase 1), so the 2,500-line build is about 0.91 s.
+*Result: the target is met on this host, measured directly on a 2,500-line corpus, with a margin of about 13% (`fast/corpus_test.go`, `CORPUS=testdata/corpus2500.txt`).* The corpus is the four boot files and 13 of the 20 standard-library files: 17 files, exactly 2,500 lines, 87,699 bytes (`fast/gen/corpus2500.luau`). Each file goes through its imports, then layout, lex, parse and check, on the four stage programs. Every stage of every file matches the reference, and the corpus's expect lines are the reference's outcomes. The build takes 260,297,203 core steps (about 104,000 per line). On this host, with the jets on, it takes 0.87 s (median of five; 0.86 to 0.93 s over the runs). The larger corpus of 2,590 lines (all 20 libraries) takes about 0.94 s, the same work per line. The stages are linear in lines (Phase 1).
 
-Against the target (2,500 lines under 1 s), the measured numbers, all on the same corpus:
+Against the target (2,500 lines under 1 s), the measured numbers, all on the 2,500-line corpus unless stated:
 
-| Configuration | Core steps | Time (2,590 lines) | At 2,500 lines (linear) |
+| Configuration | Core steps | Time | Against the target |
 | --- | ---: | ---: | --- |
-| Jets on, memo off (default) | 263,212,747 | 0.94 s (best of 5) | about 0.91 s: met |
-| Jets off, memo off | 263,212,747 | 2.46 s | about 2.4 s: not met |
-| Memo on, cold | 263,212,747 | 2.48 s | not met (the memo costs a cold build) |
-| Memo on, warm (same corpus again) | 263,212,747 | 0.040 s | met, but only for an unchanged input |
-| Jets on, `GOGC=400` (a host setting) | 263,212,747 | 0.86 to 0.90 s | about 0.83 to 0.87 s: met |
+| Jets on, memo off (default) | 260,297,203 | 0.87 s (median of 5) | met, margin about 13% |
+| Jets off, memo off | 260,297,203 | about 2.4 s (2,590-line corpus, 2.46 s) | not met |
+| Memo on, cold | 260,297,203 | about 2.5 s (2,590-line corpus) | not met (the memo costs a cold build) |
+| Memo on, warm (same corpus again) | 260,297,203 | about 0.04 s (2,590-line corpus) | met, but only for an unchanged input |
+| Jets on, `GOGC=400` (a host setting) | 260,297,203 | about 0.83 s (2,590-line corpus, 0.86 to 0.90 s) | met |
 
-The checker alone (types.l2, jets on): 68,125,825 steps in about 0.18 s, against 0.53 s at the start of this run.
+The checker alone (types.l2, jets on): 68,125,825 steps in about 0.16 s.
 
-*Decision.* The target is met on this host, by the measurement above, which is extrapolated from 2,590 lines to 2,500. The margin is about 9%, which is more than the run-to-run noise (about 4%), but not by much. Before this run, the build was about 2.9 times the target. The work that closed the gap was: the evaluator (about a quarter of the time), the constants of the lowering and the mutual group's desugaring (fewer steps, and smaller frames), the `head` and `tail` matches (about 13% of the steps), jets for five hot laws (the list and name helpers `lenOf`, `envKid`, `envPut` and the parser's `same`, and `prune`), and the cache of a law's jet. The steps per line fell from 142,000 to 102,000 in this run. The interpreted steps are now about 30% of the corpus's steps; the rest run as jets. A native host is not needed for the target on this host. Whether the target should hold on a slower host is not measured.
+*Decision.* The target is met on this host by a direct measurement. The margin is about 13%, which is above the run-to-run noise (about 4%), but it is a margin on one host. Earlier in this run the 2,500-line figure was an extrapolation from the 2,590-line corpus (about 0.91 s); the direct measurement on the later build is 0.87 s, and the 2,590-line corpus on the same build takes about 0.94 s. The work that closed the gap, from about 2.9 times the target at the start of the run, was: the evaluator (about a quarter of the time), recycled frames (about 8%), the constants of the lowering and the mutual group's desugaring (fewer steps and smaller frames), the `head` and `tail` matches (about 13% of the steps), jets for five hot laws, the cache of a law's jet, and the removal of an unused form, which changes no step. The steps per line fell from 142,000 to about 104,000. The interpreted steps are about a third of the corpus's steps; the rest run as jets. A native host is not needed for the target on this host. Whether the target should hold on a slower host is not measured.
+
+## Speed experiments
+
+The corpus build on the Go machine, on this host, with the steps (core steps) and the time. Each entry is a single change, measured as the corpus time before and after.
+
+- **Machine.** A continuation kept only its node, frame and child index; a leaf operand (lit or arg) is evaluated in place, as its own step; a node's children are read into pools; a law's jet is cached on the law (the lookup hashed 32 bytes on every call, about 7%). The explicit-stack loop was replaced by a recursive evaluator (about 26% faster on the corpus), with tail calls in a loop. Frames are recycled per run (a body gives its frame back when nothing refers to it; about 8% on the 2,500-line corpus). Each of these keeps the steps: the suite (cases, the corpus's expect lines, the memo and the jets on and off) passes unchanged.
+- **Lowering: constants.** A variable bound to a closed value (a top-level function, or an integer) is a constant, not a frame slot, so a law no longer carries every top-level function it calls as an argument. The mutual group of the parser had 42 arguments per call; now it has 15. The corpus goes from 317.3 million steps to 307.4 million (with the mutual group below) and from 1.8 s to 1.43 s.
+- **Desugar: mutual groups** (the measurement's copy of the desugarer; Prototype 6's is unchanged). A member's branch binds only the names of the group its body mentions (332.0 million steps to 317.3 million), and the dispatch on the member is a balanced tree of tests, not a chain (to 303.0 million). The expect lines of all 24 files are unchanged.
+- **Jets, four list helpers** (`lenOf`, `envKid`, `envPut` and the parser's `same`): 1.37 s to 1.17 s, steps unchanged. **A jet for `prune`**: the corpus to 1.04 s, the checker from 0.36 s to 0.19 s.
+- **Desugar: `match` on `head` or `tail`** (the measurement's copy). A match on `head x` or `tail x` with an `Ok` arm and an `Err` arm tests the kind of `x` and binds the part directly, so the `Ok` value is not built and tested by its tag. The expect lines are unchanged. The corpus goes from 303.0 million steps to 263.2 million, the checker from 76.3 million to 68.1 million. The eleven jets that use `head` or `tail` are re-hashed and re-fitted (a cell takes 12 steps for `tl`, `hdOr`, `first` and `hd`, and anything else 53).
+- **Pins removed** (SPEC.md decision 16): the steps are unchanged; the three renumbered primitives change the law hashes, so the fourteen jets are re-hashed from the corpus. **The `case` form removed** (decision 17): no pipeline program used it, and the corpora are byte-identical.
+- **Measured and not adopted:** the collector setting (`GOGC=400` gives about 8%; a host setting, not in the library); `GOGC=off` (slower, page faults); the flat program layout (Phase 4, about 7% slower); a table of preboxed small integers (no change); a balanced tree for the tag chains (about 1%, not done).
+
+**Next candidates, not done.**
+- The parser's largest unnamed law (about 5% of the remaining steps) is a large anonymous match on the token structure; it is not a jet candidate without a name.
+- The mutual group's call goes through the dispatch law (a second entry for each member call). Binding the members once per group would remove it; that changes the desugarer's shape.
+
+## Next step
+
+Phases 1 to 8 are done, and the speed target is met on this host by a direct measurement, with a margin of about 13%. The spec has nine forms and thirteen primitives, and the shortcuts are no longer defined by it (decisions 16 to 18). Open: the parser's anonymous laws and the mutual group's dispatch (both speed, not required); and the owner's decision on the host's collector setting (decision 10 in "Decisions").
 
 ## Risks
 
@@ -234,25 +254,5 @@ These need an answer from the project owner before the phase that depends on the
 8. **Resolved (this run): the machine is recursive.** The explicit-stack machine (Phase 4) was replaced by a recursive evaluator with the same steps, form for form, and a loop for tail calls (`fast/eval.go`). It is about a quarter faster. The one cost is a host limit: a run nested deeper than `MaxNesting` (400,000 evaluations) ends with the status `host_limit`, which the spec does not have, instead of the Go stack overflowing. The spec asks for no depth limit; the host limit is documented in `fast/README.md`. The owner may prefer the iterative machine back if deep programs matter more than speed.
 9. **Resolved (this run): pins are removed** (SPEC.md decision 16): the pin and unpin primitives, the pin value and its binary part. The spec has thirteen primitives.
 10. **Open for the owner: the host's collector setting.** `GOGC=400` gives about 8% on the corpus (0.86 to 0.90 s against 0.94 to 0.96 s). It is a runtime setting of the host, not of the library, so it is not set in the code; a host that runs the VM can set it.
-
-## Speed experiments
-
-The corpus build on the Go machine, on this host, with the steps (core steps) and the time. The corpus has 2,590 lines. Each entry is a single change, measured as the corpus time before and after.
-
-- **Machine, this run.** A continuation kept only its node, frame and child index; a leaf operand (lit or arg) is evaluated in place, as its own step; a node's children are read into pools; a law's jet is cached on the law (the lookup hashed 32 bytes on every call, about 7%). The explicit-stack loop was replaced by a recursive evaluator (about 26% faster on the corpus), with tail calls in a loop. Each of these keeps the steps: the suite (cases, the corpus's expect lines, the memo and the jets on and off) passes unchanged.
-- **Lowering: constants.** A variable bound to a closed value (a top-level function, or an integer) is a constant, not a frame slot, so a law no longer carries every top-level function it calls as an argument. The mutual group of the parser had 42 arguments per call; now it has 15. The corpus goes from 317.3 million steps to 307.4 million (with the mutual group below) and from 1.8 s to 1.43 s.
-- **Desugar: mutual groups** (the measurement's copy of the desugarer; Prototype 6's is unchanged). A member's branch binds only the names of the group its body mentions (332.0 million steps to 317.3 million), and the dispatch on the member is a balanced tree of tests, not a chain (to 303.0 million). The expect lines of all 24 files are unchanged.
-- **Jets, four list helpers** (`lenOf`, `envKid`, `envPut` and the parser's `same`): 1.37 s to 1.17 s, steps unchanged. **A jet for `prune`**: the corpus to 1.04 s, the checker from 0.36 s to 0.19 s.
-- **Desugar: `match` on `head` or `tail`** (the measurement's copy). A match on `head x` or `tail x` with an `Ok` arm and an `Err` arm tests the kind of `x` and binds the part directly, so the `Ok` value is not built and tested by its tag. The expect lines are unchanged. The corpus goes from 303.0 million steps to 263.2 million, the checker from 76.3 million to 68.1 million, and the build from about 1.0 s to 0.94 s. The eleven jets that use `head` or `tail` are re-hashed and re-fitted (a cell takes 12 steps for `tl`, `hdOr`, `first` and `hd`, and anything else 53).
-- **Pins removed** (SPEC.md decision 16): the steps are unchanged; the three renumbered primitives change the law hashes, so the fourteen jets are re-hashed from the corpus.
-- **Collector setting** (host, not adopted): `GOGC=400` gives about 8%. `GOGC=off` is slower than the default, because of page faults.
-- **Tried or measured and not adopted:** the flat program layout (Phase 4, about 7% slower); a table of preboxed small integers (no change); the parser's `match` over a long sum as a chain of tag tests (not changed; a balanced tree would save about 1%).
-
-**Not done, and the next candidates.**
-- The parser's largest unnamed law (about 5% of the remaining steps) is a large anonymous match on the token structure; it is not a jet candidate without a name.
-- The mutual group's call goes through the dispatch law (a second entry for each member call). Binding the members once per group, rather than per branch, would remove it; that is a change to the desugarer's shape, not a speed trick.
-
-## Next step
-
-Phases 1 to 8 are done, and the speed target is met on this host with a margin of about 9%. The spec has thirteen primitives after pins were removed (decision 16). Open work: the parser's anonymous laws, the mutual group's dispatch, and the owner's decision on the host's collector setting (decision 10 in "Decisions"). The corpus's 2,500-line figure is an extrapolation until a 2,500-line corpus is measured directly.
-
+11. **Resolved (this run): the `case` form is removed** (SPEC.md decision 17). Nothing built it, and a jump table would save about 3% of the checker's steps, which is recorded in the spec as the reason to bring it back.
+12. **Resolved (this run): the shortcuts are not part of the spec** (SPEC.md decision 18). The content hash was the key of the memo and the jets, so it leaves the spec, and the Go implementation keeps its definition in `fast/README.md`.
