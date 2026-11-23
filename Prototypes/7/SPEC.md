@@ -120,6 +120,8 @@ A run gives one of three outcomes:
 - `error m`: the run cannot continue, with a message `m` (a division by zero, a non-cell `head`, an unbound slot, a `force` of a non-thunk, and the like);
 - `out_of_fuel`: the run used up its fuel.
 
+An implementation may also end a run when it runs out of a resource of its own, such as the depth of nested evaluations the host can hold. That is not an outcome of the program: the spec does not define it, the reference never gives it, and a program that ends this way has no value, error or out-of-fuel result. The Go machine's limit is documented in `fast/README.md` (`host_limit`).
+
 Errors are not caught by the core. A program that wants to recover tests first (section 4).
 
 A **program** is a law of arity 1. `run(program, input, fuel)` applies the program to the input and gives the outcome. Out of fuel is a result, so a diverging program can be tested like any other.

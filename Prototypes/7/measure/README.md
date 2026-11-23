@@ -16,7 +16,7 @@ The run takes about 24 minutes, most of it in the layout scaling at 1,600 functi
 | --- | --- |
 | `phase0.luau` | The driver: validation, the corpus build, the profile, the growth by owner, and the scaling. |
 | `compile.luau` | Compiles an L2 file as Prototype 6's `L2.compile` does, including imports, and times each host stage. Keeps the raw program section (before layout), which the VM's layout stage reads. Each node gets an owner (the function it belongs to). |
-| `desugar_named.luau` | A copy of Prototype 6's desugarer. The only change: a function bound by `let` or `letrec` is labelled with its name and line, so the profile can name it. |
+| `desugar_named.luau` | A copy of Prototype 6's desugarer, with two changes made in Prototype 7 (Prototype 6's is unchanged). A function bound by `let` or `letrec` is labelled with its name and line, so the profile can name it. A mutual group binds in each branch only the names its function mentions, and dispatches on the member by a balanced tree of tests, not a chain. Both keep every program's outcome (the corpus's expect lines are unchanged), and both lower the same programs to fewer steps. |
 | `vm_counted.luau` | A copy of Prototype 6's machine (`interpreter/vm.luau`). The changes: the primitives come from Prototype 6, nil is Prototype 6's table (the machine tests nil by identity), and the reference loop calls a hook at each step. |
 | `results/run5.txt` | The raw output of the run below. |
 | `results/run4.txt` | The earlier run, without the VM layout stage. |
