@@ -160,10 +160,10 @@ All 57 agree: where the host gives text, the VM gives the same text, and where t
 - **Agreement with the Luau checker** (`imports_run.luau`): `lex.l2` and `parse.l2`, which import libraries, give the same type as the Luau checker and no errors. `layout.l2` and `types.l2`, which import nothing, agree too.
 - **Scaling** is unchanged, since the generated programs import nothing.
 
-### Not yet checked
+### Checked after the variant (see below)
 
-- The wider `infer_run` suite (160 programs in Prototype 6) has not been run against this variant.
-- No negative test has been run: a program that uses a library name it does not import should give an unbound-name error on both checkers.
+- The wider `infer_run` suite (160 programs in Prototype 6) is run against this variant, in the section below.
+- The negative test (a program that uses `reverse` without importing it) is run on both checkers, also below. An earlier run passed falsely, because its import list was malformed; the list is fixed, and the test now refuses without the import and accepts with it.
 
 ## A trie change that did not help
 
