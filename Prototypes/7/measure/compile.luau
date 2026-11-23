@@ -1,10 +1,13 @@
 --!strict
 -- COMPILES AN L2 FILE FOR THE PHASE 0 MEASUREMENT
 --
--- Does what Prototype 6's L2.compile does, including the imports, and times each host stage: the layout (inside ProgramFile.parse), the Luau parser, the Luau checker, and the desugarer. Imports are compiled the same way, recursively, and their times are added up in imports. The compiled program is the same expression that L2.compile gives, except that every node carries an owner: the name of the function whose body contains it ("top" outside any function). The owner is what the profile charges steps to.
+-- Does what Prototype 6's L2.compile does, including the imports, and times each host stage: the layout, the Luau parser, the Luau checker, and the desugarer. Imports are compiled the same way, recursively, and their times are added up in imports. The compiled program is the same expression that L2.compile gives, except that every node carries an owner: the name of the function whose body contains it ("top" outside any function). The owner is what the profile charges steps to.
+--
+-- The raw program section is kept too. The VM's layout stage reads the raw section, so it is what a VM build starts from. The host layout is run here on the same section, and the two results are compared by the driver.
 
 const fs = require "@lute/fs"
 const ProgramFile = require "../../6/L2/programfile"
+const Layout = require "../../6/L2/layout"
 const Parser = require "../../6/L2/parser"
 const Checker = require "../../6/L2/checker"
 const Desugar = require "./desugar_named"
@@ -24,8 +27,10 @@ export type Compiled = {
 	expr: any,
 	scheme: any,
 	timings: Timings,
-	-- The program text after the layout pass, which is what the bootstrapped tokenizer reads.
+	-- The program section after the host layout pass: bracketed text, which the Luau parser reads.
 	source: string,
+	-- The program section before layout: indented text, which the VM's layout stage reads.
+	raw: string,
 }
 
 -- Gives each node its owner, top-down. A lambda with a label starts a new owner; a node that is already owned is not visited again, so a shared node keeps its first owner.
@@ -71,12 +76,16 @@ end
 
 local compileFile: (text: string, name: string, stack: { string }) -> Compiled
 compileFile = function(text: string, name: string, stack: { string }): Compiled
+	-- A name that does not end in .l2 means the program section is not laid out by ProgramFile, so it is the raw indented text.
+	const file = ProgramFile.parse(text, nil)
+	const raw = file.program :: string
+
 	const layoutStart = os.clock()
-	const file = ProgramFile.parse(text, name)
+	const laidOut = Layout.layout(raw)
 	const layoutTime = os.clock() - layoutStart
 
 	const parseStart = os.clock()
-	const program = Parser.parse(file.program)
+	const program = Parser.parse(laidOut)
 	const parseTime = os.clock() - parseStart
 
 	const names: { string } = {}
@@ -118,7 +127,8 @@ compileFile = function(text: string, name: string, stack: { string }): Compiled
 	return {
 		expr = expr,
 		scheme = checked.scheme,
-		source = file.program :: string,
+		source = laidOut,
+		raw = raw,
 		timings = {
 			layout = layoutTime,
 			parse = parseTime,

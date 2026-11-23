@@ -1,13 +1,14 @@
 --!strict
 -- PHASE 0 OF PROTOTYPE 7: MEASURES PROTOTYPE 6, WITHOUT CHANGING IT
 --
--- Four measurements:
+-- Five measurements:
 --   1. Validation. The checker on types.l2 takes 299,622,490 steps on the hybrid machine and on the counted reference machine, as vm_bench reports. The counted machine must agree with Prototype 6 before its profile is trusted.
---   2. The build of the corpus. Each file goes through the host stages (layout, Luau parser, Luau checker, desugar) and the bootstrapped VM stages (lex, parse, check). Steps are exact; seconds are CPU time on this host.
+--   2. The build of the corpus. Each file goes through the VM stages (layout, lex, parse, check) and the host stages (layout, Luau parser, Luau checker, desugar). Steps are exact; seconds are CPU time on this host. The VM's layout output must equal the host's.
 --   3. The profile. The checker on types.l2 under the counted machine: steps by form, by frame, and by owning function.
---   4. Scaling. The same stages on generated programs, to see how the costs grow with size.
+--   4. Growth by owner. The checker on 100 and 400 generated functions, profiled.
+--   5. Scaling. The VM stages on generated programs, to see how the costs grow with size.
 --
--- Run from this folder, with results kept in results/:
+-- Run from this folder:
 --   lute run phase0.luau
 
 const fs = require "@lute/fs"
@@ -50,6 +51,19 @@ const function bytesValue(s: string): any
 	return v
 end
 
+-- The text of a list of bytes.
+const function textOf(v: any): string
+	local out: { string } = {}
+	local cur = v
+
+	while type(cur) == "table" and cur.kind == "cell" do
+		table.insert(out, string.char(cur.head))
+		cur = cur.tail
+	end
+
+	return table.concat(out)
+end
+
 const function commas(n: number): string
 	local s = string.format("%d", n)
 	local out = s:reverse():gsub("(%d%d%d)", "%1,"):reverse()
@@ -71,12 +85,14 @@ local function timedRun(compiled: any, input: any, fuel: number): (any, number)
 	return result, os.clock() - t0
 end
 
--- Lex, parse and check a source on the VM, with the checker compiled from types.l2. The check is the only stage that uses the request built from the parse.
 type Stage = { steps: number, seconds: number, status: string }
 type VmBuild = {
+	layout: Stage,
 	lex: Stage,
 	parse: Stage,
 	check: Stage,
+	-- The laid-out text the VM's layout stage gives, when it succeeds. The driver compares it with the host's.
+	laidOut: string?,
 	refused: string?,
 	result: string?,
 }
@@ -85,46 +101,69 @@ local function stage(result: any, seconds: number): Stage
 	return { steps = result.steps, seconds = seconds, status = result.status }
 end
 
-local function vmBuild(compiled: { lexer: any, parser: any, checker: any }, source: string): VmBuild
-	const lexed, lexTime = timedRun(compiled.lexer, bytesValue(source), 1e8)
+local function skipped(): Stage
+	return { steps = 0, seconds = 0, status = "skipped" }
+end
+
+-- The VM build of one source: layout, then lex, parse and check. The source is the raw program section (indented), which is what a VM build starts from. Each stage that fails ends the build, and the later stages are skipped.
+local function vmBuild(compiled: any, raw: string): VmBuild
+	const laid, layoutTime = timedRun(compiled.layout, bytesValue(raw), 1e10)
+	const layout = stage(laid, layoutTime)
+
+	if laid.status ~= "value" or laid.value.tag ~= 0 then
+		return { layout = layout, lex = skipped(), parse = skipped(), check = skipped(), refused = "layout " .. laid.status }
+	end
+
+	const bracketed = laid.value.payload
+	const lexed, lexTime = timedRun(compiled.lexer, bracketed, 1e8)
 	const lex = stage(lexed, lexTime)
 
 	if lexed.status ~= "value" then
-		return { lex = lex, parse = { steps = 0, seconds = 0, status = "skipped" }, check = { steps = 0, seconds = 0, status = "skipped" }, refused = "lex " .. lexed.status }
+		return { layout = layout, lex = lex, parse = skipped(), check = skipped(), laidOut = textOf(bracketed), refused = "lex " .. lexed.status }
 	end
 
 	const parsed, parseTime = timedRun(compiled.parser, lexed.value.payload, 5e8)
 	const parse = stage(parsed, parseTime)
 
 	if parsed.status ~= "value" or parsed.value.tag ~= 0 then
-		return { lex = lex, parse = parse, check = { steps = 0, seconds = 0, status = "skipped" }, refused = "parse " .. parsed.status }
+		return { layout = layout, lex = lex, parse = parse, check = skipped(), laidOut = textOf(bracketed), refused = "parse " .. parsed.status }
 	end
 
 	const request = { kind = "con", tag = 3, payload = parsed.value.payload }
 	const checked, checkTime = timedRun(compiled.checker, request, 1e10)
 
 	return {
+		layout = layout,
 		lex = lex,
 		parse = parse,
 		check = stage(checked, checkTime),
+		laidOut = textOf(bracketed),
 		result = if checked.status == "value" then VM.show(checked.value) else checked.status,
 	}
 end
 
+const function vmSteps(build: VmBuild): number
+	return build.layout.steps + build.lex.steps + build.parse.steps + build.check.steps
+end
+
+const function vmSeconds(build: VmBuild): number
+	return build.layout.seconds + build.lex.seconds + build.parse.seconds + build.check.seconds
+end
+
 -- The steps and seconds of each stage of a VM build, as text.
 local function describe(name: string, build: VmBuild): string
-	const s = build.lex.steps + build.parse.steps + build.check.steps
-
 	return string.format(
-		"%s: lex %s steps %.3fs, parse %s steps %.3fs, check %s steps %.3fs (total %s steps)%s",
+		"%s: layout %s steps %.3fs, lex %s steps %.3fs, parse %s steps %.3fs, check %s steps %.3fs (total %s steps)%s",
 		name,
+		commas(build.layout.steps),
+		build.layout.seconds,
 		commas(build.lex.steps),
 		build.lex.seconds,
 		commas(build.parse.steps),
 		build.parse.seconds,
 		commas(build.check.steps),
 		build.check.seconds,
-		commas(s),
+		commas(vmSteps(build)),
 		if build.refused then "  refused: " .. build.refused else ""
 	)
 end
@@ -139,10 +178,11 @@ local function compileCompiler(file: string): any
 end
 
 print("== The compiler's own stages (host, once; not part of any build below)")
+const layoutC = compileCompiler "layout.l2"
 const lexer = compileCompiler "lex.l2"
 const parser = compileCompiler "parse.l2"
 const checker = compileCompiler "types.l2"
-const compiled = { lexer = lexer, parser = parser, checker = checker }
+const compiled = { layout = layoutC, lexer = lexer, parser = parser, checker = checker }
 
 for _, line in compilerTimes do
 	print(line)
@@ -152,7 +192,7 @@ end
 print("")
 print("== 1. Validation: the checker on types.l2")
 useMachine "hybrid"
-const hybridRun = vmBuild(compiled, checker.source)
+const hybridRun = vmBuild(compiled, checker.raw)
 print(describe("hybrid", hybridRun))
 print("  result: " .. tostring(hybridRun.result))
 print(
@@ -160,9 +200,14 @@ print(
 		then "  matches vm_bench: " .. commas(CHECKER_STEPS) .. " steps"
 		else "  DOES NOT MATCH vm_bench (" .. commas(CHECKER_STEPS) .. " steps)"
 )
+print(
+	if hybridRun.laidOut == checker.source
+		then "  VM layout agrees with host layout"
+		else "  VM layout DISAGREES with host layout"
+)
 
 useMachine "counted"
-const countedRun = vmBuild(compiled, checker.source)
+const countedRun = vmBuild(compiled, checker.raw)
 useMachine "hybrid"
 print(
 	if countedRun.check.steps == hybridRun.check.steps
@@ -179,41 +224,49 @@ local totalLines = 0
 local totalHostSeconds = 0
 local totalVmSteps = 0
 local totalVmSeconds = 0
+local layoutAgreed = 0
 
 for _, file in corpus do
 	const text = readFile(BOOT .. file)
 	const host = Compile.compile(text, "boot/" .. file)
 	const hostSeconds = host.timings.layout + host.timings.parse + host.timings.check + host.timings.desugar + host.timings.imports
-	const vm = vmBuild({ lexer = lexer, parser = parser, checker = checker }, host.source)
-	const vmSteps = vm.lex.steps + vm.parse.steps + vm.check.steps
-	const vmSeconds = vm.lex.seconds + vm.parse.seconds + vm.check.seconds
+	const vm = vmBuild(compiled, host.raw)
+	const agreed = vm.laidOut == host.source
+
+	if agreed then
+		layoutAgreed += 1
+	end
 
 	totalBytes += #text
 	totalLines += linesOf(text)
 	totalHostSeconds += hostSeconds
-	totalVmSteps += vmSteps
-	totalVmSeconds += vmSeconds
+	totalVmSteps += vmSteps(vm)
+	totalVmSeconds += vmSeconds(vm)
 
 	print(string.format("%s: %s bytes, %d lines", file, commas(#text), linesOf(text)))
 	print(string.format("  host: layout %.3fs, parse %.3fs, check %.3fs, desugar %.3fs, imports %.3fs", host.timings.layout, host.timings.parse, host.timings.check, host.timings.desugar, host.timings.imports))
 	print("  " .. describe("VM", vm))
+	print("  VM layout " .. if agreed then "agrees with host" else "DISAGREES with host")
 	print("  check result: " .. tostring(vm.result))
 end
 
 print(
 	string.format(
-		"corpus total: %s bytes, %d lines; host %.3fs; VM %s steps in %.3fs (hybrid)",
+		"corpus total: %s bytes, %d lines; host %.3fs; VM %s steps in %.3fs (hybrid); layout agreed on %d of %d files",
 		commas(totalBytes),
 		totalLines,
 		totalHostSeconds,
 		commas(totalVmSteps),
-		totalVmSeconds
+		totalVmSeconds,
+		layoutAgreed,
+		#corpus
 	)
 )
 
 -- 3. The profile.
 print("")
 print("== 3. Profile: the checker on types.l2, counted machine")
+
 local function newProfile(): { op: { [string]: number }, frame: { [string]: number }, owner: { [string]: number }, steps: number }
 	return {
 		op = {},
@@ -242,8 +295,9 @@ local function hook(expr: any, returning: boolean, frame: any)
 	bump(profile.owner, expr.owner or "?")
 end
 
--- The request for the profile is built on the hybrid machine, so only the checker's own steps are counted.
-const profileLexed = Lifecycle.run(lexer.expr, bytesValue(checker.source), 1e8)
+-- The request for the profile comes from the VM's own layout, lex and parse, on the hybrid machine, so only the checker's own steps are counted.
+const profileLaid = Lifecycle.run(layoutC.expr, bytesValue(checker.raw), 1e10)
+const profileLexed = Lifecycle.run(lexer.expr, profileLaid.value.payload, 1e8)
 const profileParsed = Lifecycle.run(parser.expr, profileLexed.value.payload, 5e8)
 const profileRequest = { kind = "con", tag = 3, payload = profileParsed.value.payload }
 
@@ -302,15 +356,15 @@ const function synthetic(n: number): string
 	return table.concat(lines, "\n")
 end
 
--- 4. Growth by owner: where the growth comes from. The checker's owner steps on two sizes of the generated program: a function whose steps grow 16× from 100 to 400 functions is quadratic, and one that grows 4× is linear.
+-- 4. Growth by owner: the checker's owner steps on two sizes of the generated program. A function whose steps grow 16× from 100 to 400 functions is quadratic, and one that grows 4× is linear.
 print("")
 print("== 4. Growth by owner: the checker on 100 and 400 generated functions, counted")
 local grown: { [number]: { [string]: number } } = {}
 
 for _, n in { 100, 400 } do
 	const host = Compile.compile(synthetic(n), `synthetic {n}`)
-	useMachine "hybrid"
-	const lexedFor = Lifecycle.run(lexer.expr, bytesValue(host.source), 1e8)
+	const laidFor = Lifecycle.run(layoutC.expr, bytesValue(host.raw), 1e10)
+	const lexedFor = Lifecycle.run(lexer.expr, laidFor.value.payload, 1e8)
 	const parsedFor = Lifecycle.run(parser.expr, lexedFor.value.payload, 5e8)
 	const requestFor = { kind = "con", tag = 3, payload = parsedFor.value.payload }
 
@@ -345,7 +399,7 @@ for i = 1, math.min(15, #growthRows) do
 	print(string.format("  %-44s %14s %14s %7.1fx", row[1], commas(small), commas(large), if small > 0 then large / small else 0))
 end
 
--- 4. Scaling, on generated programs. Each function calls the one before it, so the program is a chain of nested lets.
+-- 5. Scaling, on generated programs. Each function calls the one before it, so the program is a chain of nested lets.
 print("")
 print("== 5. Scaling: generated programs, chained functions")
 useMachine "hybrid"
@@ -353,7 +407,7 @@ useMachine "hybrid"
 for _, n in { 25, 50, 100, 200, 400, 800, 1600 } do
 	const text = synthetic(n)
 	const host = Compile.compile(text, `synthetic {n}`)
-	const vm = vmBuild({ lexer = lexer, parser = parser, checker = checker }, host.source)
+	const vm = vmBuild(compiled, host.raw)
 	const lines = linesOf(text)
 
 	print(string.format("%d functions: %d lines, %s bytes; host check %.3fs, desugar %.3fs", n, lines, commas(#text), host.timings.check, host.timings.desugar))
