@@ -91,3 +91,21 @@ A quadratic term grows 16× here and a linear one 4×. The name environment grow
 - **The gap to the target is larger than run 4 said.** Run 4 counted only the checker, lex and parse. With layout, the corpus is about 690,000 steps per line on the VM, so the build for 2,500 lines is well over the 18M-step budget, and the layout term alone is about 200 times over it.
 - **The imports gap is unchanged.** The checker needs an import request before the import files can be fully checked.
 - **Desugar is still host-only.** The target counts the front end, as the plan now says.
+
+## Layout profile
+
+`layout_profile.luau` profiles the VM's layout (`boot/layout.l2`) the way the checker was profiled, with the same counted machine and charging rule. Output: `results/layout_profile.txt`. It runs in about four minutes.
+
+On `types.l2` (its raw program section, 37,004 bytes), the layout takes 486,251,251 steps, and:
+
+| Owner | Share of layout steps |
+| --- | ---: |
+| `tlOf` (list tail) | 32.5% |
+| `hd` (list head) | 31.7% |
+| `cat` (list append) | 22.6% |
+| top level | 10.9% |
+| everything else | under 1% each |
+
+So about 87% of the layout's steps are in three list helpers, and the helpers are called from `cat` and `joinLines`. On generated programs of 100 and 400 functions, the three grow 14.6×, 15.1× and 16.5×, close to the 16× of a quadratic term, while the other helpers grow about 4×. Total layout growth is 14.4×.
+
+The cause is not yet confirmed. From the code: `joinLines` and the nested `cat` calls in the block printers build each block's text by copying the text of its children into it, so a chain of nested blocks copies its text once per level. That is quadratic in the nesting depth, and the generated programs are deep chains of nested `let`s. The host layout is cheap on the same input, which fits a host that does not copy at each level. The test is to change the layout to build its output once, and then to check that the steps drop to linear and the output still equals the host's.
