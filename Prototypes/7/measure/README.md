@@ -164,3 +164,9 @@ All 57 agree: where the host gives text, the VM gives the same text, and where t
 
 - The wider `infer_run` suite (160 programs in Prototype 6) has not been run against this variant.
 - No negative test has been run: a program that uses a library name it does not import should give an unbound-name error on both checkers.
+
+## A trie change that did not help
+
+Tried: replacing the two divisions per trie level (`halfOf` and `oddOf` in `findB` and `setB`) with one division that returns the quotient and remainder as a pair (`divMod2`), so each level makes one division instead of two. The result was the same, but the checker on Prototype 6's `types.l2` took 354,034,460 steps, against 299,622,570 before: 18% more. Building the pair and reading it back costs more than the division it saves. The change is reverted, and the trie is as in the variant committed in run 7.
+
+What this says about the trie: its per-level cost is the pattern matching, the calls and the pair construction, not the arithmetic. Fewer divisions do not help on their own. A structure that does fewer operations per level is needed (for example, a random-access list whose index steps are comparisons and subtractions), and it has to be measured the same way.
