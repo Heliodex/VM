@@ -13,6 +13,9 @@ type (
 	reader struct {
 		s []byte
 		p int
+		// nodePool and kidPool are the pools the forms are read into, so a program's nodes are a few large arrays, not many small objects: the collector scans every object it finds, and a program is scanned each cycle.
+		nodePool []Node
+		kidPool []*Node
 	}
 
 	// ---- writing
@@ -113,6 +116,31 @@ func (r *reader) integer(neg bool) (Value, error) {
 	}
 
 	return norm(m), nil
+}
+
+// kids is a slice of n children, from the reader's pool.
+func (r *reader) kids(n int) []*Node {
+	if len(r.kidPool) < n {
+		r.kidPool = make([]*Node, max(n, 1024))
+	}
+
+	s := r.kidPool[:n:n]
+	r.kidPool = r.kidPool[n:]
+
+	return s
+}
+
+// node is a new node, from the reader's pool.
+func (r *reader) node(n Node) *Node {
+	if len(r.nodePool) == 0 {
+		r.nodePool = make([]Node, 256)
+	}
+
+	p := &r.nodePool[0]
+	r.nodePool = r.nodePool[1:]
+	*p = n
+
+	return p
 }
 
 // pos reads a position: a magnitude that is at most 2^53 - 1.
@@ -499,20 +527,20 @@ func (r *reader) form() (*Node, error) {
 			return nil, err
 		}
 
-		return &Node{
+		return r.node(Node{
 			Op: OpLit,
 			Lit: v,
-		}, nil
+		}), nil
 	case fArg:
 		i, err := r.pos("an index")
 		if err != nil {
 			return nil, err
 		}
 
-		return &Node{
+		return r.node(Node{
 			Op: OpArg,
 			Index: i,
-		}, nil
+		}), nil
 	case fCall, fDelay:
 		n, err := r.pos("a count")
 		if err != nil {
@@ -532,16 +560,16 @@ func (r *reader) form() (*Node, error) {
 		}
 
 		if t == fDelay {
-			return &Node{
+			return r.node(Node{
 				Op: OpDelay,
 				Kids: kids,
-			}, nil
+			}), nil
 		}
 
-		return &Node{
+		return r.node(Node{
 			Op: OpCall,
 			Kids: kids,
-		}, nil
+		}), nil
 	case fCon:
 		tag, err := r.pos("a tag")
 		if err != nil {
@@ -553,11 +581,11 @@ func (r *reader) form() (*Node, error) {
 			return nil, err
 		}
 
-		return &Node{
+		return r.node(Node{
 			Op: OpCon,
 			Tag: tag,
 			Kids: []*Node{e},
-		}, nil
+		}), nil
 	case fCase:
 		e, err := r.form()
 		if err != nil {
@@ -569,10 +597,10 @@ func (r *reader) form() (*Node, error) {
 			return nil, err
 		}
 
-		n := &Node{
+		n := r.node(Node{
 			Op: OpCase,
 			Kids: []*Node{e},
-		}
+		})
 		seen := map[int]bool{}
 
 		for range k {
@@ -615,7 +643,7 @@ func (r *reader) form() (*Node, error) {
 
 		return n, nil
 	case fIf:
-		kids := make([]*Node, 3)
+		kids := r.kids(3)
 
 		for i := range kids {
 			if kids[i], err = r.form(); err != nil {
@@ -623,10 +651,10 @@ func (r *reader) form() (*Node, error) {
 			}
 		}
 
-		return &Node{
+		return r.node(Node{
 			Op: OpIf,
 			Kids: kids,
-		}, nil
+		}), nil
 	case fLet:
 		e, err := r.form()
 		if err != nil {
@@ -638,20 +666,20 @@ func (r *reader) form() (*Node, error) {
 			return nil, err
 		}
 
-		return &Node{
+		return r.node(Node{
 			Op: OpLet,
 			Kids: []*Node{e, b},
-		}, nil
+		}), nil
 	case fForce:
 		e, err := r.form()
 		if err != nil {
 			return nil, err
 		}
 
-		return &Node{
+		return r.node(Node{
 			Op: OpForce,
 			Kids: []*Node{e},
-		}, nil
+		}), nil
 	case fPrim:
 		op, err := r.pos("a primitive")
 		if err != nil {
@@ -662,7 +690,7 @@ func (r *reader) form() (*Node, error) {
 			return nil, fmt.Errorf("binary: primitive %d does not exist", op)
 		}
 
-		kids := make([]*Node, primArity[op])
+		kids := r.kids(primArity[op])
 
 		for i := range kids {
 			if kids[i], err = r.form(); err != nil {
@@ -670,11 +698,11 @@ func (r *reader) form() (*Node, error) {
 			}
 		}
 
-		return &Node{
+		return r.node(Node{
 			Op: OpPrim,
 			Tag: op,
 			Kids: kids,
-		}, nil
+		}), nil
 	}
 
 	return nil, fmt.Errorf("binary: tag %d is not a form", t)
