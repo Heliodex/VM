@@ -806,6 +806,307 @@ const function runReference(program: Expr, fuel: number, initialEnv: Binding?): 
 	return loop()
 end
 
+-- THE DIRECT MACHINE
+--
+-- Each expression is compiled into a Luau closure that evaluates its children by calling them. The machine's steps are counted at the same points as in runReference: each node's evaluation is one step, and each hand-over of a value to a waiting frame is one step (the final value is one too). So a run has the same steps, the same fuel behaviour and the same errors.
+--
+-- The cost of this form is the Luau stack: a program's recursion becomes Luau recursion, so a deep program can run out of stack, where the stack machine cannot.
+
+-- Raised to stop a run: the fuel is used up, or a step fails with a message.
+const DIRECT_OUT_OF_FUEL = {}
+local directSteps = 0
+local directFuel = 0
+
+-- One step: a node is evaluated, or a value is handed on. Stops the run when the fuel is used up.
+local function tick()
+	if directSteps >= directFuel then
+		error(DIRECT_OUT_OF_FUEL, 0)
+	end
+
+	directSteps += 1
+end
+
+local function directFail(message: string)
+	error({ failure = message }, 0)
+end
+
+-- Compiled code: a function from an environment to a value.
+type Code = (Binding?) -> Value
+
+local directMemo: { [any]: Code } = setmetatable({}, { __mode = "k" })
+local compileDirect: (Expr) -> Code
+
+compileDirect = function(e: Expr): Code
+	const known = directMemo[e]
+
+	if known ~= nil then
+		return known
+	end
+
+	local code: Code
+
+	if e.op == "quote" then
+		const v = e.value
+		code = function(_env: Binding?): Value
+			tick()
+
+			return v
+		end
+	elseif e.op == "var" then
+		const index = e.index
+		code = function(env: Binding?): Value
+			tick()
+			const found = lookup(env, index)
+
+			if found == nil then
+				directFail("no variable at index " .. index)
+			end
+
+			return found :: Value
+		end
+	elseif e.op == "lam" then
+		const body = compileDirect(e.body)
+		const bodyExpr = e.body
+		code = function(env: Binding?): Value
+			tick()
+
+			return { kind = "closure", body = bodyExpr, env = env, code = body } :: any
+		end
+	elseif e.op == "pin" then
+		const inner = compileDirect(e.e)
+		const innerExpr = e.e
+		code = function(env: Binding?): Value
+			tick()
+
+			return { kind = "pin", expr = innerExpr, env = env, busy = false, code = inner } :: any
+		end
+	elseif e.op == "cell" then
+		const headCode = compileDirect(e.head)
+		const tailCode = compileDirect(e.tail)
+		code = function(env: Binding?): Value
+			tick()
+			const head = headCode(env)
+			tick()
+			const tail = tailCode(env)
+			tick()
+
+			return { kind = "cell", head = head, tail = tail }
+		end
+	elseif e.op == "index" then
+		const inner = compileDirect(e.e)
+		const n = e.n
+		code = function(env: Binding?): Value
+			tick()
+			local value = inner(env)
+			tick()
+
+			-- The steps of the address, low bit first, applied from the high end.
+			local path: { number } = {}
+			local m = n
+
+			while m > 1 do
+				table.insert(path, m % 2)
+				m = math.floor(m / 2)
+			end
+
+			for i = #path, 1, -1 do
+				if type(value) ~= "table" or (value :: any).kind ~= "cell" then
+					directFail((if path[i] == 0 then "head" else "tail") .. " of a non-cell")
+				end
+
+				value = if path[i] == 0 then (value :: any).head else (value :: any).tail
+			end
+
+			return value
+		end
+	elseif e.op == "force" then
+		const inner = compileDirect(e.e)
+		code = function(env: Binding?): Value
+			tick()
+			const v = inner(env)
+			tick()
+
+			if type(v) ~= "table" or (v :: any).kind ~= "pin" then
+				directFail("forcing a non-pin")
+			end
+
+			const pin = v :: any
+
+			if pin.result ~= nil then
+				return pin.result
+			end
+
+			if pin.busy then
+				directFail("a pin forced itself")
+			end
+
+			pin.busy = true
+			const pinCode: Code = pin.code or compileDirect(pin.expr)
+			const result = pinCode(pin.env)
+			tick()
+			pin.result = result
+			pin.busy = false
+
+			return result
+		end
+	elseif e.op == "if" then
+		const cond = compileDirect(e.c)
+		const thenCode = compileDirect(e.t)
+		const elseCode = compileDirect(e.e)
+		code = function(env: Binding?): Value
+			tick()
+			const c = cond(env)
+			tick()
+
+			if type(c) ~= "number" then
+				directFail("if needs an integer condition")
+			end
+
+			if c ~= 0 then
+				return thenCode(env)
+			end
+
+			return elseCode(env)
+		end
+	elseif e.op == "apply" then
+		const fnCode = compileDirect(e.f)
+		const argCode = compileDirect(e.arg)
+		code = function(env: Binding?): Value
+			tick()
+			const f = fnCode(env)
+			tick()
+
+			if type(f) ~= "table" or (f :: any).kind ~= "closure" then
+				directFail("applying a non-function")
+			end
+
+			const closure = f :: any
+			const a = argCode(env)
+			tick()
+			const bodyCode: Code = closure.code or compileDirect(closure.body)
+
+			return bodyCode({ value = a, rest = closure.env })
+		end
+	elseif e.op == "construct" then
+		const inner = compileDirect(e.e)
+		const tag = e.tag
+		code = function(env: Binding?): Value
+			tick()
+			const v = inner(env)
+			tick()
+
+			return { kind = "con", tag = tag, payload = v } :: any
+		end
+	elseif e.op == "tagof" then
+		const inner = compileDirect(e.e)
+		code = function(env: Binding?): Value
+			tick()
+			const v = inner(env)
+			tick()
+
+			return if type(v) == "table" and (v :: any).kind == "con" then (v :: any).tag else -1
+		end
+	elseif e.op == "payload" then
+		const inner = compileDirect(e.e)
+		code = function(env: Binding?): Value
+			tick()
+			const v = inner(env)
+			tick()
+
+			if type(v) ~= "table" or (v :: any).kind ~= "con" then
+				directFail("a payload of a non-constructor")
+			end
+
+			return (v :: any).payload
+		end
+	else
+		-- A primitive, the only expression left.
+		const prim = e :: PrimExpr
+		const tag = prim.tag
+		const aCode = compileDirect(prim.a)
+
+		if prim.b == nil then
+			code = function(env: Binding?): Value
+				tick()
+				const a = aCode(env)
+				tick()
+
+				return kindOf(a)
+			end
+		else
+			const bCode = compileDirect(prim.b :: Expr)
+			code = function(env: Binding?): Value
+				tick()
+				const a = aCode(env)
+				tick()
+				const b = bCode(env)
+				tick()
+				const result, message = binary(tag, a, b)
+
+				if message ~= nil then
+					directFail(message)
+				end
+
+				return result :: number
+			end
+		end
+	end
+
+	directMemo[e] = code
+
+	return code
+end
+
+const function runDirect(program: Expr, fuel: number, initialEnv: Binding?): Outcome
+	const code = compileDirect(program)
+	directSteps = 0
+	directFuel = fuel
+
+	const ok, result = pcall(function(): Value
+		const v = code(initialEnv)
+		-- The final value is handed back, which is a step of its own.
+		tick()
+
+		return v
+	end)
+
+	if ok then
+		return {
+			status = "value",
+			value = result :: Value,
+			steps = directSteps,
+		}
+	end
+
+	if result == DIRECT_OUT_OF_FUEL then
+		return {
+			status = "out_of_fuel",
+			steps = directSteps,
+		}
+	end
+
+	if type(result) == "table" and (result :: any).failure ~= nil then
+		return failed((result :: any).failure, directSteps)
+	end
+
+	error(result, 0)
+end
+
+-- The direct machine, where the Luau stack is deep enough for the program. A program that recurses past the Luau stack is run again, from the start, on the stack machine. Runs are pure, so the second run gives the same outcome, with the same steps.
+const function runHybrid(program: Expr, fuel: number, initialEnv: Binding?): Outcome
+	const ok, result = pcall(runDirect, program, fuel, initialEnv)
+
+	if ok then
+		return result :: Outcome
+	end
+
+	if type(result) == "string" and string.find(result, "stack overflow", 1, true) ~= nil then
+		return run(program, fuel, initialEnv)
+	end
+
+	error(result, 0)
+end
+
 -- Prints a value the way the examples write expected results: integers as numbers, lists as (1 2 3), improper pairs as (1 . 2).
 const function show(v: Value): string
 	if type(v) == "number" then
@@ -848,6 +1149,8 @@ end
 local M = {}
 M.run = run
 M.runReference = runReference
+M.runDirect = runDirect
+M.runHybrid = runHybrid
 M.show = show
 M.NIL = NIL
 M.MAX_INTEGER = MAX_INTEGER

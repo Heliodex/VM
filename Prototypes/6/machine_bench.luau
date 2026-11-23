@@ -60,6 +60,8 @@ end
 const fibExpr = fibProgram(22)
 bench("fib 22, reference", VM.runReference, fibExpr, 1e9)
 bench("fib 22, fast", VM.run, fibExpr, 1e9)
+bench("fib 22, direct", VM.runDirect, fibExpr, 1e9)
+bench("fib 22, hybrid", VM.runHybrid, fibExpr, 1e9)
 -- The checker on types.l2: the program is parsed once, then the checker's request is run on each machine.
 const tokenizer = L2.compile(readFile "L2/programs/boot/lex.l2", resolve, "boot/lex.l2")
 const parser = L2.compile(readFile "L2/programs/boot/parse.l2", resolve, "boot/parse.l2")
@@ -85,3 +87,5 @@ end
 
 timedChecker("checker on types.l2, reference", VM.runReference)
 timedChecker("checker on types.l2, fast", fastRun)
+timedChecker("checker on types.l2, direct", VM.runDirect)
+timedChecker("checker on types.l2, hybrid", VM.runHybrid)
