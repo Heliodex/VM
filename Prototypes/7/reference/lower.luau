@@ -11,13 +11,15 @@
 -- The mapping of the constructs:
 --   quote v                 lit v (nil is the core's nil)
 --   var i                   arg (the slot the map gives the variable's level)
---   lam body                a law of arity (free + 1): lit law, or call (lit law) applied to the free variables
+--   lam body                a law of arity (free + 1), or of the chain's arguments: lit law, or call (lit law) applied to the free variables
 --   pin e                   delay (call (lit law) nil free...): a law of arity (free + 1), its first argument a dummy
 --   cell a b                prim cons a b (primitive 14)
 --   index n e               prim head or tail, once per step of n's binary address
 --   force e                 force e
 --   if c t e                if c t e
---   apply f a               call f a
+--   apply (lam b) a         let a in b, when no lambda in b makes a closure: the variable is the next slot of the frame
+--   apply f a               call f a (a call of a call is one call with all its arguments)
+--   letrec (fix of a lambda) a recursive law: arg 0 is the law itself
 --   prim tag a b            prim (the core's tag of the same name)
 --   construct tag e         con tag e
 --   tagof e                 prim 12 e
@@ -168,6 +170,48 @@ const function lamChain(e: Expr): (number, Expr)
 	return n, cur
 end
 
+-- Whether an expression makes a lambda anywhere in it.
+local function containsLam(e: Expr): boolean
+	if e.op == "lam" then
+		return true
+	end
+
+	if e.op == "apply" then
+		return containsLam(e.f) or containsLam(e.arg)
+	elseif e.op == "if" then
+		return containsLam(e.c) or containsLam(e.t) or containsLam(e.e)
+	elseif e.op == "cell" then
+		return containsLam(e.head) or containsLam(e.tail)
+	elseif e.op == "prim" then
+		return containsLam(e.a) or e.b ~= nil and containsLam(e.b)
+	elseif e.op == "pin" or e.op == "force" or e.op == "construct" or e.op == "tagof" or e.op == "payload" or e.op == "index" then
+		return containsLam(e.e)
+	end
+
+	return false
+end
+
+-- An application of a lambda to one argument: a let.
+const function isLetApp(e: Expr): boolean
+	if e.op ~= "apply" then
+		return false
+	end
+
+	const f = (e :: VM.ApplyExpr).f
+
+	-- The fixed point is a lambda too, but it is not a let: applied to a function it is the recursion of the desugarer's letrec and of its mutual groups.
+	return f.op == "lam" and f ~= VM.fix and not containsLam(f.body)
+end
+
+-- The argument of a fixed point that the desugarer writes for a recursive function: a lambda whose body is a lambda.
+const function isFixOfLams(e: Expr): boolean
+	if e.op ~= "lam" then
+		return false
+	end
+
+	return e.body.op == "lam"
+end
+
 -- A recursive function, written as fix applied to a lambda that binds the function itself (the desugarer's letrec). Inside its body the function is arg 0, the law itself, applied to the outer variables it uses. So there is no fixed point: a recursive call is a call of the law, and the law is one law. The lambda's own argument is the law's first argument after the outer variables.
 -- e is the lambda that binds the function (at level depth); its body is the function's own lambda (at depth + 1), whose body is at depth + 2.
 lowerFix = function(e: Expr, depth: number, map: { number }): Form
@@ -197,6 +241,7 @@ lowerFix = function(e: Expr, depth: number, map: { number }): Form
 	end
 
 	inner[-1] = #free
+	inner[-2] = #free + n + 1
 	const law: Law = { kind = "law"; arity = #free + n; body = lower(body, depth + 1 + n, inner) }
 
 	if lawHook ~= nil then
@@ -243,6 +288,7 @@ lower = function(e: Expr, depth: number, map: { number }): Form
 			inner[depth + j - 1] = #free + j
 		end
 
+		inner[-2] = #free + n + 1
 		const law: Law = { kind = "law"; arity = #free + n; body = lower(body, depth + n, inner) }
 
 		if lawHook ~= nil then
@@ -258,10 +304,12 @@ lower = function(e: Expr, depth: number, map: { number }): Form
 		const free = sortedFree(e.e, depth, depth)
 		local inner: { number } = {}
 
+		-- The law's first argument is a dummy (slot 1), and the free variables are its arguments after it (slots 2 onwards).
 		for i, lvl in free do
-			inner[lvl] = i
+			inner[lvl] = i + 1
 		end
 
+		inner[-2] = #free + 2
 		const law: Law = { kind = "law"; arity = #free + 1; body = lower(e.e, depth, inner) }
 		local args: { Form } = { { op = "lit"; value = NIL } }
 
@@ -292,12 +340,27 @@ lower = function(e: Expr, depth: number, map: { number }): Form
 		return { op = "force"; e = lower(e.e, depth, map) }
 	elseif e.op == "if" then
 		return { op = "if"; c = lower(e.c, depth, map); t = lower(e.t, depth, map); e = lower(e.e, depth, map) }
-	elseif e.op == "apply" and e.f == VM.fix and e.arg.op == "lam" and e.arg.body.op == "lam" then
+	elseif e.op == "apply" and e.f == VM.fix and isFixOfLams(e.arg) then
 		return lowerFix(e.arg, depth, map)
+	elseif isLetApp(e) then
+		-- An immediately applied lambda is a let: the argument is evaluated in this frame, and the lambda's variable is the next slot of the frame, so no law is made and nothing is entered (SPEC.md section 3, let).
+		const slot = map[-2] or 0
+		local inner: { number } = {}
+
+		for lvl, sl in map do
+			inner[lvl] = sl
+		end
+
+		inner[depth] = slot
+		inner[-2] = slot + 1
+		const app = e :: VM.ApplyExpr
+		const lambda = app.f :: VM.LamExpr
+
+		return { op = "let"; e = lower(app.arg, depth, map); body = lower(lambda.body, depth + 1, inner) }
 	elseif e.op == "apply" then
 		-- The arguments of a chain of applications, as one call (the head is not an application, or the fixed point's own application).
 		local args: { Expr } = {}
-		local head: Expr = e
+		local head: Expr = e :: Expr
 
 		while head.op == "apply" and head.f ~= VM.fix do
 			table.insert(args, 1, head.arg)
@@ -315,7 +378,24 @@ lower = function(e: Expr, depth: number, map: { number }): Form
 			table.insert(forms, lower(a, depth, map))
 		end
 
-		return { op = "call"; f = lower(head, depth, map); args = forms }
+		-- A call of a call is one call with all the arguments: a partial application of a law, applied to more, is the law applied to all of them (the core's calls are curried in effect, SPEC.md section 3).
+		const headForm = lower(head, depth, map)
+
+		if headForm.op == "call" then
+			local all: { Form } = {}
+
+			for _, a in headForm.args do
+				table.insert(all, a)
+			end
+
+			for _, a in forms do
+				table.insert(all, a)
+			end
+
+			return { op = "call"; f = headForm.f; args = all }
+		end
+
+		return { op = "call"; f = headForm; args = forms }
 	elseif e.op == "prim" then
 		const name = Primitives.BY_TAG[e.tag].name
 		const tag = CORE_TAG[name]
@@ -345,7 +425,7 @@ end
 -- Lowers a top-level expression: no binders, so the map is empty.
 const function expr(e: Expr, hook: ((Expr, Law) -> ())?): Form
 	lawHook = hook
-	const form = lower(e, 0, {})
+	const form = lower(e, 0, { [-2] = 2 })
 	lawHook = nil
 
 	return form
@@ -353,7 +433,7 @@ end
 
 -- A closed closure: the body of a lambda at the top level, with no environment, as a law of arity 1. Its variable of index 0 is its argument.
 const function closedClosure(body: Expr): Law
-	return { kind = "law"; arity = 1; body = lower(body, 1, { [0] = 1 }) }
+	return { kind = "law"; arity = 1; body = lower(body, 1, { [0] = 1, [-2] = 2 }) }
 end
 
 return {
