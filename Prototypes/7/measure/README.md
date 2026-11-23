@@ -219,3 +219,9 @@ The doubling ratios stay between 1.94 and 2.08, against 2.0 to 2.9 in run 4. The
 ### Profile (`results/checker_profile_nogroup.txt`, before the last same-loop change)
 
 Of 151M steps: the binding trie's `findB` is about 33% (its per-level division and `Result` match are the floor for this machine); `setB` about 15%; the fixed-point combinator (`fixpoint`) about 9%; the list accessor `tl` about 8%; the environment's child walk `envKid` about 6%; name comparison `same` about 5%.
+
+## A list-accessor change that did not help
+
+Tried: in the environment's child walks (`envKid`, `envPut`), `lookupM` and `memberI`, replacing the closure call `tl rest` with a `match (tail rest)` so the walk used the builtin directly. The answers were the same (160 of 160), but the checker on `types.l2` took 151,856,891 steps, against 151,336,815 before: 0.3% more. A `match` on the builtin's `Result` costs about as much as the closure call it replaces. The change is reverted.
+
+What this says: the list-accessor cost is the language's `Result` wrapping of `head` and `tail` (and of `/`), not the closure call. The checker's code cannot remove it. The remedy is a core primitive that reads a list without a `Result` (Phase 2), or a jet for the hot list operations (Phase 5).

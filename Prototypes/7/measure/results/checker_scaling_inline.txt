@@ -1,0 +1,10 @@
+types.l2 (Prototype 6's): checker 167,055,401 steps (value)
+
+functions  checker steps  steps per function  ratio to the previous size
+       25       2,855,736             114,229  -  (value)
+       50       5,545,607             110,912  1.94  (value)
+      100      11,006,244             110,062  1.98  (value)
+      200      21,852,462             109,262  1.99  (value)
+      400      43,777,620             109,444  2.00  (value)
+      800      91,211,456             114,014  2.08  (value)
+     1600     186,169,183             116,355  2.04  (value)
