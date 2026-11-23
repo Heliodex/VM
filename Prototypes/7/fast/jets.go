@@ -61,24 +61,24 @@ func register(lawHash string, fn jetFn) {
 
 func init() {
 	// tl (measure/boot/types.l2, line 24): match (tail l), Ok t -> t, Err -> nil. Measured (the lowering of its current law): a cell takes 21 steps with the entry, nil takes 67.
-	register("6ece330888dd31128a424c0f26cebdf7e9a21f481fa943536b13fca0cabeeca1", func(args []Value) (Value, int64, bool) {
+	register("4fe38189203deaed2ca446f08c515cfd6d1eee1f79b38e05679f07e5ca332067", func(args []Value) (Value, int64, bool) {
 		switch l := args[0].(type) {
 		case *Cell:
-			return l.Tail, 21, true
+			return l.Tail, 12, true
 		case NilT:
-			return NIL, 67, true
+			return NIL, 53, true
 		}
 
 		return nil, 0, false
 	})
 
 	// hdOr (line 14), the inner law of two arguments (the list, then the default): match (head l), Ok x -> x, Err -> dflt. Measured (the lowering of its current law): a cell takes 21 steps with the entry, nil takes 67.
-	register("bbab4e1e68242e0e95a025f10b269d0d76c4deb8e03ceb361def6b8a9f5bf38b", func(args []Value) (Value, int64, bool) {
+	register("7dea60eed6b833b22695e1d7192478ba5d8bcd1c04497d4ada103c17a52fd5e6", func(args []Value) (Value, int64, bool) {
 		switch l := args[0].(type) {
 		case *Cell:
-			return l.Head, 21, true
+			return l.Head, 12, true
 		case NilT:
-			return args[1], 67, true
+			return args[1], 53, true
 		}
 
 		return nil, 0, false

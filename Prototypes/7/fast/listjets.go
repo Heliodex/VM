@@ -42,16 +42,16 @@ const (
 
 var (
 	// costEnvKid is the cost of each arm of envKid, in steps, counting its entry.
-	costEnvKid = [ekArms]int64{70, 37, 63}
+	costEnvKid = [ekArms]int64{61, 23, 35}
 
 	// costEnvPut is the cost of each arm of envPut, in steps, counting its entry.
-	costEnvPut = [epArms]int64{72, 65, 67}
+	costEnvPut = [epArms]int64{63, 37, 39}
 
 	// costLenOf is the cost of each arm of lenOf, in steps, counting its entry.
-	costLenOf = [lenArms]int64{7, 34, 80}
+	costLenOf = [lenArms]int64{7, 25, 66}
 
 	// costParseSame is the cost of each arm of the parser's same, in steps, counting its entry.
-	costParseSame = [psArms]int64{10, 10, 12, 62, 111}
+	costParseSame = [psArms]int64{10, 10, 12, 44, 75}
 )
 
 // armsCostN is the cost of the arms of a walk, with the costs of each arm.
@@ -218,7 +218,7 @@ func envPutWalk(kids, b, child Value, w *[epArms]int64) (Value, bool) {
 
 func init() {
 	// check:lenOf@55: arity 1.
-	register("9ccac6f1220b9d1b044a90aa8b76d11dd2bc467956192d710d53e6898dcdc2cd", func(args []Value) (Value, int64, bool) {
+	register("3b4dfddda8b88551ed372239805d957727a1d0c1eee7ecc0ce2be8042e594878", func(args []Value) (Value, int64, bool) {
 		var w [lenArms]int64
 
 		res, ok := lenOfWalk(args[0], &w)
@@ -230,7 +230,7 @@ func init() {
 	})
 
 	// check:envKid@292: arity 2, (kids, b).
-	register("b73fd88dc97ce54c8a13be3bc52a3144ce0bb98f249518eb820bf3f8ba679777", func(args []Value) (Value, int64, bool) {
+	register("54e4289f782ecc8177dbf10a05bc1131c263b3a7040892ba0e28c9817164e6c1", func(args []Value) (Value, int64, bool) {
 		var w [ekArms]int64
 
 		res, ok := envKidWalk(args[0], args[1], &w)
@@ -242,7 +242,7 @@ func init() {
 	})
 
 	// check:envPut@302: arity 3, (kids, b, child).
-	register("1f939048e9e9d8672970c0c8927a2e0f8c51daf80199162ff31a668afce9f9e3", func(args []Value) (Value, int64, bool) {
+	register("4aa09bfafce14eb662abb331a7d9ddd9915de08d4fe458211861e7e2d2fb9185", func(args []Value) (Value, int64, bool) {
 		var w [epArms]int64
 
 		res, ok := envPutWalk(args[0], args[1], args[2], &w)
@@ -254,7 +254,7 @@ func init() {
 	})
 
 	// parse:same@20: arity 2.
-	register("9aeabac5c88a99708e577cccb128b7455177f7ccec861ff5e85becbfe5ac34a3", func(args []Value) (Value, int64, bool) {
+	register("d98b2114cd71937bc44aa03e208de0bc6c2e5171947e9464c2135eba12a7f6d1", func(args []Value) (Value, int64, bool) {
 		var w [psArms]int64
 
 		res, ok := parseSameWalk(args[0], args[1], &w)

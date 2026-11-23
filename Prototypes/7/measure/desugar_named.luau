@@ -957,7 +957,53 @@ local function withExpr(node: Expr & { k: "with" }, scope: { string }, ctors: { 
 	return M.app(M.lam(M.construct((rc :: Ctor).tag, pairsOf(values))), desugar(node.base, scope, ctors))
 end
 
+-- A match on head x or tail x, with an Ok arm and an Err arm, tests the kind of x, as checkedHead and checkedTail do, and binds the part straight away: the Ok value is never built, nor tested by its tag. The Err arm gets the same message the checked form gives, so the outcome is the same.
+local function desugarHeadMatch(name: string, arg: Expr, okArm: Arm, errArm: Arm, scope: { string }, ctors: { [string]: Ctor }): M.Expr
+	const a = desugar(arg, scope, ctors)
+	const inner = withNames(scope, { " scrut" })
+	local okBranch: M.Expr
+	const okBind = (okArm.pat :: any).bind :: string?
+
+	if okBind ~= nil then
+		checkBinder(okBind, okArm.pat.at)
+		const part = if name == "head" then M.head(M.var(0)) else M.tail(M.var(0))
+		okBranch = M.app(M.lam(desugar(okArm.body, withNames(inner, { okBind }), ctors)), part)
+	else
+		okBranch = desugar(okArm.body, inner, ctors)
+	end
+
+	local errBranch: M.Expr
+	const errBind = (errArm.pat :: any).bind :: string?
+	const reason = if name == "head" then "head of an empty list" else "tail of an empty list"
+
+	if errBind ~= nil then
+		checkBinder(errBind, errArm.pat.at)
+		errBranch = M.app(M.lam(desugar(errArm.body, withNames(inner, { errBind }), ctors)), textValue(reason))
+	else
+		errBranch = desugar(errArm.body, inner, ctors)
+	end
+
+	return M.app(M.lam(M.ite(M.prim(Primitives.TAG.eq, M.prim(KIND_TAG, M.var(0)), M.int(2)), okBranch, errBranch)), a)
+end
+
 local function desugarMatch(scrut: Expr, arms: { Arm }, scope: { string }, ctors: { [string]: Ctor }): M.Expr
+	if scrut.k == "app" and scrut.f.k == "name" and (scrut.f.name == "head" or scrut.f.name == "tail") and #scrut.args == 1 and indexOf(scope, scrut.f.name) == nil and #arms == 2 then
+		local okArm: Arm? = nil
+		local errArm: Arm? = nil
+
+		for _, arm in arms do
+			if arm.pat.k == "con" and arm.pat.name == "Ok" then
+				okArm = arm
+			elseif arm.pat.k == "con" and arm.pat.name == "Err" then
+				errArm = arm
+			end
+		end
+
+		if okArm ~= nil and errArm ~= nil then
+			return desugarHeadMatch(scrut.f.name, scrut.args[1], okArm, errArm, scope, ctors)
+		end
+	end
+
 	const s = desugar(scrut, scope, ctors)
 	const inner = withNames(scope, { " scrut" })
 

@@ -7,19 +7,19 @@ package fast
 //	parse:kn@22: match (fst t), one arm per token kind 0 to 15, each giving its kind. The kind k costs 10 + 5k with the entry. A kind past 15, and a value that is not a token, is an error in the body, so the jet gives up there.
 
 func init() {
-	register("bf67082dcc14ec0804c7893707e92cdecc959f3e786498d28b6bb220ec7b7670", func(args []Value) (Value, int64, bool) {
+	register("77190d018a115b6952e43dcae952ab69d1335d9645c1da2c4e25cb3fa3146341", func(args []Value) (Value, int64, bool) {
 		if c, ok := args[0].(*Cell); ok {
-			return c.Head, 21, true
+			return c.Head, 12, true
 		}
 
-		return Small(-1), 67, true
+		return Small(-1), 53, true
 	})
-	register("b5a7fd17c61e1218dbec3b963f1e2b5138649f330be896345940ee5d64ffe08f", func(args []Value) (Value, int64, bool) {
+	register("544e6f6f925d439cef2d0fba39e357a7965abc61690f63445099c034b4cc8e53", func(args []Value) (Value, int64, bool) {
 		if c, ok := args[0].(*Cell); ok {
-			return c.Head, 21, true
+			return c.Head, 12, true
 		}
 
-		return Small(0), 67, true
+		return Small(0), 53, true
 	})
 	register("7d9cb981108e83e32c0aa4e35b89d68b15e48c88753de7d4465ee0788eef3949", func(args []Value) (Value, int64, bool) {
 		c, ok := args[0].(*Cell)
