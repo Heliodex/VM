@@ -3,11 +3,6 @@ package fast
 import "fmt"
 
 type (
-	// Env is a frame: slot 0 is the law, then the arguments, then what let and case push (SPEC.md section 2).
-	Env struct {
-		Slots []Value
-	}
-
 	// Outcome is the result of a run (SPEC.md section 5). Status is "value", "error" or "out_of_fuel". Steps is the fuel used (section 6).
 	Outcome struct {
 		Status string
@@ -22,7 +17,7 @@ type (
 	cont struct {
 		kind contKind
 		node *Node
-		env *Env
+		env []Value
 		vbase, i, n int
 		rest []Value
 		th *Thunk
@@ -42,8 +37,6 @@ const (
 const (
 	// kItems: a form with children, waiting for the child at index i.
 	kItems contKind = iota
-	// kRestore: a let or a case body, after which the frame goes back to n slots.
-	kRestore
 	// kApplyRest: the arguments that a call has over the law's arity, to apply to its result.
 	kApplyRest
 	// kForce: a thunk, to store the result in once its call has run.
@@ -64,7 +57,7 @@ func fail(msg string, steps int64) Outcome {
 }
 
 // machine runs the machine with an explicit stack. In mode mEval it evaluates node in env; in mApply it applies fv to args; in mRet it gives value to the continuation on top. Operands are kept on vs, and each items continuation remembers where its own operands start, so nothing is copied to make a frame.
-func machine(m mode, node *Node, env *Env, fv Value, args []Value, fuel int64) Outcome {
+func machine(m mode, node *Node, env []Value, fv Value, args []Value, fuel int64) Outcome {
 	var (
 		k []cont
 		vs []Value
@@ -85,7 +78,7 @@ func machine(m mode, node *Node, env *Env, fv Value, args []Value, fuel int64) O
 			steps++
 
 			if StepHook != nil {
-				StepHook(env.Slots[0])
+				StepHook(env[0])
 			}
 
 			switch node.Op {
@@ -93,11 +86,11 @@ func machine(m mode, node *Node, env *Env, fv Value, args []Value, fuel int64) O
 				value = node.Lit
 				m = mRet
 			case OpArg:
-				if node.Index < 0 || node.Index >= len(env.Slots) {
+				if node.Index < 0 || node.Index >= len(env) {
 					return fail(fmt.Sprintf("no slot %d in the frame", node.Index), steps)
 				}
 
-				value = env.Slots[node.Index]
+				value = env[node.Index]
 				m = mRet
 			default:
 				k = append(k, cont{
@@ -225,9 +218,7 @@ func machine(m mode, node *Node, env *Env, fv Value, args []Value, fuel int64) O
 				})
 			}
 
-			env = &Env{
-				Slots: slots,
-			}
+			env = slots
 
 			if StepHook != nil {
 				StepHook(law)
@@ -244,27 +235,29 @@ func machine(m mode, node *Node, env *Env, fv Value, args []Value, fuel int64) O
 				}
 			}
 
-			c := k[len(k)-1]
+			c := &k[len(k)-1]
 
 			switch c.kind {
 			case kItems:
+				// The fields are copied out first: the record is popped below, and its slot may be reused by a push.
+				cnode, cenv, cvbase, ci := c.node, c.env, c.vbase, c.i
 				// The child at c.i has finished with value. Its operands are the ones before it, so the operands are cut back to that point before it is added.
-				vs = append(vs[:c.vbase+c.i], value)
+				vs = append(vs[:cvbase+ci], value)
 
-				if items := c.node.items(); c.i+1 < len(items) {
-					k[len(k)-1].i = c.i + 1
-					node = items[c.i+1]
-					env = c.env
+				if items := cnode.items(); ci+1 < len(items) {
+					k[len(k)-1].i = ci + 1
+					node = items[ci+1]
+					env = cenv
 					m = mEval
 
 					continue
 				}
 
 				k = k[:len(k)-1]
-				vals := vs[c.vbase:]
+				vals := vs[cvbase:]
 				m = mRet
 
-				switch c.node.Op {
+				switch cnode.Op {
 				case OpCall:
 					fv = vals[0]
 					// The arguments alias the operands, which are cut back below. They are read once, to build the frame or a partial application (which copies them), so nothing outlives the operands.
@@ -277,7 +270,7 @@ func machine(m mode, node *Node, env *Env, fv Value, args []Value, fuel int64) O
 					}
 				case OpCon:
 					value = &Con{
-						Tag: c.node.Tag,
+						Tag: cnode.Tag,
 						Payload: vals[0],
 					}
 				case OpCase:
@@ -290,7 +283,7 @@ func machine(m mode, node *Node, env *Env, fv Value, args []Value, fuel int64) O
 
 					pushed := vals[0]
 
-					for _, a := range c.node.Alts {
+					for _, a := range cnode.Alts {
 						if a.Tag == con.Tag {
 							branch = a.Body
 							pushed = con.Payload
@@ -300,21 +293,16 @@ func machine(m mode, node *Node, env *Env, fv Value, args []Value, fuel int64) O
 					}
 
 					if branch == nil {
-						if c.node.Else == nil {
+						if cnode.Else == nil {
 							return fail(fmt.Sprintf("no branch for the constructor's tag %d", con.Tag), steps)
 						}
 
-						branch = c.node.Else
+						branch = cnode.Else
 					}
 
-					k = append(k, cont{
-						kind: kRestore,
-						n: len(c.env.Slots),
-						env: c.env,
-					})
-					c.env.Slots = append(c.env.Slots, pushed)
 					node = branch
-					env = c.env
+
+					env = append(cenv, pushed)
 					m = mEval
 				case OpIf:
 					if !isInt(vals[0]) {
@@ -322,22 +310,17 @@ func machine(m mode, node *Node, env *Env, fv Value, args []Value, fuel int64) O
 					}
 
 					if sign(vals[0]) != 0 {
-						node = c.node.Kids[1]
+						node = cnode.Kids[1]
 					} else {
-						node = c.node.Kids[2]
+						node = cnode.Kids[2]
 					}
 
-					env = c.env
+					env = cenv
 					m = mEval
 				case OpLet:
-					k = append(k, cont{
-						kind: kRestore,
-						n: len(c.env.Slots),
-						env: c.env,
-					})
-					c.env.Slots = append(c.env.Slots, vals[0])
-					node = c.node.Kids[1]
-					env = c.env
+					node = cnode.Kids[1]
+
+					env = append(cenv, vals[0])
 					m = mEval
 				case OpDelay:
 					value = &Thunk{
@@ -362,7 +345,7 @@ func machine(m mode, node *Node, env *Env, fv Value, args []Value, fuel int64) O
 						m = mApply
 					}
 				case OpPrim:
-					res, msg := prim(c.node.Tag, vals)
+					res, msg := prim(cnode.Tag, vals)
 					if msg != "" {
 						return fail(msg, steps)
 					}
@@ -370,10 +353,7 @@ func machine(m mode, node *Node, env *Env, fv Value, args []Value, fuel int64) O
 					value = res
 				}
 
-				vs = vs[:c.vbase]
-			case kRestore:
-				c.env.Slots = c.env.Slots[:c.n]
-				k = k[:len(k)-1]
+				vs = vs[:cvbase]
 			case kApplyRest:
 				fv = value
 				args = c.rest
@@ -406,7 +386,5 @@ func Run(program *Law, input Value, fuel int64) Outcome {
 
 // RunBody evaluates the body of a law of arity 1 with the input as its argument, with no law entry: the frame is [NIL, input]. It is the reference's runForm, which the examples and the L2 tests use.
 func RunBody(body *Node, input Value, fuel int64) Outcome {
-	return machine(mEval, body, &Env{
-		Slots: []Value{NIL, input},
-	}, nil, nil, fuel)
+	return machine(mEval, body, []Value{NIL, input}, nil, nil, fuel)
 }
