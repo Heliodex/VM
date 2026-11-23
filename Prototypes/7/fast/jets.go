@@ -61,7 +61,7 @@ func register(lawHash string, fn jetFn) {
 
 func init() {
 	// tl (measure/boot/types.l2, line 24): match (tail l), Ok t -> t, Err -> nil. Measured (the lowering of its current law): a cell takes 21 steps with the entry, nil takes 67.
-	register("a068edb019f9f7c17e5aecb7a8b5db9c703b6d6393aef36768a736783427c8b2", func(args []Value) (Value, int64, bool) {
+	register("6ece330888dd31128a424c0f26cebdf7e9a21f481fa943536b13fca0cabeeca1", func(args []Value) (Value, int64, bool) {
 		switch l := args[0].(type) {
 		case *Cell:
 			return l.Tail, 21, true
@@ -73,7 +73,7 @@ func init() {
 	})
 
 	// hdOr (line 14), the inner law of two arguments (the list, then the default): match (head l), Ok x -> x, Err -> dflt. Measured (the lowering of its current law): a cell takes 21 steps with the entry, nil takes 67.
-	register("555d8d8dd5cb85c84f6a66cc0b6377cb4a1b647cf433ea5586b62ae899b7f647", func(args []Value) (Value, int64, bool) {
+	register("bbab4e1e68242e0e95a025f10b269d0d76c4deb8e03ceb361def6b8a9f5bf38b", func(args []Value) (Value, int64, bool) {
 		switch l := args[0].(type) {
 		case *Cell:
 			return l.Head, 21, true
@@ -85,7 +85,7 @@ func init() {
 	})
 
 	// stP (line 63): match st, St p -> p. Measured (the lowering of its current law): a St constructor (tag 0) takes 12 steps with the entry. Any other value is an error in the body, so it is left to the body.
-	register("c89197fc1fb23952ba9aff53d994baf3f310ecbeeabdfa111a47030834358787", func(args []Value) (Value, int64, bool) {
+	register("b3f7179f4bbb8eab72fca40836c377e63c856e3e621d7a5fda33ae6bd10b7f89", func(args []Value) (Value, int64, bool) {
 		if c, ok := args[0].(*Con); ok && c.Tag == 0 {
 			return c.Payload, 12, true
 		}

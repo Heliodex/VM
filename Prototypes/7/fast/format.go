@@ -37,7 +37,6 @@ const (
 	vCon = 4
 	vLaw = 5
 	vApp = 6
-	vPin = 7
 	fLit = 0x10
 	fArg = 0x11
 	fCall = 0x12
@@ -267,14 +266,6 @@ func (w *writer) value(v Value) error {
 		}
 
 		return w.form(x.Body)
-	case *Pin:
-		if _, ok := x.Value.(*Thunk); ok {
-			return errors.New("binary: a pin of a thunk has no binary form")
-		}
-
-		w.buf = append(w.buf, vPin)
-
-		return w.value(x.Value)
 	case *Thunk:
 		return errors.New("binary: a thunk has no binary form")
 	case *big.Int, Small:
@@ -499,15 +490,6 @@ func (r *reader) value() (Value, error) {
 		return &App{
 			Law: law,
 			Args: args,
-		}, nil
-	case vPin:
-		v, err := r.value()
-		if err != nil {
-			return nil, err
-		}
-
-		return &Pin{
-			Value: v,
 		}, nil
 	}
 

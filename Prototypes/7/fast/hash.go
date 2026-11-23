@@ -114,21 +114,6 @@ func hashOf(v Value) ([32]byte, bool, error) {
 		h, err := LawHash(x)
 
 		return h, false, err
-	case *Pin:
-		if x.hashed {
-			return x.hash, true, nil
-		}
-
-		vh, _, err := hashOf(x.Value)
-		if err != nil {
-			return [32]byte{}, false, err
-		}
-
-		x.hash = sha256.Sum256(concat([]byte{'P'}, vh[:]))
-		x.data = true
-		x.hashed = true
-
-		return x.hash, true, nil
 	case *Thunk:
 		return [32]byte{}, false, errors.New("binary: a thunk has no binary form")
 	case *big.Int, NilT, Small:

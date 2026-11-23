@@ -46,7 +46,7 @@ const (
 )
 
 // primArity is the number of arguments of each primitive (SPEC.md section 4), by tag.
-var primArity = []int{2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 2}
+var primArity = []int{2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 2}
 
 // items are the children a form evaluates, in order, before it finishes. A case, an if, a let and a con evaluate only their first child first; the rest are used when it finishes.
 func (n *Node) items() []*Node {

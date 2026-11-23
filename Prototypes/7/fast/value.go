@@ -28,7 +28,7 @@ type (
 	// Small is an integer that fits in an int64.
 	Small int64
 
-	// Value is one of: Small, *big.Int, NilT, *Cell, *Con, *Law, *App, *Pin or *Thunk.
+	// Value is one of: Small, *big.Int, NilT, *Cell, *Con, *Law, *App or *Thunk.
 	Value any
 
 	// App is a partial application of Law to Args, which are fewer than the law's arity.
@@ -60,15 +60,6 @@ type (
 		data, hashed bool
 	}
 
-	// Pin is a value in normal form, interned by its content: equal pins are the same pointer.
-	Pin struct {
-		Value Value
-
-		// hash, data and hashed cache hashOf (hash.go).
-		hash [32]byte
-		data, hashed bool
-	}
-
 	// Thunk is a delayed call of F to Args. It runs once; its result is kept in Result.
 	Thunk struct {
 		F Value
@@ -90,8 +81,6 @@ func KindOf(v Value) int {
 		return 2
 	case *Con:
 		return 5
-	case *Pin:
-		return 4
 	case *Thunk:
 		return 6
 	case *big.Int, Small:

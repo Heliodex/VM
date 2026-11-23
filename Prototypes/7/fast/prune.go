@@ -65,7 +65,7 @@ func pruneWalk(bs, t Value, w *[pArms]int64, fw *[6]int64) (Value, bool) {
 
 func init() {
 	// prune@126: arity 2, the trie and the type. The fuel is its own arms, and the findB calls.
-	register("3f3dc2d77035ba7caf99f84f934eacee77bec5303b5d751b5c8ec321c05cd7d2", func(args []Value) (Value, int64, bool) {
+	register("584760e6947018adf101e6fd7d9052ece11e7e74c74cc222ceb6e5c624695835", func(args []Value) (Value, int64, bool) {
 		var (
 			w [pArms]int64
 			fw [6]int64

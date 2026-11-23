@@ -18,7 +18,7 @@ var (
 
 	// The memo (SPEC.md section 7). A saturated call of a law is memoised when every argument is data: its key is the law's content hash and the content hashes of its arguments (hash.go). A memo entry stores the call's result and the fuel the call used, counting its entry. A hit charges that stored fuel and does no work, so the fuel of a run is the same with the memo as without it. A hit that would run past the fuel is not taken: the body runs, and stops where the spec says.
 	//
-	// The table lives for the process, as the pin table does, so a second run of the same input is a hit at its top call. MemoOn turns it on; the results and the fuel do not depend on it.
+	// The table lives for the process, so a second run of the same input is a hit at its top call. MemoOn turns it on; the results and the fuel do not depend on it.
 
 	// MemoOn turns the memo on.
 	MemoOn bool

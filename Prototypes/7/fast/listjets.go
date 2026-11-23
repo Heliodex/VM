@@ -218,7 +218,7 @@ func envPutWalk(kids, b, child Value, w *[epArms]int64) (Value, bool) {
 
 func init() {
 	// check:lenOf@55: arity 1.
-	register("2298ef3cfd2b21567e051f34d5863170062dad35c3709bd9f37d09492009109f", func(args []Value) (Value, int64, bool) {
+	register("9ccac6f1220b9d1b044a90aa8b76d11dd2bc467956192d710d53e6898dcdc2cd", func(args []Value) (Value, int64, bool) {
 		var w [lenArms]int64
 
 		res, ok := lenOfWalk(args[0], &w)
@@ -230,7 +230,7 @@ func init() {
 	})
 
 	// check:envKid@292: arity 2, (kids, b).
-	register("4ebaefaeb7147e6899bde716526cc4a377cb20530099a414edbd3a022e7afd85", func(args []Value) (Value, int64, bool) {
+	register("b73fd88dc97ce54c8a13be3bc52a3144ce0bb98f249518eb820bf3f8ba679777", func(args []Value) (Value, int64, bool) {
 		var w [ekArms]int64
 
 		res, ok := envKidWalk(args[0], args[1], &w)
@@ -242,7 +242,7 @@ func init() {
 	})
 
 	// check:envPut@302: arity 3, (kids, b, child).
-	register("8514ed55e670606cda618acdc3e3587222b948488fb2e776cb85fcd1b31ade00", func(args []Value) (Value, int64, bool) {
+	register("1f939048e9e9d8672970c0c8927a2e0f8c51daf80199162ff31a668afce9f9e3", func(args []Value) (Value, int64, bool) {
 		var w [epArms]int64
 
 		res, ok := envPutWalk(args[0], args[1], args[2], &w)
@@ -254,7 +254,7 @@ func init() {
 	})
 
 	// parse:same@20: arity 2.
-	register("830bcd29a9e7a470a2eb500987b7fd83d44bc730aa8d8c014b781ecead0ecb55", func(args []Value) (Value, int64, bool) {
+	register("9aeabac5c88a99708e577cccb128b7455177f7ccec861ff5e85becbfe5ac34a3", func(args []Value) (Value, int64, bool) {
 		var w [psArms]int64
 
 		res, ok := parseSameWalk(args[0], args[1], &w)

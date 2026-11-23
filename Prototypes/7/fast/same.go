@@ -61,7 +61,7 @@ func sameWalk(a, b Value, w *[sameArms]int64) (Value, bool) {
 
 func init() {
 	// same@39: arity 2, the two names. The hash is the law's content hash (sha256 of its encoding, section 12.7).
-	register("3e86f7c1398a8db3be9e86e8dfda54d432246ae62731cb7c18297e922afd5320", func(args []Value) (Value, int64, bool) {
+	register("426d16d421b423e8dd95476b240c1cef453d6b8a8a4ecc22f23d1089957b30d3", func(args []Value) (Value, int64, bool) {
 		var w [sameArms]int64
 
 		res, ok := sameWalk(args[0], args[1], &w)

@@ -2,9 +2,6 @@ package fast
 
 import "fmt"
 
-// pins interns pins by their content: the same bytes give the same pin, as in the reference (SPEC.md section 4, primitive 10). It is a process-wide table, as the reference's is.
-var pins = map[string]*Pin{}
-
 // bit is the integer 1 for true, and 0 for false.
 func bit(b bool) Value {
 	if b {
@@ -12,32 +9,6 @@ func bit(b bool) Value {
 	}
 
 	return Small(0)
-}
-
-// pinOf is primitive 10: a pin of a value that is not a thunk, interned by its binary form.
-func pinOf(a Value) (Value, string) {
-	switch x := a.(type) {
-	case *Pin:
-		return x, ""
-	case *Thunk:
-		return nil, "a thunk cannot be pinned"
-	}
-
-	key, err := EncodeValue(a)
-	if err != nil {
-		return nil, "a pin has no binary form: " + err.Error()
-	}
-
-	if p, ok := pins[string(key)]; ok {
-		return p, ""
-	}
-
-	p := &Pin{
-		Value: a,
-	}
-	pins[string(key)] = p
-
-	return p, ""
 }
 
 // prim applies primitive tag to vals (SPEC.md section 4). It gives the result, or a message when the primitive is an error. The message is empty when there is none.
@@ -86,32 +57,23 @@ func prim(tag int, vals []Value) (Value, string) {
 
 		return c.Tail, ""
 	case 10:
-		return pinOf(vals[0])
-	case 11:
-		p, ok := vals[0].(*Pin)
-		if !ok {
-			return nil, "unpin of a value that is not a pin"
-		}
-
-		return p.Value, ""
-	case 12:
 		if c, ok := vals[0].(*Con); ok {
 			return Small(c.Tag), ""
 		}
 
 		return Small(-1), ""
-	case 14:
-		return &Cell{
-			Head: vals[0],
-			Tail: vals[1],
-		}, ""
-	case 13:
+	case 11:
 		c, ok := vals[0].(*Con)
 		if !ok {
 			return nil, "payload of a value that is not a constructor"
 		}
 
 		return c.Payload, ""
+	case 12:
+		return &Cell{
+			Head: vals[0],
+			Tail: vals[1],
+		}, ""
 	}
 
 	return nil, fmt.Sprintf("primitive %d does not exist", tag)
