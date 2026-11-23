@@ -580,3 +580,121 @@ do
 	emit("jet parse:kn@22 nil", "body", law(1, call(lit(knLaw), arg(1))), NIL, 1000)
 end
 
+-- ---- 10. the list helpers the corpus runs most, in the checker and the parser: lenOf (the checker's length), envKid and envPut (the checker's name environment, a list of (byte . node) pairs), and same as the parser has it (a different body from the checker's: its test on a list is a nil test, so a number is not a cell, and the walk gives up on that). Each is found by its owner and arity, as in section 9, and called on lists, with the arguments of the call read from one pair (or a triple of pairs), so every arm of each body is taken: a list that ends, a key found or not, a number and a nil, a non-number key that the body refuses.
+
+do
+	math.randomseed(23)
+	const wanted: { [string]: number } = { ["check:lenOf@55"] = 1, ["check:envKid@292"] = 2, ["check:envPut@302"] = 3, ["parse:same@20"] = 2 }
+	const found: { [string]: Law } = {}
+
+	const function collect(c: Compile.Compiled, stage: string)
+		Lower.expr(c.expr, function(e, l)
+			const key = `{stage}:{V.ownerOf(e)}`
+
+			if wanted[key] == l.arity then
+				found[key] = l
+			end
+		end)
+	end
+
+	collect(Compile.compile(readFile("boot/types.l2"), "boot/types.l2"), "check")
+	collect(Compile.compile(readFile(BOOT6 .. "parse.l2"), "parse.l2"), "parse")
+
+	const LEN = found["check:lenOf@55"]
+	const KID = found["check:envKid@292"]
+	const PUT = found["check:envPut@302"]
+	const SAME = found["parse:same@20"]
+
+	const function cellV(a: Value, b: Value): Value
+		return { kind = "cell", head = a, tail = b }
+	end
+
+	const function listOfV(items: { Value }): Value
+		local v: Value = NIL
+
+		for i = #items, 1, -1 do
+			v = cellV(items[i], v)
+		end
+
+		return v
+	end
+
+	const function randInts(n: number, hi: number): { Value }
+		local out: { Value } = {}
+
+		for _ = 1, n do
+			table.insert(out, math.random(0, hi))
+		end
+
+		return out
+	end
+
+	-- lenOf: lists of 0 to 12 numbers, and values that are not lists.
+	for i = 1, 40 do
+		emit(`jet check:lenOf@55 {i}`, "body", law(1, call(lit(LEN), arg(1))), listOfV(randInts(math.random(0, 12), 9)), 1e6)
+	end
+
+	emit("jet check:lenOf@55 a number", "body", law(1, call(lit(LEN), arg(1))), 5, 1000)
+	emit("jet check:lenOf@55 a pair", "body", law(1, call(lit(LEN), arg(1))), cellV(1, 2), 1000)
+	emit("jet check:lenOf@55 a constructor", "body", law(1, call(lit(LEN), arg(1))), { kind = "con", tag = 0, payload = 1 }, 1000)
+
+	-- envKid: (kids . b), kids a list of (key . value) pairs, with keys 0 to 5; b is a key, or a key that is not in the list, or a non-number.
+	for i = 1, 60 do
+		local entries: { Value } = {}
+
+		for k = 0, math.random(0, 6) do
+			table.insert(entries, cellV(k * 2 + math.random(0, 1) * 0, math.random(0, 9)))
+		end
+
+		const b = math.random(0, 14)
+		emit(`jet check:envKid@292 {i}`, "body", law(1, call(lit(KID), prim(8, arg(1)), prim(9, arg(1)))), cellV(listOfV(entries), b), 1e6)
+	end
+
+	emit("jet check:envKid@292 no list", "body", law(1, call(lit(KID), prim(8, arg(1)), prim(9, arg(1)))), cellV(5, 1), 1000)
+	emit("jet check:envKid@292 nil", "body", law(1, call(lit(KID), prim(8, arg(1)), prim(9, arg(1)))), cellV(NIL, 1), 1000)
+	emit("jet check:envKid@292 a key that is not a number", "body", law(1, call(lit(KID), prim(8, arg(1)), prim(9, arg(1)))), cellV(listOfV({ cellV({ kind = "con", tag = 0, payload = 1 }, 2) }), 1), 1000)
+	emit("jet check:envKid@292 a non-number b", "body", law(1, call(lit(KID), prim(8, arg(1)), prim(9, arg(1)))), cellV(listOfV({ cellV(1, 2) }), { kind = "con", tag = 0, payload = 1 }), 1000)
+
+	-- envPut: (kids . (b . child)), the same kids, and a child that is a number.
+	for i = 1, 60 do
+		local entries: { Value } = {}
+
+		for k = 0, math.random(0, 6) do
+			table.insert(entries, cellV(k, math.random(0, 9)))
+		end
+
+		const b = math.random(0, 7)
+		emit(`jet check:envPut@302 {i}`, "body", law(1, call(lit(PUT), prim(8, arg(1)), prim(8, prim(9, arg(1))), prim(9, prim(9, arg(1))))), cellV(listOfV(entries), cellV(b, math.random(0, 9))), 1e6)
+	end
+
+	emit("jet check:envPut@302 nil", "body", law(1, call(lit(PUT), prim(8, arg(1)), prim(8, prim(9, arg(1))), prim(9, prim(9, arg(1))))), cellV(NIL, cellV(1, 2)), 1000)
+	emit("jet check:envPut@302 a number", "body", law(1, call(lit(PUT), prim(8, arg(1)), prim(8, prim(9, arg(1))), prim(9, prim(9, arg(1))))), cellV(5, cellV(1, 2)), 1000)
+
+	-- parse's same: (a . b), lists of numbers from 0 to 2, equal, differing in the last, of different length; a nil and a number; non-numbers.
+	for i = 1, 300 do
+		const a = randInts(math.random(0, 4), 2)
+		local b: { Value } = {}
+
+		if i % 3 == 0 then
+			b = table.clone(a)
+		elseif i % 3 == 1 then
+			b = table.clone(a)
+
+			if #b > 0 then
+				b[#b] = ((b[#b] :: number) + 1) % 3
+			end
+		else
+			b = randInts(math.random(0, 4), 2)
+		end
+
+		emit(`jet parse:same@20 {i}`, "body", law(1, call(lit(SAME), prim(8, arg(1)), prim(9, arg(1)))), cellV(listOfV(a), listOfV(b)), 1e6)
+	end
+
+	emit("jet parse:same@20 nil and nil", "body", law(1, call(lit(SAME), prim(8, arg(1)), prim(9, arg(1)))), cellV(NIL, NIL), 1000)
+	emit("jet parse:same@20 nil and a list", "body", law(1, call(lit(SAME), prim(8, arg(1)), prim(9, arg(1)))), cellV(NIL, listOfV({ 1 })), 1000)
+	emit("jet parse:same@20 a list and nil", "body", law(1, call(lit(SAME), prim(8, arg(1)), prim(9, arg(1)))), cellV(listOfV({ 1 }), NIL), 1000)
+	emit("jet parse:same@20 a number and nil", "body", law(1, call(lit(SAME), prim(8, arg(1)), prim(9, arg(1)))), cellV(5, NIL), 1000)
+	emit("jet parse:same@20 nil and a number", "body", law(1, call(lit(SAME), prim(8, arg(1)), prim(9, arg(1)))), cellV(NIL, 5), 1000)
+	emit("jet parse:same@20 a non-number element", "body", law(1, call(lit(SAME), prim(8, arg(1)), prim(9, arg(1)))), cellV(listOfV({ { kind = "con", tag = 0, payload = 1 } }), listOfV({ 1 })), 1000)
+end
+
