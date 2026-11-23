@@ -229,6 +229,23 @@ These need an answer from the project owner before the phase that depends on the
 6. **Resolved: the content hash.** It is SHA-256 of a value's binary encoding without the header byte (SPEC.md section 12.7). It names a law, keys a memo, selects a jet, and interns a pin. Jets are chosen by the hash of the law, so no hint from a program is needed.
 7. **Resolved: jets are for laws only.** Primitives stay primitives: a jet on one would add a law entry to its fuel for no gain. A new primitive needs a spec change with its reason (SPEC.md decision 12). Work that fuel does not count, such as `pin` encoding a whole value, is a known gap, closed by a spec change rather than a jet.
 
+## Phase 8 results table (current code)
+
+Corpus build (four boot files, 2,235 lines, 82,118 bytes; each file with its imports; the reference host is this machine, one Latitude 5440, i7-1355U). Best of three for the timed run.
+
+| Configuration | Core steps | Time | Against the target (2,500 lines, 1 s) |
+| --- | ---: | ---: | --- |
+| Jets on, memo off (default) | 441,584,946 | 5.20 s | about 5.8 times too slow (linear scaling to 2,500 lines) |
+| Jets off, memo off | 441,584,946 | 7.83 s | about 7.8 times too slow |
+| Memo on, cold | 441,584,946 | 12.9 s | slower: the memo costs about 2.5 times on a cold build |
+| Memo on, warm (same corpus again) | 441,584,946 | 0.04 s | met, but only for an unchanged input |
+
+Per file, jets on: lex.l2 0.42 s, parse.l2 1.52 s, layout.l2 0.79 s, types.l2 2.47 s.
+
+Checker alone (types.l2, jets on): 108,352,804 steps in about 0.71 s.
+
+Decision (unchanged): the target is not met on the Go machine, and it is not a native-host question alone, since the Go machine is already native. The remaining gap is the interpreted steps (about 36 million of the checker's 108 million are interpreted, and the corpus has about 280 million interpreted steps out of 441 million). The next candidates for jets, by share of the checker's interpreted steps, are envKid (14%), prune (11%) and envPut (11%); each would need a walk over a letrec whose recursive law takes the outer variables as arguments.
+
 ## Speed experiments (after the plan)
 
 The corpus build on the Go machine, on this host (441.6 million core steps, jets on; the figures are single runs, with noise of about 3%):
@@ -246,4 +263,4 @@ Together, the frame change and GOGC=400 give about 5.1 s on the corpus, still ab
 
 ## Next step
 
-Phases 1 to 8 are done, with the misses written above (the speed target is not met: about 7 times). The remaining work is the experiments on simplicity and speed that the user asked for: the first is to measure the interpreted step rate with a compiled-closure machine, against the 3 times the decision above needs, and the second is to look for steps the front end can drop without changing its results.
+Phases 1 to 8 are done, with the misses written above. Since the last note, the cell form became a primitive (decision 15), frames became slices, and the name comparison `same` got a jet (commit 53d05c9). The speed target is still not met (about 5.8 times the 1 s target, on the corpus with jets on). The open work is the speed target: the next jets are the checker's largest interpreted owners (envKid, prune, envPut), each needing a walk that takes the outer variables as arguments. A simplification pass on the spec is also open; the cell change is the first of them.
