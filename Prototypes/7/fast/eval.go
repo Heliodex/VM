@@ -170,8 +170,6 @@ func (r *recRun) eval(node *Node, env []Value, tail bool) (Value, bool) {
 		v, t = r.call(node, env, tail)
 	case OpCon:
 		v = r.conOf(node, env)
-	case OpCase:
-		v, t = r.caseOf(node, env, tail)
 	case OpIf:
 		v, t = r.ifOf(node, env, tail)
 	case OpLet:
@@ -220,39 +218,6 @@ func (r *recRun) letOf(node *Node, env []Value, tail bool) (Value, bool) {
 	v := r.operand(node.Kids[0], env)
 
 	return r.eval(node.Kids[1], append(env, v), tail)
-}
-
-// caseOf evaluates a case: its scrutinee, then the branch for its tag, with the payload (or the scrutinee, for the else branch) in the frame.
-func (r *recRun) caseOf(node *Node, env []Value, tail bool) (Value, bool) {
-	v := r.operand(node.Kids[0], env)
-	con, ok := v.(*Con)
-
-	if !ok {
-		r.fail("case of a value that is not a constructor")
-	}
-
-	var branch *Node
-
-	pushed := v
-
-	for _, a := range node.Alts {
-		if a.Tag == con.Tag {
-			branch = a.Body
-			pushed = con.Payload
-
-			break
-		}
-	}
-
-	if branch == nil {
-		if node.Else == nil {
-			r.fail(fmt.Sprintf("no branch for the constructor's tag %d", con.Tag))
-		}
-
-		branch = node.Else
-	}
-
-	return r.eval(branch, append(env, pushed), tail)
 }
 
 // operand gives the value of a node that is an operand (not in tail position). A leaf, a lit or an arg, is its own step and cannot nest, so it is read here, without the depth count of eval; any other node is evaluated by eval.

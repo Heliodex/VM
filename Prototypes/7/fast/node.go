@@ -4,12 +4,6 @@ type (
 	// Op is the kind of a form (SPEC.md section 3).
 	Op uint8
 
-	// Alt is one alternative of a case: its tag and its body.
-	Alt struct {
-		Tag int
-		Body *Node
-	}
-
 	// Node is a form, with its parts resolved, so the machine reads it without looking anything up. Its children are in Kids, in the order of SPEC.md section 12.4:
 	//
 	//	lit:   Lit
@@ -17,7 +11,6 @@ type (
 	//	call:  Kids = f, e1 … en (also delay, which holds a call)
 	//	cell:  Kids = a, b
 	//	con:   Tag, Kids = e
-	//	case:  Kids = e, Alts, Else (nil when there is no else branch)
 	//	if:    Kids = c, t, e
 	//	let:   Kids = e, b
 	//	force: Kids = e
@@ -27,7 +20,6 @@ type (
 		Lit Value
 		Index, Tag int
 		Kids []*Node
-		Alts []Alt
 		Else *Node
 	}
 )
@@ -37,7 +29,6 @@ const (
 	OpArg
 	OpCall
 	OpCon
-	OpCase
 	OpIf
 	OpLet
 	OpDelay

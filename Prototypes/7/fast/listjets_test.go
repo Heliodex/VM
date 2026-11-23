@@ -55,10 +55,6 @@ func nodeCount(n *Node) int64 {
 		c += nodeCount(k)
 	}
 
-	for _, a := range n.Alts {
-		c += nodeCount(a.Body)
-	}
-
 	return c + nodeCount(n.Else)
 }
 

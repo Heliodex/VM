@@ -64,9 +64,6 @@ const function conForm(tag: number, e: Form): Form
 	return { op = "con"; tag = tag; e = e }
 end
 
-const function caseForm(e: Form, alts: { Types.Alt }, elseBody: Form?): Form
-	return { op = "case"; e = e; alts = alts; elseBody = elseBody }
-end
 
 const function ifForm(c: Form, t: Form, e: Form): Form
 	return { op = "if"; c = c; t = t; e = e }
@@ -186,16 +183,11 @@ do
 	emit("run a law on an input (one entry)", "run", inc, 41, 100)
 	emit("cell list (1 2)", "body", law(1, cellForm(lit(1), cellForm(lit(2), lit(NIL)))), NIL, 100)
 	emit("con 0 5", "body", law(1, conForm(0, lit(5))), NIL, 100)
-	emit("case takes the payload", "body", law(1, caseForm(conForm(1, lit(9)), { { tag = 0; body = lit(0) }; { tag = 1; body = arg(2) } }, lit(0))), NIL, 100)
-	emit("case else gets the constructor", "body", law(1, caseForm(conForm(5, lit(1)), { { tag = 0; body = lit(0) } }, arg(2))), NIL, 100)
-	emit("case with no branch is an error", "body", law(1, caseForm(conForm(5, lit(1)), { { tag = 0; body = lit(0) } }, nil)), NIL, 100)
-	emit("case of a non-constructor is an error", "body", law(1, caseForm(lit(3), { { tag = 0; body = lit(0) } }, nil)), NIL, 100)
 	emit("if takes then on non-zero", "body", law(1, ifForm(lit(0), lit(1), lit(2))), NIL, 100)
 	emit("if takes then on non-zero (big)", "body", law(1, ifForm(lit(big100), lit(1), lit(2))), NIL, 100)
 	emit("if of nil is an error", "body", law(1, ifForm(lit(NIL), lit(1), lit(2))), NIL, 100)
 	emit("let binds a slot", "body", law(1, letForm(lit(3), prim(0, arg(2), arg(2)))), NIL, 100)
 	emit("let inside a call argument", "body", law(1, call(lit(inc), letForm(lit(3), prim(0, arg(2), lit(1))))), NIL, 100)
-	emit("case payload then let", "body", law(1, caseForm(conForm(0, lit(4)), { { tag = 0; body = letForm(lit(2), prim(0, arg(2), arg(3))) } }, nil)), NIL, 100)
 	emit("delay then force", "body", law(1, forceForm(thunkForm)), NIL, 100)
 	emit("force twice runs the call once", "body", law(1, letForm(thunkForm, cellForm(forceForm(arg(2)), forceForm(arg(2))))), NIL, 100)
 	emit("force of a non-thunk is an error", "body", law(1, forceForm(lit(5))), NIL, 100)

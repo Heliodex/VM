@@ -30,10 +30,6 @@ func laws(t *testing.T, n *Node, seen map[[32]byte]bool) {
 		laws(t, k, seen)
 	}
 
-	for _, a := range n.Alts {
-		laws(t, a.Body, seen)
-	}
-
 	laws(t, n.Else, seen)
 }
 

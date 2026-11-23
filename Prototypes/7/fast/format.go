@@ -41,7 +41,6 @@ const (
 	fArg = 0x11
 	fCall = 0x12
 	fCon = 0x14
-	fCase = 0x15
 	fIf = 0x16
 	fLet = 0x17
 	fDelay = 0x18
@@ -313,36 +312,6 @@ func (w *writer) form(n *Node) error {
 		}
 
 		return w.form(n.Kids[0])
-	case OpCase:
-		w.buf = append(w.buf, fCase)
-
-		if err := w.form(n.Kids[0]); err != nil {
-			return err
-		}
-
-		if err := w.pos(len(n.Alts)); err != nil {
-			return err
-		}
-
-		for _, a := range n.Alts {
-			if err := w.pos(a.Tag); err != nil {
-				return err
-			}
-
-			if err := w.form(a.Body); err != nil {
-				return err
-			}
-		}
-
-		if n.Else == nil {
-			w.buf = append(w.buf, 0)
-
-			return nil
-		}
-
-		w.buf = append(w.buf, 1)
-
-		return w.form(n.Else)
 	case OpIf:
 		w.buf = append(w.buf, fIf)
 
@@ -568,62 +537,6 @@ func (r *reader) form() (*Node, error) {
 			Tag: tag,
 			Kids: []*Node{e},
 		}), nil
-	case fCase:
-		e, err := r.form()
-		if err != nil {
-			return nil, err
-		}
-
-		k, err := r.pos("a count")
-		if err != nil {
-			return nil, err
-		}
-
-		n := r.node(Node{
-			Op: OpCase,
-			Kids: []*Node{e},
-		})
-		seen := map[int]bool{}
-
-		for range k {
-			tag, err := r.pos("a tag")
-			if err != nil {
-				return nil, err
-			}
-
-			if seen[tag] {
-				return nil, fmt.Errorf("binary: the case has tag %d twice", tag)
-			}
-
-			seen[tag] = true
-
-			body, err := r.form()
-			if err != nil {
-				return nil, err
-			}
-
-			n.Alts = append(n.Alts, Alt{
-				Tag: tag,
-				Body: body,
-			})
-		}
-
-		flag, err := r.byteOf("the else flag")
-		if err != nil {
-			return nil, err
-		}
-
-		switch flag {
-		case 0:
-		case 1:
-			if n.Else, err = r.form(); err != nil {
-				return nil, err
-			}
-		default:
-			return nil, errors.New("binary: the else flag is 0 or 1")
-		}
-
-		return n, nil
 	case fIf:
 		kids := r.kids(3)
 
