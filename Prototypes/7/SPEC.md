@@ -339,7 +339,7 @@ A reader refuses, with a message that gives the reason:
 - a `prim` tag of 13 or more, a form tag that is unused (19 or 21), a partial application with too many arguments, and a program whose arity is not 1;
 - a position past what the implementation can index (at least 2^53 − 1 in every implementation, section 12.2).
 
-The reader and writer have no limit on the depth of a program: both keep their own stack, as the machine does (the Luau reference tests a program 20,000 forms deep).
+The reference's reader and writer have no limit on the depth of a program: they keep their own stack (the reference tests a program 20,000 forms deep). An implementation with a host stack may have a limit of its own, which it reports as a host limit (section 5), not as a program outcome.
 
 A writer refuses a thunk, and any other value without a binary form.
 
