@@ -409,12 +409,52 @@ local function mutualSurface(bindings: { Binding }, body: Expr, at: Pos): Expr
 		return fnE({ " y" }, appE(appE(nameE(g, at), { intE(j, at) }, at), { nameE(" y", at) }, at), at)
 	end
 
-	-- branch(j) runs the j-th function, with every name of the group bound to its member.
+	-- The names of the group that the j-th function's body mentions. A name it does not mention is not bound in its branch, so a call costs the bindings it uses, not one for each name of the group.
+	local function mentions(j: number): { boolean }
+		local index: { [string]: number } = {}
+
+		for k, name in names do
+			index[name] = k
+		end
+
+		local used: { boolean } = {}
+
+		local function walk(e: unknown)
+			if type(e) ~= "table" then
+				return
+			end
+
+			local node = e :: { [string]: unknown }
+
+			if node.k == "name" and type(node.name) == "string" then
+				const k = index[node.name]
+
+				if k ~= nil then
+					used[k] = true
+				end
+			end
+
+			for _, child in node do
+				if type(child) == "table" then
+					walk(child)
+				end
+			end
+		end
+
+		walk(bindings[j].value)
+
+		return used
+	end
+
+	-- branch(j) runs the j-th function, with the names of the group it mentions bound to their members.
 	local function branch(j: number): Expr
 		local bodyE: Expr = appE(bindings[j].value, { nameE(" x", at) }, at)
+		const used = mentions(j)
 
 		for k = n, 1, -1 do
-			bodyE = letE(names[k], member(" self", k - 1), bodyE, at)
+			if used[k] then
+				bodyE = letE(names[k], member(" self", k - 1), bodyE, at)
+			end
 		end
 
 		return bodyE
