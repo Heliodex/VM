@@ -57,7 +57,7 @@ end
 
 -- A cell, built by the primitive cons (tag 14), as the reference's lowering builds it.
 const function cellForm(a: Form, b: Form): Form
-	return { op = "prim", tag = 14, args = { a, b } }
+	return { op = "prim", tag = 12, args = { a, b } }
 end
 
 const function conForm(tag: number, e: Form): Form
@@ -179,7 +179,6 @@ do
 	const bigNeg: Value = Int.fromMagnitude(true, { 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 16 })
 	const pow53: Value = Int.fromMagnitude(false, { 0; 0; 0; 0; 0; 0; 32 })
 	const unitLaw = law(1, arg(1))
-	const pinned = prim(10, cellForm(lit(1), lit(2)))
 	const thunkForm = delayForm(lit(inc), lit(1))
 	emit("lit", "body", law(1, lit(7)), NIL, 100)
 	emit("arg is the input", "body", law(1, arg(1)), 5, 100)
@@ -200,7 +199,7 @@ do
 	emit("delay then force", "body", law(1, forceForm(thunkForm)), NIL, 100)
 	emit("force twice runs the call once", "body", law(1, letForm(thunkForm, cellForm(forceForm(arg(2)), forceForm(arg(2))))), NIL, 100)
 	emit("force of a non-thunk is an error", "body", law(1, forceForm(lit(5))), NIL, 100)
-	emit("kind of each kind of value", "body", law(1, cellForm(prim(7, lit(5)), cellForm(prim(7, lit(NIL)), cellForm(prim(7, cellForm(lit(1), lit(2))), cellForm(prim(7, lit(inc)), cellForm(prim(7, pinned), cellForm(prim(7, conForm(1, lit(1))), prim(7, thunkForm)))))))), NIL, 100)
+	emit("kind of each kind of value", "body", law(1, cellForm(prim(7, lit(5)), cellForm(prim(7, lit(NIL)), cellForm(prim(7, cellForm(lit(1), lit(2))), cellForm(prim(7, lit(inc)), cellForm(prim(7, conForm(1, lit(1))), prim(7, thunkForm))))))), NIL, 100)
 	emit("head and tail of a cell", "body", law(1, cellForm(prim(8, cellForm(lit(1), lit(2))), prim(9, cellForm(lit(1), lit(2))))), NIL, 100)
 	emit("head of a non-cell is an error", "body", law(1, prim(8, lit(5))), NIL, 100)
 	emit("tail of a non-cell is an error", "body", law(1, prim(9, lit(NIL))), NIL, 100)
@@ -214,13 +213,8 @@ do
 	emit("2^100 div 2^53", "body", law(1, prim(3, lit(big100), lit(pow53))), NIL, 100)
 	emit("-2^100 mod 7 (sign of the divisor)", "body", law(1, prim(4, lit(bigNeg), lit(7))), NIL, 100)
 	emit("2^100 as a value", "body", law(1, lit(big100)), NIL, 100)
-	emit("pin of a cell", "body", law(1, pinned), NIL, 100)
-	emit("pin of a pin is the same pin", "body", law(1, prim(10, prim(10, cellForm(lit(1), lit(2))))), NIL, 100)
-	emit("pin of a thunk is an error", "body", law(1, prim(10, thunkForm)), NIL, 100)
-	emit("unpin of a pin", "body", law(1, prim(11, pinned)), NIL, 100)
-	emit("unpin of a non-pin is an error", "body", law(1, prim(11, lit(5))), NIL, 100)
-	emit("tagof a constructor, of a number", "body", law(1, cellForm(prim(12, conForm(3, lit(1))), cellForm(prim(12, lit(5)), prim(13, conForm(3, lit(9)))))), NIL, 100)
-	emit("payload of a non-constructor is an error", "body", law(1, prim(13, lit(5))), NIL, 100)
+	emit("tagof a constructor, of a number", "body", law(1, cellForm(prim(10, conForm(3, lit(1))), cellForm(prim(10, lit(5)), prim(11, conForm(3, lit(9)))))), NIL, 100)
+	emit("payload of a non-constructor is an error", "body", law(1, prim(11, lit(5))), NIL, 100)
 	emit("a partial application is a function", "body", law(1, call(lit(two), lit(1))), NIL, 100)
 	emit("a partial application completed", "body", law(1, call(call(lit(two), lit(1)), lit(2))), NIL, 100)
 	emit("over-application applies the result", "body", law(1, call(lit(law(1, lit(one))), lit(0), lit(5))), NIL, 100)
