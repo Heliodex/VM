@@ -209,6 +209,7 @@ These need an answer from the project owner before the phase that depends on the
 3. **Resolved: fuel of jets.** Every jet declares a fuel formula, checked against the reference on the suite and on generated inputs. There are no work-only jets, so a law whose fuel cannot be stated gets no jet (SPEC.md decision 11). The reason is determinism: a work-only jet would make steps and out-of-fuel depend on which jets are installed.
 4. **Strings and names** (before Phase 6). Option A: keep lists of bytes, and rely on interning and jets. Option B: a byte kind backed by the host's strings. The plan assumes B, but it waits for Phase 0 to show whether text is a large cost.
 5. **Laziness.** Whether the core keeps `delay` and `force` as explicit forms, as drafted, or makes evaluation lazy by default. The plan assumes explicit forms, so that the cost of each thunk is visible in the fuel and work counts.
+6. **Resolved: the content hash.** It is SHA-256 of a value's binary encoding without the header byte (SPEC.md section 12.7). It names a law, keys a memo, selects a jet, and interns a pin. Jets are chosen by the hash of the law, so no hint from a program is needed.
 
 ## Next step
 
