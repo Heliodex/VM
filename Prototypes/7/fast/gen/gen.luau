@@ -32,6 +32,11 @@ type Form = Types.Form
 type Value = Types.Value
 type Law = Types.Law
 const NIL = Format.NIL
+-- The helpers that have jets (the owner names of measure/boot/types.l2 at its present lines).
+-- Each helper, with the arity of the law that a jet replaces. hdOr is curried, so its jet is the inner law of two arguments (the outer law of one argument has the list as a free variable of the inner one).
+const JET_ARITY: { [string]: number } = { ["tl@24"] = 1, ["hdOr@14"] = 2, ["stP@63"] = 1 }
+-- The laws of those helpers, as the checker's lowering makes them (filled by the benchmark below).
+const jetLaws: { [string]: Law } = {}
 const P6_PROGRAMS = "../../6/L2/programs/"
 const BOOT6 = "../../6/L2/programs/boot/"
 
@@ -333,10 +338,49 @@ do
 	const parsed = Lifecycle.run(parser.expr, O.payloadOf(O.valueOf(lexed)), 5e8)
 	const request: P6VM.Value = { kind = "con"; tag = 3; payload = O.payloadOf(O.valueOf(parsed)) }
 	const input = convertInput(request)
-	const body = call(Lower.expr(checker.expr), arg(1))
+	const body = call(
+		Lower.expr(
+			checker.expr,
+			function(e, l)
+				const owner = V.ownerOf(e)
+
+				if JET_ARITY[owner] == l.arity then
+					jetLaws[owner] = l
+				end
+			end
+		),
+		arg(1)
+	)
 	const started = os.clock()
 	const outcome = Interp.runForm(body, input, 1e10)
 	const seconds = os.clock() - started
 	print(`# reference checker: {outcome.status} after {string.format("%d", outcome.steps)} steps in {string.format("%.3f", seconds)}s`)
 	line("checker: variant types.l2 on types.l2", "body", law(1, body), input, 1e10, outcome)
+end
+
+-- ---- 5. the jets: each law a jet replaces, called on a range of inputs. The reference's steps are the fuel a jet must declare.
+-- Each jet's law, as the value's bytes with the header (sha256 of them without the first byte is the content hash, SPEC.md 12.7).
+for owner, l in jetLaws do
+	print(`# jet {owner} lawvalue {hex(Format.encodeValue(l) :: string)}`)
+end
+
+do
+	const tl = jetLaws["tl@24"]
+	const hd = jetLaws["hdOr@14"]
+	const st = jetLaws["stP@63"]
+	const big: Value = Int.fromMagnitude(false, { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16 })
+
+	for i, v in { NIL, { kind = "cell", head = 1, tail = NIL } :: Value, { kind = "cell", head = { kind = "cell", head = 1, tail = 2 }, tail = 3 } :: Value, { kind = "cell", head = NIL, tail = NIL } :: Value, 5, big, { kind = "con", tag = 0, payload = 1 } :: Value, list(1, 2) } do
+		emit(`jet tl@24 {i}`, "body", law(1, call(lit(tl), arg(1))), v, 1000)
+	end
+
+	for i, v in { NIL, list(5), list(NIL), 5, { kind = "con", tag = 0, payload = 1 } :: Value, { kind = "cell", head = big, tail = NIL } :: Value } do
+		for j, d in { 0, 7, NIL } do
+			emit(`jet hdOr@14 {i}.{j}`, "body", law(1, call(lit(hd), arg(1), lit(d))), v, 1000)
+		end
+	end
+
+	for i, v in { { kind = "con", tag = 0, payload = list(3, NIL) } :: Value, NIL, 5, { kind = "con", tag = 1, payload = 2 } :: Value, list(1) } do
+		emit(`jet stP@63 {i}`, "body", law(1, call(lit(st), arg(1))), v, 1000)
+	end
 end

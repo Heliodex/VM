@@ -111,6 +111,8 @@ const function steps(n: number): { number }
 	return out
 end
 
+-- The hook that expr may set: it is told each law as the law is made, closed or not, with the lambda it came from. The jet tests use it to find the laws the jets replace (the lambda's owner says which function it is).
+local lawHook: ((Expr, Law) -> ())? = nil
 local lower: (e: Expr, depth: number, map: { number }) -> Form
 
 -- The arguments that hold the given levels in the current law's frame.
@@ -162,6 +164,10 @@ lower = function(e: Expr, depth: number, map: { number }): Form
 
 		inner[depth] = #free + 1
 		const law: Law = { kind = "law"; arity = #free + 1; body = lower(e.body, depth + 1, inner) }
+
+		if lawHook ~= nil then
+			lawHook(e, law)
+		end
 
 		if #free == 0 then
 			return { op = "lit"; value = law }
@@ -235,8 +241,12 @@ lower = function(e: Expr, depth: number, map: { number }): Form
 end
 
 -- Lowers a top-level expression: no binders, so the map is empty.
-const function expr(e: Expr): Form
-	return lower(e, 0, {})
+const function expr(e: Expr, hook: ((Expr, Law) -> ())?): Form
+	lawHook = hook
+	const form = lower(e, 0, {})
+	lawHook = nil
+
+	return form
 end
 
 -- A closed closure: the body of a lambda at the top level, with no environment, as a law of arity 1. Its variable of index 0 is its argument.
