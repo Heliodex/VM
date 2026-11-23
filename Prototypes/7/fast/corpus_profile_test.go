@@ -64,6 +64,10 @@ func TestCorpusProfile(t *testing.T) {
 
 		if o, ok := owners[h]; ok {
 			counts[o]++
+
+			if o == "top" || o == "parse:top" {
+				counts[fmt.Sprintf("  law %x arity %d", h[:4], l.Arity)]++
+			}
 		} else {
 			counts["(no owner)"]++
 		}

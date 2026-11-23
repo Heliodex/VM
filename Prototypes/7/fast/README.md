@@ -7,7 +7,10 @@ The core of `SPEC.md`, run on Go. It reads the binary format of section 12, and 
 - `value.go`: the values, and the integer operations (`Small` for any integer that fits in int64, `*big.Int` for the rest; a result that fits is always a `Small`).
 - `node.go`: forms, with their parts resolved (children, alternatives, else branch). The reader builds them directly, so a law's body is in this form when it is read.
 - `format.go`: the writer and the reader of section 12, byte for byte the same as `reference/format.luau`, with the same messages.
-- `machine.go`: the machine. One loop, with an explicit stack of continuations, as in the reference. Operands are kept on one stack, and each continuation remembers where its own operands start.
+- `eval.go`: the evaluator, the one machine. A node is evaluated by a call that returns its value; a call in tail position is returned to a loop (`runBody`), so a loop of any length uses the stack of one call. Operands are kept on one stack. The steps, fuel, errors and outcomes are the spec's, form for form.
+- `machine.go`: the outcome type, `Run` and `RunBody`, and the step hook the profile uses.
+- `eval_test.go`: a tail loop of three million calls, a call nested a hundred thousand deep, and the nesting limit.
+- `corpus_profile_test.go`: the corpus's profile by owner (`PROFILE_CORPUS=1`).
 - `prim.go`: the fourteen primitives, and the pin table (interned by the value's binary form).
 - `jets.go`: the jet table, and the helper jets (see "Jets" below).
 - `trie.go`, `trie_test.go`: the jets for `findB` and `setB`, and the fit of their arm costs.
@@ -61,7 +64,8 @@ The steps are unchanged, by design. The checker takes 77,805,895 core steps and 
 
 ## Limits of this version
 
-- The machine reads the bytes of a program into a tree of resolved nodes, not into one flat array. The flat layout is the next step if the speed target needs it.
+- The machine reads the bytes of a program into a tree of resolved nodes, not into one flat array. The flat layout was tried and was slower (see the plan's experiments).
+- **Nesting limit (a host limit, not in the spec).** A nested evaluation takes about a kilobyte of the Go stack, and the default stack is one gigabyte, so a run nested deeper than `MaxNesting` (400,000 evaluations, about 130,000 calls nested in calls) ends with the status `host_limit`, not with the stack overflowing. The spec asks for no depth limit; tail calls are not nested, so only nesting counts. The old explicit-stack machine had none, and a deeper program needs the limit raised (with `debug.SetMaxStack`) or the evaluator made iterative again.
 - Readers and writers recurse, as the Go call stack allows (up to 1 GB by default, so far deeper than the 20,000 tested). The spec asks for no depth limit; the Go stack is the limit here.
 - The reference's inline checks in `interp_run.luau` are not ported one by one. Each rule they test is covered by a hand-written case, and the spec's examples keep their step counts (`call (lit inc) (lit 41)` is 7 steps).
 
