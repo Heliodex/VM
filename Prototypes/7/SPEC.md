@@ -2,7 +2,7 @@
 
 Status: draft for Phase 3. Every rule the reference interpreter needs is here. Where the plan left a choice open, the default the plan recommends is taken and listed under "Decisions taken" at the end.
 
-The core is what a surface language compiles to. It has ten forms and fifteen primitives, and nothing else. Recursion, data structures, strings and effects are built on top of these, or are added later with a rule of their own.
+The core is what a surface language compiles to. It has ten forms and thirteen primitives, and nothing else. Recursion, data structures, strings and effects are built on top of these, or are added later with a rule of their own.
 
 ## 1. Values
 
@@ -14,7 +14,7 @@ Every value is one of these kinds. The kind number is what the primitive `kind` 
 | 1 | nil | The empty list. There is one nil. |
 | 2 | cell | A pair `(a . b)`, where `a` and `b` are values. Lists are cells ending in nil. |
 | 3 | function | A law, or a partial application of a law (a law with fewer arguments than its arity). |
-| 4 | pin | A value in normal form, held by its content hash. Equal pins are the same object. |
+| 4 | (unused) | Reserved: a pin in Prototypes 5 and 6, removed by decision 16. The other kinds keep their numbers. |
 | 5 | con | A constructor: a tag (an integer from 0 up) and a payload value. |
 | 6 | thunk | A delayed call: a function and its arguments, not yet run. |
 
@@ -88,7 +88,7 @@ Every form has a fixed number of parts, so a program is checked when it is built
 
 ## 4. Primitives
 
-Fifteen primitives, each written by a number (its tag) and a name. The tag is what a program uses in the `prim` form.
+Thirteen primitives, each written by a number (its tag) and a name. The tag is what a program uses in the `prim` form.
 
 | Tag | Name | Arity | Rule |
 | ---: | --- | ---: | --- |
@@ -102,17 +102,15 @@ Fifteen primitives, each written by a number (its tag) and a name. The tag is wh
 | 7 | kind | 1 | any value; its kind number (section 1) |
 | 8 | head | 1 | a cell; its first component. Not a cell: an error |
 | 9 | tail | 1 | a cell; its second component. Not a cell: an error |
-| 10 | pin | 1 | any value that is not a thunk; a pin holding it, interned by content hash. Pinning a pin gives the same pin |
-| 11 | unpin | 1 | a pin; the value it holds. Not a pin: an error |
-| 12 | tagof | 1 | a constructor; its tag, a number from 0 up. Any other value: -1 |
-| 13 | payload | 1 | a constructor; its payload. Any other value: an error |
-| 14 | cons | 2 | the cell `(a . b)` of its two arguments, evaluated in order (it was a form, `cell`, until decision 15) |
+| 10 | tagof | 1 | a constructor; its tag, a number from 0 up. Any other value: -1 |
+| 11 | payload | 1 | a constructor; its payload. Any other value: an error |
+| 12 | cons | 2 | the cell `(a . b)` of its two arguments, evaluated in order (it was a form, `cell`, until decision 15; its tag was 14 until decision 16) |
 
 Three rules about primitives:
 
 - **There is no `Result`.** `div` and `mod` by zero, and `head` or `tail` of a non-cell, are errors of the whole run, not values. A program that must handle them tests first, with `kind` or `eq`. This is the rule that the Phase 1 measurements asked for: the checker paid for a `Result` at every division and every list access, and in the core those tests are one primitive each, with no wrapping.
 - **Integers are never out of range.** Every integer result is exact, at any size, so there is no overflow outcome. An implementation whose host cannot hold a large integer represents it in another way (a bignum, a list of limbs), and does not fail or round. An implementation that rounds or stops on a large integer is not conformant.
-- **Kind reads any value**, including a pin, a function and a thunk, so a program can always check what it has before it reads it.
+- **Kind reads any value**, including a function and a thunk, so a program can always check what it has before it reads it.
 
 ## 5. Outcomes
 
@@ -228,18 +226,20 @@ These are the defaults this spec takes. Each can be changed, and a change is rec
 1. **Laziness is explicit.** `delay` and `force` are forms, so the cost of each thunk is in the fuel. The alternative (lazy by default) would hide that cost.
 2. **Jet fuel is a declared formula.** A law whose fuel cannot be stated as one gets no jet (decision 11).
 3. **Strings stay lists of integers** in the core. A byte kind waits for Phase 6.
-4. **Pins are wrappers** with their own kind, read through `unpin`. A pin is transparent to nothing: it is a value whose identity is its content, which is what a memo key needs.
+4. *Superseded by decision 16.* **Pins are wrappers** with their own kind, read through `unpin`. A pin is transparent to nothing: it is a value whose identity is its content, which is what a memo key needs.
 5. **Errors end the run** and are not values. The surface language adds `Result` on top, by testing before the primitive.
 6. **Calls are strict** in their arguments. Laziness is only through `delay`.
 7. **The step rule** is one step per form and one per law entry. Phase 3 writes the step counts of the examples into its tests, so a change to this rule is visible.
 8. **Integers are unbounded.** The VM's integers have no size limit, and the ±(2^53 − 1) bound of Prototypes 5 and 6 is a limit of the Luau host (doubles), not of the VM. The reason: a bound in the VM would make the answer depend on the host. Consequence for Phase 3: the Luau reference needs a bignum representation for integers, and its tests must include values beyond 2^53.
-9. **Constructor tags are read by primitives.** `tagof` and `payload` are primitives 12 and 13, not forms. Phase 3 found this gap: Prototype 6 reads a constructor's tag with forms, but a `case` cannot read a tag for an open set of tags, so the core needs a way to get the tag as a number. Adding two primitives keeps the form count at eleven.
-10. **A suspended expression is a thunk, kind 6.** Kind 4 is for pins: values in normal form, held by content hash. Prototype 5 reports a suspended expression as kind 4, and its example expects that; the core does not, so the example is superseded for the core. A thunk is not data (it has no binary form, and `pin` refuses it), so giving it the pin's kind would make `kind` unable to tell a stored value from an unevaluated call.
+9. **Constructor tags are read by primitives.** `tagof` and `payload` are primitives 12 and 13 (10 and 11 after decision 16), not forms. Phase 3 found this gap: Prototype 6 reads a constructor's tag with forms, but a `case` cannot read a tag for an open set of tags, so the core needs a way to get the tag as a number. Adding two primitives keeps the form count at eleven.
+10. **A suspended expression is a thunk, kind 6.** Kind 4 was for pins (decision 16 removed them, and reserves the number). Prototype 5 reports a suspended expression as kind 4, and its example expects that; the core does not, so the example is superseded for the core. A thunk is not data (it has no binary form, and `pin` refuses it), so giving it the pin's kind would make `kind` unable to tell a stored value from an unevaluated call.
 11. **Jets are fuel-exact.** Every jet declares a fuel formula equal to the fuel of the law it replaces, and there are no work-only jets. Fuel is therefore the same on every machine, with or without jets. A work-only jet would make steps and out-of-fuel depend on which jets are installed, and jets are the part of the design most likely to make a run depend on something other than the spec. Jets are pure, and a jet that cannot match its law's fuel is not a jet.
-12. **Jets replace laws only; primitives stay primitives.** A primitive is already one step of native work, and a jet would add a law entry and its argument forms to every use, raising the fuel for no gain, so a primitive gets no jet. A jet is for a law built from several forms. Work that fuel does not count (for example, `pin` encoding a whole value, or a big integer's size) is a known gap, and it is closed by a spec change, not by a jet. A new primitive also needs a spec change, with its reason.
-13. **Compound values are hashed from their parts.** The content hash of a cell, a constructor, a partial application or a pin is computed from its parts' hashes, not from its whole encoding (section 12.7), so a memo key (section 7) costs one hash per new node rather than a walk of the whole value on every call. Integers, nil and laws keep the hash of their encoding, so law hashes and the jets are unchanged. Phase 7's memo needs this; the spec's rules about the memo are unchanged.
+12. **Jets replace laws only; primitives stay primitives.** A primitive is already one step of native work, and a jet would add a law entry and its argument forms to every use, raising the fuel for no gain, so a primitive gets no jet. A jet is for a law built from several forms. Work that fuel does not count (for example, the encoding of a whole value, or a big integer's size) is a known gap, and it is closed by a spec change, not by a jet. A new primitive also needs a spec change, with its reason.
+13. **Compound values are hashed from their parts.** The content hash of a cell, a constructor or a partial application is computed from its parts' hashes, not from its whole encoding (section 12.7), so a memo key (section 7) costs one hash per new node rather than a walk of the whole value on every call. Integers, nil and laws keep the hash of their encoding, so law hashes and the jets are unchanged. Phase 7's memo needs this; the spec's rules about the memo are unchanged.
 14. **Functions are memo keys.** A law has no free variables, and a partial application is a law and its arguments, so the content hash of a function determines what it does. Excluding functions from the memo, as the first draft of section 7 did, left a one-declaration change re-checking about 90% of the checker's work, because the calls that pass a continuation or a partial application never hit. Including them, the same change re-checks 129 calls and about 5,000 steps of work, against 108 million for a cold run. The fuel rules of section 7 are unchanged.
-15. **`cell` is a primitive.** A cell is built by a primitive, `cons` (tag 14), and not by a form. The two are the same to the machine: each is one step, then its two arguments in order, so every step count is unchanged. A form that only builds a value is one more case in every reader and every machine, and `cons` sits beside `head` and `tail`, which read the same values. The forms go from eleven to ten, and the primitives from fourteen to fifteen. Form tag 19 is unused, so the other tags keep their values.
+15. **`cell` is a primitive.** A cell is built by a primitive, `cons` (tag 14 when it was added; tag 12 after decision 16), and not by a form. The two are the same to the machine: each is one step, then its two arguments in order, so every step count is unchanged. A form that only builds a value is one more case in every reader and every machine, and `cons` sits beside `head` and `tail`, which read the same values. The forms go from eleven to ten, and the primitives from fourteen to fifteen (thirteen after decision 16). Form tag 19 is unused, so the other tags keep their values.
+
+16. **Pins are removed.** A pin was a wrapper that interned a value by its content and had its own kind. Decision 13 hashes compound values from their parts, so the memo and the jets need no interning, and a program cannot observe a pin except through its kind (4) and its errors. The lowering of Prototypes 5 and 6 never made a pin primitive: their `pin` expression is a `delay` (decision 1). So the `pin` and `unpin` primitives go, the primitives go from fifteen to thirteen, and the three after them are renumbered (`tagof` 12 to 10, `payload` 13 to 11, `cons` 14 to 12). Kind 4 is reserved, so the other kinds keep their numbers, and the binary format's tag 7 (a pin) is reserved and refused. Every law that uses a renumbered primitive has a new content hash, so the jets are re-hashed; their fuel is unchanged, as every step count is.
 
 ## 12. Binary format
 
@@ -277,9 +277,9 @@ A value is a prefix sequence of parts. Each part starts with a tag byte:
 | 4 | constructor | its tag (a magnitude), then its payload |
 | 5 | law | its arity (a magnitude, at least 1), then its body (a form, section 12.4) |
 | 6 | partial application | the law, then the number of arguments (a magnitude, at least 1 and less than the law's arity), then the arguments |
-| 7 | pin | the value it holds |
+| 7 | (reserved) | nothing: a pin in Prototypes 5 and 6, removed by decision 16; a reader refuses it |
 
-A thunk (kind 6 in section 1) has no binary form, and a writer refuses it; so does a pin of a thunk. A reader refuses a law whose body is not a form of section 12.4.
+A thunk (kind 6 in section 1) has no binary form, and a writer refuses it. A reader refuses a law whose body is not a form of section 12.4, and a part with tag 7.
 
 The integer tags are the only place a sign is written. Zero is always tag 2, so tag 3 with a zero magnitude is refused as negative zero.
 
@@ -348,21 +348,21 @@ A reader refuses, with a message that gives the reason:
 
 The reader and writer have no limit on the depth of a program: both keep their own stack, as the machine does (the Luau reference tests a program 20,000 forms deep).
 
-A writer refuses a thunk, a pin of a thunk, and any other value without a binary form.
+A writer refuses a thunk, and any other value without a binary form.
 
 ### 12.7 Content hash
 
 The content hash of a value that has a binary form is 32 bytes, and two values have the same hash exactly when they have the same binary form (with overwhelming probability).
 
 - An integer, nil or a law: the SHA-256 of the value's encoding in section 12.3, without the header byte. A law's hash is that of its own encoding: its tag, its arity and its body.
-- A cell, a constructor, a partial application or a pin: the SHA-256 of a one-byte tag and the content hashes of its parts, so a new node costs one hash once its parts' hashes are known. The tags are `C` for a cell (head, then tail), `K` for a constructor (its tag as a magnitude, then its payload), `A` for a partial application (the law, then the arguments in order, each preceded by the count) and `P` for a pin (its value).
+- A cell, a constructor or a partial application: the SHA-256 of a one-byte tag and the content hashes of its parts, so a new node costs one hash once its parts' hashes are known. The tags are `C` for a cell (head, then tail), `K` for a constructor (its tag as a magnitude, then its payload) and `A` for a partial application (the law, then the arguments in order, each preceded by the count).
 
-A value with no binary form (a thunk, or a pin of one) has no hash, and a primitive that needs one is an error.
+A value with no binary form (a thunk) has no hash, and a primitive that needs one is an error.
 
-The hash is the one identity that the rules of the spec use: a law's name (section 1), a memo key (section 7), the law a jet replaces (section 3), and an interned pin (primitive 10). Hashing the parts keeps the memo's keys cheap on large values: a trie or a list is hashed once per new node, not once per call (decision 13).
+The hash is the one identity that the rules of the spec use: a law's name (section 1), a memo key (section 7), and the law a jet replaces (section 3). Hashing the parts keeps the memo's keys cheap on large values: a trie or a list is hashed once per new node, not once per call (decision 13).
 
 The header byte is left out so that a value's hash is the same whether it is written alone or inside another value. Example: the law `inc` (section 3) is `05 01 1a 00 11 01 10 02 01`, and its hash is `1b4ec34d dd5d101a ad9fd988 9cdf35b5 68a2b93f 2a2061cc 9819af67 768bb2dd`.
 
 ## 13. Form count
 
-The forms are `lit`, `arg`, `call`, `con`, `case`, `if`, `let`, `delay`, `force` and `prim`. That is ten, within the limit of twelve in Phase 2's exit test. The fifteen primitives are not forms: they are the table in section 4, so the form count does not grow when a primitive is added.
+The forms are `lit`, `arg`, `call`, `con`, `case`, `if`, `let`, `delay`, `force` and `prim`. That is ten, within the limit of twelve in Phase 2's exit test. The thirteen primitives are not forms: they are the table in section 4, so the form count does not grow when a primitive is added.

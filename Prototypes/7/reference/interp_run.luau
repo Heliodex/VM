@@ -199,10 +199,10 @@ do
 	check("loop runs out of fuel", o.status == "out_of_fuel" and o.steps <= 500, `{o.status} after {o.steps} steps`)
 	o = Interp.runForm(prim(3, lit(1), lit(0)), NIL, 100)
 	check("division by zero is an error", o.status == "error" and messageOf(o) == "division by zero", `{o.status} {tostring(messageOf(o))}`)
-	const tagPayload = law(1, prim(13, prim(12, arg(1))))
+	const tagPayload = law(1, prim(11, prim(10, arg(1))))
 	o = Interp.run(tagPayload, con(5, 7), 100)
 	check("payload of a tag (a number, not a constructor) is an error", o.status == "error", `{o.status} {tostring(messageOf(o))}`)
-	const tagOnly = law(1, prim(12, arg(1)))
+	const tagOnly = law(1, prim(10, arg(1)))
 	o = Interp.run(tagOnly, con(5, 7), 100)
 	check("tagof a constructor is its tag", o.status == "value" and valueOf(o) == 5, `{o.status} {tostring(valueOf(o))}`)
 	o = Interp.run(tagOnly, 3, 100)
@@ -296,17 +296,7 @@ do
 	check("2^53 - 1 is a number, the largest one", type(boundary) == "number" and boundary == Int.MAX_SAFE, tostring(boundary))
 end
 
--- 3. Pins are interned, and a pin of a thunk is an error.
-do
-	const pinOne = Interp.runForm(prim(10, lit(list(1, 2))), NIL, 100)
-	const pinTwo = Interp.runForm(prim(10, lit(list(1, 2))), NIL, 100)
-	check("equal pins are the same object", pinOne.status == "value" and valueOf(pinOne) == valueOf(pinTwo), `{pinOne.status}`)
-	const unpinned = Interp.runForm(prim(11, lit(valueOf(pinOne))), NIL, 100)
-	check("unpin gives back the value", unpinned.status == "value" and sameValue(valueOf(unpinned), list(1, 2)), `{unpinned.status}`)
-	const thunk = Interp.runForm({ op = "delay"; call = { op = "call"; f = lit(law(1, arg(1))); args = { lit(1) } } }, NIL, 100)
-	const bad = Interp.runForm(prim(10, { op = "lit"; value = valueOf(thunk) }), NIL, 100)
-	check("a pin of a thunk is an error", bad.status == "error", `{bad.status} {tostring(messageOf(bad))}`)
-end
+-- 3. (Pins were removed: decision 16 of the spec.)
 
 -- 4. Errors, each with its message.
 do

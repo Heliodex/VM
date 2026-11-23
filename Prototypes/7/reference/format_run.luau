@@ -188,7 +188,6 @@ do
 		{ name = "a constructor"; value = { kind = "con"; tag = 3; payload = cell(-5, Format.NIL) } },
 		{ name = "a law"; value = law(2, prim(0, arg(1), arg(2))) },
 		{ name = "a partial application"; value = { kind = "app"; law = law(3, arg(3)); args = { 1; cell(2, 3) } } },
-		{ name = "a pin of a list"; value = { kind = "pin"; value = list(1, 2, 3) } },
 	}
 
 	for _, v in values do
@@ -254,7 +253,7 @@ do
 		{ name = "unwrap"; p = unwrap },
 		{ name = "laziness"; p = laziness },
 		{ name = "loop"; p = loop },
-		{ name = "tagof and payload"; p = law(1, prim(13, prim(12, arg(1)))) },
+		{ name = "tagof and payload"; p = law(1, prim(11, prim(10, arg(1)))) },
 	}
 
 	for _, pr in programs do
@@ -331,10 +330,6 @@ do
 	const thunkValue: Types.Thunk = { kind = "thunk"; f = Format.NIL; args = {}; done = false; result = nil }
 	local ok, err = pcall(Format.encodeValue, thunkValue)
 	check("a thunk has no binary form", not ok and string.find(tostring(err), "thunk", 1, true) ~= nil, tostring(err))
-	const pinOfThunk: Types.Thunk = { kind = "thunk"; f = Format.NIL; args = {}; done = false; result = nil }
-	const pinValue: Types.Pin = { kind = "pin"; value = pinOfThunk }
-	ok, err = pcall(Format.encodeValue, pinValue)
-	check("a pin of a thunk has no binary form", not ok and string.find(tostring(err), "pin of a thunk", 1, true) ~= nil, tostring(err))
 	ok, err = pcall(Format.encodeProgram, law(2, lit(0)))
 	check("a program must be a law of arity 1", not ok and string.find(tostring(err), "arity 1", 1, true) ~= nil, tostring(err))
 	ok, err = pcall(Format.encodeProgram, law(1, prim(0, lit(1))))

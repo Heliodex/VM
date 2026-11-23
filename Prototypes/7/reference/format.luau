@@ -15,7 +15,7 @@ type Form = Types.Form
 type Law = Types.Law
 const NIL: Types.Nil = { kind = "nil" }
 -- The argument count of each primitive, by tag (SPEC.md section 4).
-const PRIM_ARITY: { number } = { 2; 2; 2; 2; 2; 2; 2; 1; 1; 1; 1; 1; 1; 1; 2 }
+const PRIM_ARITY: { number } = { 2; 2; 2; 2; 2; 2; 2; 1; 1; 1; 1; 1; 2 }
 const VALUE_HEADER = 1
 const PROGRAM_HEADER = 2
 -- The tags of values and forms (SPEC.md section 12.3 and 12.4).
@@ -26,7 +26,6 @@ const V_NEG = 3
 const V_CON = 4
 const V_LAW = 5
 const V_APP = 6
-const V_PIN = 7
 const F_LIT = 16
 const F_ARG = 17
 const F_CALL = 18
@@ -103,12 +102,6 @@ const function valuePieces(v: Value): { Piece }
 		end
 
 		return pieces
-	elseif v.kind == "pin" then
-		if type(v.value) == "table" and v.value.kind == "thunk" then
-			error("binary: a pin of a thunk has no binary form", 0)
-		end
-
-		return { string.char(V_PIN); { value = v.value } }
 	end
 
 	error("binary: a thunk has no binary form", 0)
@@ -414,20 +407,6 @@ const function open(want: string, t: number, r: Reader): (Datum?, Frame?)
 					return { req = "value" }
 				end,
 			}
-		elseif t == V_PIN then
-			return nil, fixedFrame(
-				"value",
-				1,
-				function(p: { Datum }): Value
-					const v = asValue(p[1])
-
-					if type(v) == "table" and v.kind == "thunk" then
-						error("binary: a pin of a thunk has no binary form", 0)
-					end
-
-					return { kind = "pin"; value = v }
-				end
-			)
 		end
 
 		error(`binary: tag {t} is not a value`, 0)

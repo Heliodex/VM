@@ -27,8 +27,6 @@ type Restore = { t: "restore"; env: Env; len: number }
 type ApplyRest = { t: "applyrest"; rest: { Value } }
 type ForceStore = { t: "forcestore"; thunk: Thunk }
 type Cont = Items | Restore | ApplyRest | ForceStore
--- Pins are interned by their content: the same bytes give the same pin object.
-const PINS: { [string]: Types.Pin } = {}
 -- Placeholders for the machine's registers when a mode does not use them.
 const NOFORM: Form = { op = "lit"; value = Format.NIL }
 const NOENV: Env = { slots = {} }
@@ -47,8 +45,6 @@ const function kindOf(v: Value): number
 		return 2
 	elseif v.kind == "law" or v.kind == "app" then
 		return 3
-	elseif v.kind == "pin" then
-		return 4
 	elseif v.kind == "con" then
 		return 5
 	end
@@ -104,7 +100,7 @@ const function primitive(tag: number, vals: { Value }): (Value?, string?)
 				1
 			else
 				0, nil
-	elseif tag == 14 then
+	elseif tag == 12 then
 		const cell: Types.Cell = { kind = "cell", head = a, tail = b }
 
 		return cell, nil
@@ -123,43 +119,12 @@ const function primitive(tag: number, vals: { Value }): (Value?, string?)
 
 		return a.tail, nil
 	elseif tag == 10 then
-		if type(a) == "table" and a.kind == "thunk" then
-			return nil, "a thunk cannot be pinned"
-		end
-
-		if type(a) == "table" and a.kind == "pin" then
-			return a, nil
-		end
-
-		const ok, key = pcall(Format.encodeValue, a)
-
-		if not ok then
-			return nil, "a pin has no binary form: " .. tostring(key)
-		end
-
-		const existing = PINS[key]
-
-		if existing ~= nil then
-			return existing, nil
-		end
-
-		const pin: Types.Pin = { kind = "pin"; value = a }
-		PINS[key] = pin
-
-		return pin, nil
-	elseif tag == 11 then
-		if type(a) ~= "table" or a.kind ~= "pin" then
-			return nil, "unpin of a value that is not a pin"
-		end
-
-		return a.value, nil
-	elseif tag == 12 then
 		if type(a) == "table" and a.kind == "con" then
 			return a.tag, nil
 		end
 
 		return -1, nil
-	elseif tag == 13 then
+	elseif tag == 11 then
 		if type(a) ~= "table" or a.kind ~= "con" then
 			return nil, "payload of a value that is not a constructor"
 		end

@@ -11,10 +11,9 @@ export type Cell = { kind: "cell"; head: Value; tail: Value }
 export type Con = { kind: "con"; tag: number; payload: Value }
 export type Law = { kind: "law"; arity: number; body: Form }
 export type App = { kind: "app"; law: Law; args: { Value } }
-export type Pin = { kind: "pin"; value: Value }
 export type Thunk = { kind: "thunk"; f: Value; args: { Value }; done: boolean; result: Value? }
--- A value of the core: an integer, nil, a cell, a constructor, a function (a law, or a partial application), a pin, or a thunk.
-export type Value = Int | Nil | Cell | Con | Law | App | Pin | Thunk
+-- A value of the core: an integer, nil, a cell, a constructor, a function (a law, or a partial application), or a thunk.
+export type Value = Int | Nil | Cell | Con | Law | App | Thunk
 export type Lit = { op: "lit"; value: Value }
 export type Arg = { op: "arg"; index: number }
 export type Call = { op: "call"; f: Form; args: { Form } }

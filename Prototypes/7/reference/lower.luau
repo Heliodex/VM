@@ -441,7 +441,7 @@ lower = function(e: Expr, depth: number, map: { number }): Form
 
 		return { op = "delay"; call = { op = "call"; f = { op = "lit"; value = law }; args = args } }
 	elseif e.op == "cell" then
-		return { op = "prim"; tag = 14; args = { lower(e.head, depth, map), lower(e.tail, depth, map) } }
+		return { op = "prim"; tag = 12; args = { lower(e.head, depth, map), lower(e.tail, depth, map) } }
 	elseif e.op == "index" then
 		local form = lower(e.e, depth, map)
 
@@ -536,9 +536,9 @@ lower = function(e: Expr, depth: number, map: { number }): Form
 	elseif e.op == "construct" then
 		return { op = "con"; tag = e.tag; e = lower(e.e, depth, map) }
 	elseif e.op == "tagof" then
-		return { op = "prim"; tag = 12; args = { lower(e.e, depth, map) } }
+		return { op = "prim"; tag = 10; args = { lower(e.e, depth, map) } }
 	elseif e.op == "payload" then
-		return { op = "prim"; tag = 13; args = { lower(e.e, depth, map) } }
+		return { op = "prim"; tag = 11; args = { lower(e.e, depth, map) } }
 	end
 
 	error(`lower: an expression {e.op} is not known`, 0)
