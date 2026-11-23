@@ -325,20 +325,26 @@ let builtinList = [(mono "+" (tArrow tInt (tArrow tInt tInt))) (mono "-" (tArrow
 let envEmpty = (EN (~ . ~))
 letrec envKid = fn (kids b)
 	match (head kids)
-		Err e -> envEmpty
+		Err e -> (EN (~ . ~))
 		Ok c ->
 			if (= (fst c) b)
 				snd c
 			else
-				envKid (tl kids) b
+				match (tail kids)
+					Err g -> (envKid ~ b)
+					Ok t -> (envKid t b)
 letrec envPut = fn (kids b child)
 	match (head kids)
 		Err e -> cons (b . child) ~
 		Ok c ->
 			if (= (fst c) b)
-				cons (b . child) (tl kids)
+				match (tail kids)
+					Err g -> cons (b . child) ~
+					Ok t -> cons (b . child) t
 			else
-				cons c (envPut (tl kids) b child)
+				match (tail kids)
+					Err g -> cons c (envPut ~ b child)
+					Ok t -> cons c (envPut t b child)
 letrec envBind = fn (node name e)
 	match node
 		EN p ->
