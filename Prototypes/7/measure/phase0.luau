@@ -178,7 +178,9 @@ local function compileCompiler(file: string): any
 end
 
 print("== The compiler's own stages (host, once; not part of any build below)")
-const layoutC = compileCompiler "layout.l2"
+-- The layout is the Phase 1 variant in boot/ here (difference lists), not Prototype 6's. Run 5 used Prototype 6's layout, which is the baseline.
+const layoutC = Compile.compile(readFile "boot/layout.l2", "boot/layout.l2")
+table.insert(compilerTimes, string.format("  layout.l2 (Phase 1 variant): layout %.3fs, parse %.3fs, check %.3fs, desugar %.3fs", layoutC.timings.layout, layoutC.timings.parse, layoutC.timings.check, layoutC.timings.desugar))
 const lexer = compileCompiler "lex.l2"
 const parser = compileCompiler "parse.l2"
 const checker = compileCompiler "types.l2"

@@ -23,7 +23,7 @@ Conclusions that shape this plan:
 
 - **The step count is the problem, not the step rate.** The hybrid is close to what a tree or closure machine in Luau can do per step. A machine rewrite might give about 2×. The target needs about 45× fewer steps at the same host speed, or a mix of fewer steps and jets.
 - **The checker is doing too much work, in two ways (measured in Phase 0).** The name environment is an association list searched by name (`findE`), and that search is quadratic in the number of declarations. Separately, each declaration costs about 128,000 steps, much of it in `/` and `%` by 2 and list access, which return `Result` values that are matched at every step. The binding store is a binary trie, not an association list as first assumed. See `measure/README.md`.
-- **Layout is the largest cost, not the checker (measured in Phase 0, run 5).** The VM's layout pass is 49% of the corpus build and grows quadratically in lines. The checker is 39%. Layout had not been measured on the VM before run 5.
+- **Layout was the largest cost, and is now fixed (Phase 0, runs 5 and 6).** Before the change, the VM's layout pass was 49% of the corpus build and grew quadratically in lines. After it (Phase 1, run 6), layout is 11% of the corpus build and grows linearly; the checker, at 68%, is now the largest cost, and it is still quadratic.
 - **Names are lists of bytes.** Every name comparison walks a list, and every string is a list of cells. Interned names would make equality a single comparison.
 - **The step-parity invariant will not survive jets or memoisation** unless the design says how fuel is charged. The section "Fuel, jets and memo" below handles this.
 
@@ -54,7 +54,7 @@ So the target as stated is for a *bootstrapped front end*, layout through check.
 
     steps budget = time budget × measured steps per second
 
-At the hybrid's 18.5M steps/s, the budget is about 18.5M steps for 2,500 lines, about 7,400 steps per line. Phase 0 measured the whole bootstrapped front end on the 2,235-line corpus, with layout on the VM: 1,542M steps, about 690,000 per line. At that average, 2,500 lines take about 1.7B steps, about 96× the budget at 18M steps/s. The average understates a larger build: layout and the checker are both superlinear in lines (about 600 steps per line² for layout at 200 functions and up), so a 2,500-line build costs more per line than the corpus does.
+At the hybrid's 18.5M steps/s, the budget is about 18.5M steps for 2,500 lines, about 7,400 steps per line. With the Phase 1 layout (run 6), the bootstrapped front end on the 2,235-line corpus takes 886M steps, about 396,000 per line. At that average, 2,500 lines take about 990M steps, about 55× the budget at 18M steps/s (it was about 96× before the layout change). The average understates a larger build, because the checker is still superlinear in lines: on the generated programs its steps per function rise with size, so a 2,500-line build costs more per line than the corpus does.
 
 **3. A relative check that does not depend on the host.** Steps and fuel are host-independent, so they are the primary numbers. Add two ratios so that a result has meaning even when the host changes:
 
@@ -65,7 +65,7 @@ At the hybrid's 18.5M steps/s, the budget is about 18.5M steps for 2,500 lines, 
 
 **Open questions for the speed target** (listed again in "Decisions" below):
 
-- Does the target need to hold on Luau, or only on a future native host? On Luau the step rate is about 18M steps/s, so the budget is about 18M steps. That is reachable only if the roughly 96× reduction comes from algorithms and jets, not the machine. If it cannot be reached, the target needs a native host.
+- Does the target need to hold on Luau, or only on a future native host? On Luau the step rate is about 18M steps/s, so the budget is about 18M steps. That is reachable only if the roughly 55× reduction comes from algorithms and jets, not the machine. If it cannot be reached, the target needs a native host.
 - Corpus: resolved as the four boot files now, with the top-up and the full compiler to follow (see "Speed target").
 
 ## Core design (draft)
@@ -138,7 +138,7 @@ Note: the plan first proposed scaling by repeating `types.l2`. It was replaced b
 
 **Phase 1: fix the front end's algorithms, in L2.** Measured candidates, in order of the cost they remove:
 
-- **Layout first.** It is 49% of the corpus build on the VM, grows quadratically in lines (about 600 steps per line² from 200 functions up), and is 90% of the VM steps at 1,600 functions. The host layout is cheap on the same input, so the cost is in the VM code, not in the task. Profiled (`measure/layout_profile.luau`): about 87% of layout steps are in three helpers, `tlOf`, `hd` and `cat`, and on generated programs they grow 15 to 16 times from 100 to 400 functions, against 4 times for the rest. The likely cause, from the code and not yet confirmed by a change: `joinLines` and the nested `cat` calls copy each block's text into its enclosing block, so a chain of nested blocks copies its text once per level, which is quadratic in the depth. The fix to test is to build the output once, as a list of lines joined at the end, or with an accumulator, so that each line is copied once. The exit test is the layout's steps against lines, and the layout's output must still equal the host's;
+- **Layout: done (run 6).** The profile (`measure/layout_profile.luau`) put about 87% of layout steps in `tlOf`, `hd` and `cat`, which grew 15 to 16 times from 100 to 400 functions. The cause was the text copying: each enclosing block copied the text of the blocks inside it, so nested blocks were copied once per level. The change builds the output as difference lists, in `measure/boot/layout.l2`, and copies each piece once, when it is flattened. Exit test, met: layout steps grow about 2.0 times per doubling of the input (linear), and the output equals the host's on all 57 inputs in `measure/layout_parity.luau` (the 44 L2 program files, 9 malformed inputs, and 4 generated programs). Layout steps on `types.l2` fell from 486M to 45M. Prototype 6's layout is kept as the baseline;
 - the name environment (`findE`, with `same`): a balanced map keyed by name. This removes the quadratic term (about 31% of steps at 400 functions, 64% at 1,600);
 - `halfOf` and `oddOf` (`/` and `%` by 2, each matched through a `Result`): a bit primitive or a direct trie step. About 28% of steps on `types.l2`;
 - `first`, `tl` and `hdOr`, the list accessors that wrap their result: direct access where the list is known to be non-empty. About 22% of steps.

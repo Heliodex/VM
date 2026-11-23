@@ -109,3 +109,37 @@ On `types.l2` (its raw program section, 37,004 bytes), the layout takes 486,251,
 So about 87% of the layout's steps are in three list helpers, and the helpers are called from `cat` and `joinLines`. On generated programs of 100 and 400 functions, the three grow 14.6×, 15.1× and 16.5×, close to the 16× of a quadratic term, while the other helpers grow about 4×. Total layout growth is 14.4×.
 
 The cause is not yet confirmed. From the code: `joinLines` and the nested `cat` calls in the block printers build each block's text by copying the text of its children into it, so a chain of nested blocks copies its text once per level. That is quadratic in the nesting depth, and the generated programs are deep chains of nested `let`s. The host layout is cheap on the same input, which fits a host that does not copy at each level. The test is to change the layout to build its output once, and then to check that the steps drop to linear and the output still equals the host's.
+
+## Run 6: the layout change
+
+The layout was changed (`boot/layout.l2`, a Phase 1 variant of Prototype 6's `layout.l2`), and the harness was run again with it (`results/run6.txt`, about 7 minutes). The checker and the lexer and parser are unchanged, so their steps are the same as in run 5.
+
+### What changed in the layout
+
+Prototype 6's layout builds each enclosing block's text by copying the text of the blocks inside it, so a chain of nested blocks copies its text once per level. The variant builds each piece of output as a difference list: a function from the text that follows the piece to the text followed by it. Joining two pieces is then a composition, and the whole output is copied once, by a flatten at the end. The source text is unchanged, and so is the layout's structure; only how the output is built is different. The layout's output is the same text.
+
+### Results
+
+| File | Layout, run 5 (Prototype 6) | Layout, run 6 (variant) |
+| --- | ---: | ---: |
+| `lex.l2` | 16.85M | 5.72M |
+| `parse.l2` | 172.89M | 27.82M |
+| `layout.l2` | 76.33M | 17.03M |
+| `types.l2` | 486.25M | 45.26M |
+| **Corpus** | **752.3M** | **95.8M** |
+
+- **Corpus total on the VM:** 886M steps (run 5: 1,542M), about 396,000 per line.
+- **Shares now:** checker 68%, parse 15%, layout 11%, lex 5%.
+- **Layout scaling is linear.** On the generated programs the layout's steps double with the program, 2.0 times per doubling from 25 to 1,600 functions (1.30M, 2.58M, 5.14M, 10.64M, 21.63M, 43.62M, 89.89M steps). At 1,600 functions the layout is 90M steps, where run 5 had 6,368M. Per line it is about 28,000 steps.
+- **Checker scaling is unchanged,** still superlinear: 568.8M steps at 1,600 functions, where layout is now 90M. At large sizes the checker is the cost to fix next.
+- **Validation:** the checker on `types.l2` still gives 299,622,490 steps, and the layout output matches the host on the four corpus files.
+
+### Layout parity
+
+`layout_parity.luau` checks the variant against the host layout on 57 inputs, not only the corpus:
+
+- the 44 L2 program files in the repository (`results/layout_files.txt`);
+- 9 malformed inputs, one for each kind of error the layout gives (tab indent, space indent, empty file, a let with no body, an if with no else, a match with no arms, a bad record field, no expression after declarations, a bad arm);
+- the generated programs at 25, 100, 400 and 800 functions.
+
+All 57 agree: where the host gives text, the VM gives the same text, and where the host refuses, the VM gives the same message. Eight of the malformed inputs refuse on both sides, and the ninth is accepted on both sides.

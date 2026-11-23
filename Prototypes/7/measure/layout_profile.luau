@@ -80,7 +80,8 @@ local function hook(expr: any, returning: boolean, frame: any)
 	bump(profile.owner, expr.owner or "?")
 end
 
-const layoutC = Compile.compile(readFile(BOOT .. "layout.l2"), "boot/layout.l2")
+-- The Phase 1 variant in boot/ (difference lists). Set this to BOOT .. "layout.l2" to profile Prototype 6's layout, the baseline in results/layout_profile.txt.
+const layoutC = Compile.compile(readFile "boot/layout.l2", "boot/layout.l2")
 const vmAny: any = VM
 
 -- Runs the layout on a raw program section under the counted machine, with the profile on.
