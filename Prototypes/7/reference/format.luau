@@ -15,7 +15,7 @@ type Form = Types.Form
 type Law = Types.Law
 const NIL: Types.Nil = { kind = "nil" }
 -- The argument count of each primitive, by tag (SPEC.md section 4).
-const PRIM_ARITY: { number } = { 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1 }
+const PRIM_ARITY: { number } = { 2; 2; 2; 2; 2; 2; 2; 1; 1; 1; 1; 1; 1; 1 }
 const VALUE_HEADER = 1
 const PROGRAM_HEADER = 2
 -- The tags of values and forms (SPEC.md section 12.3 and 12.4).
@@ -78,7 +78,7 @@ const function intBytes(v: Int.Int): string
 end
 
 -- The pieces a value is written as, in order. A piece is a string of bytes, or a value or form still to be written. The writer pushes the pieces on its stack in reverse, so the first piece is written first.
-type Box = { value: Value?, form: Form? }
+type Box = { value: Value?; form: Form? }
 type Piece = string | Box
 
 const function valuePieces(v: Value): { Piece }
@@ -91,13 +91,13 @@ const function valuePieces(v: Value): { Piece }
 	elseif v.kind == "nil" then
 		return { string.char(V_NIL) }
 	elseif v.kind == "cell" then
-		return { string.char(V_CELL), { value = v.head }, { value = v.tail } }
+		return { string.char(V_CELL); { value = v.head }; { value = v.tail } }
 	elseif v.kind == "con" then
-		return { string.char(V_CON), posBytes(v.tag), { value = v.payload } }
+		return { string.char(V_CON); posBytes(v.tag); { value = v.payload } }
 	elseif v.kind == "law" then
-		return { string.char(V_LAW), posBytes(v.arity), { form = v.body } }
+		return { string.char(V_LAW); posBytes(v.arity); { form = v.body } }
 	elseif v.kind == "app" then
-		local pieces: { Piece } = { string.char(V_APP), { value = v.law }, posBytes(#v.args) }
+		local pieces: { Piece } = { string.char(V_APP); { value = v.law }; posBytes(#v.args) }
 
 		for _, a in v.args do
 			table.insert(pieces, { value = a })
@@ -109,7 +109,7 @@ const function valuePieces(v: Value): { Piece }
 			error("binary: a pin of a thunk has no binary form", 0)
 		end
 
-		return { string.char(V_PIN), { value = v.value } }
+		return { string.char(V_PIN); { value = v.value } }
 	end
 
 	error("binary: a thunk has no binary form", 0)
@@ -117,11 +117,11 @@ end
 
 const function formPieces(f: Form): { Piece }
 	if f.op == "lit" then
-		return { string.char(F_LIT), { value = f.value } }
+		return { string.char(F_LIT); { value = f.value } }
 	elseif f.op == "arg" then
-		return { string.char(F_ARG), posBytes(f.index) }
+		return { string.char(F_ARG); posBytes(f.index) }
 	elseif f.op == "call" then
-		local pieces: { Piece } = { string.char(F_CALL), posBytes(#f.args), { form = f.f } }
+		local pieces: { Piece } = { string.char(F_CALL); posBytes(#f.args); { form = f.f } }
 
 		for _, a in f.args do
 			table.insert(pieces, { form = a })
@@ -129,11 +129,11 @@ const function formPieces(f: Form): { Piece }
 
 		return pieces
 	elseif f.op == "cell" then
-		return { string.char(F_CELL), { form = f.a }, { form = f.b } }
+		return { string.char(F_CELL); { form = f.a }; { form = f.b } }
 	elseif f.op == "con" then
-		return { string.char(F_CON), posBytes(f.tag), { form = f.e } }
+		return { string.char(F_CON); posBytes(f.tag); { form = f.e } }
 	elseif f.op == "case" then
-		local pieces: { Piece } = { string.char(F_CASE), { form = f.e }, posBytes(#f.alts) }
+		local pieces: { Piece } = { string.char(F_CASE); { form = f.e }; posBytes(#f.alts) }
 
 		for _, alt in f.alts do
 			table.insert(pieces, posBytes(alt.tag))
@@ -149,11 +149,11 @@ const function formPieces(f: Form): { Piece }
 
 		return pieces
 	elseif f.op == "if" then
-		return { string.char(F_IF), { form = f.c }, { form = f.t }, { form = f.e } }
+		return { string.char(F_IF); { form = f.c }; { form = f.t }; { form = f.e } }
 	elseif f.op == "let" then
-		return { string.char(F_LET), { form = f.e }, { form = f.body } }
+		return { string.char(F_LET); { form = f.e }; { form = f.body } }
 	elseif f.op == "delay" then
-		local pieces: { Piece } = { string.char(F_DELAY), posBytes(#f.call.args), { form = f.call.f } }
+		local pieces: { Piece } = { string.char(F_DELAY); posBytes(#f.call.args); { form = f.call.f } }
 
 		for _, a in f.call.args do
 			table.insert(pieces, { form = a })
@@ -161,7 +161,7 @@ const function formPieces(f: Form): { Piece }
 
 		return pieces
 	elseif f.op == "force" then
-		return { string.char(F_FORCE), { form = f.e } }
+		return { string.char(F_FORCE); { form = f.e } }
 	end
 
 	-- A prim, the last form.
@@ -175,7 +175,7 @@ const function formPieces(f: Form): { Piece }
 		error(`binary: primitive {f.tag} takes {arity} arguments, but is given {#f.args}`, 0)
 	end
 
-	local pieces: { Piece } = { string.char(F_PRIM), posBytes(f.tag) }
+	local pieces: { Piece } = { string.char(F_PRIM); posBytes(f.tag) }
 
 	for _, a in f.args do
 		table.insert(pieces, { form = a })
@@ -213,7 +213,7 @@ const function writeAll(root: Piece): string
 end
 
 -- Reading
-type Reader = { s: string, p: number }
+type Reader = { s: string; p: number }
 
 const function readByte(r: Reader, what: string): number
 	if r.p > #r.s then
@@ -302,8 +302,8 @@ const function asNumber(d: Datum): number
 end
 
 -- A reading frame: a node with some parts still to read. init is what it asks for first ("pos", "flag", "form" or "value"); feed takes what it was given, and returns what it asks for next, or the finished node as { done = node }.
-type Ask = { req: string?, done: Value | Form? }
-type Frame = { init: string, feed: (datum: Datum, dtype: string) -> Ask }
+type Ask = { req: string?; done: Value | Form? }
+type Frame = { init: string; feed: (datum: Datum, dtype: string) -> Ask }
 
 -- A frame that reads a fixed list of parts, each of the kind it asks for, then builds the node from them.
 const function fixedFrame(init: string, count: number, build: (parts: { Datum }) -> Value | Form): Frame
@@ -337,7 +337,7 @@ const function open(want: string, t: number, r: Reader): (Datum?, Frame?)
 				"value",
 				2,
 				function(p: { Datum }): Value
-					return { kind = "cell", head = asValue(p[1]), tail = asValue(p[2]) }
+					return { kind = "cell"; head = asValue(p[1]); tail = asValue(p[2]) }
 				end
 			)
 		elseif t == V_CON then
@@ -352,7 +352,7 @@ const function open(want: string, t: number, r: Reader): (Datum?, Frame?)
 						return { req = "value" }
 					end
 
-					return { done = { kind = "con", tag = tag, payload = asValue(datum) } }
+					return { done = { kind = "con"; tag = tag; payload = asValue(datum) } }
 				end,
 			}
 		elseif t == V_LAW then
@@ -371,7 +371,7 @@ const function open(want: string, t: number, r: Reader): (Datum?, Frame?)
 						return { req = "form" }
 					end
 
-					return { done = { kind = "law", arity = arity, body = asForm(datum) } }
+					return { done = { kind = "law"; arity = arity; body = asForm(datum) } }
 				end,
 			}
 		elseif t == V_APP then
@@ -411,7 +411,7 @@ const function open(want: string, t: number, r: Reader): (Datum?, Frame?)
 					table.insert(args, asValue(datum))
 
 					if #args == n then
-						return { done = { kind = "app", law = law :: Law, args = args } }
+						return { done = { kind = "app"; law = law :: Law; args = args } }
 					end
 
 					return { req = "value" }
@@ -428,7 +428,7 @@ const function open(want: string, t: number, r: Reader): (Datum?, Frame?)
 						error("binary: a pin of a thunk has no binary form", 0)
 					end
 
-					return { kind = "pin", value = v }
+					return { kind = "pin"; value = v }
 				end
 			)
 		end
@@ -442,14 +442,14 @@ const function open(want: string, t: number, r: Reader): (Datum?, Frame?)
 			"value",
 			1,
 			function(p: { Datum }): Value | Form
-				return { op = "lit", value = asValue(p[1]) }
+				return { op = "lit"; value = asValue(p[1]) }
 			end
 		)
 	elseif t == F_ARG then
 		return nil, {
 			init = "pos",
 			feed = function(datum: Datum): Ask
-				return { done = { op = "arg", index = asNumber(datum) } }
+				return { done = { op = "arg"; index = asNumber(datum) } }
 			end,
 		}
 	elseif t == F_CALL or t == F_DELAY then
@@ -460,10 +460,10 @@ const function open(want: string, t: number, r: Reader): (Datum?, Frame?)
 
 		local function finish(): Form
 			if t == F_DELAY then
-				return { op = "delay", call = { op = "call", f = f :: Form, args = args } }
+				return { op = "delay"; call = { op = "call"; f = f :: Form; args = args } }
 			end
 
-			return { op = "call", f = f :: Form, args = args }
+			return { op = "call"; f = f :: Form; args = args }
 		end
 
 		return nil, {
@@ -499,7 +499,7 @@ const function open(want: string, t: number, r: Reader): (Datum?, Frame?)
 			"form",
 			2,
 			function(p: { Datum }): Value | Form
-				return { op = "cell", a = asForm(p[1]), b = asForm(p[2]) }
+				return { op = "cell"; a = asForm(p[1]); b = asForm(p[2]) }
 			end
 		)
 	elseif t == F_CON then
@@ -514,13 +514,13 @@ const function open(want: string, t: number, r: Reader): (Datum?, Frame?)
 					return { req = "form" }
 				end
 
-				return { done = { op = "con", tag = tag, e = asForm(datum) } }
+				return { done = { op = "con"; tag = tag; e = asForm(datum) } }
 			end,
 		}
 	elseif t == F_CASE then
 		local e: Form? = nil
 		local k = 0
-		local alts: { { tag: number, body: Form } } = {}
+		local alts: { { tag: number; body: Form } } = {}
 		local seen: { boolean } = {}
 		local tag = 0
 		local st = 0
@@ -556,7 +556,7 @@ const function open(want: string, t: number, r: Reader): (Datum?, Frame?)
 
 					return { req = "form" }
 				elseif st == 3 then
-					table.insert(alts, { tag = tag, body = asForm(datum) })
+					table.insert(alts, { tag = tag; body = asForm(datum) })
 
 					if #alts < k then
 						st = 2
@@ -576,12 +576,12 @@ const function open(want: string, t: number, r: Reader): (Datum?, Frame?)
 						error("binary: the else flag is 0 or 1", 0)
 					end
 
-					const built: Types.Case = { op = "case", e = e :: Form, alts = alts, elseBody = nil }
+					const built: Types.Case = { op = "case"; e = e :: Form; alts = alts; elseBody = nil }
 
 					return { done = built }
 				end
 
-				const built: Types.Case = { op = "case", e = e :: Form, alts = alts, elseBody = asForm(datum) }
+				const built: Types.Case = { op = "case"; e = e :: Form; alts = alts; elseBody = asForm(datum) }
 
 				return { done = built }
 			end,
@@ -591,7 +591,7 @@ const function open(want: string, t: number, r: Reader): (Datum?, Frame?)
 			"form",
 			3,
 			function(p: { Datum }): Value | Form
-				return { op = "if", c = asForm(p[1]), t = asForm(p[2]), e = asForm(p[3]) }
+				return { op = "if"; c = asForm(p[1]); t = asForm(p[2]); e = asForm(p[3]) }
 			end
 		)
 	elseif t == F_LET then
@@ -599,7 +599,7 @@ const function open(want: string, t: number, r: Reader): (Datum?, Frame?)
 			"form",
 			2,
 			function(p: { Datum }): Value | Form
-				return { op = "let", e = asForm(p[1]), body = asForm(p[2]) }
+				return { op = "let"; e = asForm(p[1]); body = asForm(p[2]) }
 			end
 		)
 	elseif t == F_FORCE then
@@ -607,7 +607,7 @@ const function open(want: string, t: number, r: Reader): (Datum?, Frame?)
 			"form",
 			1,
 			function(p: { Datum }): Value | Form
-				return { op = "force", e = asForm(p[1]) }
+				return { op = "force"; e = asForm(p[1]) }
 			end
 		)
 	elseif t == F_PRIM then
@@ -634,7 +634,7 @@ const function open(want: string, t: number, r: Reader): (Datum?, Frame?)
 				table.insert(args, asForm(datum))
 
 				if #args == arity then
-					return { done = { op = "prim", tag = tag, args = args } }
+					return { done = { op = "prim"; tag = tag; args = args } }
 				end
 
 				return { req = "form" }
@@ -710,7 +710,7 @@ const function start(s: string, header: number, what: string): Reader
 		error(`binary: the bytes are not {what}`, 0)
 	end
 
-	return { s = s, p = 2 }
+	return { s = s; p = 2 }
 end
 
 const function finishRead(r: Reader, what: string)
@@ -754,7 +754,7 @@ const function decodeProgram(s: string): Law
 	const body = asForm(readNode(r, "form"))
 	finishRead(r, "program")
 
-	return { kind = "law", arity = 1, body = body }
+	return { kind = "law"; arity = 1; body = body }
 end
 
 return {

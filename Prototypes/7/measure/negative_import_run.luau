@@ -44,11 +44,11 @@ const libLaid = Lifecycle.run(layoutC.expr, bytesValue(libRaw), 1e10)
 const libLexed = Lifecycle.run(lexer.expr, O.payloadOf(O.valueOf(libLaid)), 1e8)
 const libParsed = Lifecycle.run(parser.expr, O.payloadOf(O.valueOf(libLexed)), 5e8)
 const libProgram = O.payloadOf(O.valueOf(libParsed))
-const withoutImport = Lifecycle.run(checker.expr, { kind = "con", tag = 3, payload = program }, 1e10)
+const withoutImport = Lifecycle.run(checker.expr, { kind = "con"; tag = 3; payload = program }, 1e10)
 -- The import list is a list of (name . program) pairs: one pair here, then nil.
-const importPair: VM.Value = { kind = "cell", head = bytesValue "reverse", tail = libProgram }
-const importList: VM.Value = { kind = "cell", head = importPair, tail = VM.NIL }
-const withImport = Lifecycle.run(checker.expr, { kind = "con", tag = 4, payload = { kind = "cell", head = importList, tail = program } }, 1e10)
+const importPair: VM.Value = { kind = "cell"; head = bytesValue "reverse"; tail = libProgram }
+const importList: VM.Value = { kind = "cell"; head = importPair; tail = VM.NIL }
+const withImport = Lifecycle.run(checker.expr, { kind = "con"; tag = 4; payload = { kind = "cell"; head = importList; tail = program } }, 1e10)
 
 const function vmErrors(r: Lifecycle.Result): string
 	local msgs: { string } = {}
@@ -88,7 +88,7 @@ print(
 	)
 )
 const libLuau = Checker.check(Parser.parse(Layout.layout(libRaw)), {}, "reverse")
-local okYes, errYes = pcall(Checker.check, parsedLuau, { { name = "reverse", scheme = libLuau.scheme } }, "neg")
+local okYes, errYes = pcall(Checker.check, parsedLuau, { { name = "reverse"; scheme = libLuau.scheme } }, "neg")
 print(
 	"Luau, with the import:    " .. (
 		if okYes then

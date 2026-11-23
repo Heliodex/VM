@@ -884,7 +884,7 @@ compileDirect = function(e: Expr): Code
 		code = function(env: Binding?): Value
 			tick()
 
-			return { kind = "closure", body = bodyExpr, env = env, code = body } :: any
+			return { kind = "closure"; body = bodyExpr; env = env; code = body } :: any
 		end
 	elseif e.op == "pin" then
 		const inner = compileDirect(e.e)
@@ -892,7 +892,7 @@ compileDirect = function(e: Expr): Code
 		code = function(env: Binding?): Value
 			tick()
 
-			return { kind = "pin", expr = innerExpr, env = env, busy = false, code = inner } :: any
+			return { kind = "pin"; expr = innerExpr; env = env; busy = false; code = inner } :: any
 		end
 	elseif e.op == "cell" then
 		const headCode = compileDirect(e.head)
@@ -904,7 +904,7 @@ compileDirect = function(e: Expr): Code
 			const tail = tailCode(env)
 			tick()
 
-			return { kind = "cell", head = head, tail = tail }
+			return { kind = "cell"; head = head; tail = tail }
 		end
 	elseif e.op == "index" then
 		const inner = compileDirect(e.e)
@@ -1009,7 +1009,7 @@ compileDirect = function(e: Expr): Code
 			tick()
 			const bodyCode: Code = closure.code or compileDirect(closure.body)
 
-			return bodyCode { value = a, rest = closure.env }
+			return bodyCode { value = a; rest = closure.env }
 		end
 	elseif e.op == "construct" then
 		const inner = compileDirect(e.e)
@@ -1019,7 +1019,7 @@ compileDirect = function(e: Expr): Code
 			const v = inner(env)
 			tick()
 
-			return { kind = "con", tag = tag, payload = v } :: any
+			return { kind = "con"; tag = tag; payload = v } :: any
 		end
 	elseif e.op == "tagof" then
 		const inner = compileDirect(e.e)

@@ -46,27 +46,27 @@ const function messageOf(o: Outcome): string
 end
 
 const function lit(v: Types.Value): Types.Form
-	return { op = "lit", value = v }
+	return { op = "lit"; value = v }
 end
 
 const function arg(i: number): Types.Form
-	return { op = "arg", index = i }
+	return { op = "arg"; index = i }
 end
 
 const function call(f: Types.Form, ...: Types.Form): Types.Form
-	return { op = "call", f = f, args = { ... } }
+	return { op = "call"; f = f; args = { ... } }
 end
 
 const function prim(tag: number, ...: Types.Form): Types.Form
-	return { op = "prim", tag = tag, args = { ... } }
+	return { op = "prim"; tag = tag; args = { ... } }
 end
 
 const function law(arity: number, body: Types.Form): Types.Law
-	return { kind = "law", arity = arity, body = body }
+	return { kind = "law"; arity = arity; body = body }
 end
 
 const function cell(a: Types.Value, b: Types.Value): Types.Cell
-	return { kind = "cell", head = a, tail = b }
+	return { kind = "cell"; head = a; tail = b }
 end
 
 const function list(...: Types.Value): Types.Value
@@ -81,7 +81,7 @@ const function list(...: Types.Value): Types.Value
 end
 
 const function con(tag: number, payload: Types.Value): Types.Con
-	return { kind = "con", tag = tag, payload = payload }
+	return { kind = "con"; tag = tag; payload = payload }
 end
 
 const function show(v: Types.Value): string
@@ -154,8 +154,8 @@ do
 		{
 			op = "if",
 			c = prim(6, prim(9, arg(1)), lit(0)),
-			t = { op = "con", tag = 1, e = lit(NIL) },
-			e = { op = "con", tag = 0, e = prim(3, prim(8, arg(1)), prim(9, arg(1))) },
+			t = { op = "con"; tag = 1; e = lit(NIL) },
+			e = { op = "con"; tag = 0; e = prim(3, prim(8, arg(1)), prim(9, arg(1))) },
 		}
 	)
 	o = Interp.run(safediv, cell(6, 3), 1000)
@@ -167,7 +167,7 @@ do
 		{
 			op = "case",
 			e = arg(1),
-			alts = { { tag = 0, body = arg(2) }, { tag = 1, body = lit(0) } },
+			alts = { { tag = 0; body = arg(2) }; { tag = 1; body = lit(0) } },
 			elseBody = lit(0),
 		}
 	)
@@ -177,8 +177,8 @@ do
 		1,
 		{
 			op = "let",
-			e = { op = "delay", call = { op = "call", f = lit(inc), args = { lit(1) } } },
-			body = prim(0, { op = "force", e = arg(2) }, { op = "force", e = arg(2) }),
+			e = { op = "delay"; call = { op = "call"; f = lit(inc); args = { lit(1) } } },
+			body = prim(0, { op = "force"; e = arg(2) }, { op = "force"; e = arg(2) }),
 		}
 	)
 	o = Interp.run(laziness, NIL, 1000)
@@ -188,8 +188,8 @@ do
 		1,
 		{
 			op = "let",
-			e = { op = "delay", call = { op = "call", f = lit(inc), args = { lit(1) } } },
-			body = { op = "force", e = arg(2) },
+			e = { op = "delay"; call = { op = "call"; f = lit(inc); args = { lit(1) } } },
+			body = { op = "force"; e = arg(2) },
 		}
 	)
 	local oOnce = Interp.run(onceForce, NIL, 1000)
@@ -211,23 +211,23 @@ end
 
 -- 2. Integers of any size.
 do
-	local two53 = Int.fromMagnitude(false, { 0, 0, 0, 0, 0, 0, 32 })
-	local two100 = Int.fromMagnitude(false, { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16 })
+	local two53 = Int.fromMagnitude(false, { 0; 0; 0; 0; 0; 0; 32 })
+	local two100 = Int.fromMagnitude(false, { 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 16 })
 	local o = Interp.runForm(prim(0, lit(two100), lit(1)), NIL, 100)
 	local back = Interp.runForm(prim(1, lit(valueOf(o)), lit(two100)), NIL, 100)
 	check("2^100 + 1 is big, and minus 2^100 gives 1", o.status == "value" and Int.isBig(valueOf(o)) and valueOf(back) == 1, `{o.status} {tostring(valueOf(back))}`)
 	o = Interp.runForm(prim(2, lit(two53), lit(two53)), NIL, 100)
 	check("2^53 times 2^53 is 2^106 (big)", o.status == "value" and Int.isBig(valueOf(o)), `{o.status}`)
 	o = Interp.runForm(prim(3, lit(two100), lit(two53)), NIL, 100)
-	check("2^100 div 2^53 is 2^47", o.status == "value" and Int.equal(valueOf(o) :: Int.Int, Int.fromMagnitude(false, { 0, 0, 0, 0, 0, 128 })), `{o.status} {tostring(valueOf(o))}`)
+	check("2^100 div 2^53 is 2^47", o.status == "value" and Int.equal(valueOf(o) :: Int.Int, Int.fromMagnitude(false, { 0; 0; 0; 0; 0; 128 })), `{o.status} {tostring(valueOf(o))}`)
 	-- Floored division and modulus, with the sign of the divisor, on all sign combinations.
-	const cases: { { a: number, b: number, q: number, r: number } } = {
-		{ a = 7, b = 2, q = 3, r = 1 },
-		{ a = -7, b = 2, q = -4, r = 1 },
-		{ a = 7, b = -2, q = -4, r = -1 },
-		{ a = -7, b = -2, q = 3, r = -1 },
-		{ a = 6, b = 3, q = 2, r = 0 },
-		{ a = 0, b = 5, q = 0, r = 0 },
+	const cases: { { a: number; b: number; q: number; r: number } } = {
+		{ a = 7; b = 2; q = 3; r = 1 },
+		{ a = -7; b = 2; q = -4; r = 1 },
+		{ a = 7; b = -2; q = -4; r = -1 },
+		{ a = -7; b = -2; q = 3; r = -1 },
+		{ a = 6; b = 3; q = 2; r = 0 },
+		{ a = 0; b = 5; q = 0; r = 0 },
 	}
 
 	for _, c in cases do
@@ -292,7 +292,7 @@ do
 	check("add and sub are inverse, for 300 pairs", addFailures == 0, `{addFailures} failures`)
 	check("mul is commutative, for 300 pairs", mulFailures == 0, `{mulFailures} failures`)
 	-- A number and a big integer with the same value are the same integer: the normal form.
-	const boundary = Int.fromMagnitude(false, { 255, 255, 255, 255, 255, 255, 31 })
+	const boundary = Int.fromMagnitude(false, { 255; 255; 255; 255; 255; 255; 31 })
 	check("2^53 - 1 is a number, the largest one", type(boundary) == "number" and boundary == Int.MAX_SAFE, tostring(boundary))
 end
 
@@ -303,8 +303,8 @@ do
 	check("equal pins are the same object", pinOne.status == "value" and valueOf(pinOne) == valueOf(pinTwo), `{pinOne.status}`)
 	const unpinned = Interp.runForm(prim(11, lit(valueOf(pinOne))), NIL, 100)
 	check("unpin gives back the value", unpinned.status == "value" and sameValue(valueOf(unpinned), list(1, 2)), `{unpinned.status}`)
-	const thunk = Interp.runForm({ op = "delay", call = { op = "call", f = lit(law(1, arg(1))), args = { lit(1) } } }, NIL, 100)
-	const bad = Interp.runForm(prim(10, { op = "lit", value = valueOf(thunk) }), NIL, 100)
+	const thunk = Interp.runForm({ op = "delay"; call = { op = "call"; f = lit(law(1, arg(1))); args = { lit(1) } } }, NIL, 100)
+	const bad = Interp.runForm(prim(10, { op = "lit"; value = valueOf(thunk) }), NIL, 100)
 	check("a pin of a thunk is an error", bad.status == "error", `{bad.status} {tostring(messageOf(bad))}`)
 end
 
@@ -312,15 +312,15 @@ end
 do
 	local o = Interp.runForm(prim(8, lit(3)), NIL, 100)
 	check("head of a value that is not a cell is an error", o.status == "error" and string.find(tostring(messageOf(o)), "not a cell") ~= nil, `{o.status} {tostring(messageOf(o))}`)
-	o = Interp.runForm({ op = "case", e = lit(con(2, 1)), alts = { { tag = 0, body = lit(0) } } }, NIL, 100)
+	o = Interp.runForm({ op = "case"; e = lit(con(2, 1)); alts = { { tag = 0; body = lit(0) } } }, NIL, 100)
 	check("a case with no branch for the tag is an error", o.status == "error" and string.find(tostring(messageOf(o)), "no branch") ~= nil, `{o.status} {tostring(messageOf(o))}`)
 	o = Interp.runForm(call(lit(3), lit(1)), NIL, 100)
 	check("calling a value that is not a function is an error", o.status == "error", `{o.status} {tostring(messageOf(o))}`)
-	o = Interp.runForm({ op = "force", e = lit(3) }, NIL, 100)
+	o = Interp.runForm({ op = "force"; e = lit(3) }, NIL, 100)
 	check("forcing a value that is not a thunk is an error", o.status == "error", `{o.status} {tostring(messageOf(o))}`)
-	o = Interp.runForm({ op = "if", c = lit(list(1)), t = lit(1), e = lit(2) }, NIL, 100)
+	o = Interp.runForm({ op = "if"; c = lit(list(1)); t = lit(1); e = lit(2) }, NIL, 100)
 	check("an if on a value that is not an integer is an error", o.status == "error", `{o.status} {tostring(messageOf(o))}`)
-	o = Interp.runForm({ op = "arg", index = 5 }, NIL, 100)
+	o = Interp.runForm({ op = "arg"; index = 5 }, NIL, 100)
 	check("an argument past the frame is an error", o.status == "error", `{o.status} {tostring(messageOf(o))}`)
 end
 
@@ -329,7 +329,7 @@ do
 	local deep: Types.Form = arg(1)
 
 	for i = 1, 20000 do
-		const outer: Types.Form = { op = "let", e = lit(i), body = deep }
+		const outer: Types.Form = { op = "let"; e = lit(i); body = deep }
 		deep = outer
 	end
 

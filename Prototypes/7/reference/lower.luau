@@ -124,7 +124,7 @@ const function argsOf(levels: { number }, map: { number }): { Form }
 			error(`lower: a free variable at level {lvl} is not in the law's frame`, 0)
 		end
 
-		const arg: Form = { op = "arg", index = slot }
+		const arg: Form = { op = "arg"; index = slot }
 		table.insert(args, arg)
 	end
 
@@ -134,11 +134,11 @@ end
 lower = function(e: Expr, depth: number, map: { number }): Form
 	if e.op == "quote" then
 		if type(e.value) == "number" then
-			return { op = "lit", value = e.value }
+			return { op = "lit"; value = e.value }
 		end
 
 		if type(e.value) == "table" and e.value.kind == "nil" then
-			return { op = "lit", value = NIL }
+			return { op = "lit"; value = NIL }
 		end
 
 		error("lower: a quoted value is an integer or nil", 0)
@@ -148,10 +148,10 @@ lower = function(e: Expr, depth: number, map: { number }): Form
 
 		if slot == nil then
 			-- No binder: an unbound name. The machine gives an error for it at run time, so the lowering gives a slot that no frame has, which fails the same way.
-			return { op = "arg", index = 2 ^ 40 }
+			return { op = "arg"; index = 2 ^ 40 }
 		end
 
-		return { op = "arg", index = slot }
+		return { op = "arg"; index = slot }
 	elseif e.op == "lam" then
 		const free = sortedFree(e.body, depth + 1, depth)
 		local inner: { number } = {}
@@ -161,13 +161,13 @@ lower = function(e: Expr, depth: number, map: { number }): Form
 		end
 
 		inner[depth] = #free + 1
-		const law: Law = { kind = "law", arity = #free + 1, body = lower(e.body, depth + 1, inner) }
+		const law: Law = { kind = "law"; arity = #free + 1; body = lower(e.body, depth + 1, inner) }
 
 		if #free == 0 then
-			return { op = "lit", value = law }
+			return { op = "lit"; value = law }
 		end
 
-		return { op = "call", f = { op = "lit", value = law }, args = argsOf(free, map) }
+		return { op = "call"; f = { op = "lit"; value = law }; args = argsOf(free, map) }
 	elseif e.op == "pin" then
 		const free = sortedFree(e.e, depth, depth)
 		local inner: { number } = {}
@@ -176,16 +176,16 @@ lower = function(e: Expr, depth: number, map: { number }): Form
 			inner[lvl] = i
 		end
 
-		const law: Law = { kind = "law", arity = #free + 1, body = lower(e.e, depth, inner) }
-		local args: { Form } = { { op = "lit", value = NIL } }
+		const law: Law = { kind = "law"; arity = #free + 1; body = lower(e.e, depth, inner) }
+		local args: { Form } = { { op = "lit"; value = NIL } }
 
 		for _, a in argsOf(free, map) do
 			table.insert(args, a)
 		end
 
-		return { op = "delay", call = { op = "call", f = { op = "lit", value = law }, args = args } }
+		return { op = "delay"; call = { op = "call"; f = { op = "lit"; value = law }; args = args } }
 	elseif e.op == "cell" then
-		return { op = "cell", a = lower(e.head, depth, map), b = lower(e.tail, depth, map) }
+		return { op = "cell"; a = lower(e.head, depth, map); b = lower(e.tail, depth, map) }
 	elseif e.op == "index" then
 		local form = lower(e.e, depth, map)
 
@@ -203,11 +203,11 @@ lower = function(e: Expr, depth: number, map: { number }): Form
 
 		return form
 	elseif e.op == "force" then
-		return { op = "force", e = lower(e.e, depth, map) }
+		return { op = "force"; e = lower(e.e, depth, map) }
 	elseif e.op == "if" then
-		return { op = "if", c = lower(e.c, depth, map), t = lower(e.t, depth, map), e = lower(e.e, depth, map) }
+		return { op = "if"; c = lower(e.c, depth, map); t = lower(e.t, depth, map); e = lower(e.e, depth, map) }
 	elseif e.op == "apply" then
-		return { op = "call", f = lower(e.f, depth, map), args = { lower(e.arg, depth, map) } }
+		return { op = "call"; f = lower(e.f, depth, map); args = { lower(e.arg, depth, map) } }
 	elseif e.op == "prim" then
 		const name = Primitives.BY_TAG[e.tag].name
 		const tag = CORE_TAG[name]
@@ -222,13 +222,13 @@ lower = function(e: Expr, depth: number, map: { number }): Form
 			table.insert(args, lower(e.b, depth, map))
 		end
 
-		return { op = "prim", tag = tag, args = args }
+		return { op = "prim"; tag = tag; args = args }
 	elseif e.op == "construct" then
-		return { op = "con", tag = e.tag, e = lower(e.e, depth, map) }
+		return { op = "con"; tag = e.tag; e = lower(e.e, depth, map) }
 	elseif e.op == "tagof" then
-		return { op = "prim", tag = 12, args = { lower(e.e, depth, map) } }
+		return { op = "prim"; tag = 12; args = { lower(e.e, depth, map) } }
 	elseif e.op == "payload" then
-		return { op = "prim", tag = 13, args = { lower(e.e, depth, map) } }
+		return { op = "prim"; tag = 13; args = { lower(e.e, depth, map) } }
 	end
 
 	error(`lower: an expression {e.op} is not known`, 0)
@@ -241,7 +241,7 @@ end
 
 -- A closed closure: the body of a lambda at the top level, with no environment, as a law of arity 1. Its variable of index 0 is its argument.
 const function closedClosure(body: Expr): Law
-	return { kind = "law", arity = 1, body = lower(body, 1, { [0] = 1 }) }
+	return { kind = "law"; arity = 1; body = lower(body, 1, { [0] = 1 }) }
 end
 
 return {

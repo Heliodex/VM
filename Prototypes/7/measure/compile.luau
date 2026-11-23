@@ -67,10 +67,10 @@ end
 -- Gives each node its owner, top-down. A lambda with a label starts a new owner; a node that is already owned is not visited again, so a shared node keeps its first owner.
 const function annotate(root: VM.Expr)
 	markFix(VM.fix :: Node)
-	local work: { { node: Node, owner: string } } = { { node = root :: Node, owner = "top" } }
+	local work: { { node: Node; owner: string } } = { { node = root :: Node; owner = "top" } }
 
 	while #work > 0 do
-		const item = table.remove(work) :: { node: Node, owner: string }
+		const item = table.remove(work) :: { node: Node; owner: string }
 		const node = item.node
 		local owner = item.owner
 
@@ -82,7 +82,7 @@ const function annotate(root: VM.Expr)
 			node.owner = owner
 
 			for _, child in childrenOf(node) do
-				table.insert(work, { node = child, owner = owner })
+				table.insert(work, { node = child; owner = owner })
 			end
 		end
 	end
@@ -117,7 +117,7 @@ compileFile = function(text: string, name: string, stack: { string }): Compiled
 	const parseTime = os.clock() - parseStart
 	const names: { string } = {}
 	const values: { VM.Expr } = {}
-	local importSchemes: { { name: string, scheme: Checker.Scheme } } = {}
+	local importSchemes: { { name: string; scheme: Checker.Scheme } } = {}
 	local importTime = 0
 	const chain = table.clone(stack)
 	table.insert(chain, name)
@@ -137,7 +137,7 @@ compileFile = function(text: string, name: string, stack: { string }): Compiled
 		importTime += sub.timings.layout + sub.timings.parse + sub.timings.check + sub.timings.desugar + sub.timings.imports
 		table.insert(names, import.name)
 		table.insert(values, sub.expr)
-		table.insert(importSchemes, { name = import.name, scheme = sub.scheme })
+		table.insert(importSchemes, { name = import.name; scheme = sub.scheme })
 	end
 
 	const ctors = Desugar.buildCtors(program.decls)

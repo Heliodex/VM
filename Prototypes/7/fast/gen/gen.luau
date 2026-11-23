@@ -37,57 +37,57 @@ const BOOT6 = "../../6/L2/programs/boot/"
 
 -- ---- builders, so the cases read like the spec
 const function lit(v: Value): Form
-	return { op = "lit", value = v }
+	return { op = "lit"; value = v }
 end
 
 const function arg(i: number): Form
-	return { op = "arg", index = i }
+	return { op = "arg"; index = i }
 end
 
 const function call(f: Form, ...: Form): Form
 	local args: { Form } = { ... }
 
-	return { op = "call", f = f, args = args }
+	return { op = "call"; f = f; args = args }
 end
 
 const function cellForm(a: Form, b: Form): Form
-	return { op = "cell", a = a, b = b }
+	return { op = "cell"; a = a; b = b }
 end
 
 const function conForm(tag: number, e: Form): Form
-	return { op = "con", tag = tag, e = e }
+	return { op = "con"; tag = tag; e = e }
 end
 
 const function caseForm(e: Form, alts: { Types.Alt }, elseBody: Form?): Form
-	return { op = "case", e = e, alts = alts, elseBody = elseBody }
+	return { op = "case"; e = e; alts = alts; elseBody = elseBody }
 end
 
 const function ifForm(c: Form, t: Form, e: Form): Form
-	return { op = "if", c = c, t = t, e = e }
+	return { op = "if"; c = c; t = t; e = e }
 end
 
 const function letForm(e: Form, b: Form): Form
-	return { op = "let", e = e, body = b }
+	return { op = "let"; e = e; body = b }
 end
 
 const function delayForm(f: Form, ...: Form): Form
 	local args: { Form } = { ... }
 
-	return { op = "delay", call = { op = "call", f = f, args = args } }
+	return { op = "delay"; call = { op = "call"; f = f; args = args } }
 end
 
 const function forceForm(e: Form): Form
-	return { op = "force", e = e }
+	return { op = "force"; e = e }
 end
 
 const function prim(tag: number, ...: Form): Form
 	local args: { Form } = { ... }
 
-	return { op = "prim", tag = tag, args = args }
+	return { op = "prim"; tag = tag; args = args }
 end
 
 const function law(arity: number, body: Form): Law
-	return { kind = "law", arity = arity, body = body }
+	return { kind = "law"; arity = arity; body = body }
 end
 
 -- A value of the list (1 2 …): cells ending in nil.
@@ -96,7 +96,7 @@ const function list(...: Value): Value
 	local v: Value = NIL
 
 	for i = #items, 1, -1 do
-		v = { kind = "cell", head = items[i], tail = v }
+		v = { kind = "cell"; head = items[i]; tail = v }
 	end
 
 	return v
@@ -169,9 +169,9 @@ do
 	const inc = law(1, prim(0, arg(1), lit(1)))
 	const two = law(2, prim(0, arg(1), arg(2)))
 	const one = law(1, prim(1, arg(1), lit(10)))
-	const big100: Value = Int.fromMagnitude(false, { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16 })
-	const bigNeg: Value = Int.fromMagnitude(true, { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16 })
-	const pow53: Value = Int.fromMagnitude(false, { 0, 0, 0, 0, 0, 0, 32 })
+	const big100: Value = Int.fromMagnitude(false, { 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 16 })
+	const bigNeg: Value = Int.fromMagnitude(true, { 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 16 })
+	const pow53: Value = Int.fromMagnitude(false, { 0; 0; 0; 0; 0; 0; 32 })
 	const unitLaw = law(1, arg(1))
 	const pinned = prim(10, cellForm(lit(1), lit(2)))
 	const thunkForm = delayForm(lit(inc), lit(1))
@@ -181,16 +181,16 @@ do
 	emit("run a law on an input (one entry)", "run", inc, 41, 100)
 	emit("cell list (1 2)", "body", law(1, cellForm(lit(1), cellForm(lit(2), lit(NIL)))), NIL, 100)
 	emit("con 0 5", "body", law(1, conForm(0, lit(5))), NIL, 100)
-	emit("case takes the payload", "body", law(1, caseForm(conForm(1, lit(9)), { { tag = 0, body = lit(0) }, { tag = 1, body = arg(2) } }, lit(0))), NIL, 100)
-	emit("case else gets the constructor", "body", law(1, caseForm(conForm(5, lit(1)), { { tag = 0, body = lit(0) } }, arg(2))), NIL, 100)
-	emit("case with no branch is an error", "body", law(1, caseForm(conForm(5, lit(1)), { { tag = 0, body = lit(0) } }, nil)), NIL, 100)
-	emit("case of a non-constructor is an error", "body", law(1, caseForm(lit(3), { { tag = 0, body = lit(0) } }, nil)), NIL, 100)
+	emit("case takes the payload", "body", law(1, caseForm(conForm(1, lit(9)), { { tag = 0; body = lit(0) }; { tag = 1; body = arg(2) } }, lit(0))), NIL, 100)
+	emit("case else gets the constructor", "body", law(1, caseForm(conForm(5, lit(1)), { { tag = 0; body = lit(0) } }, arg(2))), NIL, 100)
+	emit("case with no branch is an error", "body", law(1, caseForm(conForm(5, lit(1)), { { tag = 0; body = lit(0) } }, nil)), NIL, 100)
+	emit("case of a non-constructor is an error", "body", law(1, caseForm(lit(3), { { tag = 0; body = lit(0) } }, nil)), NIL, 100)
 	emit("if takes then on non-zero", "body", law(1, ifForm(lit(0), lit(1), lit(2))), NIL, 100)
 	emit("if takes then on non-zero (big)", "body", law(1, ifForm(lit(big100), lit(1), lit(2))), NIL, 100)
 	emit("if of nil is an error", "body", law(1, ifForm(lit(NIL), lit(1), lit(2))), NIL, 100)
 	emit("let binds a slot", "body", law(1, letForm(lit(3), prim(0, arg(2), arg(2)))), NIL, 100)
 	emit("let inside a call argument", "body", law(1, call(lit(inc), letForm(lit(3), prim(0, arg(2), lit(1))))), NIL, 100)
-	emit("case payload then let", "body", law(1, caseForm(conForm(0, lit(4)), { { tag = 0, body = letForm(lit(2), prim(0, arg(2), arg(3))) } }, nil)), NIL, 100)
+	emit("case payload then let", "body", law(1, caseForm(conForm(0, lit(4)), { { tag = 0; body = letForm(lit(2), prim(0, arg(2), arg(3))) } }, nil)), NIL, 100)
 	emit("delay then force", "body", law(1, forceForm(thunkForm)), NIL, 100)
 	emit("force twice runs the call once", "body", law(1, letForm(thunkForm, cellForm(forceForm(arg(2)), forceForm(arg(2))))), NIL, 100)
 	emit("force of a non-thunk is an error", "body", law(1, forceForm(lit(5))), NIL, 100)
@@ -275,9 +275,9 @@ local function convertInput(v: P6VM.Value): Value
 	elseif v.kind == "nil" then
 		return NIL
 	elseif v.kind == "cell" then
-		return { kind = "cell", head = convertInput(v.head), tail = convertInput(v.tail) }
+		return { kind = "cell"; head = convertInput(v.head); tail = convertInput(v.tail) }
 	elseif v.kind == "con" then
-		return { kind = "con", tag = v.tag, payload = convertInput(v.payload) }
+		return { kind = "con"; tag = v.tag; payload = convertInput(v.payload) }
 	end
 
 	error("an input value of kind " .. tostring(v.kind) .. " cannot be converted", 0)
@@ -331,7 +331,7 @@ do
 	const laid = Lifecycle.run(layoutC.expr, V.bytesValue(typesP6.raw), 1e10)
 	const lexed = Lifecycle.run(lexer.expr, O.payloadOf(O.valueOf(laid)), 1e8)
 	const parsed = Lifecycle.run(parser.expr, O.payloadOf(O.valueOf(lexed)), 5e8)
-	const request: P6VM.Value = { kind = "con", tag = 3, payload = O.payloadOf(O.valueOf(parsed)) }
+	const request: P6VM.Value = { kind = "con"; tag = 3; payload = O.payloadOf(O.valueOf(parsed)) }
 	const input = convertInput(request)
 	const body = call(Lower.expr(checker.expr), arg(1))
 	const started = os.clock()

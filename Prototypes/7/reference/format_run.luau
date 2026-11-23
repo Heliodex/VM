@@ -64,7 +64,7 @@ end
 
 -- Iterative, so a deep program does not overflow the call stack of the test. It walks any table, values and forms alike, so its parts are untyped: the one place the tests use any, by design.
 const function same(a: any, b: any): boolean
-	local pending: { { any } } = { { a, b } }
+	local pending: { { any } } = { { a; b } }
 
 	while #pending > 0 do
 		const pair = table.remove(pending) :: { any }
@@ -91,7 +91,7 @@ const function same(a: any, b: any): boolean
 					return false
 				end
 
-				table.insert(pending, { v, y[k] })
+				table.insert(pending, { v; y[k] })
 			end
 		end
 	end
@@ -101,27 +101,27 @@ end
 
 -- Builders, so the tests read like the spec.
 const function lit(v: Types.Value): Types.Form
-	return { op = "lit", value = v }
+	return { op = "lit"; value = v }
 end
 
 const function arg(i: number): Types.Form
-	return { op = "arg", index = i }
+	return { op = "arg"; index = i }
 end
 
 const function call(f: Types.Form, ...: Types.Form): Types.Form
-	return { op = "call", f = f, args = { ... } }
+	return { op = "call"; f = f; args = { ... } }
 end
 
 const function prim(tag: number, ...: Types.Form): Types.Form
-	return { op = "prim", tag = tag, args = { ... } }
+	return { op = "prim"; tag = tag; args = { ... } }
 end
 
 const function law(arity: number, body: Types.Form): Types.Law
-	return { kind = "law", arity = arity, body = body }
+	return { kind = "law"; arity = arity; body = body }
 end
 
 const function cell(a: Types.Value, b: Types.Value): Types.Cell
-	return { kind = "cell", head = a, tail = b }
+	return { kind = "cell"; head = a; tail = b }
 end
 
 const function list(...: Types.Value): Types.Value
@@ -136,18 +136,18 @@ const function list(...: Types.Value): Types.Value
 end
 
 -- The integer 2^53, which is past the number range, as a big integer.
-const TWO_53 = Int.fromMagnitude(false, { 0, 0, 0, 0, 0, 0, 32 })
+const TWO_53 = Int.fromMagnitude(false, { 0; 0; 0; 0; 0; 0; 32 })
 
 -- 1. The bytes of the examples in the spec (section 12.5).
 do
-	const cases: { { name: string, value: Types.Value, want: string } } = {
-		{ name = "the value 0", value = 0, want = "\1\2\0" },
-		{ name = "the value -1", value = -1, want = "\1\3\1" },
-		{ name = "the value nil", value = Format.NIL, want = "\1\0" },
-		{ name = "the list (1 2)", value = list(1, 2), want = "\1\1\2\1\1\2\2\0" },
-		{ name = "the integer 2^53", value = TWO_53, want = "\1\2\128\128\128\128\128\128\128\16" },
-		{ name = "the integer 128", value = 128, want = "\1\2\128\1" },
-		{ name = "the integer 300", value = 300, want = "\1\2\172\2" },
+	const cases: { { name: string; value: Types.Value; want: string } } = {
+		{ name = "the value 0"; value = 0; want = "\1\2\0" },
+		{ name = "the value -1"; value = -1; want = "\1\3\1" },
+		{ name = "the value nil"; value = Format.NIL; want = "\1\0" },
+		{ name = "the list (1 2)"; value = list(1, 2); want = "\1\1\2\1\1\2\2\0" },
+		{ name = "the integer 2^53"; value = TWO_53; want = "\1\2\128\128\128\128\128\128\128\16" },
+		{ name = "the integer 128"; value = 128; want = "\1\2\128\1" },
+		{ name = "the integer 300"; value = 300; want = "\1\2\172\2" },
 	}
 
 	for _, c in cases do
@@ -163,16 +163,16 @@ end
 
 -- 2. Round trips for values.
 do
-	const values: { { name: string, value: Types.Value } } = {
-		{ name = "0", value = 0 },
-		{ name = "-1", value = -1 },
-		{ name = "2^53 - 1 (the largest number)", value = Int.MAX_SAFE },
-		{ name = "-(2^53 - 1)", value = -Int.MAX_SAFE },
-		{ name = "2^53 (a big integer)", value = TWO_53 },
-		{ name = "-(2^53) (a big integer)", value = Int.fromMagnitude(true, { 0, 0, 0, 0, 0, 0, 32 }) },
-		{ name = "2^100", value = Int.fromMagnitude(false, { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16 }) },
-		{ name = "-(2^100 + 7)", value = Int.fromMagnitude(true, { 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16 }) },
-		{ name = "nil", value = Format.NIL },
+	const values: { { name: string; value: Types.Value } } = {
+		{ name = "0"; value = 0 },
+		{ name = "-1"; value = -1 },
+		{ name = "2^53 - 1 (the largest number)"; value = Int.MAX_SAFE },
+		{ name = "-(2^53 - 1)"; value = -Int.MAX_SAFE },
+		{ name = "2^53 (a big integer)"; value = TWO_53 },
+		{ name = "-(2^53) (a big integer)"; value = Int.fromMagnitude(true, { 0; 0; 0; 0; 0; 0; 32 }) },
+		{ name = "2^100"; value = Int.fromMagnitude(false, { 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 16 }) },
+		{ name = "-(2^100 + 7)"; value = Int.fromMagnitude(true, { 7; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 16 }) },
+		{ name = "nil"; value = Format.NIL },
 		{
 			name = "a list of 5000 integers",
 			value = (function()
@@ -185,10 +185,10 @@ do
 				return list(table.unpack(items))
 			end)(),
 		},
-		{ name = "a constructor", value = { kind = "con", tag = 3, payload = cell(-5, Format.NIL) } },
-		{ name = "a law", value = law(2, prim(0, arg(1), arg(2))) },
-		{ name = "a partial application", value = { kind = "app", law = law(3, arg(3)), args = { 1, cell(2, 3) } } },
-		{ name = "a pin of a list", value = { kind = "pin", value = list(1, 2, 3) } },
+		{ name = "a constructor"; value = { kind = "con"; tag = 3; payload = cell(-5, Format.NIL) } },
+		{ name = "a law"; value = law(2, prim(0, arg(1), arg(2))) },
+		{ name = "a partial application"; value = { kind = "app"; law = law(3, arg(3)); args = { 1; cell(2, 3) } } },
+		{ name = "a pin of a list"; value = { kind = "pin"; value = list(1, 2, 3) } },
 	}
 
 	for _, v in values do
@@ -225,8 +225,8 @@ do
 		{
 			op = "if",
 			c = prim(6, prim(9, arg(1)), lit(0)),
-			t = { op = "con", tag = 1, e = lit(Format.NIL) },
-			e = { op = "con", tag = 0, e = prim(3, prim(8, arg(1)), prim(9, arg(1))) },
+			t = { op = "con"; tag = 1; e = lit(Format.NIL) },
+			e = { op = "con"; tag = 0; e = prim(3, prim(8, arg(1)), prim(9, arg(1))) },
 		}
 	)
 	const unwrap = law(
@@ -234,7 +234,7 @@ do
 		{
 			op = "case",
 			e = arg(1),
-			alts = { { tag = 0, body = arg(2) }, { tag = 1, body = lit(0) } },
+			alts = { { tag = 0; body = arg(2) }; { tag = 1; body = lit(0) } },
 			elseBody = lit(0),
 		}
 	)
@@ -242,19 +242,19 @@ do
 		1,
 		{
 			op = "let",
-			e = { op = "delay", call = { op = "call", f = lit(inc), args = { lit(1) } } },
-			body = prim(0, { op = "force", e = arg(2) }, { op = "force", e = arg(2) }),
+			e = { op = "delay"; call = { op = "call"; f = lit(inc); args = { lit(1) } } },
+			body = prim(0, { op = "force"; e = arg(2) }, { op = "force"; e = arg(2) }),
 		}
 	)
 	const loop = law(1, call(arg(0), arg(1)))
-	const programs: { { name: string, p: Types.Law } } = {
-		{ name = "inc", p = inc },
-		{ name = "length", p = length },
-		{ name = "safediv", p = safediv },
-		{ name = "unwrap", p = unwrap },
-		{ name = "laziness", p = laziness },
-		{ name = "loop", p = loop },
-		{ name = "tagof and payload", p = law(1, prim(13, prim(12, arg(1)))) },
+	const programs: { { name: string; p: Types.Law } } = {
+		{ name = "inc"; p = inc },
+		{ name = "length"; p = length },
+		{ name = "safediv"; p = safediv },
+		{ name = "unwrap"; p = unwrap },
+		{ name = "laziness"; p = laziness },
+		{ name = "loop"; p = loop },
+		{ name = "tagof and payload"; p = law(1, prim(13, prim(12, arg(1)))) },
 	}
 
 	for _, pr in programs do
@@ -275,7 +275,7 @@ do
 	local deep: Types.Form = arg(1)
 
 	for i = 1, 20000 do
-		const outer: Types.Form = { op = "let", e = lit(i), body = deep }
+		const outer: Types.Form = { op = "let"; e = lit(i); body = deep }
 		deep = outer
 	end
 
@@ -295,23 +295,23 @@ end
 
 -- 4. The bytes that are refused, each with its reason.
 do
-	const refused: { { name: string, bytes: string, want: string, decodeAs: string } } = {
-		{ name = "an empty string", bytes = "", want = "not a value", decodeAs = "value" },
-		{ name = "a program read as a value", bytes = "\2\1\26\0\17\1\16\2\1", want = "not a value", decodeAs = "value" },
-		{ name = "a value read as a program", bytes = "\1\2\0", want = "not a program", decodeAs = "program" },
-		{ name = "an unknown value tag", bytes = "\1\t", want = "tag 9 is not a value", decodeAs = "value" },
-		{ name = "negative zero", bytes = "\1\3\0", want = "negative zero", decodeAs = "value" },
-		{ name = "a magnitude with a zero last group", bytes = "\1\2\128\0", want = "shortest form", decodeAs = "value" },
-		{ name = "a magnitude cut short", bytes = "\1\2\128", want = "end", decodeAs = "value" },
-		{ name = "bytes after a value", bytes = "\1\2\1\2", want = "after", decodeAs = "value" },
-		{ name = "a law whose body is not a form", bytes = "\1\5\1\0", want = "tag 0 is not a form", decodeAs = "value" },
-		{ name = "a program of arity 2", bytes = "\2\2\16\0", want = "arity 1", decodeAs = "program" },
-		{ name = "an unknown form tag", bytes = "\2\1\27", want = "tag 27 is not a form", decodeAs = "program" },
-		{ name = "a primitive of tag 14", bytes = "\2\1\26\14\16\0\16\0", want = "does not exist", decodeAs = "program" },
-		{ name = "a case with the tag 0 twice", bytes = "\2\1\21\17\1\2\0\16\2\0\0\16\2\0\0", want = "twice", decodeAs = "program" },
-		{ name = "a partial application with no fewer arguments than its arity", bytes = "\1\6\5\1\16\0\1\0", want = "fewer arguments", decodeAs = "value" },
-		{ name = "a program with bytes after it", bytes = "\2\1\16\0\0", want = "after", decodeAs = "program" },
-		{ name = "an index past 2^53 - 1 (a position, not an integer value)", bytes = "\2\1\17\128\128\128\128\128\128\128\16", want = "past 2^53 - 1", decodeAs = "program" },
+	const refused: { { name: string; bytes: string; want: string; decodeAs: string } } = {
+		{ name = "an empty string"; bytes = ""; want = "not a value"; decodeAs = "value" },
+		{ name = "a program read as a value"; bytes = "\2\1\26\0\17\1\16\2\1"; want = "not a value"; decodeAs = "value" },
+		{ name = "a value read as a program"; bytes = "\1\2\0"; want = "not a program"; decodeAs = "program" },
+		{ name = "an unknown value tag"; bytes = "\1\t"; want = "tag 9 is not a value"; decodeAs = "value" },
+		{ name = "negative zero"; bytes = "\1\3\0"; want = "negative zero"; decodeAs = "value" },
+		{ name = "a magnitude with a zero last group"; bytes = "\1\2\128\0"; want = "shortest form"; decodeAs = "value" },
+		{ name = "a magnitude cut short"; bytes = "\1\2\128"; want = "end"; decodeAs = "value" },
+		{ name = "bytes after a value"; bytes = "\1\2\1\2"; want = "after"; decodeAs = "value" },
+		{ name = "a law whose body is not a form"; bytes = "\1\5\1\0"; want = "tag 0 is not a form"; decodeAs = "value" },
+		{ name = "a program of arity 2"; bytes = "\2\2\16\0"; want = "arity 1"; decodeAs = "program" },
+		{ name = "an unknown form tag"; bytes = "\2\1\27"; want = "tag 27 is not a form"; decodeAs = "program" },
+		{ name = "a primitive of tag 14"; bytes = "\2\1\26\14\16\0\16\0"; want = "does not exist"; decodeAs = "program" },
+		{ name = "a case with the tag 0 twice"; bytes = "\2\1\21\17\1\2\0\16\2\0\0\16\2\0\0"; want = "twice"; decodeAs = "program" },
+		{ name = "a partial application with no fewer arguments than its arity"; bytes = "\1\6\5\1\16\0\1\0"; want = "fewer arguments"; decodeAs = "value" },
+		{ name = "a program with bytes after it"; bytes = "\2\1\16\0\0"; want = "after"; decodeAs = "program" },
+		{ name = "an index past 2^53 - 1 (a position, not an integer value)"; bytes = "\2\1\17\128\128\128\128\128\128\128\16"; want = "past 2^53 - 1"; decodeAs = "program" },
 	}
 
 	for _, c in refused do
@@ -328,11 +328,11 @@ end
 
 -- 5. The writer refuses what has no binary form.
 do
-	const thunkValue: Types.Thunk = { kind = "thunk", f = Format.NIL, args = {}, done = false, result = nil }
+	const thunkValue: Types.Thunk = { kind = "thunk"; f = Format.NIL; args = {}; done = false; result = nil }
 	local ok, err = pcall(Format.encodeValue, thunkValue)
 	check("a thunk has no binary form", not ok and string.find(tostring(err), "thunk", 1, true) ~= nil, tostring(err))
-	const pinOfThunk: Types.Thunk = { kind = "thunk", f = Format.NIL, args = {}, done = false, result = nil }
-	const pinValue: Types.Pin = { kind = "pin", value = pinOfThunk }
+	const pinOfThunk: Types.Thunk = { kind = "thunk"; f = Format.NIL; args = {}; done = false; result = nil }
+	const pinValue: Types.Pin = { kind = "pin"; value = pinOfThunk }
 	ok, err = pcall(Format.encodeValue, pinValue)
 	check("a pin of a thunk has no binary form", not ok and string.find(tostring(err), "pin of a thunk", 1, true) ~= nil, tostring(err))
 	ok, err = pcall(Format.encodeProgram, law(2, lit(0)))

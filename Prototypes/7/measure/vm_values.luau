@@ -12,7 +12,7 @@ const function bytesValue(s: string): Value
 	local v: Value = VM.NIL
 
 	for i = #s, 1, -1 do
-		const cell: VM.Cell = { kind = "cell", head = string.byte(s, i) :: number, tail = v }
+		const cell: VM.Cell = { kind = "cell"; head = string.byte(s, i) :: number; tail = v }
 		v = cell
 	end
 

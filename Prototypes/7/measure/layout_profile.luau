@@ -33,7 +33,7 @@ end
 
 -- The same generator as phase0.luau's section 5.
 const function synthetic(n: number): string
-	local lines = { string.format("%d chained functions", n), "---", "---", "fn x" }
+	local lines = { string.format("%d chained functions", n); "---"; "---"; "fn x" }
 	table.insert(lines, "\tlet f0 = fn y")
 	table.insert(lines, "\t\ty")
 
@@ -50,8 +50,8 @@ const function synthetic(n: number): string
 	return table.concat(lines, "\n")
 end
 
-const function newProfile(): { op: { [string]: number }, frame: { [string]: number }, owner: { [string]: number }, steps: number }
-	return { op = {}, frame = {}, owner = {}, steps = 0 }
+const function newProfile(): { op: { [string]: number }; frame: { [string]: number }; owner: { [string]: number }; steps: number }
+	return { op = {}; frame = {}; owner = {}; steps = 0 }
 end
 
 local profile = newProfile()
@@ -100,7 +100,7 @@ const function printTop(title: string, t: { [string]: number }, total: number, l
 	local rows: { { string | number } } = {}
 
 	for key, value in t do
-		table.insert(rows, { key, value })
+		table.insert(rows, { key; value })
 	end
 
 	table.sort(
@@ -135,7 +135,7 @@ print "== Growth by owner: layout on 100 and 400 generated functions"
 local grown: { { [string]: number } } = {}
 local totals: { number } = {}
 
-for _, n in { 100, 400 } do
+for _, n in { 100; 400 } do
 	const raw = Compile.compile(synthetic(n), `synthetic {n}`).raw
 	const steps, status, p = profiled(raw)
 	grown[n] = p.owner
@@ -146,7 +146,7 @@ end
 local rows: { { string | number } } = {}
 
 for key, small in grown[100] do
-	table.insert(rows, { key, small, grown[400][key] or 0 })
+	table.insert(rows, { key; small; grown[400][key] or 0 })
 end
 
 table.sort(

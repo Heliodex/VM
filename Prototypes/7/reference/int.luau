@@ -21,7 +21,7 @@
 --   Int.divFloor, Int.modFloor      floored quotient, and remainder with the sign of the divisor (a = b * q + r); the divisor must not be zero
 --   Int.compare(a, b)               -1, 0 or 1
 
-export type Big = { kind: "big", neg: boolean, bytes: { number } }
+export type Big = { kind: "big"; neg: boolean; bytes: { number } }
 export type Int = number | Big
 -- The largest integer a double holds exactly, with the range the representation above uses for numbers.
 const MAX_SAFE = 9007199254740991
@@ -80,7 +80,7 @@ const function fromMagnitude(neg: boolean, bytes: { number }): Int
 		return small
 	end
 
-	return { kind = "big", neg = neg, bytes = trim }
+	return { kind = "big"; neg = neg; bytes = trim }
 end
 
 const function magnitudeBytes(v: Int): { number }

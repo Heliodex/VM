@@ -68,15 +68,15 @@ end
 
 -- Inputs that the host refuses, one for each kind of error the layout gives, and the generated programs of the scaling runs.
 const extra: { { string } } = {
-	{ "tab-indent", "fn x\n\t\tx\n" },
-	{ "space-indent", "fn x\n  x\n" },
-	{ "empty", "" },
-	{ "let without body", "fn x\n\tlet y = 1\n" },
-	{ "if without else", "fn x\n\tif x\n\t\t1\n" },
-	{ "match without arms", "fn x\n\tmatch x\n" },
-	{ "record bad field", "type T = A\n\tfoo\n\nfn x\n\t1\n" },
-	{ "no expression after declarations", "type T = A\n" },
-	{ "bad arm", "fn x\n\tmatch x\n\t\tfoo\n\t\t\t1\n" },
+	{ "tab-indent"; "fn x\n\t\tx\n" },
+	{ "space-indent"; "fn x\n  x\n" },
+	{ "empty"; "" },
+	{ "let without body"; "fn x\n\tlet y = 1\n" },
+	{ "if without else"; "fn x\n\tif x\n\t\t1\n" },
+	{ "match without arms"; "fn x\n\tmatch x\n" },
+	{ "record bad field"; "type T = A\n\tfoo\n\nfn x\n\t1\n" },
+	{ "no expression after declarations"; "type T = A\n" },
+	{ "bad arm"; "fn x\n\tmatch x\n\t\tfoo\n\t\t\t1\n" },
 }
 
 for _, case in extra do
@@ -101,7 +101,7 @@ for _, case in extra do
 	end
 end
 
-for _, n in { 25, 100, 400, 800 } do
+for _, n in { 25; 100; 400; 800 } do
 	const text = "fn x\n"
 	local body = {}
 	table.insert(body, "\tlet f0 = fn y")

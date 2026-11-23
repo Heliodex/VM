@@ -22,15 +22,15 @@ type Outcome = Types.Outcome
 -- The slots of one invocation of a law: slot 0 is the law, then the arguments, then what let and case push.
 type Env = { slots: { Value } }
 -- A continuation: what to do with the next value. Each kind has the fields it needs.
-type Items = { t: "items", items: { Form }, vals: { Value }, i: number, fin: string, form: Form, env: Env }
-type Restore = { t: "restore", env: Env, len: number }
-type ApplyRest = { t: "applyrest", rest: { Value } }
-type ForceStore = { t: "forcestore", thunk: Thunk }
+type Items = { t: "items"; items: { Form }; vals: { Value }; i: number; fin: string; form: Form; env: Env }
+type Restore = { t: "restore"; env: Env; len: number }
+type ApplyRest = { t: "applyrest"; rest: { Value } }
+type ForceStore = { t: "forcestore"; thunk: Thunk }
 type Cont = Items | Restore | ApplyRest | ForceStore
 -- Pins are interned by their content: the same bytes give the same pin object.
 const PINS: { [string]: Types.Pin } = {}
 -- Placeholders for the machine's registers when a mode does not use them.
-const NOFORM: Form = { op = "lit", value = Format.NIL }
+const NOFORM: Form = { op = "lit"; value = Format.NIL }
 const NOENV: Env = { slots = {} }
 
 -- The kind number of a value (SPEC.md section 1).
@@ -139,7 +139,7 @@ const function primitive(tag: number, vals: { Value }): (Value?, string?)
 			return existing, nil
 		end
 
-		const pin: Types.Pin = { kind = "pin", value = a }
+		const pin: Types.Pin = { kind = "pin"; value = a }
 		PINS[key] = pin
 
 		return pin, nil
@@ -185,7 +185,7 @@ const function itemsOf(form: Form): ({ Form }, string)
 
 		return items, "delay"
 	elseif form.op == "cell" then
-		return { form.a, form.b }, "cell"
+		return { form.a; form.b }, "cell"
 	elseif form.op == "con" then
 		return { form.e }, "con"
 	elseif form.op == "case" then
@@ -219,7 +219,7 @@ const function machine(mode0: Mode, form0: Form, env0: Env, fv0: Value, args0: {
 	while true do
 		if mode == "eval" then
 			if steps >= fuel then
-				return { status = "out_of_fuel", steps = steps }
+				return { status = "out_of_fuel"; steps = steps }
 			end
 
 			steps += 1
@@ -231,14 +231,14 @@ const function machine(mode0: Mode, form0: Form, env0: Env, fv0: Value, args0: {
 				const slot: Value? = env.slots[form.index + 1]
 
 				if slot == nil then
-					return { status = "error", message = "no slot " .. tostring(form.index) .. " in the frame", steps = steps }
+					return { status = "error"; message = "no slot " .. tostring(form.index) .. " in the frame"; steps = steps }
 				end
 
 				value = slot
 				mode = "ret"
 			else
 				const items, fin = itemsOf(form)
-				table.insert(k, { t = "items", items = items, vals = {}, i = 1, fin = fin, form = form, env = env } :: Cont)
+				table.insert(k, { t = "items"; items = items; vals = {}; i = 1; fin = fin; form = form; env = env } :: Cont)
 				form = items[1]
 			end
 		elseif mode == "apply" then
@@ -259,7 +259,7 @@ const function machine(mode0: Mode, form0: Form, env0: Env, fv0: Value, args0: {
 				law = fv
 				all = args
 			else
-				return { status = "error", message = "a call of a value that is not a function", steps = steps }
+				return { status = "error"; message = "a call of a value that is not a function"; steps = steps }
 			end
 
 			const arity = law.arity
@@ -269,13 +269,13 @@ const function machine(mode0: Mode, form0: Form, env0: Env, fv0: Value, args0: {
 				if n == 0 then
 					value = law
 				else
-					value = { kind = "app", law = law, args = all }
+					value = { kind = "app"; law = law; args = all }
 				end
 
 				mode = "ret"
 			else
 				if steps >= fuel then
-					return { status = "out_of_fuel", steps = steps }
+					return { status = "out_of_fuel"; steps = steps }
 				end
 
 				steps += 1
@@ -286,7 +286,7 @@ const function machine(mode0: Mode, form0: Form, env0: Env, fv0: Value, args0: {
 				end
 
 				if #rest > 0 then
-					table.insert(k, { t = "applyrest", rest = rest } :: Cont)
+					table.insert(k, { t = "applyrest"; rest = rest } :: Cont)
 				end
 
 				local slots: { Value } = { law }
@@ -304,7 +304,7 @@ const function machine(mode0: Mode, form0: Form, env0: Env, fv0: Value, args0: {
 			const c = table.remove(k)
 
 			if c == nil then
-				return { status = "value", value = value, steps = steps }
+				return { status = "value"; value = value; steps = steps }
 			end
 
 			if c.t == "items" then
@@ -323,14 +323,14 @@ const function machine(mode0: Mode, form0: Form, env0: Env, fv0: Value, args0: {
 					const fin = c.fin
 
 					if fin == "cell" then
-						value = { kind = "cell", head = vals[1], tail = vals[2] }
+						value = { kind = "cell"; head = vals[1]; tail = vals[2] }
 						mode = "ret"
 					elseif fin == "con" then
 						if f.op ~= "con" then
 							error("machine: a con finish on another form", 0)
 						end
 
-						value = { kind = "con", tag = f.tag, payload = vals[1] }
+						value = { kind = "con"; tag = f.tag; payload = vals[1] }
 						mode = "ret"
 					elseif fin == "call" then
 						const all: { Value } = {}
@@ -349,7 +349,7 @@ const function machine(mode0: Mode, form0: Form, env0: Env, fv0: Value, args0: {
 							table.insert(all, vals[i])
 						end
 
-						const thunk: Thunk = { kind = "thunk", f = vals[1], args = all, done = false, result = nil }
+						const thunk: Thunk = { kind = "thunk"; f = vals[1]; args = all; done = false; result = nil }
 						value = thunk
 						mode = "ret"
 					elseif fin == "prim" then
@@ -360,7 +360,7 @@ const function machine(mode0: Mode, form0: Form, env0: Env, fv0: Value, args0: {
 						const result, message = primitive(f.tag, vals)
 
 						if message ~= nil or result == nil then
-							return { status = "error", message = message or "a primitive gave nothing", steps = steps }
+							return { status = "error"; message = message or "a primitive gave nothing"; steps = steps }
 						end
 
 						value = result
@@ -373,7 +373,7 @@ const function machine(mode0: Mode, form0: Form, env0: Env, fv0: Value, args0: {
 						const c0 = vals[1]
 
 						if not isInt(c0) then
-							return { status = "error", message = "if needs an integer condition", steps = steps }
+							return { status = "error"; message = "if needs an integer condition"; steps = steps }
 						end
 
 						form =
@@ -388,7 +388,7 @@ const function machine(mode0: Mode, form0: Form, env0: Env, fv0: Value, args0: {
 							error("machine: a let finish on another form", 0)
 						end
 
-						table.insert(k, { t = "restore", env = e, len = #e.slots } :: Cont)
+						table.insert(k, { t = "restore"; env = e; len = #e.slots } :: Cont)
 						table.insert(e.slots, vals[1])
 						form = f.body
 						env = e
@@ -401,7 +401,7 @@ const function machine(mode0: Mode, form0: Form, env0: Env, fv0: Value, args0: {
 						const scrut = vals[1]
 
 						if type(scrut) ~= "table" or scrut.kind ~= "con" then
-							return { status = "error", message = "case of a value that is not a constructor", steps = steps }
+							return { status = "error"; message = "case of a value that is not a constructor"; steps = steps }
 						end
 
 						local branch: Form? = nil
@@ -417,13 +417,13 @@ const function machine(mode0: Mode, form0: Form, env0: Env, fv0: Value, args0: {
 
 						if branch == nil then
 							if f.elseBody == nil then
-								return { status = "error", message = "no branch for the constructor's tag " .. tostring(scrut.tag), steps = steps }
+								return { status = "error"; message = "no branch for the constructor's tag " .. tostring(scrut.tag); steps = steps }
 							end
 
 							branch = f.elseBody
 						end
 
-						table.insert(k, { t = "restore", env = e, len = #e.slots } :: Cont)
+						table.insert(k, { t = "restore"; env = e; len = #e.slots } :: Cont)
 						table.insert(e.slots, pushed)
 						form = branch :: Form
 						env = e
@@ -432,20 +432,20 @@ const function machine(mode0: Mode, form0: Form, env0: Env, fv0: Value, args0: {
 						const th = vals[1]
 
 						if type(th) ~= "table" or th.kind ~= "thunk" then
-							return { status = "error", message = "force of a value that is not a thunk", steps = steps }
+							return { status = "error"; message = "force of a value that is not a thunk"; steps = steps }
 						end
 
 						if th.done then
 							value = th.result :: Value
 							mode = "ret"
 						else
-							table.insert(k, { t = "forcestore", thunk = th } :: Cont)
+							table.insert(k, { t = "forcestore"; thunk = th } :: Cont)
 							fv = th.f
 							args = th.args
 							mode = "apply"
 						end
 					else
-						return { status = "error", message = "machine: unknown finish " .. fin, steps = steps }
+						return { status = "error"; message = "machine: unknown finish " .. fin; steps = steps }
 					end
 				end
 			elseif c.t == "restore" then
@@ -475,7 +475,7 @@ end
 
 -- Runs a form as the body of a law of arity 1, with the input as its argument. The wrapper costs no step.
 const function runForm(form: Form, input: Value, fuel: number): Outcome
-	return machine("eval", form, { slots = { Format.NIL, input } }, Format.NIL, {}, fuel)
+	return machine("eval", form, { slots = { Format.NIL; input } }, Format.NIL, {}, fuel)
 end
 
 return {

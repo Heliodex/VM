@@ -31,7 +31,7 @@ const function commas(n: number): string
 	return (out:gsub("^,", ""))
 end
 
-local profile = { op = {} :: { [string]: number }, frame = {} :: { [string]: number }, owner = {} :: { [string]: number }, steps = 0 }
+local profile = { op = {} :: { [string]: number }; frame = {} :: { [string]: number }; owner = {} :: { [string]: number }; steps = 0 }
 
 const function bump(t: { [string]: number }, key: string)
 	t[key] = (t[key] or 0) + 1
@@ -63,7 +63,7 @@ const typesP6 = Compile.compile(readFile(BOOT .. "types.l2"), "boot/types.l2")
 const laid = Lifecycle.run(layoutC.expr, bytesValue(typesP6.raw), 1e10)
 const lexed = Lifecycle.run(lexer.expr, O.payloadOf(O.valueOf(laid)), 1e8)
 const parsed = Lifecycle.run(parser.expr, O.payloadOf(O.valueOf(lexed)), 5e8)
-const request = { kind = "con", tag = 3, payload = O.payloadOf(O.valueOf(parsed)) }
+const request = { kind = "con"; tag = 3; payload = O.payloadOf(O.valueOf(parsed)) }
 VM.run = function(p: VM.Expr, f: number, e: VM.Binding?): VM.Outcome
 	return Counted.runReference(p, f, e)
 end;
@@ -84,7 +84,7 @@ const function printTop(title: string, t: { [string]: number }, total: number, l
 	local rows: { { string | number } } = {}
 
 	for key, value in t do
-		table.insert(rows, { key, value })
+		table.insert(rows, { key; value })
 	end
 
 	table.sort(

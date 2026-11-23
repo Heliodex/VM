@@ -73,8 +73,8 @@ const function timedRun(compiled: Compile.Compiled, input: VM.Value, fuel: numbe
 	return result, os.clock() - t0
 end
 
-type Stage = { steps: number, seconds: number, status: string }
-type Import = { name: string, file: string }
+type Stage = { steps: number; seconds: number; status: string }
+type Import = { name: string; file: string }
 type VmBuild = {
 	imports: Stage,
 	layout: Stage,
@@ -88,11 +88,11 @@ type VmBuild = {
 }
 
 const function stage(result: Lifecycle.Result, seconds: number): Stage
-	return { steps = result.steps, seconds = seconds, status = result.status }
+	return { steps = result.steps; seconds = seconds; status = result.status }
 end
 
 const function skipped(): Stage
-	return { steps = 0, seconds = 0, status = "skipped" }
+	return { steps = 0; seconds = 0; status = "skipped" }
 end
 
 -- The imports of a file, from its header.
@@ -101,7 +101,7 @@ const function importsOf(text: string): { Import }
 	local out: { Import } = {}
 
 	for _, imp in file.imports do
-		table.insert(out, { name = imp.name, file = imp.file })
+		table.insert(out, { name = imp.name; file = imp.file })
 	end
 
 	return out
@@ -109,7 +109,7 @@ end
 
 -- The VM build of one source: its imports, then layout, lex, parse and check. The source is the raw program section (indented), which is what a VM build starts from. Each library is laid out, lexed and parsed on the VM, and the checker gets the libraries as InferI (name . program) with the program. A stage that fails ends the build, and the later stages are skipped.
 -- The compiled stages of the compiler, each as Compile.Compiled.
-type Compiler = { layout: Compile.Compiled, lexer: Compile.Compiled, parser: Compile.Compiled, checker: Compile.Compiled }
+type Compiler = { layout: Compile.Compiled; lexer: Compile.Compiled; parser: Compile.Compiled; checker: Compile.Compiled }
 
 const function vmBuild(compiled: Compiler, raw: string, imports: { Import }): VmBuild
 	local importSteps = 0
@@ -146,7 +146,7 @@ const function vmBuild(compiled: Compiler, raw: string, imports: { Import }): Vm
 			break
 		end
 
-		const library: VM.Cell = { kind = "cell", head = bytesValue(imp.name), tail = O.payloadOf(O.valueOf(parsed)) }
+		const library: VM.Cell = { kind = "cell"; head = bytesValue(imp.name); tail = O.payloadOf(O.valueOf(parsed)) }
 		table.insert(libraries, library)
 	end
 
@@ -160,14 +160,14 @@ const function vmBuild(compiled: Compiler, raw: string, imports: { Import }): Vm
 	}
 
 	if importRefusal ~= nil then
-		return { imports = importStage, layout = skipped(), lex = skipped(), parse = skipped(), check = skipped(), refused = "imports: " .. importRefusal }
+		return { imports = importStage; layout = skipped(); lex = skipped(); parse = skipped(); check = skipped(); refused = "imports: " .. importRefusal }
 	end
 
 	const laid, layoutTime = timedRun(compiled.layout, bytesValue(raw), 1e10)
 	const layout = stage(laid, layoutTime)
 
 	if laid.status ~= "value" or O.tagOf(O.valueOf(laid)) ~= 0 then
-		return { imports = importStage, layout = layout, lex = skipped(), parse = skipped(), check = skipped(), refused = "layout " .. laid.status }
+		return { imports = importStage; layout = layout; lex = skipped(); parse = skipped(); check = skipped(); refused = "layout " .. laid.status }
 	end
 
 	const bracketed = O.payloadOf(O.valueOf(laid))
@@ -175,29 +175,29 @@ const function vmBuild(compiled: Compiler, raw: string, imports: { Import }): Vm
 	const lex = stage(lexed, lexTime)
 
 	if lexed.status ~= "value" then
-		return { imports = importStage, layout = layout, lex = lex, parse = skipped(), check = skipped(), laidOut = textOf(bracketed), refused = "lex " .. lexed.status }
+		return { imports = importStage; layout = layout; lex = lex; parse = skipped(); check = skipped(); laidOut = textOf(bracketed); refused = "lex " .. lexed.status }
 	end
 
 	const parsed, parseTime = timedRun(compiled.parser, O.payloadOf(O.valueOf(lexed)), 5e8)
 	const parse = stage(parsed, parseTime)
 
 	if parsed.status ~= "value" or O.tagOf(O.valueOf(parsed)) ~= 0 then
-		return { imports = importStage, layout = layout, lex = lex, parse = parse, check = skipped(), laidOut = textOf(bracketed), refused = "parse " .. parsed.status }
+		return { imports = importStage; layout = layout; lex = lex; parse = parse; check = skipped(); laidOut = textOf(bracketed); refused = "parse " .. parsed.status }
 	end
 
 	-- Without imports the request is Infer (tag 3); with them it is InferI (tag 4), with the libraries in the order of the header.
-	local request: VM.Value = { kind = "con", tag = 3, payload = O.payloadOf(O.valueOf(parsed)) }
+	local request: VM.Value = { kind = "con"; tag = 3; payload = O.payloadOf(O.valueOf(parsed)) }
 
 	if #libraries > 0 then
 		local cells: VM.Value = VM.NIL
 
 		for i = #libraries, 1, -1 do
-			const cell: VM.Cell = { kind = "cell", head = libraries[i], tail = cells }
+			const cell: VM.Cell = { kind = "cell"; head = libraries[i]; tail = cells }
 			cells = cell
 		end
 
-		const pair: VM.Cell = { kind = "cell", head = cells, tail = O.payloadOf(O.valueOf(parsed)) }
-		const withLibraries: VM.Con = { kind = "con", tag = 4, payload = pair }
+		const pair: VM.Cell = { kind = "cell"; head = cells; tail = O.payloadOf(O.valueOf(parsed)) }
+		const withLibraries: VM.Con = { kind = "con"; tag = 4; payload = pair }
 		request = withLibraries
 	end
 
@@ -265,7 +265,7 @@ const parser = compileCompiler("parse.l2", BOOT)
 const checker = compileCompiler("types.l2", "boot/")
 -- Prototype 6's types.l2 is the input of the validation and the profile, as in run 4.
 const typesP6 = compileCompiler("types.l2", BOOT)
-const compiled = { layout = layoutC, lexer = lexer, parser = parser, checker = checker }
+const compiled = { layout = layoutC; lexer = lexer; parser = parser; checker = checker }
 
 for _, line in compilerTimes do
 	print(line)
@@ -302,7 +302,7 @@ print(
 -- 2. The build of the corpus.
 print ""
 print "== 2. The build of the corpus (each file, host and VM)"
-const corpus = { "lex.l2", "parse.l2", "layout.l2", "types.l2" }
+const corpus = { "lex.l2"; "parse.l2"; "layout.l2"; "types.l2" }
 local totalBytes = 0
 local totalLines = 0
 local totalHostSeconds = 0
@@ -345,7 +345,7 @@ print(string.format("corpus total: %s bytes, %d lines; host %.3fs; VM %s steps i
 print ""
 print "== 3. Profile: the checker on Prototype 6's types.l2, counted machine"
 
-const function newProfile(): { op: { [string]: number }, frame: { [string]: number }, owner: { [string]: number }, steps: number }
+const function newProfile(): { op: { [string]: number }; frame: { [string]: number }; owner: { [string]: number }; steps: number }
 	return {
 		op = {},
 		frame = {},
@@ -383,7 +383,7 @@ end
 const profileLaid = Lifecycle.run(layoutC.expr, bytesValue(typesP6.raw), 1e10)
 const profileLexed = Lifecycle.run(lexer.expr, O.payloadOf(O.valueOf(profileLaid)), 1e8)
 const profileParsed = Lifecycle.run(parser.expr, O.payloadOf(O.valueOf(profileLexed)), 5e8)
-const profileRequest = { kind = "con", tag = 3, payload = O.payloadOf(O.valueOf(profileParsed)) }
+const profileRequest = { kind = "con"; tag = 3; payload = O.payloadOf(O.valueOf(profileParsed)) }
 useMachine "counted";
 Counted.probe.profile = hook
 const profiled = Lifecycle.run(checker.expr, profileRequest, 1e10);
@@ -401,7 +401,7 @@ const function printTop(title: string, t: { [string]: number }, total: number, l
 	local rows: { { string | number } } = {}
 
 	for key, value in t do
-		table.insert(rows, { key, value })
+		table.insert(rows, { key; value })
 	end
 
 	table.sort(
@@ -424,7 +424,7 @@ printTop("by owning function (every step, top 40):", profile.owner, profile.step
 
 -- A program file: a header, no imports, the program, and one test. The program is a function of x, which calls the chain at x; f_n(x) = x + 1 + 2 + ... + n, so the test is the sum. Each function calls the one before it, so the program is a chain of nested lets.
 const function synthetic(n: number): string
-	local lines = { string.format("%d chained functions", n), "---", "---", "fn x" }
+	local lines = { string.format("%d chained functions", n); "---"; "---"; "fn x" }
 	table.insert(lines, "\tlet f0 = fn y")
 	table.insert(lines, "\t\ty")
 
@@ -446,12 +446,12 @@ print ""
 print "== 4. Growth by owner: the checker on 100 and 400 generated functions, counted"
 local grown: { { [string]: number } } = {}
 
-for _, n in { 100, 400 } do
+for _, n in { 100; 400 } do
 	const host = Compile.compile(synthetic(n), `synthetic {n}`)
 	const laidFor = Lifecycle.run(layoutC.expr, bytesValue(host.raw), 1e10)
 	const lexedFor = Lifecycle.run(lexer.expr, O.payloadOf(O.valueOf(laidFor)), 1e8)
 	const parsedFor = Lifecycle.run(parser.expr, O.payloadOf(O.valueOf(lexedFor)), 5e8)
-	const requestFor = { kind = "con", tag = 3, payload = O.payloadOf(O.valueOf(parsedFor)) }
+	const requestFor = { kind = "con"; tag = 3; payload = O.payloadOf(O.valueOf(parsedFor)) }
 	profile = newProfile()
 	useMachine "counted";
 	Counted.probe.profile = hook
@@ -466,7 +466,7 @@ local growthRows: { { string | number } } = {}
 
 for key, small in grown[100] do
 	const large = grown[400][key] or 0
-	table.insert(growthRows, { key, small, large })
+	table.insert(growthRows, { key; small; large })
 end
 
 table.sort(
@@ -500,7 +500,7 @@ print ""
 print "== 5. Scaling: generated programs, chained functions"
 useMachine "hybrid"
 
-for _, n in { 25, 50, 100, 200, 400, 800, 1600 } do
+for _, n in { 25; 50; 100; 200; 400; 800; 1600 } do
 	const text = synthetic(n)
 	const host = Compile.compile(text, `synthetic {n}`)
 	const vm = vmBuild(compiled, host.raw, {})

@@ -33,7 +33,7 @@ end
 
 -- The same generator as phase0.luau.
 const function synthetic(n: number): string
-	local lines = { string.format("%d chained functions", n), "---", "---", "fn x" }
+	local lines = { string.format("%d chained functions", n); "---"; "---"; "fn x" }
 	table.insert(lines, "\tlet f0 = fn y")
 	table.insert(lines, "\t\ty")
 
@@ -61,7 +61,7 @@ const function checkerSteps(text: string): (number, string)
 	const laid = Lifecycle.run(layoutC.expr, bytesValue(raw), 1e10)
 	const lexed = Lifecycle.run(lexer.expr, O.payloadOf(O.valueOf(laid)), 1e8)
 	const parsed = Lifecycle.run(parser.expr, O.payloadOf(O.valueOf(lexed)), 5e8)
-	const result = Lifecycle.run(checker.expr, { kind = "con", tag = 3, payload = O.payloadOf(O.valueOf(parsed)) }, 1e10)
+	const result = Lifecycle.run(checker.expr, { kind = "con"; tag = 3; payload = O.payloadOf(O.valueOf(parsed)) }, 1e10)
 
 	return result.steps, result.status
 end
@@ -73,7 +73,7 @@ print "functions  checker steps  steps per function  ratio to the previous size"
 local previous: number? = nil
 local previousN: number? = nil
 
-for _, n in { 25, 50, 100, 200, 400, 800, 1600 } do
+for _, n in { 25; 50; 100; 200; 400; 800; 1600 } do
 	const steps, status = checkerSteps(synthetic(n))
 	local ratio = "-"
 

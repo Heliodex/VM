@@ -90,7 +90,7 @@ const function checkFile(name: string)
 	const raw = file.program :: string
 	-- The VM: each import's parsed program, then the request.
 	local importCells: VM.Value = VM.NIL
-	local libraries: { { name: string, laid: string } } = {}
+	local libraries: { { name: string; laid: string } } = {}
 
 	for _, imp in file.imports do
 		const libFile = ProgramFile.parse(readFile(P6 .. imp.file), nil)
@@ -103,17 +103,17 @@ const function checkFile(name: string)
 			return
 		end
 
-		const pairCell: VM.Cell = { kind = "cell", head = bytesValue(imp.name), tail = libProgram }
-		const listCell: VM.Cell = { kind = "cell", head = pairCell, tail = importCells }
+		const pairCell: VM.Cell = { kind = "cell"; head = bytesValue(imp.name); tail = libProgram }
+		const listCell: VM.Cell = { kind = "cell"; head = pairCell; tail = importCells }
 		importCells = listCell
-		table.insert(libraries, { name = imp.name, laid = Layout.layout(libFile.program :: string) })
+		table.insert(libraries, { name = imp.name; laid = Layout.layout(libFile.program :: string) })
 	end
 
 	-- Reversed by construction; put them back in order so the order matches the Luau side.
 	local ordered: VM.Value = VM.NIL
 
 	for _, item in itemsOf(importCells) do
-		const orderedCell: VM.Cell = { kind = "cell", head = item, tail = ordered }
+		const orderedCell: VM.Cell = { kind = "cell"; head = item; tail = ordered }
 		ordered = orderedCell
 	end
 
@@ -126,8 +126,8 @@ const function checkFile(name: string)
 		return
 	end
 
-	const requestCell: VM.Cell = { kind = "cell", head = ordered, tail = targetProgram }
-	const request: VM.Con = { kind = "con", tag = 4, payload = requestCell }
+	const requestCell: VM.Cell = { kind = "cell"; head = ordered; tail = targetProgram }
+	const request: VM.Con = { kind = "con"; tag = 4; payload = requestCell }
 	const result = Lifecycle.run(checker.expr, request, 1e10)
 
 	if result.status ~= "value" then
@@ -145,12 +145,12 @@ const function checkFile(name: string)
 	end
 
 	-- The Luau side, with the same libraries as import schemes.
-	local importSchemes: { { name: string, scheme: Checker.Scheme } } = {}
+	local importSchemes: { { name: string; scheme: Checker.Scheme } } = {}
 
 	for _, lib in libraries do
 		const libProgram = Parser.parse(lib.laid)
 		const libChecked = Checker.check(libProgram, {}, lib.name)
-		table.insert(importSchemes, { name = lib.name, scheme = libChecked.scheme })
+		table.insert(importSchemes, { name = lib.name; scheme = libChecked.scheme })
 	end
 
 	local luauText = ""

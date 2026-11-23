@@ -47,7 +47,7 @@ end
 
 -- A machine value, as the reference's: integers, nil, cells and constructors deeply. A function is a marker, and so is a pin.
 -- A converted machine value: the reference's values, where a cell or a constructor may hold a marker for a function or a pin (which the reference does not give as a value).
-type Shown = number | Types.Nil | { kind: "cell", head: Shown, tail: Shown } | { kind: "con", tag: number, payload: Shown } | { kind: "function-marker" } | { kind: "pin-marker" }
+type Shown = number | Types.Nil | { kind: "cell"; head: Shown; tail: Shown } | { kind: "con"; tag: number; payload: Shown } | { kind: "function-marker" } | { kind: "pin-marker" }
 
 const function convert(v: P5VM.Value | P6VM.Value): Shown
 	if type(v) == "number" then
@@ -57,9 +57,9 @@ const function convert(v: P5VM.Value | P6VM.Value): Shown
 	if v.kind == "nil" then
 		return NIL
 	elseif v.kind == "cell" then
-		return { kind = "cell", head = convert(v.head), tail = convert(v.tail) }
+		return { kind = "cell"; head = convert(v.head); tail = convert(v.tail) }
 	elseif v.kind == "con" then
-		return { kind = "con", tag = v.tag, payload = convert(v.payload) }
+		return { kind = "con"; tag = v.tag; payload = convert(v.payload) }
 	elseif v.kind == "closure" then
 		return { kind = "function-marker" }
 	elseif v.kind == "pin" then
@@ -84,9 +84,9 @@ const function convertInput(v: P6VM.Value): Types.Value
 	elseif v.kind == "nil" then
 		return NIL
 	elseif v.kind == "cell" then
-		return { kind = "cell", head = convertInput(v.head), tail = convertInput(v.tail) }
+		return { kind = "cell"; head = convertInput(v.head); tail = convertInput(v.tail) }
 	elseif v.kind == "con" then
-		return { kind = "con", tag = v.tag, payload = convertInput(v.payload) }
+		return { kind = "con"; tag = v.tag; payload = convertInput(v.payload) }
 	end
 
 	error("cross: an input value of kind " .. tostring(v.kind) .. " cannot be converted", 0)
@@ -234,7 +234,7 @@ do
 				tests += 1
 				const p6 = L2.run(compiled, input, test.fuel)
 				const budget = 20 * test.fuel + 10000
-				const r = Interp.runForm({ op = "call", f = program, args = { { op = "arg", index = 1 } } }, convertInput(input), budget)
+				const r = Interp.runForm({ op = "call"; f = program; args = { { op = "arg"; index = 1 } } }, convertInput(input), budget)
 				local ok: boolean
 				local detail: string
 

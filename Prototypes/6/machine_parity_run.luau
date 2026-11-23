@@ -21,8 +21,10 @@ local function compare(name: string, program: any, fuel: number)
 	if not directOk then
 		failures += 1
 		print(`DIRECT FAILED {name}: {tostring(direct)}`)
+
 		return
 	end
+
 	const directResult: any = direct
 	const hybrid = VM.runHybrid(program, fuel)
 	local sameHybrid = ref.status == hybrid.status and ref.steps == hybrid.steps
@@ -37,6 +39,7 @@ local function compare(name: string, program: any, fuel: number)
 		failures += 1
 		print(`HYBRID DIFF {name}`)
 	end
+
 	local same = ref.status == fast.status and ref.steps == fast.steps
 
 	if same and ref.status == "value" and fast.status == "value" then
