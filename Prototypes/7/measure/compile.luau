@@ -6,6 +6,7 @@
 -- The raw program section is kept too. The VM's layout stage reads the raw section, so it is what a VM build starts from. The host layout is run here on the same section, and the two results are compared by the driver.
 
 const fs = require "@lute/fs"
+const VM = require "../../6/interpreter/vm"
 const ProgramFile = require "../../6/L2/programfile"
 const Layout = require "../../6/L2/layout"
 const Parser = require "../../6/L2/parser"
@@ -33,8 +34,28 @@ export type Compiled = {
 	raw: string,
 }
 
+-- The fixed-point combinator is one table, shared by every recursive function of every program (the machine's M.fix). Its nodes are owned by "fixpoint", not by whichever function first reaches them, which is what the owner pass would otherwise do: Phase 0's "top" owner was partly this.
+const function markFix(root: any)
+	local work: { any } = { root }
+
+	while #work > 0 do
+		const node = table.remove(work) :: any
+
+		if node.owner == nil then
+			node.owner = "fixpoint"
+
+			for _, child in node do
+				if type(child) == "table" and child.op ~= nil then
+					table.insert(work, child)
+				end
+			end
+		end
+	end
+end
+
 -- Gives each node its owner, top-down. A lambda with a label starts a new owner; a node that is already owned is not visited again, so a shared node keeps its first owner.
 const function annotate(root: any)
+	markFix(VM.fix)
 	local work: { { any } } = { { root, "top" } }
 
 	while #work > 0 do

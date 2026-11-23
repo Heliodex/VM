@@ -72,8 +72,23 @@ let mod10 = fn n
 	match (% n 10)
 		Ok r -> r
 		Err e -> 0
+; Names are compared a byte at a time. Each step reads the head of each list once, through the builtin (a match, not a call to first), since this is the innermost loop of the name environment.
 letrec same = fn (a b)
-	(if (= (@ a) 1) (= (@ b) 1) (if (= (@ b) 1) 0 (if (= (first a) (first b)) (same (tl a) (tl b)) 0)))
+	match (head a)
+		Err e -> (if (= (@ b) 1) 1 0)
+		Ok x ->
+			match (head b)
+				Err f -> 0
+				Ok y ->
+					if (= x y)
+						match (tail a)
+							Err g -> 0
+							Ok ta ->
+								match (tail b)
+									Err h -> 0
+									Ok tb -> (same ta tb)
+					else
+						0
 letrec lenOf = fn l
 	(if (= (@ l) 1) 0 (+ 1 (lenOf (tl l))))
 letrec cat = fn (a b)
@@ -103,46 +118,44 @@ letrec snoc = fn (l x)
 let addErr = fn (st msg)
 	(mkSt (nextOf st) (bindsOf st) (snoc (errsOf st) msg))
 ; The binding store is a radix-4 trie on the id. A node holds the binding of the id that is 0 at that node (the node's own), and four children, one for each remainder r = id mod 4; a child is reached with id div 4. So a lookup takes about log4 of the id in levels, each with one division, where the binary trie it replaces took log2 with two. The children are a nest of pairs (c0 . (c1 . (c2 . c3))), read with fst and snd, so no list is walked.
-let q4 = fn n
-	match (/ n 4)
-		Ok q -> q
-		Err e -> 0
 letrec findB = fn (bs id)
-	match bs
-		TEmpty -> (Unbound 0)
-		TNode p ->
-			if (= id 0)
-				fst p
-			else
-				let q = (q4 id)
-				let r = (- id (* 4 q))
-				let kids = (snd p)
-				if (< r 2)
-					(if (= r 0) (findB (fst kids) q) (findB (fst (snd kids)) q))
-				elseif (= r 2)
-					findB (fst (snd (snd kids))) q
-				else
-					findB (snd (snd (snd kids))) q
-letrec
-	setB = fn (bs id b)
-		match bs
-			TEmpty -> (setB (TNode ((Unbound 0) . (TEmpty . (TEmpty . (TEmpty . TEmpty))))) id b)
-			TNode p ->
-				if (= id 0)
-					TNode (b . (snd p))
-				else
-					let q = (q4 id)
-					let r = (- id (* 4 q))
-					TNode ((fst p) . (setSlot (snd p) r q b))
-	setSlot = fn (kids r q b)
-		if (= r 0)
-			((setB (fst kids) q b) . (snd kids))
-		elseif (= r 1)
-			((fst kids) . ((setB (fst (snd kids)) q b) . (snd (snd kids))))
-		elseif (= r 2)
-			((fst kids) . ((fst (snd kids)) . ((setB (fst (snd (snd kids))) q b) . (snd (snd (snd kids))))))
-		else
-			((fst kids) . ((fst (snd kids)) . ((fst (snd (snd kids))) . (setB (snd (snd (snd kids))) q b))))
+	match (/ id 4)
+		Ok q ->
+			match bs
+				TEmpty -> (Unbound 0)
+				TNode p ->
+					if (= id 0)
+						fst p
+					else
+						let r = (- id (* 4 q))
+						let kids = (snd p)
+						if (< r 2)
+							(if (= r 0) (findB (fst kids) q) (findB (fst (snd kids)) q))
+						elseif (= r 2)
+							findB (fst (snd (snd kids))) q
+						else
+							findB (snd (snd (snd kids))) q
+		Err e -> (Unbound 0)
+letrec setB = fn (bs id b)
+	match (/ id 4)
+		Ok q ->
+			match bs
+				TEmpty -> (setB (TNode ((Unbound 0) . (TEmpty . (TEmpty . (TEmpty . TEmpty))))) id b)
+				TNode p ->
+					if (= id 0)
+						TNode (b . (snd p))
+					else
+						let r = (- id (* 4 q))
+						let kids = (snd p)
+						if (= r 0)
+							TNode ((fst p) . ((setB (fst kids) q b) . (snd kids)))
+						elseif (= r 1)
+							TNode ((fst p) . ((fst kids) . ((setB (fst (snd kids)) q b) . (snd (snd kids)))))
+						elseif (= r 2)
+							TNode ((fst p) . ((fst kids) . ((fst (snd kids)) . ((setB (fst (snd (snd kids))) q b) . (snd (snd (snd kids)))))))
+						else
+							TNode ((fst p) . ((fst kids) . ((fst (snd kids)) . ((fst (snd (snd kids))) . (setB (snd (snd (snd kids))) q b)))))
+		Err e -> bs
 let levelOf = fn b
 	match b
 		Unbound lv -> lv
@@ -209,7 +222,13 @@ letrec unify = fn (st a0 e0)
 				TVar y -> (bindVar st y a)
 				TCon q -> (unifyCon st (fst p) (snd p) (fst q) (snd q) a e)
 letrec memberI = fn (x l)
-	(if (= (@ l) 1) 0 (if (= (first l) x) 1 (memberI x (tl l))))
+	match (head l)
+		Err e -> 0
+		Ok y ->
+			if (= y x)
+				1
+			else
+				memberI x (tl l)
 letrec freeAbove = fn (bs level t acc)
 	letrec argsFree = fn (acc2 args)
 		(if (= (@ args) 1) acc2 (argsFree (freeAbove bs level (hdOr args (TVar 0)) acc2) (tl args)))
@@ -225,7 +244,13 @@ let schemeTy = fn s
 	match s
 		Scheme p -> (snd p)
 letrec lookupM = fn (m id dflt)
-	(if (= (@ m) 1) dflt (if (= (fst (hdOr m (0 . (TVar 0)))) id) (snd (hdOr m (0 . (TVar 0)))) (lookupM (tl m) id dflt)))
+	match (head m)
+		Err e -> dflt
+		Ok c ->
+			if (= (fst c) id)
+				snd c
+			else
+				lookupM (tl m) id dflt
 letrec subst = fn (bs m t)
 	letrec substArgs = fn args
 		(if (= (@ args) 1) ~ (cons (subst bs m (hdOr args (TVar 0))) (substArgs (tl args))))
@@ -299,19 +324,21 @@ let builtinList = [(mono "+" (tArrow tInt (tArrow tInt tInt))) (mono "-" (tArrow
 ; The name environment is a persistent trie on the bytes of a name, not a list. A lookup walks the name, so it costs the same however many names are in scope, and a list walk was the quadratic term of the checker (Phase 0). A node is (entries . children): the entries bound at exactly this name (a list of at most one, the newest), and the children, a list of (byte . node). Binding copies the nodes on one path, so an outer environment is unchanged by a binding made inside it, as a list was.
 let envEmpty = (EN (~ . ~))
 letrec envKid = fn (kids b)
-	if (= (@ kids) 1)
-		envEmpty
-	elseif (= (fst (hdOr kids (b . envEmpty))) b)
-		snd (hdOr kids (b . envEmpty))
-	else
-		envKid (tl kids) b
+	match (head kids)
+		Err e -> envEmpty
+		Ok c ->
+			if (= (fst c) b)
+				snd c
+			else
+				envKid (tl kids) b
 letrec envPut = fn (kids b child)
-	if (= (@ kids) 1)
-		cons (b . child) ~
-	elseif (= (fst (hdOr kids (b . child))) b)
-		cons (b . child) (tl kids)
-	else
-		cons (hdOr kids (b . child)) (envPut (tl kids) b child)
+	match (head kids)
+		Err e -> cons (b . child) ~
+		Ok c ->
+			if (= (fst c) b)
+				cons (b . child) (tl kids)
+			else
+				cons c (envPut (tl kids) b child)
 letrec envBind = fn (node name e)
 	match node
 		EN p ->
