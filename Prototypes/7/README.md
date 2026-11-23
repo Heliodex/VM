@@ -22,7 +22,7 @@ Checking `L2/programs/boot/types.l2` with the L2 checker, which is written in L2
 Conclusions that shape this plan:
 
 - **The step count is the problem, not the step rate.** The hybrid is close to what a tree or closure machine in Luau can do per step. A machine rewrite might give about 2×. The target needs about 45× fewer steps at the same host speed, or a mix of fewer steps and jets.
-- **The checker is probably doing too much work.** The state is association lists (`lookupM`, `hdOr`), and `subst (bindsOf …)` is called once per declaration, which probably re-walks the bindings each time. If the cost grows quadratically with input size, the fix is in `types.l2`, not the VM. This is a hypothesis until Phase 0 tests it.
+- **The checker is doing too much work, in two ways (measured in Phase 0).** The name environment is an association list searched by name (`findE`), and that search is quadratic in the number of declarations. Separately, each declaration costs about 128,000 steps, much of it in `/` and `%` by 2 and list access, which return `Result` values that are matched at every step. The binding store is a binary trie, not an association list as first assumed. See `measure/README.md`.
 - **Names are lists of bytes.** Every name comparison walks a list, and every string is a list of cells. Interned names would make equality a single comparison.
 - **The step-parity invariant will not survive jets or memoisation** unless the design says how fuel is charged. The section "Fuel, jets and memo" below handles this.
 
@@ -45,7 +45,7 @@ The target has three parts. Each one is measured on a fixed reference host, and 
 
     steps budget = time budget × measured steps per second
 
-At the hybrid's 18.5M steps/s, the budget is about 18.5M steps for 2,500 lines, about 7,400 steps per line. The current checker alone spends about 330,000 steps per line (299.6M / 913), so the gap is about 44×. Lex, parse and desugar are not counted in that figure and are not measured yet, so the real gap is at least this large. This assumes cost is linear in the input. Phase 0 tests that assumption.
+At the hybrid's 18.5M steps/s, the budget is about 18.5M steps for 2,500 lines, about 7,400 steps per line. Phase 0 measured the whole bootstrapped build on the 2,235-line corpus: 789.9M steps, about 353,000 per line, so 2,500 lines take about 884M steps. That is about 49× the budget at 18M steps/s, and about 68× at the 13M steps/s of the slower run. Cost is not linear in the input: the name environment makes it quadratic in the number of declarations, so a large build costs more per line than the average suggests.
 
 **3. A relative check that does not depend on the host.** Steps and fuel are host-independent, so they are the primary numbers. Add two ratios so that a result has meaning even when the host changes:
 
@@ -56,7 +56,7 @@ At the hybrid's 18.5M steps/s, the budget is about 18.5M steps for 2,500 lines, 
 
 **Open questions for the speed target** (listed again in "Decisions" below):
 
-- Does the target need to hold on Luau, or only on a future native host? On Luau the step rate is about 18M steps/s, so the budget is about 18M steps. That is reachable only if the 44× reduction comes from algorithms and jets, not the machine. If it cannot be reached, the target needs a native host.
+- Does the target need to hold on Luau, or only on a future native host? On Luau the step rate is about 18M steps/s, so the budget is about 18M steps. That is reachable only if the 49–68× reduction comes from algorithms and jets, not the machine. If it cannot be reached, the target needs a native host.
 - Is the corpus right? The 2,500 lines and the file choice are proposals.
 
 ## Core design (draft)
@@ -115,15 +115,25 @@ One machine, with an explicit stack and a single dispatch loop. Compiling each l
 
 Each phase ends with an exit test. A phase is not finished until its test passes, and the harness numbers are committed with it.
 
-**Phase 0: measure Prototype 6.** Freeze Prototype 6 as the baseline. Measure, without changing the machine:
+**Phase 0: measure Prototype 6** (done; harness and results in `measure/`, see `measure/README.md`). Prototype 6 was not changed. The measurement covered:
 
-- the checker on `types.l2` at 1×, 2× and 4× input (for example, the parsed declarations repeated with fresh names). Steps against size.
-- a histogram of steps by form and by library function (`lookupM`, `subst`, `bindsOf`, `hdOr`, and the rest), and of allocations.
-- the whole build on the build corpus (2,500 lines): lex, parse, check and desugar, each stage's steps reported separately. This is the first measurement of the real target, and the first time the lex, parse and desugar costs are known.
+- validation: the checker on `types.l2` gives 299,622,490 steps on the hybrid and the counted machine, as `vm_bench` reports;
+- the whole bootstrapped build on the corpus, each stage's steps reported separately (lex, parse, check), with the host stages timed alongside;
+- a profile of the checker by form, by frame and by owning function;
+- growth by owner, on 100 and 400 generated functions;
+- scaling of the VM stages on generated programs of 25 to 1,600 functions.
 
-*Exit:* we know whether the checker's cost is linear, and we know the five largest cost centres. If it is quadratic, the cause is named.
+Note: the plan first proposed scaling by repeating `types.l2`. It was replaced by generated programs, since repeating declarations needs renaming, and the generator gives a clean size series.
 
-**Phase 1: fix the checker's algorithms, in L2.** Only if Phase 0 finds a quadratic or a large avoidable cost. Candidates: union-find for type variables, a balanced map for the environment, and not converting the binding tree to a list per declaration. This runs on Prototype 6, so the gain is measured before any new machine exists.
+*Exit, met:* the checker's cost is superlinear, and the cost centres are named: the name environment search (quadratic), the binding trie's index arithmetic and access, and the `Result`-wrapped list accessors.
+
+**Phase 1: fix the checker's algorithms, in L2.** Measured candidates, in order of the cost they remove:
+
+- the name environment (`findE`, with `same`): a balanced map keyed by name. This removes the quadratic term (about 31% of steps at 400 functions, 64% at 1,600);
+- `halfOf` and `oddOf` (`/` and `%` by 2, each matched through a `Result`): a bit primitive or a direct trie step. About 28% of steps on `types.l2`;
+- `first`, `tl` and `hdOr`, the list accessors that wrap their result: direct access where the list is known to be non-empty. About 22% of steps.
+
+This runs on Prototype 6, so each gain is measured before any new machine exists.
 
 *Exit:* steps against size is linear on the same inputs, with the checker's answers unchanged (`infer_run` and `checker_run` agree).
 
@@ -143,7 +153,7 @@ Each phase ends with an exit test. A phase is not finished until its test passes
 
 *Exit:* every jet agrees with its reference on the whole test suite, the fuel formulas match wherever they are claimed to, and the checker benchmark's steps and work drop by the amount the histogram predicted.
 
-**Phase 6: interned names and a byte kind.** If Phase 0 shows that name and string comparison is a large cost, intern names as pins and add a byte kind for source text, with lexing as a jet.
+**Phase 6: interned names and a byte kind.** Phase 0 measured name comparison (`same`) at 4.3% of the checker's steps on `types.l2`, and its share grows with the environment. Phase 1 removes most of the environment search, so Phase 6 is worth doing only if its share is still large after Phase 1. If it is, intern names as pins and add a byte kind for source text, with lexing as a jet. Lexing is linear already (565–706 steps per byte), so the byte kind is for speed, not for growth.
 
 *Exit:* the lexer and the parser give the same token and tree output on every program file, and the name cost in the histogram drops to a small share.
 
@@ -176,4 +186,4 @@ These need an answer from the project owner before the phase that depends on the
 
 ## Next step
 
-Phase 0. Freeze Prototype 6, then write the measurement harness in `Prototypes/7/measure/`, so that the baseline numbers for this plan come from the same tool that later phases use.
+Phase 1, on the measured candidates above. The first measurement to repeat after each change is the same harness, so the numbers stay comparable. The corpus files still need the project owner's confirmation, and the bootstrapped checker still needs imports before the two files that import library code can be fully checked.
