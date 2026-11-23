@@ -372,11 +372,15 @@ func machine(m mode, node *Node, env *Env, fv Value, args []Value, fuel int64) O
 				c.th.Result = value
 				k = k[:len(k)-1]
 			case kMemo:
-				memo[c.key] = memoEntry{
-					value: value,
-					fuel: steps - c.start,
+				// A call that used little fuel saves little work, and an entry for it costs memory: only calls of at least MemoMinFuel steps are stored (memo.go). The fuel is the same either way.
+				if steps-c.start >= MemoMinFuel {
+					memo[c.key] = memoEntry{
+						value: value,
+						fuel: steps - c.start,
+					}
+					MemoCounts.Stores++
 				}
-				MemoCounts.Stores++
+
 				k = k[:len(k)-1]
 			}
 		}

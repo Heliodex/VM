@@ -22,6 +22,9 @@ var (
 
 	// MemoOn turns the memo on.
 	MemoOn bool
+
+	// MemoMinFuel is the least fuel a call must use to be stored: a smaller call saves little work, and its entry costs memory. The results and the fuel do not depend on it.
+	MemoMinFuel int64 = 1000
 	memo = map[string]memoEntry{}
 )
 
