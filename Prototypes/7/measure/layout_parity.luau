@@ -39,7 +39,7 @@ for name in string.gmatch(names, "[^\n]+") do
 	local ok, file = pcall(ProgramFile.parse, readFile(PROGRAMS .. name), nil)
 
 	if ok then
-		raw = (file :: any).program :: string
+		raw = file.program :: string
 	end
 
 	if raw ~= nil then

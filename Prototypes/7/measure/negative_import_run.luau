@@ -50,7 +50,7 @@ const importPair: VM.Value = { kind = "cell", head = bytesValue "reverse", tail 
 const importList: VM.Value = { kind = "cell", head = importPair, tail = VM.NIL }
 const withImport = Lifecycle.run(checker.expr, { kind = "con", tag = 4, payload = { kind = "cell", head = importList, tail = program } }, 1e10)
 
-const function vmErrors(r: any): string
+const function vmErrors(r: Lifecycle.Result): string
 	local msgs: { string } = {}
 
 	for _, e in itemsOf(O.tailOf(O.valueOf(r))) do
@@ -84,7 +84,7 @@ print(
 		if okNo then
 			"no errors"
 		else
-			tostring(type(errNo) == "table" and (errNo :: any).typeError or errNo)
+			tostring(type(errNo) == "table" and (errNo :: { typeError: unknown }).typeError or errNo)
 	)
 )
 const libLuau = Checker.check(Parser.parse(Layout.layout(libRaw)), {}, "reverse")
@@ -94,6 +94,6 @@ print(
 		if okYes then
 			"no errors"
 		else
-			tostring(type(errYes) == "table" and (errYes :: any).typeError or errYes)
+			tostring(type(errYes) == "table" and (errYes :: { typeError: unknown }).typeError or errYes)
 	)
 )

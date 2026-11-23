@@ -81,18 +81,17 @@ end
 
 -- The Phase 1 variant in boot/ (difference lists). Set this to BOOT .. "layout.l2" to profile Prototype 6's layout, the baseline in results/layout_profile.txt.
 const layoutC = Compile.compile(readFile "boot/layout.l2", "boot/layout.l2")
-const vmAny: any = VM
 
 -- Runs the layout on a raw program section under the counted machine, with the profile on.
-const function profiled(raw: string): (number, string, any)
+const function profiled(raw: string): (number, string, typeof(profile))
 	profile = newProfile()
-	vmAny.run = function(p: any, f: number, e: any)
+	VM.run = function(p: VM.Expr, f: number, e: VM.Binding?): VM.Outcome
 		return Counted.runReference(p, f, e)
 	end;
-	(Counted :: any).probe.profile = hook
+	Counted.probe.profile = hook
 	const result = Lifecycle.run(layoutC.expr, bytesValue(raw), 1e10);
-	(Counted :: any).probe.profile = nil
-	vmAny.run = VM.runHybrid
+	Counted.probe.profile = nil
+	VM.run = VM.runHybrid
 
 	return result.steps, result.status, profile
 end

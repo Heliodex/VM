@@ -64,14 +64,13 @@ const laid = Lifecycle.run(layoutC.expr, bytesValue(typesP6.raw), 1e10)
 const lexed = Lifecycle.run(lexer.expr, O.payloadOf(O.valueOf(laid)), 1e8)
 const parsed = Lifecycle.run(parser.expr, O.payloadOf(O.valueOf(lexed)), 5e8)
 const request = { kind = "con", tag = 3, payload = O.payloadOf(O.valueOf(parsed)) }
-local vmAny: any = VM
-vmAny.run = function(p: any, f: number, e: any)
+VM.run = function(p: VM.Expr, f: number, e: VM.Binding?): VM.Outcome
 	return Counted.runReference(p, f, e)
 end;
-(Counted :: any).probe.profile = hook
+Counted.probe.profile = hook
 const run = Lifecycle.run(checker.expr, request, 1e10);
-(Counted :: any).probe.profile = nil
-vmAny.run = VM.runHybrid
+Counted.probe.profile = nil
+VM.run = VM.runHybrid
 print(
 	`checker steps: {commas(run.steps)} ({run.status}); profile covers {
 		if profile.steps == run.steps then

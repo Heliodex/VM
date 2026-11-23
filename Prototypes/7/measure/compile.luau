@@ -23,55 +23,66 @@ export type Timings = {
 	imports: number,
 }
 export type Compiled = {
-	expr: any,
-	scheme: any,
+	expr: VM.Expr,
+	scheme: Checker.Scheme,
 	timings: Timings,
 	-- The program section after the host layout pass: bracketed text, which the Luau parser reads.
 	source: string,
 	-- The program section before layout: indented text, which the VM's layout stage reads.
 	raw: string,
 }
+-- A node of a program's tree, walked generically: its fields are the op, the owner, and the children, so its fields are read as unknown and checked where they are used.
+type Node = { [string]: unknown }
+
+-- The children of a node: the fields that are themselves nodes (a table with an op).
+const function childrenOf(node: Node): { Node }
+	local out: { Node } = {}
+
+	for _, child in node do
+		if type(child) == "table" and (child :: Node).op ~= nil then
+			table.insert(out, child :: Node)
+		end
+	end
+
+	return out
+end
 
 -- The fixed-point combinator is one table, shared by every recursive function of every program (the machine's M.fix). Its nodes are owned by "fixpoint", not by whichever function first reaches them, which is what the owner pass would otherwise do: Phase 0's "top" owner was partly this.
-const function markFix(root: any)
-	local work: { any } = { root }
+const function markFix(root: Node)
+	local work: { Node } = { root }
 
 	while #work > 0 do
-		const node = table.remove(work) :: any
+		const node = table.remove(work) :: Node
 
 		if node.owner == nil then
 			node.owner = "fixpoint"
 
-			for _, child in node do
-				if type(child) == "table" and child.op ~= nil then
-					table.insert(work, child)
-				end
+			for _, child in childrenOf(node) do
+				table.insert(work, child)
 			end
 		end
 	end
 end
 
 -- Gives each node its owner, top-down. A lambda with a label starts a new owner; a node that is already owned is not visited again, so a shared node keeps its first owner.
-const function annotate(root: any)
-	markFix(VM.fix)
-	local work: { { any } } = { { root, "top" } }
+const function annotate(root: VM.Expr)
+	markFix(VM.fix :: Node)
+	local work: { { node: Node, owner: string } } = { { node = root :: Node, owner = "top" } }
 
 	while #work > 0 do
-		const item = table.remove(work) :: { any }
-		const node = item[1]
-		local owner = item[2] :: string
+		const item = table.remove(work) :: { node: Node, owner: string }
+		const node = item.node
+		local owner = item.owner
 
 		if node.owner == nil then
 			if node.op == "lam" and node.label ~= nil then
-				owner = node.label
+				owner = node.label :: string
 			end
 
 			node.owner = owner
 
-			for _, child in node do
-				if type(child) == "table" and child.op ~= nil then
-					table.insert(work, { child, owner })
-				end
+			for _, child in childrenOf(node) do
+				table.insert(work, { node = child, owner = owner })
 			end
 		end
 	end
@@ -105,8 +116,8 @@ compileFile = function(text: string, name: string, stack: { string }): Compiled
 	const program = Parser.parse(laidOut)
 	const parseTime = os.clock() - parseStart
 	const names: { string } = {}
-	const values: { any } = {}
-	local importSchemes: { { name: string, scheme: any } } = {}
+	const values: { VM.Expr } = {}
+	local importSchemes: { { name: string, scheme: Checker.Scheme } } = {}
 	local importTime = 0
 	const chain = table.clone(stack)
 	table.insert(chain, name)

@@ -37,16 +37,18 @@ const function readFile(path: string): string
 end
 
 -- Which machine runs the L2 programs. Lifecycle.run calls VM.run, so swapping that field swaps the machine, as vm_bench does.
-const machines: { [string]: any } = {
+-- The signature of a machine's run. Each machine has it: Prototype 6's run, runHybrid, and the counted copy's runReference.
+type Runner = (program: VM.Expr, fuel: number, initialEnv: VM.Binding?) -> VM.Outcome
+const machines: { [string]: Runner } = {
 	fast = VM.run,
 	hybrid = VM.runHybrid,
-	counted = function(program: any, fuel: number, env: any): any
+	counted = function(program: VM.Expr, fuel: number, env: VM.Binding?): VM.Outcome
 		return Counted.runReference(program, fuel, env)
 	end,
 }
 
 const function useMachine(name: string)
-	(VM :: any).run = machines[name]
+	VM.run = machines[name]
 end
 
 -- The text of a list of bytes.
@@ -64,7 +66,7 @@ const function linesOf(text: string): number
 end
 
 -- Runs one stage, and gives the result and its CPU seconds.
-const function timedRun(compiled: any, input: any, fuel: number): (any, number)
+const function timedRun(compiled: Compile.Compiled, input: VM.Value, fuel: number): (Lifecycle.Result, number)
 	const t0 = os.clock()
 	const result = Lifecycle.run(compiled.expr, input, fuel)
 
@@ -85,7 +87,7 @@ type VmBuild = {
 	result: string?,
 }
 
-const function stage(result: any, seconds: number): Stage
+const function stage(result: Lifecycle.Result, seconds: number): Stage
 	return { steps = result.steps, seconds = seconds, status = result.status }
 end
 
@@ -106,10 +108,13 @@ const function importsOf(text: string): { Import }
 end
 
 -- The VM build of one source: its imports, then layout, lex, parse and check. The source is the raw program section (indented), which is what a VM build starts from. Each library is laid out, lexed and parsed on the VM, and the checker gets the libraries as InferI (name . program) with the program. A stage that fails ends the build, and the later stages are skipped.
-const function vmBuild(compiled: any, raw: string, imports: { Import }): VmBuild
+-- The compiled stages of the compiler, each as Compile.Compiled.
+type Compiler = { layout: Compile.Compiled, lexer: Compile.Compiled, parser: Compile.Compiled, checker: Compile.Compiled }
+
+const function vmBuild(compiled: Compiler, raw: string, imports: { Import }): VmBuild
 	local importSteps = 0
 	local importSeconds = 0
-	local libraries: { any } = {}
+	local libraries: { VM.Value } = {}
 	local importRefusal: string? = nil
 
 	for _, imp in imports do
@@ -141,7 +146,8 @@ const function vmBuild(compiled: any, raw: string, imports: { Import }): VmBuild
 			break
 		end
 
-		table.insert(libraries, { kind = "cell", head = bytesValue(imp.name), tail = O.payloadOf(O.valueOf(parsed)) })
+		const library: VM.Cell = { kind = "cell", head = bytesValue(imp.name), tail = O.payloadOf(O.valueOf(parsed)) }
+		table.insert(libraries, library)
 	end
 
 	const importStage: Stage = {
@@ -180,16 +186,19 @@ const function vmBuild(compiled: any, raw: string, imports: { Import }): VmBuild
 	end
 
 	-- Without imports the request is Infer (tag 3); with them it is InferI (tag 4), with the libraries in the order of the header.
-	local request: any = { kind = "con", tag = 3, payload = O.payloadOf(O.valueOf(parsed)) }
+	local request: VM.Value = { kind = "con", tag = 3, payload = O.payloadOf(O.valueOf(parsed)) }
 
 	if #libraries > 0 then
-		local cells: any = VM.NIL
+		local cells: VM.Value = VM.NIL
 
 		for i = #libraries, 1, -1 do
-			cells = { kind = "cell", head = libraries[i], tail = cells }
+			const cell: VM.Cell = { kind = "cell", head = libraries[i], tail = cells }
+			cells = cell
 		end
 
-		request = { kind = "con", tag = 4, payload = { kind = "cell", head = cells, tail = O.payloadOf(O.valueOf(parsed)) } }
+		const pair: VM.Cell = { kind = "cell", head = cells, tail = O.payloadOf(O.valueOf(parsed)) }
+		const withLibraries: VM.Con = { kind = "con", tag = 4, payload = pair }
+		request = withLibraries
 	end
 
 	const checked, checkTime = timedRun(compiled.checker, request, 1e10)
@@ -242,7 +251,7 @@ end
 -- The compiler's own stages, compiled once. Their compile time is not part of any build here, since the compiler is built once and used many times.
 const compilerTimes: { string } = {}
 
-const function compileCompiler(file: string, dir: string): any
+const function compileCompiler(file: string, dir: string): Compile.Compiled
 	const c = Compile.compile(readFile(dir .. file), "boot/" .. file)
 	table.insert(compilerTimes, string.format("  %s (%s): layout %.3fs, parse %.3fs, check %.3fs, desugar %.3fs", file, dir, c.timings.layout, c.timings.parse, c.timings.check, c.timings.desugar))
 
@@ -376,9 +385,9 @@ const profileLexed = Lifecycle.run(lexer.expr, O.payloadOf(O.valueOf(profileLaid
 const profileParsed = Lifecycle.run(parser.expr, O.payloadOf(O.valueOf(profileLexed)), 5e8)
 const profileRequest = { kind = "con", tag = 3, payload = O.payloadOf(O.valueOf(profileParsed)) }
 useMachine "counted";
-(Counted :: any).probe.profile = hook
+Counted.probe.profile = hook
 const profiled = Lifecycle.run(checker.expr, profileRequest, 1e10);
-(Counted :: any).probe.profile = nil
+Counted.probe.profile = nil
 useMachine "hybrid"
 print(string.format("checker steps under the profile: %s (outcome %s)", commas(profiled.steps), profiled.status))
 print(
@@ -445,9 +454,9 @@ for _, n in { 100, 400 } do
 	const requestFor = { kind = "con", tag = 3, payload = O.payloadOf(O.valueOf(parsedFor)) }
 	profile = newProfile()
 	useMachine "counted";
-	(Counted :: any).probe.profile = hook
+	Counted.probe.profile = hook
 	const runFor = Lifecycle.run(checker.expr, requestFor, 1e10);
-	(Counted :: any).probe.profile = nil
+	Counted.probe.profile = nil
 	useMachine "hybrid"
 	grown[n] = profile.owner
 	print(string.format("%d functions: checker %s steps (outcome %s)", n, commas(runFor.steps), runFor.status))

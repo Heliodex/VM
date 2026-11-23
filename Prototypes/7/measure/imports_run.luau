@@ -60,7 +60,7 @@ const parser = Compile.compile(readFile(P6BOOT .. "parse.l2"), "boot/parse.l2")
 const checker = Compile.compile(readFile "boot/types.l2", "boot/types.l2")
 
 -- The VM's front end on a raw program section: layout, lex, parse. Gives the parsed program, or the message of the stage that refuses.
-const function vmParse(raw: string): (any?, string?)
+const function vmParse(raw: string): (VM.Value?, string?)
 	const laid = Lifecycle.run(layoutC.expr, bytesValue(raw), 1e10)
 
 	if laid.status ~= "value" or O.tagOf(O.valueOf(laid)) ~= 0 then
@@ -89,7 +89,7 @@ const function checkFile(name: string)
 	const file = ProgramFile.parse(text, nil)
 	const raw = file.program :: string
 	-- The VM: each import's parsed program, then the request.
-	local importCells: any = VM.NIL
+	local importCells: VM.Value = VM.NIL
 	local libraries: { { name: string, laid: string } } = {}
 
 	for _, imp in file.imports do
@@ -103,15 +103,18 @@ const function checkFile(name: string)
 			return
 		end
 
-		importCells = { kind = "cell", head = { kind = "cell", head = bytesValue(imp.name), tail = libProgram }, tail = importCells }
+		const pairCell: VM.Cell = { kind = "cell", head = bytesValue(imp.name), tail = libProgram }
+		const listCell: VM.Cell = { kind = "cell", head = pairCell, tail = importCells }
+		importCells = listCell
 		table.insert(libraries, { name = imp.name, laid = Layout.layout(libFile.program :: string) })
 	end
 
 	-- Reversed by construction; put them back in order so the order matches the Luau side.
-	local ordered: any = VM.NIL
+	local ordered: VM.Value = VM.NIL
 
 	for _, item in itemsOf(importCells) do
-		ordered = { kind = "cell", head = item, tail = ordered }
+		const orderedCell: VM.Cell = { kind = "cell", head = item, tail = ordered }
+		ordered = orderedCell
 	end
 
 	const targetProgram, targetErr = vmParse(raw)
@@ -123,7 +126,8 @@ const function checkFile(name: string)
 		return
 	end
 
-	const request = { kind = "con", tag = 4, payload = { kind = "cell", head = ordered, tail = targetProgram } }
+	const requestCell: VM.Cell = { kind = "cell", head = ordered, tail = targetProgram }
+	const request: VM.Con = { kind = "con", tag = 4, payload = requestCell }
 	const result = Lifecycle.run(checker.expr, request, 1e10)
 
 	if result.status ~= "value" then
@@ -141,7 +145,7 @@ const function checkFile(name: string)
 	end
 
 	-- The Luau side, with the same libraries as import schemes.
-	local importSchemes: { { name: string, scheme: any } } = {}
+	local importSchemes: { { name: string, scheme: Checker.Scheme } } = {}
 
 	for _, lib in libraries do
 		const libProgram = Parser.parse(lib.laid)
@@ -155,7 +159,7 @@ const function checkFile(name: string)
 	const okCheck, res = pcall(Checker.check, parsedLuau, importSchemes, name)
 
 	if okCheck then
-		luauText = Checker.showScheme((res :: any).scheme)
+		luauText = Checker.showScheme(res.scheme)
 	else
 		luauOk = false
 		luauText = tostring(res)
