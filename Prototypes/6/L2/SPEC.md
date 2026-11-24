@@ -1,8 +1,8 @@
 # L2: specification draft
 
-Status: draft. Every question in the draft is decided; section 14 records them. The reference implementation is the L2 compiler written in L2 (section 11), and the Luau compiler is its oracle.
+Status: draft. Every question in the draft is decided; section 14 records them. The intended reference implementation is the L2 compiler written in L2 (section 11); the Luau compiler is its oracle and is still the one the tools run by default.
 
-L2 is the next language on the machine in `interpreter/`. It keeps what L1 learned, changes the surface syntax, and adds tagged values. The reference implementation is the L2 compiler written in L2, in `programs/boot/`, run on the machine. The Luau compiler in `L2/` is the oracle that checks it (section 11). L2 was bootstrapped once its surface was stable.
+L2 is the next language on the machine in `interpreter/`. It keeps what L1 learned, changes the surface syntax, and adds tagged values. The intended reference implementation is the L2 compiler written in L2, in `programs/boot/`, run on the machine. The Luau compiler in `L2/` is its oracle (section 11), and it is still the compiler the tools run by default. L2 was bootstrapped once its surface was stable.
 
 ## 1. Goals
 
