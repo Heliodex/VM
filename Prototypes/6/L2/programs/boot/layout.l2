@@ -1,4 +1,5 @@
 The L2 layout layer, written in indented L2: it turns an indented source, as a list of bytes, into the bracketed source the parser reads. It gives Ok of the bracketed bytes, or Err of the message the Luau layer gives (L2/layout.luau). The two give the same text for every case in layout_cases_run.luau.
+Phase 1 variant (Prototypes/7, Phase 0 profile): the output is built as difference lists, so each piece of text is copied once, when it is flattened. Prototype 6's layout.l2 builds each enclosing block by copying the text of the blocks inside it, which is quadratic in the nesting depth. The output must stay the same, which the Phase 0 harness checks against the host layout.
 ---
 
 ---
@@ -53,6 +54,21 @@ letrec cat = fn (a b)
 		b
 	else
 		cons (hd a) (cat (tlOf a) b)
+; A piece of output is a function from the text that follows it to the text that follows it with the piece in front. Joining two pieces is a composition, which copies nothing. The whole output is copied once, by flatD. A piece of source text is a leaf, lf.
+let lf = fn s
+	fn tl
+		cat s tl
+let emptyD = fn tl
+	tl
+let dcat = fn (f g)
+	fn tl
+		f (g tl)
+let flatD = fn d
+	d ~
+let hdD = fn l
+	match (head l)
+		Ok x -> x
+		Err e -> emptyD
 let divN = fn n
 	match (/ n 10)
 		Ok q -> q
@@ -221,11 +237,11 @@ let dropSpace1 = fn l
 		l
 letrec joinLines = fn ls
 	if (= (@ ls) 1)
-		~
+		emptyD
 	elseif (= (@ (tlOf ls)) 1)
-		hdL ls
+		hdD ls
 	else
-		cat (hdL ls) (cat "\n" (joinLines (tlOf ls)))
+		dcat (hdD ls) (dcat (lf "\n") (joinLines (tlOf ls)))
 let isCapB = fn t
 	if (< 64 (hd t))
 		< (hd t) 91
@@ -246,7 +262,7 @@ let anyKids = fn ks
 letrec
 	fieldValue = fn (value ln ks)
 		if (= (@ ks) 1)
-			Ok value
+			Ok (lf value)
 		else
 			expr (mkNode value ln ks)
 	fieldLines = fn ch
@@ -260,17 +276,17 @@ letrec
 			else
 				let vs = (fieldValue (snd (snd nv)) (nline c) (kids c))?
 				let more = (fieldLines (tlOf ch))?
-				Ok (cons (cat (fst (snd nv)) (cat " = " vs)) more)
+				Ok (cons (dcat (lf (fst (snd nv))) (dcat (lf " = ") vs)) more)
 	armBlockBody = fn nxt
 		if (= (@ (kids nxt)) 1)
-			Ok (dropSpace1 (dropN (ntext nxt) 2))
+			Ok (lf (dropSpace1 (dropN (ntext nxt) 2)))
 		else
 			let s = (seq (kids nxt))?
-			Ok (cat "(" (cat s ")"))
+			Ok (dcat (lf "(") (dcat s (lf ")")))
 	armBlockLine = fn (c nxt)
 		let fl = (fieldLines (kids c))?
 		let body = (armBlockBody nxt)?
-		Ok (cat (ntext c) (cat " {\n" (cat (joinLines fl) (cat "\n} -> " body))))
+		Ok (dcat (lf (ntext c)) (dcat (lf " {\n") (dcat (joinLines fl) (dcat (lf "\n} -> ") body))))
 	armHasBlock = fn ch
 		if (= (@ ch) 1)
 			0
@@ -287,14 +303,14 @@ letrec
 			if (anyKids (kids c))
 				lineErr (nline c) "an arm with a body on its line has no lines below it"
 			else
-				Ok (cat (takeN t i) (cat " -> " (dropN t (+ i 4))))
+				Ok (dcat (lf (takeN t i)) (dcat (lf " -> ") (lf (dropN t (+ i 4)))))
 		elseif (endsArrow t)
 			let pat = trimEnd (takeN t (- (lenL t) 2))
 			if (= (@ (kids c)) 1)
 				lineErr (nline c) "an arm needs a body after its ->"
 			else
 				let s = (seq (kids c))?
-				Ok (cat pat (cat " -> (" (cat s ")")))
+				Ok (dcat (lf pat) (dcat (lf " -> (") (dcat s (lf ")"))))
 		else
 			lineErr (nline c) "an arm is written pat -> body"
 	armLines = fn ch
@@ -313,25 +329,25 @@ letrec
 			lineErr (nline n) "a match needs arms below it"
 		else
 			let arms = (armLines (kids n))?
-			Ok (cat "match " (cat (dropN (ntext n) 6) (cat " {\n" (cat (joinLines arms) "\n}"))))
+			Ok (dcat (lf "match ") (dcat (lf (dropN (ntext n) 6)) (dcat (lf " {\n") (dcat (joinLines arms) (lf "\n}")))))
 	condText = fn n
 		if (= (@ (kids n)) 1)
 			lineErr (nline n) "a cond needs clauses below it"
 		else
 			let arms = (armLines (kids n))?
-			Ok (cat "cond {\n" (cat (joinLines arms) "\n}"))
+			Ok (dcat (lf "cond {\n") (dcat (joinLines arms) (lf "\n}")))
 	withText = fn n
 		if (= (@ (kids n)) 1)
 			lineErr (nline n) "a with needs field lines below it"
 		else
 			let fl = (fieldLines (kids n))?
-			Ok (cat "with " (cat (dropN (ntext n) 5) (cat " {\n" (cat (joinLines fl) "\n}"))))
+			Ok (dcat (lf "with ") (dcat (lf (dropN (ntext n) 5)) (dcat (lf " {\n") (dcat (joinLines fl) (lf "\n}")))))
 	recordText = fn n
 		let fl = (fieldLines (kids n))?
-		Ok (cat (ntext n) (cat " {\n" (cat (joinLines fl) "\n}")))
+		Ok (dcat (lf (ntext n)) (dcat (lf " {\n") (dcat (joinLines fl) (lf "\n}"))))
 	fnText = fn n
 		let s = (seq (kids n))?
-		Ok (cat "(" (cat (ntext n) (cat "\n" (cat s ")"))))
+		Ok (dcat (lf "(") (dcat (lf (ntext n)) (dcat (lf "\n") (dcat s (lf ")")))))
 	argsOf = fn ks
 		if (= (@ ks) 1)
 			Ok ~
@@ -341,7 +357,7 @@ letrec
 			Ok (cons a more)
 	appText = fn n
 		let args = (argsOf (kids n))?
-		Ok (cat "(" (cat (ntext n) (cat "\n" (cat (joinLines args) ")"))))
+		Ok (dcat (lf "(") (dcat (lf (ntext n)) (dcat (lf "\n") (dcat (joinLines args) (lf ")")))))
 	expr = fn n
 		if (startsWith "match " (ntext n))
 			matchText n
@@ -352,7 +368,7 @@ letrec
 		elseif (if (isCapB (ntext n)) (if (= (@ (kids n)) 1) 0 (allFieldsOf (kids n))) 0)
 			recordText n
 		elseif (= (@ (kids n)) 1)
-			Ok (ntext n)
+			Ok (lf (ntext n))
 		elseif (startsWith "fn " (ntext n))
 			fnText n
 		elseif (if (startsWith "if " (ntext n)) 1 (startsWith "let " (ntext n)))
@@ -380,7 +396,7 @@ letrec
 				lineErr (nline n) "a let needs a body after it"
 			else
 				let s = (seq rest)?
-				Ok (cat "(" (cat kw (cat " " (cat (fst (snd nv)) (cat " = " (cat vt (cat "\n" (cat s ")"))))))))
+				Ok (dcat (lf "(") (dcat (lf kw) (dcat (lf " ") (dcat (lf (fst (snd nv))) (dcat (lf " = ") (dcat vt (dcat (lf "\n") (dcat s (lf ")")))))))))
 	bindingLines = fn ks
 		if (= (@ ks) 1)
 			Ok ~
@@ -392,7 +408,7 @@ letrec
 			else
 				let vt = (fieldValue (snd (snd nv)) (nline c) (kids c))?
 				let more = (bindingLines (tlOf ks))?
-				Ok (cons (cat (fst (snd nv)) (cat " = " vt)) more)
+				Ok (cons (dcat (lf (fst (snd nv))) (dcat (lf " = ") vt)) more)
 	blockLet = fn (n rest)
 		if (= (@ (kids n)) 1)
 			lineErr (nline n) (cat (ntext n) " needs its bindings below it")
@@ -401,7 +417,7 @@ letrec
 		else
 			let bs = (bindingLines (kids n))?
 			let s = (seq rest)?
-			Ok (cat (ntext n) (cat " {\n" (cat (joinLines bs) (cat "\n(" (cat s ")\n}")))))
+			Ok (dcat (lf (ntext n)) (dcat (lf " {\n") (dcat (joinLines bs) (dcat (lf "\n(") (dcat s (lf ")\n}"))))))
 	elifCount = fn rs
 		if (= (@ rs) 1)
 			0
@@ -429,12 +445,12 @@ letrec
 	chainText = fn (bs elseKids)
 		if (= (@ bs) 1)
 			let s = (seq elseKids)?
-			Ok (cat "(" (cat s ")"))
+			Ok (dcat (lf "(") (dcat s (lf ")")))
 		else
 			let b = hdN bs
 			let th = (seq (kids b))?
 			let rest = (chainText (tlOf bs) elseKids)?
-			Ok (cat "(if " (cat (condOf b) (cat "\n(" (cat th (cat ")\n" (cat rest ")"))))))
+			Ok (dcat (lf "(if ") (dcat (lf (condOf b)) (dcat (lf "\n(") (dcat th (dcat (lf ")\n") (dcat rest (lf ")")))))))
 	ifText = fn (n rest)
 		if (= (@ (kids n)) 1)
 			lineErr (nline n) "an if needs its then-branch below it"
@@ -479,7 +495,7 @@ letrec
 				lineErr (nline c) "a record field is written name: Type"
 			else
 				let more = (declFields (tlOf ks))?
-				Ok (cons (ntext c) more)
+				Ok (cons (lf (ntext c)) more)
 	endsEq = fn s
 		if (< (lenL s) 2)
 			0
@@ -494,17 +510,17 @@ letrec
 			lineErr (nline (hdN cs)) "a constructor of a sum is a line starting with |"
 	conText = fn c
 		if (= (@ (kids c)) 1)
-			Ok (dropN (ntext c) 2)
+			Ok (lf (dropN (ntext c) 2))
 		else
 			let fs = (declFields (kids c))?
-			Ok (cat (dropN (ntext c) 2) (cat " {\n" (cat (joinLines fs) "\n}")))
+			Ok (dcat (lf (dropN (ntext c) 2)) (dcat (lf " {\n") (dcat (joinLines fs) (lf "\n}"))))
 	sumText = fn cs
 		let t = (conText (hdN cs))?
 		if (= (@ (tlOf cs)) 1)
 			Ok t
 		else
 			let rest = (sumText (tlOf cs))?
-			Ok (cat t (cat " | " rest))
+			Ok (dcat t (dcat (lf " | ") rest))
 	declLine = fn d
 		if (endsEq (ntext d))
 			if (= (@ (kids d)) 1)
@@ -512,14 +528,14 @@ letrec
 			else
 				let checked = (sumOk (kids d))?
 				let st = (sumText (kids d))?
-				Ok (cat (ntext d) (cat " " st))
+				Ok (dcat (lf (ntext d)) (dcat (lf " ") st))
 		elseif (= (@ (kids d)) 1)
-			Ok (ntext d)
+			Ok (lf (ntext d))
 		elseif (startsWith "| " (ntext (hdN (kids d))))
 			lineErr (nline (hdN (kids d))) "the constructors of a sum go below a type line that ends with ="
 		else
 			let fs = (declFields (kids d))?
-			Ok (cat (ntext d) (cat " {\n" (cat (joinLines fs) "\n}")))
+			Ok (dcat (lf (ntext d)) (dcat (lf " {\n") (dcat (joinLines fs) (lf "\n}"))))
 	declsOf = fn rs
 		if (= (@ rs) 1)
 			Ok (~ . rs)
@@ -533,7 +549,7 @@ letrec
 		if (= (@ a) 1)
 			b
 		else
-			cons (hdL a) (appendL (tlOf a) b)
+			cons (hdD a) (appendL (tlOf a) b)
 let layoutOf = fn src
 	let raws = (rawsOf (linesOf src) 1)?
 	if (= (@ raws) 1)
@@ -545,7 +561,7 @@ let layoutOf = fn src
 			lineErr 0 "a program needs an expression after its declarations"
 		else
 			let s = (seq (snd ds))?
-			Ok (joinLines (appendL (fst ds) (cons s ~)))
+			Ok (flatD (joinLines (appendL (fst ds) (cons s ~))))
 fn src
 	layoutOf src
 ---

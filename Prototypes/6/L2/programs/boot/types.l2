@@ -3,7 +3,7 @@ The first part of the L2 checker, written in L2 with no mutation. The state is a
 ---
 type Ty = TVar Int | TCon ([Int] . [Ty])
 type Bind = Unbound Int | Bound Ty
-type St = St (Int . (Tr . [[Int]]))
+type St = St (Int . (Tr . ([[Int]] . [((Int . Int) . Ty)])))
 type Scheme = Scheme ([Int] . Ty)
 type Entry =
 	| EVar Scheme
@@ -12,6 +12,7 @@ type Entry =
 	| ERecC ([Int] . ([Int] . (Int . ([[Int]] . Ty))))
 	| EAcc ([Int] . (Int . Int))
 type Look = Found Entry | Missing
+type EN = EN ([Entry] . [(Int . EN)])
 type PTy =
 	| TName ([Int] . (Int . Int))
 	| TApp ([Int] . ([PTy] . (Int . Int)))
@@ -20,11 +21,27 @@ type PTy =
 	| TFun (PTy . (PTy . (Int . Int)))
 	| NoType
 	| TRec [([Int] . (PTy . (Int . Int)))]
+type Test =
+	| KAny
+	| KNil
+	| KInt
+	| KFn
+	| KPin
+	| KPair (Test . Test)
+	| KList (Test . Test)
+	| KSum [(Int . Test)]
+	| KRec [Int]
+	| KFixdef ([Int] . Test)
+type InputCheck =
+	| NoInputCheck
+	| HasInputCheck (Test . [Int])
 type Req =
 	| Unify (Ty . Ty)
 	| Gen (Int . Ty)
 	| Inst (Int . Scheme)
 	| Infer ([([Int] . ([[Int]] . ([([Int] . (PTy . (Int . Int)))] . (Int . Int))))] . Expr)
+	| InferI ([([Int] . ([([Int] . ([[Int]] . ([([Int] . (PTy . (Int . Int)))] . (Int . Int))))] . Expr))] . ([([Int] . ([[Int]] . ([([Int] . (PTy . (Int . Int)))] . (Int . Int))))] . Expr))
+	| InferT ([([Int] . ([([Int] . ([[Int]] . ([([Int] . (PTy . (Int . Int)))] . (Int . Int))))] . Expr))] . ([([Int] . ([[Int]] . ([([Int] . (PTy . (Int . Int)))] . (Int . Int))))] . Expr))
 type MS = MS (St . (Int . ([Int] . (Ty . ([Ty] . ([Int] . Int))))))
 type Expr =
 	| EInt (Int . (Int . Int))
@@ -44,7 +61,7 @@ type Expr =
 	| EUntyped (Expr . (Int . Int))
 	| ERec ([Int] . ([([Int] . (Expr . (Int . Int)))] . (Int . Int)))
 	| EWith (Expr . ([([Int] . (Expr . (Int . Int)))] . (Int . Int)))
-type Tr = TEmpty | TNode (Bind . (Tr . Tr))
+type Tr = TEmpty | TNode (Bind . (Tr . (Tr . (Tr . Tr))))
 type Pat =
 	| PCon ([Int] . ([Int] . (Int . Int)))
 	| PBind ([Int] . (Int . Int))
@@ -70,8 +87,23 @@ let mod10 = fn n
 	match (% n 10)
 		Ok r -> r
 		Err e -> 0
+; Names are compared a byte at a time. Each step reads the head of each list once, through the builtin (a match, not a call to first), since this is the innermost loop of the name environment.
 letrec same = fn (a b)
-	(if (= (@ a) 1) (= (@ b) 1) (if (= (@ b) 1) 0 (if (= (first a) (first b)) (same (tl a) (tl b)) 0)))
+	match (head a)
+		Err e -> (if (= (@ b) 1) 1 0)
+		Ok x ->
+			match (head b)
+				Err f -> 0
+				Ok y ->
+					if (= x y)
+						match (tail a)
+							Err g -> 0
+							Ok ta ->
+								match (tail b)
+									Err h -> 0
+									Ok tb -> (same ta tb)
+					else
+						0
 letrec lenOf = fn l
 	(if (= (@ l) 1) 0 (+ 1 (lenOf (tl l))))
 letrec cat = fn (a b)
@@ -88,9 +120,15 @@ let nextOf = fn st
 let bindsOf = fn st
 	(fst (snd (stP st)))
 let errsOf = fn st
-	(snd (snd (stP st)))
+	(fst (snd (snd (stP st))))
+let pendOf = fn st
+	(snd (snd (snd (stP st))))
 let mkSt = fn (n bs es)
-	(St (n . (bs . es)))
+	(St (n . (bs . (es . ~))))
+let restate = fn (st n bs es)
+	(St (n . (bs . (es . (pendOf st)))))
+let addPend = fn (st at ty)
+	(St ((nextOf st) . ((bindsOf st) . ((errsOf st) . (cons (at . ty) (pendOf st))))))
 letrec snoc = fn (l x)
 	if (= (@ l) 1)
 		(cons x ~)
@@ -99,32 +137,53 @@ letrec snoc = fn (l x)
 			Ok h -> (cons h (snoc (tl l) x))
 			Err e -> (cons x ~)
 let addErr = fn (st msg)
-	(mkSt (nextOf st) (bindsOf st) (snoc (errsOf st) msg))
-let halfOf = fn n
-	match (/ n 2)
-		Ok q -> q
-		Err e -> 0
-let oddOf = fn n
-	match (% n 2)
-		Ok r -> r
-		Err e -> 0
-let pickSide = fn (lr b)
-	(if (= b 1) (snd lr) (fst lr))
+	(restate st (nextOf st) (bindsOf st) (snoc (errsOf st) msg))
+; The binding store is a radix-4 trie on the id. A node holds the binding of the id that is 0 at that node (the node's own), and four children, one for each remainder r = id mod 4; a child is reached with id div 4. So a lookup takes about log4 of the id in levels, each with one division, where the binary trie it replaces took log2 with two. The children are a nest of pairs (c0 . (c1 . (c2 . c3))), read with fst and snd, so no list is walked.
 letrec findB = fn (bs id)
-	match bs
-		TEmpty -> (Unbound 0)
-		TNode p -> (if (= id 0) (fst p) (findB (pickSide (snd p) (oddOf id)) (halfOf id)))
+	match (/ id 4)
+		Ok q ->
+			match bs
+				TEmpty -> (Unbound 0)
+				TNode p ->
+					if (= id 0)
+						fst p
+					else
+						let r = (- id (* 4 q))
+						let kids = (snd p)
+						if (< r 2)
+							(if (= r 0) (findB (fst kids) q) (findB (fst (snd kids)) q))
+						elseif (= r 2)
+							findB (fst (snd (snd kids))) q
+						else
+							findB (snd (snd (snd kids))) q
+		Err e -> (Unbound 0)
 letrec setB = fn (bs id b)
-	match bs
-		TEmpty -> (setB (TNode ((Unbound 0) . (TEmpty . TEmpty))) id b)
-		TNode p -> (if (= id 0) (TNode (b . (snd p))) (if (= (oddOf id) 1) (TNode ((fst p) . ((fst (snd p)) . (setB (snd (snd p)) (halfOf id) b)))) (TNode ((fst p) . ((setB (fst (snd p)) (halfOf id) b) . (snd (snd p)))))))
+	match (/ id 4)
+		Ok q ->
+			match bs
+				TEmpty -> (setB (TNode ((Unbound 0) . (TEmpty . (TEmpty . (TEmpty . TEmpty))))) id b)
+				TNode p ->
+					if (= id 0)
+						TNode (b . (snd p))
+					else
+						let r = (- id (* 4 q))
+						let kids = (snd p)
+						if (= r 0)
+							TNode ((fst p) . ((setB (fst kids) q b) . (snd kids)))
+						elseif (= r 1)
+							TNode ((fst p) . ((fst kids) . ((setB (fst (snd kids)) q b) . (snd (snd kids)))))
+						elseif (= r 2)
+							TNode ((fst p) . ((fst kids) . ((fst (snd kids)) . ((setB (fst (snd (snd kids))) q b) . (snd (snd (snd kids)))))))
+						else
+							TNode ((fst p) . ((fst kids) . ((fst (snd kids)) . ((fst (snd (snd kids))) . (setB (snd (snd (snd kids))) q b)))))
+		Err e -> bs
 let levelOf = fn b
 	match b
 		Unbound lv -> lv
 		Bound t -> 0
 let fresh = fn (st level)
 	let n = (nextOf st)
-	((TVar n) . (mkSt (+ n 1) (setB (bindsOf st) n (Unbound level)) (errsOf st)))
+	((TVar n) . (restate st (+ n 1) (setB (bindsOf st) n (Unbound level)) (errsOf st)))
 letrec prune = fn (bs t)
 	match t
 		TVar id ->
@@ -161,7 +220,7 @@ letrec render = fn (bs t)
 let mismatch = fn (st a e)
 	(addErr st (cat "expected " (cat (render (bindsOf st) e) (cat ", but this is " (render (bindsOf st) a)))))
 let bindVar = fn (st id t)
-	(if (occurs (bindsOf st) id t) (addErr st (cat (varName id) " would be an infinite type")) (mkSt (nextOf st) (setB (lowerT (bindsOf st) t (levelOf (findB (bindsOf st) id))) id (Bound t)) (errsOf st)))
+	(if (occurs (bindsOf st) id t) (addErr st (cat (varName id) " would be an infinite type")) (restate st (nextOf st) (setB (lowerT (bindsOf st) t (levelOf (findB (bindsOf st) id))) id (Bound t)) (errsOf st)))
 letrec unify = fn (st a0 e0)
 	letrec unifyArgs = fn (st0 aa ea)
 		if (= (@ aa) 1)
@@ -184,7 +243,13 @@ letrec unify = fn (st a0 e0)
 				TVar y -> (bindVar st y a)
 				TCon q -> (unifyCon st (fst p) (snd p) (fst q) (snd q) a e)
 letrec memberI = fn (x l)
-	(if (= (@ l) 1) 0 (if (= (first l) x) 1 (memberI x (tl l))))
+	match (head l)
+		Err e -> 0
+		Ok y ->
+			if (= y x)
+				1
+			else
+				memberI x (tl l)
 letrec freeAbove = fn (bs level t acc)
 	letrec argsFree = fn (acc2 args)
 		(if (= (@ args) 1) acc2 (argsFree (freeAbove bs level (hdOr args (TVar 0)) acc2) (tl args)))
@@ -200,7 +265,13 @@ let schemeTy = fn s
 	match s
 		Scheme p -> (snd p)
 letrec lookupM = fn (m id dflt)
-	(if (= (@ m) 1) dflt (if (= (fst (hdOr m (0 . (TVar 0)))) id) (snd (hdOr m (0 . (TVar 0)))) (lookupM (tl m) id dflt)))
+	match (head m)
+		Err e -> dflt
+		Ok c ->
+			if (= (fst c) id)
+				snd c
+			else
+				lookupM (tl m) id dflt
 letrec subst = fn (bs m t)
 	letrec substArgs = fn args
 		(if (= (@ args) 1) ~ (cons (subst bs m (hdOr args (TVar 0))) (substArgs (tl args))))
@@ -270,11 +341,59 @@ let mono = fn (name ty)
 	(name . (EVar (Scheme (~ . ty))))
 let poly = fn (vars name ty)
 	(name . (EVar (Scheme (vars . ty))))
-let builtinEnv = [(mono "+" (tArrow tInt (tArrow tInt tInt))) (mono "-" (tArrow tInt (tArrow tInt tInt))) (mono "*" (tArrow tInt (tArrow tInt tInt))) (mono "<" (tArrow tInt (tArrow tInt tInt))) (mono "=" (tArrow tInt (tArrow tInt tInt))) (mono "/" (tArrow tInt (tArrow tInt (tRes tInt (tList tInt))))) (mono "%" (tArrow tInt (tArrow tInt (tRes tInt (tList tInt))))) (poly [1] "@" (tArrow (TVar 1) tInt)) (poly [1] "head" (tArrow (tList (TVar 1)) (tRes (TVar 1) (tList tInt)))) (poly [1] "tail" (tArrow (tList (TVar 1)) (tRes (tList (TVar 1)) (tList tInt)))) (poly [1 2] "fst" (tArrow (tPair (TVar 1) (TVar 2)) (TVar 1))) (poly [1 2] "snd" (tArrow (tPair (TVar 1) (TVar 2)) (TVar 2))) (poly [1] "cons" (tArrow (TVar 1) (tArrow (tList (TVar 1)) (tList (TVar 1))))) (poly [1] "pin" (tArrow (TVar 1) (tPin (TVar 1)))) (poly [1] "force" (tArrow (tPin (TVar 1)) (TVar 1))) (poly [1] "fix" (tArrow (tArrow (TVar 1) (TVar 1)) (TVar 1))) ("Ok" . (ECtor ("Result" . ([1 2] . (0 . (1 . (TVar 1))))))) ("Err" . (ECtor ("Result" . ([1 2] . (1 . (1 . (TVar 2))))))) ("#Result" . (ESum ("Result" . ([1 2] . [("Ok" . (0 . 1)) ("Err" . (1 . 1))]))))]
+let builtinList = [(mono "+" (tArrow tInt (tArrow tInt tInt))) (mono "-" (tArrow tInt (tArrow tInt tInt))) (mono "*" (tArrow tInt (tArrow tInt tInt))) (mono "<" (tArrow tInt (tArrow tInt tInt))) (mono "=" (tArrow tInt (tArrow tInt tInt))) (mono "/" (tArrow tInt (tArrow tInt (tRes tInt (tList tInt))))) (mono "%" (tArrow tInt (tArrow tInt (tRes tInt (tList tInt))))) (poly [1] "@" (tArrow (TVar 1) tInt)) (poly [1] "head" (tArrow (tList (TVar 1)) (tRes (TVar 1) (tList tInt)))) (poly [1] "tail" (tArrow (tList (TVar 1)) (tRes (tList (TVar 1)) (tList tInt)))) (poly [1 2] "fst" (tArrow (tPair (TVar 1) (TVar 2)) (TVar 1))) (poly [1 2] "snd" (tArrow (tPair (TVar 1) (TVar 2)) (TVar 2))) (poly [1] "cons" (tArrow (TVar 1) (tArrow (tList (TVar 1)) (tList (TVar 1))))) (poly [1] "pin" (tArrow (TVar 1) (tPin (TVar 1)))) (poly [1] "force" (tArrow (tPin (TVar 1)) (TVar 1))) (poly [1] "fix" (tArrow (tArrow (TVar 1) (TVar 1)) (TVar 1))) ("Ok" . (ECtor ("Result" . ([1 2] . (0 . (1 . (TVar 1))))))) ("Err" . (ECtor ("Result" . ([1 2] . (1 . (1 . (TVar 2))))))) ("#Result" . (ESum ("Result" . ([1 2] . [("Ok" . (0 . 1)) ("Err" . (1 . 1))]))))]
+; The name environment is a persistent trie on the bytes of a name, not a list. A lookup walks the name, so it costs the same however many names are in scope, and a list walk was the quadratic term of the checker (Phase 0). A node is (entries . children): the entries bound at exactly this name (a list of at most one, the newest), and the children, a list of (byte . node). Binding copies the nodes on one path, so an outer environment is unchanged by a binding made inside it, as a list was.
+let envEmpty = (EN (~ . ~))
+letrec envKid = fn (kids b)
+	match (head kids)
+		Err e -> (EN (~ . ~))
+		Ok c ->
+			if (= (fst c) b)
+				snd c
+			else
+				match (tail kids)
+					Err g -> (envKid ~ b)
+					Ok t -> (envKid t b)
+letrec envPut = fn (kids b child)
+	match (head kids)
+		Err e -> cons (b . child) ~
+		Ok c ->
+			if (= (fst c) b)
+				match (tail kids)
+					Err g -> cons (b . child) ~
+					Ok t -> cons (b . child) t
+			else
+				match (tail kids)
+					Err g -> cons c (envPut ~ b child)
+					Ok t -> cons c (envPut t b child)
+letrec envBind = fn (node name e)
+	match node
+		EN p ->
+			if (= (@ name) 1)
+				EN ((cons e ~) . (snd p))
+			else
+				let b = (hdOr name 0)
+				let child = (envKid (snd p) b)
+				EN ((fst p) . (envPut (snd p) b (envBind child (tl name) e)))
+let envCons = fn (env pr)
+	envBind env (fst pr) (snd pr)
+letrec envFind = fn (node name)
+	match node
+		EN p ->
+			if (= (@ name) 1)
+				(if (= (@ (fst p)) 1) Missing (Found (hdOr (fst p) (EVar (Scheme (~ . (TVar 0)))))))
+			else
+				envFind (envKid (snd p) (hdOr name 0)) (tl name)
 letrec findE = fn (env name)
-	(if (= (@ env) 1) Missing (if (same (fst (hdOr env (~ . (EVar (Scheme (~ . (TVar 0))))))) name) (Found (snd (hdOr env (~ . (EVar (Scheme (~ . (TVar 0)))))))) (findE (tl env) name)))
+	envFind env name
+letrec envFromList = fn l
+	if (= (@ l) 1)
+		envEmpty
+	else
+		envCons (envFromList (tl l)) (hdOr l (~ . (EVar (Scheme (~ . (TVar 0))))))
+let builtinEnv = envFromList builtinList
 let addPos = fn (st0 st1 at)
-	(if (< (lenOf (errsOf st0)) (lenOf (errsOf st1))) (mkSt (nextOf st1) (bindsOf st1) (snoc (errsOf st0) (posMsg at (lastMsg (errsOf st1))))) st1)
+	(if (< (lenOf (errsOf st0)) (lenOf (errsOf st1))) (restate st1 (nextOf st1) (bindsOf st1) (snoc (errsOf st0) (posMsg at (lastMsg (errsOf st1))))) st1)
 let unifyAt = fn (st at a e)
 	(addPos st (unify st a e) at)
 letrec varsOf = fn l
@@ -499,7 +618,7 @@ letrec recPats = fn (ms env seen pats names pt name at)
 		elseif (= (nameIn fname seen) 1)
 			(0 . ((withSt ms (addErr (msSt ms) (posMsg (snd (snd pf)) (cat fname " is given twice")))) . env))
 		else
-			let env2 = (if (= (@ (fst (snd pf))) 1) env (cons ((fst (snd pf)) . (EVar (Scheme (~ . (fieldAtT pt j (lenOf names)))))) env))
+			let env2 = (if (= (@ (fst (snd pf))) 1) env (envCons env ((fst (snd pf)) . (EVar (Scheme (~ . (fieldAtT pt j (lenOf names))))))))
 			(recPats ms env2 (cons fname seen) (tl pats) names pt name at)
 let recBind = fn (ms env pats names ids pay tag name at)
 	let ms1 = (mkMS (msSt ms) (msFixed ms) (msName ms) (msTy ms) (msArgs ms) (cons tag (msCov ms)) (msCatch ms))
@@ -529,7 +648,7 @@ let recPat = fn (ms env p scrutTy scrutAt level)
 let conPatGo = fn (ms env name bind at tagv hasPay pay params scrutTy level)
 	let ms1 = (mkMS (msSt ms) (msFixed ms) (msName ms) (msTy ms) (msArgs ms) (cons tagv (msCov ms)) (msCatch ms))
 	let pt = (subst (bindsOf (msSt ms1)) (zipM params (msArgs ms1)) pay)
-	(if (= (@ bind) 1) (1 . (ms1 . env)) (if (= hasPay 0) (0 . ((withSt ms1 (addErr (msSt ms1) (posMsg at (cat name " has no payload to bind")))) . env)) (1 . (ms1 . (cons (bind . (EVar (Scheme (~ . pt)))) env)))))
+	(if (= (@ bind) 1) (1 . (ms1 . env)) (if (= hasPay 0) (0 . ((withSt ms1 (addErr (msSt ms1) (posMsg at (cat name " has no payload to bind")))) . env)) (1 . (ms1 . (envCons env (bind . (EVar (Scheme (~ . pt)))))))))
 let conCtor = fn (ms env c name bind at scrutTy scrutAt level)
 	if (= (msFixed ms) 1)
 		(if (same (fst c) (msName ms)) (conPatGo ms env name bind at (fst (snd (snd c))) (fst (snd (snd (snd c)))) (snd (snd (snd (snd c)))) (fst (snd c)) scrutTy level) (0 . ((withSt ms (addErr (msSt ms) (posMsg at (cat name (cat " belongs to " (cat (fst c) (cat ", but the match is on " (msName ms)))))))) . env)))
@@ -549,7 +668,7 @@ let conPat = fn (ms env name bind at scrutTy scrutAt level)
 let armPat = fn (ms env pat scrutTy scrutAt level)
 	match pat
 		PCon p -> (conPat ms env (fst p) (fst (snd p)) (snd (snd p)) scrutTy scrutAt level)
-		PBind p -> (1 . ((withCatch ms) . (cons ((fst p) . (EVar (Scheme (~ . scrutTy)))) env)))
+		PBind p -> (1 . ((withCatch ms) . (envCons env ((fst p) . (EVar (Scheme (~ . scrutTy)))))))
 		PWild p -> (1 . ((withCatch ms) . env))
 		PRec p -> (recPat ms env p scrutTy scrutAt level)
 let armBody = fn (inf ms env body resTy level)
@@ -618,12 +737,12 @@ letrec infer = fn (st env node level)
 	letrec inferFn = fn (st0 envF names body)
 		if (= (@ names) 1)
 			let rr = (fresh st0 level)
-			let rb = (infer (snd rr) (cons ("#ret" . (EVar (Scheme (~ . (fst rr))))) envF) body level)
+			let rb = (infer (snd rr) (envCons envF ("#ret" . (EVar (Scheme (~ . (fst rr)))))) body level)
 			let s1 = (unifyAt (snd rb) (atOfE body) (fst rb) (fst rr))
 			(if (= (grew (snd rb) s1) 1) (0 . ((fst rr) . s1)) (1 . ((fst rr) . s1)))
 		else
 			let p = (fresh st0 level)
-			let envF2 = (cons ((hdOr names ~) . (EVar (Scheme (~ . (fst p))))) envF)
+			let envF2 = (envCons envF ((hdOr names ~) . (EVar (Scheme (~ . (fst p))))))
 			let rest = (inferFn (snd p) envF2 (tl names) body)
 			((fst rest) . ((tArrow (fst p) (fst (snd rest))) . (snd (snd rest))))
 	letrec bindVars = fn (st0 envB bs)
@@ -631,7 +750,7 @@ letrec infer = fn (st env node level)
 			(st0 . (envB . ~))
 		else
 			let f = (fresh st0 (+ level 1))
-			let rest = (bindVars (snd f) (cons ((fst (hdOr bs (~ . ((ENil (0 . 0)) . (0 . 0))))) . (EVar (Scheme (~ . (fst f))))) envB) (tl bs))
+			let rest = (bindVars (snd f) (envCons envB ((fst (hdOr bs (~ . ((ENil (0 . 0)) . (0 . 0))))) . (EVar (Scheme (~ . (fst f)))))) (tl bs))
 			((fst rest) . ((fst (snd rest)) . (cons (fst f) (snd (snd rest)))))
 	letrec inferBinds = fn (st0 envI bs vs)
 		if (= (@ bs) 1)
@@ -645,7 +764,7 @@ letrec infer = fn (st env node level)
 		if (= (@ bs) 1)
 			envB
 		else
-			bindEnv sx (cons ((fst (hdOr bs (~ . ((ENil (0 . 0)) . (0 . 0))))) . (EVar (generalize sx level (hdOr vs (TVar 0))))) envB) (tl bs) (tl vs)
+			bindEnv sx (envCons envB ((fst (hdOr bs (~ . ((ENil (0 . 0)) . (0 . 0))))) . (EVar (generalize sx level (hdOr vs (TVar 0)))))) (tl bs) (tl vs)
 	match node
 		EInt p -> (tInt . st)
 		EStr p -> ((tList tInt) . st)
@@ -671,17 +790,17 @@ letrec infer = fn (st env node level)
 		ELet p ->
 			if (= (fst (snd (snd (snd p)))) 1)
 				let f = (fresh st (+ level 1))
-				let recEnv = (cons ((fst p) . (EVar (Scheme (~ . (fst f))))) env)
+				let recEnv = (envCons env ((fst p) . (EVar (Scheme (~ . (fst f))))))
 				let v = (infer (snd f) recEnv (fst (snd p)) (+ level 1))
 				let s2 = (unifyAt (snd v) (atOfE (fst (snd p))) (fst v) (fst f))
 				if (= (grew (snd v) s2) 1)
 					(fresh s2 level)
 				else
-					let env2 = (cons ((fst p) . (EVar (generalize s2 level (fst f)))) env)
+					let env2 = (envCons env ((fst p) . (EVar (generalize s2 level (fst f)))))
 					(infer s2 env2 (fst (snd (snd p))) level)
 			else
 				let v = (infer st env (fst (snd p)) (+ level 1))
-				let env2 = (cons ((fst p) . (EVar (generalize (snd v) level (fst v)))) env)
+				let env2 = (envCons env ((fst p) . (EVar (generalize (snd v) level (fst v)))))
 				(infer (snd v) env2 (fst (snd (snd p))) level)
 		EMutual p ->
 			let bv = (bindVars st env (fst p))
@@ -712,7 +831,7 @@ letrec infer = fn (st env node level)
 		ECheck p ->
 			let r = (infer st env (fst p) level)
 			let t = (fresh (snd r) (- 0 1))
-			((tRes (fst t) (tList tInt)) . (snd t))
+			((tRes (fst t) (tList tInt)) . (addPend (snd t) (atOfE node) (fst t)))
 		EUntyped p ->
 			let r = (infer st env (fst p) level)
 			(tDyn . (snd r))
@@ -817,12 +936,12 @@ letrec addAccessors = fn (env cname sumN ids names tys j n)
 	else
 		let fieldTy = (hdOr tys (TVar 0))
 		let sch = (Scheme (ids . (tArrow (TCon (sumN . (varsOf ids))) fieldTy)))
-		(addAccessors (cons ((cat "@" (hdOr names ~)) . (EAcc (cname . (j . n)))) (cons ((hdOr names ~) . (EVar sch)) env)) cname sumN ids (tl names) (tl tys) (+ j 1) n)
+		(addAccessors (envCons (envCons env ((hdOr names ~) . (EVar sch))) ((cat "@" (hdOr names ~)) . (EAcc (cname . (j . n))))) cname sumN ids (tl names) (tl tys) (+ j 1) n)
 let recEnv = fn (env pm cname fs k sumN ids)
 	let tys = ((convFields env pm fs)?)
 	let names = (fieldNames fs)
 	let pay = (payloadOfT tys)
-	let env1 = (cons (cname . (ERecC (sumN . (ids . (k . (names . pay)))))) env)
+	let env1 = (envCons env (cname . (ERecC (sumN . (ids . (k . (names . pay)))))))
 	(Ok (addAccessors env1 cname sumN ids names tys 1 (lenOf names)))
 letrec prepSums = fn (st env ds)
 	if (= (@ ds) 1)
@@ -835,7 +954,7 @@ letrec prepSums = fn (st env ds)
 		else
 			let fr = (freshN st (lenOf (fst (snd d))) (- 0 1))
 			let ids = (idsOf (fst fr))
-			let env2 = (cons ((cat "#" name) . (ESum (name . (ids . (ctorItems (fst (snd (snd d))) 0))))) env)
+			let env2 = (envCons env ((cat "#" name) . (ESum (name . (ids . (ctorItems (fst (snd (snd d))) 0))))))
 			let more = ((prepSums (snd fr) env2 (tl ds))?)
 			(Ok ((fst more) . ((fst (snd more)) . (cons (d . ids) (snd (snd more))))))
 letrec conPass = fn (st env cs k pm sumN ids)
@@ -849,13 +968,13 @@ letrec conPass = fn (st env cs k pm sumN ids)
 		if (findIs env cname)
 			(Err (posMsg at (cat cname " is already declared")))
 		elseif (= (isNoType pay) 1)
-			(conPass st (cons (cname . (ECtor (sumN . (ids . (k . (0 . (TVar 0))))))) env) (tl cs) (+ k 1) pm sumN ids)
+			(conPass st (envCons env (cname . (ECtor (sumN . (ids . (k . (0 . (TVar 0)))))))) (tl cs) (+ k 1) pm sumN ids)
 		elseif (= (isRecT pay) 1)
 			let ne = ((recEnv env pm cname (recFieldsOf pay) k sumN ids)?)
 			(conPass st ne (tl cs) (+ k 1) pm sumN ids)
 		else
 			let ty = ((convType env pm pay)?)
-			(conPass st (cons (cname . (ECtor (sumN . (ids . (k . (1 . ty)))))) env) (tl cs) (+ k 1) pm sumN ids)
+			(conPass st (envCons env (cname . (ECtor (sumN . (ids . (k . (1 . ty))))))) (tl cs) (+ k 1) pm sumN ids)
 letrec ctorsPass = fn (st env infos)
 	if (= (@ infos) 1)
 		(Ok (st . env))
@@ -870,7 +989,7 @@ let declareAll = fn (st env ds)
 	(ctorsPass (fst p) (fst (snd p)) (snd (snd p)))
 let inferBody = fn (st env ex)
 	let rv = (fresh st 0)
-	let r = (infer (snd rv) (cons ("#ret" . (EVar (Scheme (~ . (fst rv))))) env) ex 0)
+	let r = (infer (snd rv) (envCons env ("#ret" . (EVar (Scheme (~ . (fst rv)))))) ex 0)
 	let st1 = (snd r)
 	if (= (badProgram (bindsOf st1) (fst r)) 1)
 		let st3 = (addErr st1 (posMsg (atOfE ex) (cat "the program must be a function of its input, but it is " (render (bindsOf st1) (fst r)))))
@@ -884,30 +1003,208 @@ let inferProgram = fn prog
 	match (declareAll (mkSt 1000 TEmpty ~) builtinEnv (fst prog))
 		Err msg -> ("" . (cons msg ~))
 		Ok d -> (inferBody (fst d) (snd d) (snd prog))
+; Imports (Req InferI). Each import is a library program, which is inferred and generalised here, so its scheme is a value of this checker, not text. Its type variables are resolved (zonk) before it leaves its own state, since the state is not kept. Each library has its own range of variable ids, from 1000 * k, and the program starts above all of them, so the ids of an imported scheme never meet the program's bindings.
+letrec appendE = fn (a b)
+	(if (= (@ a) 1) b (cons (hdOr a ~) (appendE (tl a) b)))
+letrec zonk = fn (bs t)
+	letrec zargs = fn args
+		(if (= (@ args) 1) ~ (cons (zonk bs (hdOr args (TVar 0))) (zargs (tl args))))
+	match (prune bs t)
+		TVar y -> (TVar y)
+		TCon p -> (TCon ((fst p) . (zargs (snd p))))
+let schemeBody = fn (st env ex)
+	let rv = (fresh st 0)
+	let r = (infer (snd rv) (envCons env ("#ret" . (EVar (Scheme (~ . (fst rv)))))) ex 0)
+	let st1 = (snd r)
+	if (= (badProgram (bindsOf st1) (fst r)) 1)
+		let st3 = (addErr st1 (posMsg (atOfE ex) (cat "the program must be a function of its input, but it is " (render (bindsOf st1) (fst r)))))
+		((Scheme (~ . (TVar 0))) . (errsOf st3))
+	else
+		let inp = (fresh st1 0)
+		let outp = (fresh (snd inp) 0)
+		let st2 = (unifyAt (snd outp) (atOfE ex) (fst r) (tArrow (fst inp) (fst outp)))
+		let bs = (bindsOf st2)
+		((Scheme ((freeAbove bs (- 0 1) (fst r) ~) . (zonk bs (fst r)))) . (errsOf st2))
+let schemeProgram = fn (base prog)
+	match (declareAll (mkSt base TEmpty ~) builtinEnv (fst prog))
+		Err msg -> ((Scheme (~ . (TVar 0))) . (cons msg ~))
+		Ok d -> (schemeBody (fst d) (snd d) (snd prog))
+letrec importsOf = fn (imps k env errs)
+	if (= (@ imps) 1)
+		(env . errs)
+	else
+		let imp = (hdOr imps (~ . (~ . (ENil (0 . 0)))))
+		let r = (schemeProgram (* k 1000) (snd imp))
+		(importsOf (tl imps) (+ k 1) (envCons env ((fst imp) . (EVar (fst r)))) (appendE errs (snd r)))
+let inferWithEnv = fn (base env prog)
+	match (declareAll (mkSt base TEmpty ~) env (fst prog))
+		Err msg -> ("" . (cons msg ~))
+		Ok d -> (inferBody (fst d) (snd d) (snd prog))
+let inferProgramI = fn (imps prog)
+	let ie = (importsOf imps 1 builtinEnv ~)
+	if (= (@ (snd ie)) 1)
+		(inferWithEnv (+ (* (lenOf imps) 1000) 1000) (fst ie) prog)
+	else
+		("" . (snd ie))
+letrec memberB = fn (k l)
+	(if (= (@ l) 1) 0 (if (same (hdOr l ~) k) 1 (memberB k (tl l))))
+let sumIdsOf = fn e
+	match e
+		ESum s -> (fst (snd s))
+		_ -> ~
+let ctorTyOf = fn e
+	match e
+		ECtor p -> (snd (snd (snd (snd p))))
+		ERecC p -> (snd (snd (snd (snd p))))
+		_ -> (TVar 0)
+; THE TESTS OF THE CHECKER: the describer of a type, as the Luau checker's describe gives it. The stack holds the keys of the types being described; a recursive reference adds its key to used, and a type whose key is in used when it is done is wrapped in KFixdef.
+let describeTop = fn (bs env t)
+	letrec
+		describeGo = fn (bs env stack used t)
+			match (prune bs t)
+				TVar y -> (KAny . used)
+				TCon p -> (describeCon bs env stack used (fst p) (snd p))
+		describeCon = fn (bs env stack used name args)
+			(if (same name "Dyn") (KAny . used) (describeCon2 bs env stack used name args))
+		describeCon2 = fn (bs env stack used name args)
+			(if (same name "Int") (KInt . used) (describeCon3 bs env stack used name args))
+		describeCon3 = fn (bs env stack used name args)
+			(if (same name "->") (KFn . used) (describeCon4 bs env stack used name args))
+		describeCon4 = fn (bs env stack used name args)
+			(if (same name "Pin") (KPin . used) (describeCon5 bs env stack used name args))
+		describeCon5 = fn (bs env stack used name args)
+			(if (same name "pair") (describePair bs env stack used args) (describeNamed bs env stack used name args))
+		describePair = fn (bs env stack used args)
+			let ta = (describeGo bs env stack used (hdOr args (TVar 0)))
+			let tb = (describeGo bs env stack (snd ta) (hdOr (tl args) (TVar 0)))
+			((KPair ((fst ta) . (fst tb))) . (snd tb))
+		describeNamed = fn (bs env stack used name args)
+			let key = (render bs (TCon (name . args)))
+			if (= (memberB key stack) 1)
+				((KRec key) . (addB key used))
+			else
+				let body = (describeBody bs env (cons key stack) used name args)
+				if (= (memberB key (snd body)) 1)
+					((KFixdef (key . (fst body))) . (snd body))
+				else
+					body
+		addB = fn (k l)
+			(if (= (memberB k l) 1) l (cons k l))
+		describeBody = fn (bs env stack used name args)
+			(if (same name "list") (describeList bs env stack used name args) (describeSum bs env stack used name args))
+		describeList = fn (bs env stack used name args)
+			let item = (describeGo bs env stack used (hdOr args (TVar 0)))
+			let rest = (describeGo bs env stack (snd item) (TCon (name . args)))
+			((KList ((fst item) . (fst rest))) . (snd rest))
+		describeSum = fn (bs env stack used name args)
+			match (findE env (cat "#" name))
+				Found e -> (describeSumOk bs env stack used e args)
+				Missing -> (KAny . used)
+		describeSumOk = fn (bs env stack used e args)
+			let m = (zipM (sumIdsOf e) args)
+			let cs = (describeCtors bs env (sumCtorsEntry e) m stack used)
+			((KSum (fst cs)) . (snd cs))
+		describeCtors = fn (bs env cs m stack used)
+			if (= (@ cs) 1)
+				(~ . used)
+			else
+				let c = (hdOr cs (~ . (0 . 0)))
+				let pay = (ctorPayTest bs env stack used c m)
+				let rest = (describeCtors bs env (tl cs) m stack (snd pay))
+				((cons ((fst (snd c)) . (fst pay)) (fst rest)) . (snd rest))
+		ctorPayTest = fn (bs env stack used c m)
+			(if (= (snd (snd c)) 1) (ctorPayOf bs env stack used (fst c) m) (KNil . used))
+		ctorPayOf = fn (bs env stack used cname m)
+			match (findE env cname)
+				Found e -> (describeGo bs env stack used (subst bs m (ctorTyOf e)))
+				Missing -> (KNil . used)
+	(fst (describeGo bs env ~ ~ t))
+; The type variables of a text, numbered from 1 by where they first appear: the same numbering as the host checker's, so the expected type of a check reads the same on both. A variable is a question mark and its id; the id's digits are the key.
+let canonIsDigit = fn c
+	(if (< 47 c) (if (< c 58) 1 0) 0)
+letrec canonDigits = fn l
+	(if (= (@ l) 1) ~ (if (canonIsDigit (hdOr l 0)) (cons (hdOr l 0) (canonDigits (tl l))) ~))
+letrec canonSkip = fn l
+	(if (= (@ l) 1) l (if (canonIsDigit (hdOr l 0)) (canonSkip (tl l)) l))
+letrec canonFind = fn (m key)
+	(if (= (@ m) 1) (-1) (if (same (fst (hdOr m (~ . 0))) key) (snd (hdOr m (~ . 0))) (canonFind (tl m) key)))
+letrec canonGo = fn (l m n out)
+	if (= (@ l) 1)
+		(out . (m . n))
+	else
+		if (= (hdOr l 0) 63)
+			if (canonIsDigit (hdOr (tl l) 0))
+				let key = (canonDigits (tl l))
+				let found = (canonFind m key)
+				if (< found 0)
+					(canonGo (canonSkip (tl l)) (cons (key . (+ n 1)) m) (+ n 1) (cat out (cons 63 (showNat (+ n 1)))))
+				else
+					(canonGo (canonSkip (tl l)) m n (cat out (cons 63 (showNat found))))
+			else
+				(canonGo (tl l) m n (cat out (cons 63 ~)))
+		else
+			(canonGo (tl l) m n (cat out (cons (hdOr l 0) ~)))
+let canonVars = fn s
+	(fst (canonGo s ~ 0 ~))
+letrec checksOf = fn (bs env pend)
+	if (= (@ pend) 1)
+		~
+	else
+		let p = (hdOr pend ((0 . 0) . (TVar 0)))
+		(cons ((fst p) . ((canonVars (render bs (snd p))) . (describeTop bs env (snd p)))) (checksOf bs env (tl pend)))
+let inputInfo = fn (bs env inp)
+	(HasInputCheck ((describeTop bs env inp) . (canonVars (render bs inp))))
+let inferBodyT = fn (st env ex)
+	let rv = (fresh st 0)
+	let r = (infer (snd rv) (envCons env ("#ret" . (EVar (Scheme (~ . (fst rv)))))) ex 0)
+	let st1 = (snd r)
+	if (= (badProgram (bindsOf st1) (fst r)) 1)
+		let st3 = (addErr st1 (posMsg (atOfE ex) (cat "the program must be a function of its input, but it is " (render (bindsOf st1) (fst r)))))
+		((render (bindsOf st3) (fst r)) . ((errsOf st3) . (~ . NoInputCheck)))
+	else
+		let inp = (fresh st1 0)
+		let outp = (fresh (snd inp) 0)
+		let st2 = (unifyAt (snd outp) (atOfE ex) (fst r) (tArrow (fst inp) (fst outp)))
+		((render (bindsOf st2) (fst r)) . ((errsOf st2) . ((checksOf (bindsOf st2) env (pendOf st2)) . (inputInfo (bindsOf st2) env (fst inp)))))
+let inferWithEnvT = fn (base env prog)
+	match (declareAll (mkSt base TEmpty ~) env (fst prog))
+		Err msg -> ("" . ((cons msg ~) . (~ . NoInputCheck)))
+		Ok d -> (inferBodyT (fst d) (snd d) (snd prog))
+let inferProgramIT = fn (imps prog)
+	let ie = (importsOf imps 1 builtinEnv ~)
+	if (= (@ (snd ie)) 1)
+		(inferWithEnvT (+ (* (lenOf imps) 1000) 1000) (fst ie) prog)
+	else
+		("" . ((snd ie) . (~ . NoInputCheck)))
+; Every request gives the same shape: the text, the errors, the checks' tests and the input's test. The requests that only need the first two give no tests, and no input check.
+let padR = fn r
+	((fst r) . ((snd r) . (~ . NoInputCheck)))
 fn p
 	match p
-		Unify q -> (runUnify q)
-		Gen q -> (runGen q)
-		Inst q -> (runInst q)
-		Infer ex -> (inferProgram ex)
+		Unify q -> (padR (runUnify q))
+		Gen q -> (padR (runGen q))
+		Inst q -> (padR (runInst q))
+		Infer ex -> (padR (inferProgram ex))
+		InferI q -> (padR (inferProgramI (fst q) (snd q)))
+		InferT q -> (inferProgramIT (fst q) (snd q))
 ---
-Unify ((TCon ("Int" . ~)) . (TCon ("Int" . ~))) => ("Int" . ~) fuel 1000000
-Unify ((TCon ("Int" . ~)) . (TCon ("list" . [(TCon ("Int" . ~))]))) => ("Int" . ["expected [Int], but this is Int"]) fuel 1000000
-Unify ((TVar 1) . (TCon ("Int" . ~))) => ("Int" . ~) fuel 1000000
-Unify ((TVar 1) . (TVar 2)) => ("?2" . ~) fuel 1000000
-Unify ((TVar 1) . (TCon ("list" . [(TVar 1)]))) => ("?1" . ["?1 would be an infinite type"]) fuel 1000000
-Unify ((TCon ("Dyn" . ~)) . (TCon ("Int" . ~))) => ("Dyn" . ["expected Int, but this is Dyn"]) fuel 1000000
-Unify ((TVar 1) . (TCon ("Dyn" . ~))) => ("Dyn" . ~) fuel 1000000
-Unify ((TCon ("pair" . [(TCon ("Int" . ~)) (TCon ("Int" . ~))])) . (TCon ("list" . [(TCon ("Int" . ~))]))) => ("(Int . Int)" . ["expected [Int], but this is (Int . Int)"]) fuel 1000000
-Unify ((TCon ("->" . [(TCon ("Int" . ~)) (TCon ("Int" . ~))])) . (TCon ("->" . [(TCon ("Int" . ~)) (TCon ("Int" . ~))]))) => ("(Int -> Int)" . ~) fuel 1000000
-Unify ((TCon ("->" . [(TCon ("Int" . ~)) (TCon ("Int" . ~))])) . (TCon ("->" . [(TCon ("list" . [(TCon ("Int" . ~))])) (TCon ("list" . [(TCon ("Int" . ~))]))]))) => ("(Int -> Int)" . ["expected [Int], but this is Int"]) fuel 1000000
-Unify (TCon ("Option" . [(TCon ("Int" . ~))]) . (TCon ("Option" . [(TVar 3)]))) => ("Option Int" . ~) fuel 1000000
-Gen (-1 . (TVar 1)) => ("forall ?1. ?1" . ~) fuel 1000000
-Gen (-1 . (TCon ("->" . [(TVar 1) (TVar 2)]))) => ("forall ?1 ?2. (?1 -> ?2)" . ~) fuel 1000000
-Gen (-1 . (TCon ("Int" . ~))) => ("Int" . ~) fuel 1000000
-Gen (0 . (TVar 1)) => ("?1" . ~) fuel 1000000
-Inst (0 . (Scheme ([1] . (TCon ("->" . [(TVar 1) (TVar 1)]))))) => ("(?1000 -> ?1000)" . ~) fuel 1000000
-Inst (0 . (Scheme ([1 2] . (TCon ("->" . [(TVar 1) (TVar 2)]))))) => ("(?1000 -> ?1001)" . ~) fuel 1000000
-Inst (0 . (Scheme ([] . (TVar 5)))) => ("?5" . ~) fuel 1000000
-Inst (0 . (Scheme ([1] . (TCon ("list" . [(TVar 1)]))))) => ("[?1000]" . ~) fuel 1000000
+Unify ((TCon ("Int" . ~)) . (TCon ("Int" . ~))) => ("Int" . (~ . (~ . NoInputCheck))) fuel 1000000
+Unify ((TCon ("Int" . ~)) . (TCon ("list" . [(TCon ("Int" . ~))]))) => ("Int" . (["expected [Int], but this is Int"] . (~ . NoInputCheck))) fuel 1000000
+Unify ((TVar 1) . (TCon ("Int" . ~))) => ("Int" . (~ . (~ . NoInputCheck))) fuel 1000000
+Unify ((TVar 1) . (TVar 2)) => ("?2" . (~ . (~ . NoInputCheck))) fuel 1000000
+Unify ((TVar 1) . (TCon ("list" . [(TVar 1)]))) => ("?1" . (["?1 would be an infinite type"] . (~ . NoInputCheck))) fuel 1000000
+Unify ((TCon ("Dyn" . ~)) . (TCon ("Int" . ~))) => ("Dyn" . (["expected Int, but this is Dyn"] . (~ . NoInputCheck))) fuel 1000000
+Unify ((TVar 1) . (TCon ("Dyn" . ~))) => ("Dyn" . (~ . (~ . NoInputCheck))) fuel 1000000
+Unify ((TCon ("pair" . [(TCon ("Int" . ~)) (TCon ("Int" . ~))])) . (TCon ("list" . [(TCon ("Int" . ~))]))) => ("(Int . Int)" . (["expected [Int], but this is (Int . Int)"] . (~ . NoInputCheck))) fuel 1000000
+Unify ((TCon ("->" . [(TCon ("Int" . ~)) (TCon ("Int" . ~))])) . (TCon ("->" . [(TCon ("Int" . ~)) (TCon ("Int" . ~))]))) => ("(Int -> Int)" . (~ . (~ . NoInputCheck))) fuel 1000000
+Unify ((TCon ("->" . [(TCon ("Int" . ~)) (TCon ("Int" . ~))])) . (TCon ("->" . [(TCon ("list" . [(TCon ("Int" . ~))])) (TCon ("list" . [(TCon ("Int" . ~))]))]))) => ("(Int -> Int)" . (["expected [Int], but this is Int"] . (~ . NoInputCheck))) fuel 1000000
+Unify (TCon ("Option" . [(TCon ("Int" . ~))]) . (TCon ("Option" . [(TVar 3)]))) => ("Option Int" . (~ . (~ . NoInputCheck))) fuel 1000000
+Gen (-1 . (TVar 1)) => ("forall ?1. ?1" . (~ . (~ . NoInputCheck))) fuel 1000000
+Gen (-1 . (TCon ("->" . [(TVar 1) (TVar 2)]))) => ("forall ?1 ?2. (?1 -> ?2)" . (~ . (~ . NoInputCheck))) fuel 1000000
+Gen (-1 . (TCon ("Int" . ~))) => ("Int" . (~ . (~ . NoInputCheck))) fuel 1000000
+Gen (0 . (TVar 1)) => ("?1" . (~ . (~ . NoInputCheck))) fuel 1000000
+Inst (0 . (Scheme ([1] . (TCon ("->" . [(TVar 1) (TVar 1)]))))) => ("(?1000 -> ?1000)" . (~ . (~ . NoInputCheck))) fuel 1000000
+Inst (0 . (Scheme ([1 2] . (TCon ("->" . [(TVar 1) (TVar 2)]))))) => ("(?1000 -> ?1001)" . (~ . (~ . NoInputCheck))) fuel 1000000
+Inst (0 . (Scheme ([] . (TVar 5)))) => ("?5" . (~ . (~ . NoInputCheck))) fuel 1000000
+Inst (0 . (Scheme ([1] . (TCon ("list" . [(TVar 1)]))))) => ("[?1000]" . (~ . (~ . NoInputCheck))) fuel 1000000
 

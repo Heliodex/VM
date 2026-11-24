@@ -1087,6 +1087,27 @@ local function describe(cx: Cx, t: Ty): Parser.Test
 	return go(t)
 end
 
+-- The type variables of a text, numbered from 1 by where they first appear, so the text of a type does not depend on the numbering of the checker that wrote it. The runtime messages of a check (its expected type) use this.
+local function canonVars(s: string): string
+	local names: { [string]: string } = {}
+	local count = 0
+
+	return (
+		string.gsub(
+			s,
+			"%?(%d+)",
+			function(id: string): string
+				if names[id] == nil then
+					count += 1
+					names[id] = `?{count}`
+				end
+
+				return names[id]
+			end
+		)
+	)
+end
+
 -- ENTRY
 local function untyped(): Scheme
 	return { vars = {}; ty = DYN }
@@ -1127,13 +1148,13 @@ local function check(program: Parser.Program, imports: { { name: string; scheme:
 
 	for _, pending in cx.pending do
 		pending.node.test = describe(cx, pending.ty)
-		pending.node.expect = render(pending.ty, false)
+		pending.node.expect = canonVars(render(pending.ty, false))
 	end
 
 	return {
 		expr = expr,
 		input = describe(cx, input),
-		inputExpect = render(input, false),
+		inputExpect = canonVars(render(input, false)),
 		scheme = generalize(ty, -1),
 	}
 end
