@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/hex"
-	"fmt"
 	"os"
 	"regexp"
 	"strconv"
@@ -118,7 +117,7 @@ func TestChecker(t *testing.T) {
 		goRate := float64(out.Steps) / elapsed
 		refRate := float64(refSteps) / refSeconds
 
-		t.Log(fmt.Sprintf("checker: %d steps in %.3fs, %.1f M steps/s; reference %.1f M steps/s; ratio %.1fx", out.Steps, elapsed, goRate/1e6, refRate/1e6, goRate/refRate))
+		t.Logf("checker: %d steps in %.3fs, %.1f M steps/s; reference %.1f M steps/s; ratio %.1fx", out.Steps, elapsed, goRate/1e6, refRate/1e6, goRate/refRate)
 	}
 }
 
