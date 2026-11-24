@@ -245,3 +245,14 @@ Things the port depends on:
 - **Top-level definitions see only the ones above them**, and the functions that call each other are in one `letrec`, inside the program's function, where they also see that program's constructors and checks.
 
 Promoted: the file moved to `Prototypes/6/L2/programs/boot/desugar.l2` (its history follows it), and `desugar_run.luau` reads it from there. `l2_run.luau` in Prototype 6 runs its smoke test. Not done: the desugarer's step count on the 2,500-line corpus, and putting it into the timed build.
+
+## The checker's tests, and the bootstrapped compiler
+
+The checker (`boot/types.l2`, request `InferT`) gives the tests the build needs. A check's value type is recorded while the program is inferred, and described once inference is done: a test is built from the type as the Luau checker builds it, with a recursive type's key wrapped in `KFixdef` where it recurs. The input's test and text are given too. Every request gives the same four-part result, since one `match` has one type.
+
+`checker_tests_run.luau` checks the tests against the Luau checker's on the 44 program files (with their imports) and eight programs with checks, including a recursive list: 52 of 52 agree.
+
+`boot_pipeline_run.luau` compiles each program file through the bootstrapped compiler and runs its tests with it: the layout (`boot/layout.l2`, the variant the build uses), the tokenizer and the parser (`Prototypes/6/L2/programs/boot`), the checker (`InferT`), and the desugarer (`Prototypes/6/L2/programs/boot/desugar.l2`), with the imports compiled the same way. The desugarer's machine expression is run on the VM, and the test inputs and outputs are read by the same stages, with the file's own declarations in scope. The host reads the file format and checks each test as `l2_run.luau` does: 148 of 148 tests pass, across the 45 program files, including the desugarer's own file.
+
+What this does not cover yet: the layout, the checker and the lexer are the Prototype 7 variants, not Prototype 6's canonical files (the checker's `InferT` and the variant layout are not in Prototype 6); the programs run on the Luau machine; and the refusal cases of `l2_run.luau` (the malformed programs) are not run through the bootstrapped compiler.
+
