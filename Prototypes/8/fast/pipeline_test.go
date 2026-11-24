@@ -2,7 +2,7 @@ package fast
 
 import "testing"
 
-// TestSeedFixedPoint compiles each stage's source with the seed stages, and checks that the law is the seed's own: the compiler, run on the machine, gives the stages it is made of. The seed is the fixed point (testdata/stages.txt), so the check is that the compiler compiles itself to the same bytes.
+// TestSeedFixedPoint compiles each stage's source with the seed stages, and checks that the law is the seed's own: the compiler, run on the machine, gives the stages it is made of. The seed is the fixed point (testdata/seed.p8), so the check is that the compiler compiles itself to the same bytes.
 func TestSeedFixedPoint(t *testing.T) {
 	stages, err := SeedStages()
 	if err != nil {
