@@ -95,3 +95,14 @@ The memo and the jet table (SPEC.md section 7) are keyed by the content hash of 
 - The header byte is left out so that a value's hash is the same whether it is written alone or inside another value. Example: the law `inc` (SPEC.md section 9) is `05 01 1a 00 11 01 10 02 01`, and its hash is `1b4ec34d dd5d101a ad9fd988 9cdf35b5 68a2b93f 2a2061cc 9819af67 768bb2dd`.
 
 A memo key is the law's hash and the hashes of its arguments (memo.go). A jet is picked by the law's hash (jets.go).
+
+## The pipeline, the seed, and the driver (Prototype 8)
+
+The compiler runs on this machine. `pipeline.go` runs the five stage programs (layout, tokenizer, parser, checker, desugarer) as `boot_pipeline.luau` does, and `convert.go` turns the desugarer's output into the law the machine runs.
+
+- `testdata/stages.txt` is the seed: the five stage programs, embedded in the build. It is the compiler's second generation. The first generation was the host's lowering of the stage sources; compiled with it, the stages give the second generation, and the second generation compiles to itself (`TestSeedFixedPoint`, `TestSeedGenerations`). `l2 seed` rebuilds it and checks the fixed point.
+- `programfile.go` splits a program file into its four sections, as `programfile.luau` does.
+- `programs_test.go` runs the 148 tests of the 45 program files through the Go pipeline: each input and output expression is evaluated, the program runs on the machine, and both must give the bootstrapped compile's encodings (`testdata/programs.txt`, from `gen/programs.luau`). All 148 pass.
+- `cmd/l2`: `l2 run [-root dir] file.l2` runs a program file's tests (printing each value), `l2 eval file.l2 expr` evaluates an expression, and `l2 seed` writes the stages. The root is the programs folder, which imports are read under (default `../../6/L2/programs/`).
+
+Timings on this host, one run each, from the driver: `lib/abs.l2` (three tests) about 0.08 s, including loading the seed. `boot/types.l2` (19 tests, the checker itself) about 3.2 s. The compile is most of that; it is the stage programs running, with no jets on the stage laws beyond the corpus's own.
