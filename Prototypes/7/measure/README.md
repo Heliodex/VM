@@ -262,7 +262,7 @@ The checker (`types.l2`) and the layout (`layout.l2`) are promoted: their canoni
 
 `boot_pipeline.luau` is the bootstrapped compiler as a module: a program file given as text goes through the layout, the tokenizer, the parser, the checker and the desugarer, each an L2 program on the VM, and its imports are compiled the same way. The layout is applied only to a file named `.l2`, as the host applies it. `boot_pipeline_run.luau` runs the 45 program files' tests through it: 148 of 148 pass.
 
-`boot_refusals_run.luau` runs the 28 malformed programs of `Prototypes/6/L2/malformed.luau` through the stages. The stage that finds the fault must give the reason the case names: 28 of 28 agree. One case is refused by the host's file reader before any stage runs, so that part is not bootstrapped; the import of a missing file gives the host's text without its line number.
+`boot_refusals_run.luau` runs the 31 malformed programs of `Prototypes/6/L2/malformed.luau` through the stages. The stage that finds the fault must give the reason the case names: 31 of 31 agree. Three of them are parser refusals of forms the first version does not have: a top-level pair without parentheses, a nested pattern, and a literal in a record pattern. One case is refused by the host's file reader before any stage runs, so that part is not bootstrapped; the import of a missing file gives the host's text without its line number.
 
 `cases_run.luau` runs six case files in `measure/cases` (a checker failure at the input boundary with its message, records with a `with` and a `match`, a mutual group, an early return, a user sum, and an import) on the host compiler and on the bootstrapped one, and checks each test against its expected outcome: 13 of 13 checks pass on both.
 
