@@ -23,7 +23,7 @@ The core of `SPEC.md`, run on Go. It reads the binary format of section 12, and 
 - `convert.go`, `convert_test.go`: the converter (Prototype 8, step 1): the desugarer's output (a `Code` value) read as a Prototype 6 expression, then lowered to the core as `reference/lower.luau` does. `gen/convert.luau` writes `testdata/convert.txt`, the bootstrapped compile's Code values and program laws, which the test checks byte for byte.
 - `hash.go`: the content hash, the implementation's keys (see "Keys" below).
 - `memo.go`, `memo_test.go`: the memo (SPEC.md section 7), and the incremental measurement.
-- `corpus_test.go`: the corpus build (Phase 8), against `testdata/corpus.txt`, or the file named by `CORPUS` (for example `CORPUS=testdata/corpus2500.txt`, the 2,500-line corpus).
+- `corpus_test.go`: the corpus build (Phase 8), against `testdata/corpus.txt`, or the file named by `CORPUS` (for example `CORPUS=testdata/corpus2500_desugar.txt`, the 2,500-line build with the desugarer). The four-stage baseline `testdata/corpus2500.txt` has been dropped; `gen/corpus2500.luau stages4` would regenerate it.
 - `profile_test.go`: the core's profile of the checker (`PROFILE=1`).
 - `fast_test.go`: runs every case in `testdata/cases.txt` with the jets on and off, and times the checker.
 - `jets_test.go`: checks that every jet still names a law of the checker's program or the corpus's.
@@ -116,7 +116,7 @@ Each Luau oracle that the Go side must agree with is exported as a fixture in `t
 | `programs.txt` | `gen/programs.luau` | `programs_test.go` | the 148 tests of the 45 program files: input and output encodings, and the run on the Go machine |
 | `refusals.txt` | `gen/refusals.luau` | `refusals_test.go` | the 31 malformed programs: the stage that refuses each, and its reason |
 | `checker.txt` | `gen/checker.luau` (sources in `gen/checker_sources.luau`) | `checker_test.go` | the pure checker's outcome on 164 sources: 161 agree, 3 skipped |
-| `layout.txt` | `gen/layout.luau` | `layout_test.go` | the layout stage on 1,284 inputs (about 70 s) |
+| `layout.txt` | `gen/layout.luau`, then `gen/layout_digest.py` | `layout_test.go` | the layout stage on 1,284 inputs, rebuilt from the program files: a SHA-256 of each text, or each error message (about 70 s) |
 | `cases/`, `l2cases.txt` | `gen/cases.luau` | `cases_test.go` | the 6 case programs and their 13 tests |
 | `desugar.txt` | `gen/desugar.luau` | `desugar_test.go` | the desugarer's outcome on 87 expressions and programs: 87 agree, 3 skipped |
 | `convert.txt` | `gen/convert.luau` | `convert_test.go` | the converter's law and the desugarer's Code value, for 17 files |

@@ -131,16 +131,17 @@ for i, src in SNIPPETS do
 end
 
 
-local function emit(src: string)
+-- One line per input: its name (which the Go test rebuilds the input from), whether the layout gives text or an error, and the text's hex or the error's message in hex. A text is written as its hex here, and layout_digest.py replaces it with its SHA-256.
+local function emit(name: string, src: string)
 	const okA, outA = pcall(Layout.layout, src)
-	const want =
-		if okA then
-			outA :: string
-		else
-			"error " .. tostring(outA)
-	print(`layout {hex(src)} {hex(want)}`)
+
+	if okA then
+		print(`layout {hex(name)} text {hex(outA :: string)}`)
+	else
+		print(`layout {hex(name)} error {hex(tostring(outA))}`)
+	end
 end
 
 for _, input in inputs do
-	emit(input.src)
+	emit(input.name, input.src)
 end
