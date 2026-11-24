@@ -1,8 +1,8 @@
 # The standard library, in L2
 
-Each file here is an L2 program file (see `L2/programs/`). Each one defines one function, and its tests run with the rest of `l2_run.luau`. A program that uses a library function imports it by its path from the top of `L2/programs/`, such as `lib/sort.l2` importing `lib/insert.l2`.
+Each file here is an L2 program file (see `l2/SPEC.md`). Each one defines one function, and its tests run with the rest of the programs, with `l2 run file.l2` (see `Prototypes/8/fast/`). A program that uses a library function imports it by its path from the top of `l2/programs/`, such as `lib/sort.l2` importing `lib/insert.l2`.
 
-This is the L2 counterpart of `L1/programs/lib/`. The same functions are here, with the L2 conventions in place of the L1 ones.
+This is the L2 counterpart of the L1 standard library it was ported from (in an earlier prototype's `programs/lib/`, in git history). The same functions are here, with the L2 conventions in place of the L1 ones.
 
 ## Conventions
 
