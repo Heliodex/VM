@@ -53,7 +53,7 @@ const withImport = Lifecycle.run(checker.expr, { kind = "con"; tag = 4; payload 
 const function vmErrors(r: Lifecycle.Result): string
 	local msgs: { string } = {}
 
-	for _, e in itemsOf(O.tailOf(O.valueOf(r))) do
+	for _, e in itemsOf(O.headOf(O.tailOf(O.valueOf(r)))) do
 		table.insert(msgs, textOf(e))
 	end
 

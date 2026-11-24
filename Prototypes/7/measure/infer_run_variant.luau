@@ -150,7 +150,7 @@ local function l2Outcome(src: string): string?
 	const text = textOf(out.head)
 	const errs: { string } = {}
 
-	for _, e in itemsOf(out.tail) do
+	for _, e in itemsOf((out.tail :: VM.Cell).head) do
 		table.insert(errs, textOf(e))
 	end
 

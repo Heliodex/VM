@@ -11,6 +11,8 @@
 --
 -- Run from Prototypes/7/measure:
 --   cd Prototypes/7/measure && lute run ../fast/gen/corpus2500.luau > ../fast/testdata/corpus2500_desugar.txt
+-- With the argument stages4, the four-stage build (testdata/corpus2500.txt):
+--   cd Prototypes/7/measure && lute run ../fast/gen/corpus2500.luau stages4 > ../fast/testdata/corpus2500.txt
 -- The generator now also runs the desugarer (Prototypes/6/L2/programs/boot/desugar.l2) on each library and each file, so its output is the build with the desugarer, testdata/corpus2500_desugar.txt. testdata/corpus2500.txt is the four-stage build, from before the desugarer was added; it is kept as the baseline, and the Go build runs it without the desugar stage.
 
 const ProgramFile = require "../../../6/L2/programfile"
@@ -31,6 +33,9 @@ const FUEL_LEX = 1e8
 const FUEL_PARSE = 5e8
 const FUEL_CHECK = 1e10
 const FUEL_DESUGAR = 1e11
+
+-- Run with the argument stages4 to leave out the desugarer: the four-stage build (testdata/corpus2500.txt), which is the baseline.
+const WITH_DESUGAR = ({ ... })[2] ~= "stages4"
 
 -- A cell of two values, and a list of values, as the machine's values.
 local function cellOf(a: Value, b: Value): Value
@@ -149,7 +154,9 @@ print(`# program layout {hex(program(layoutC, "layout"))}`)
 print(`# program lex {hex(program(lexC, "lex"))}`)
 print(`# program parse {hex(program(parseC, "parse"))}`)
 print(`# program check {hex(program(checkC, "check"))}`)
-print(`# program desugar {hex(program(desugarC, "desugar"))}`)
+if WITH_DESUGAR then
+	print(`# program desugar {hex(program(desugarC, "desugar"))}`)
+end
 -- The corpus: the four boot files of the Phase 0 harness, then the standard library (Prototype 6's lib folder, 20 files), which tops the corpus up to 2,500 lines and more. A library file is named by its path from the programs folder (lib/...), and its label is that path.
 const corpus = { "lex.l2", "parse.l2", "layout.l2", "types.l2" }
 
@@ -221,15 +228,17 @@ for _, file in corpus do
 		table.insert(libraries, library)
 
 		-- The library's machine expression, which the file's desugarer wraps around the file.
-		const libDesugared = stage(desugarC, desugarInput(Format.NIL, parsedPayload, Format.NIL), FUEL_DESUGAR)
-		const libCode = payloadOf(libDesugared)
+		if WITH_DESUGAR then
+			const libDesugared = stage(desugarC, desugarInput(Format.NIL, parsedPayload, Format.NIL), FUEL_DESUGAR)
+			const libCode = payloadOf(libDesugared)
 
-		if libCode == nil then
-			refused = `{imp.file} desugar`
-			break
+			if libCode == nil then
+				refused = `{imp.file} desugar`
+				break
+			end
+
+			table.insert(libraryCodes, libCode)
 		end
-
-		table.insert(libraryCodes, libCode)
 	end
 
 	if refused ~= nil then
@@ -285,14 +294,16 @@ for _, file in corpus do
 	print(`expect {file} check {describe(checked)}`)
 
 	-- The file's desugarer, with the names and machine expressions of its imports.
-	local importNames: { Value } = {}
+	if WITH_DESUGAR then
+		local importNames: { Value } = {}
 
-	for _, imp in imports do
-		table.insert(importNames, bytesValue(imp.name))
+		for _, imp in imports do
+			table.insert(importNames, bytesValue(imp.name))
+		end
+
+		const desugared = stage(desugarC, desugarInput(listOf(importNames), parsedPayload, listOf(libraryCodes)), FUEL_DESUGAR)
+		print(`expect {file} desugar {describe(desugared)}`)
 	end
-
-	const desugared = stage(desugarC, desugarInput(listOf(importNames), parsedPayload, listOf(libraryCodes)), FUEL_DESUGAR)
-	print(`expect {file} desugar {describe(desugared)}`)
 end
 
 print(`# corpus: {bytes} bytes, {lines} lines`)

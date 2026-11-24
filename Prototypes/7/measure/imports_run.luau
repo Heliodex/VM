@@ -140,7 +140,7 @@ const function checkFile(name: string)
 	const vmText = textOf(O.headOf(O.valueOf(result)))
 	local vmErrors: { string } = {}
 
-	for _, e in itemsOf(O.tailOf(O.valueOf(result))) do
+	for _, e in itemsOf(O.headOf(O.tailOf(O.valueOf(result)))) do
 		table.insert(vmErrors, textOf(e))
 	end
 
