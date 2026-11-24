@@ -308,6 +308,8 @@ do
 		{ name = "an unknown form tag"; bytes = "\2\1\27"; want = "tag 27 is not a form"; decodeAs = "program" },
 		{ name = "a primitive of tag 15"; bytes = "\2\1\26\15\16\0\16\0"; want = "does not exist"; decodeAs = "program" },
 		{ name = "the tag of the removed case form is not a form"; bytes = "\2\1\21"; want = "tag 21 is not a form"; decodeAs = "program" },
+		{ name = "the unused form tag 19 is not a form"; bytes = "\2\1\19"; want = "tag 19 is not a form"; decodeAs = "program" },
+		{ name = "the reserved value tag 7 (a pin in Prototypes 5 and 6) is refused"; bytes = "\1\a"; want = "tag 7 is not a value"; decodeAs = "value" },
 		{ name = "a partial application with no fewer arguments than its arity"; bytes = "\1\6\5\1\16\0\1\0"; want = "fewer arguments"; decodeAs = "value" },
 		{ name = "a program with bytes after it"; bytes = "\2\1\16\0\0"; want = "after"; decodeAs = "program" },
 		{ name = "an index past 2^53 - 1 (a position, not an integer value)"; bytes = "\2\1\17\128\128\128\128\128\128\128\16"; want = "past 2^53 - 1"; decodeAs = "program" },
