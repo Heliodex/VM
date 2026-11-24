@@ -47,6 +47,7 @@ const (
 	fuelLayout = int64(1e10)
 	fuelLex = int64(1e8)
 	fuelParse = int64(5e8)
+	fuelDesugar = int64(1e11)
 )
 
 // bytesOf is a string of bytes as a machine list of integers (the reference's bytesValue).
@@ -96,6 +97,43 @@ func payloadOf(o Outcome) (Value, bool) {
 	return c.Payload, true
 }
 
+// desugarInput is the input of the desugarer: (imports . (declarations . (expression . (tests . (import codes . input test))))), with the names of the imports, the parse's payload (declarations . expression), no checks (the corpus has none), the import codes, and no input check.
+func desugarInput(names, parsed, codes Value) Value {
+	pair := parsed.(*Cell)
+	noInputCheck := &Con{Tag: 0, Payload: NIL}
+
+	return &Cell{
+		Head: names,
+		Tail: &Cell{
+			Head: pair.Head,
+			Tail: &Cell{
+				Head: pair.Tail,
+				Tail: &Cell{
+					Head: NIL,
+					Tail: &Cell{
+						Head: codes,
+						Tail: noInputCheck,
+					},
+				},
+			},
+		},
+	}
+}
+
+// listOf is a list of values, in order.
+func listOf(items []Value) Value {
+	var v Value = NIL
+
+	for _, item := range slices.Backward(items) {
+		v = &Cell{
+			Head: item,
+			Tail: v,
+		}
+	}
+
+	return v
+}
+
 // buildFile runs one file's build: its imports, then the file. It gives each stage's outcome, and the steps and time.
 func buildFile(data corpusData, f *corpusFile) (map[string]Outcome, buildStats, error) {
 	var st buildStats
@@ -111,6 +149,8 @@ func buildFile(data corpusData, f *corpusFile) (map[string]Outcome, buildStats, 
 	}
 
 	var libraries []Value
+
+	var libraryCodes []Value
 
 	for _, imp := range f.imports {
 		laid, laidPayload, ok := run("layout", bytesOf(imp.raw), fuelLayout)
@@ -132,6 +172,16 @@ func buildFile(data corpusData, f *corpusFile) (map[string]Outcome, buildStats, 
 			Head: bytesOf([]byte(imp.name)),
 			Tail: parsedPayload,
 		})
+
+		// The library's machine expression, which the file's desugarer wraps around the file.
+		if data.programs["desugar"] != nil {
+			_, libCode, ok := run("desugar", desugarInput(NIL, parsedPayload, NIL), fuelDesugar)
+			if !ok {
+				return outs, st, fmt.Errorf("import %s: desugar refused", imp.file)
+			}
+
+			libraryCodes = append(libraryCodes, libCode)
+		}
 	}
 
 	laid, bracketed, ok := run("layout", bytesOf(f.raw), fuelLayout)
@@ -181,6 +231,17 @@ func buildFile(data corpusData, f *corpusFile) (map[string]Outcome, buildStats, 
 
 	checked, _, _ := run("check", request, fuelCheck)
 	outs["check"] = checked
+
+	// The file's desugarer, with the names and the machine expressions of its imports.
+	var importNames []Value
+	for _, imp := range f.imports {
+		importNames = append(importNames, bytesOf([]byte(imp.name)))
+	}
+
+	if data.programs["desugar"] != nil {
+		desugared, _, _ := run("desugar", desugarInput(listOf(importNames), parsedPayload, listOf(libraryCodes)), fuelDesugar)
+		outs["desugar"] = desugared
+	}
 	st.elapsed = time.Since(start)
 
 	return outs, st, nil
@@ -267,7 +328,12 @@ func TestCorpus(t *testing.T) {
 			continue
 		}
 
-		for _, stage := range []string{"layout", "lex", "parse", "check"} {
+		stages := []string{"layout", "lex", "parse", "check"}
+		if _, ok := f.expect["desugar"]; ok {
+			stages = append(stages, "desugar")
+		}
+
+		for _, stage := range stages {
 			want, ok := f.expect[stage]
 			if !ok {
 				t.Errorf("%s: no reference for stage %s", f.name, stage)

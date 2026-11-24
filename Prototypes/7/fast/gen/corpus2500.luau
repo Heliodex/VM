@@ -10,7 +10,8 @@
 -- THE 2,500-LINE CORPUS: the same generator as corpus.luau, with 13 of the 20 library files (265 lines), which makes the four boot files and the libraries 2,500 lines exactly. The libraries left out are max, min, ninefold, range, sort, triple and unwrap_or. Its output is testdata/corpus2500.txt.
 --
 -- Run from Prototypes/7/measure:
---   cd Prototypes/7/measure && lute run ../fast/gen/corpus2500.luau > ../fast/testdata/corpus2500.txt
+--   cd Prototypes/7/measure && lute run ../fast/gen/corpus2500.luau > ../fast/testdata/corpus2500_desugar.txt
+-- The generator now also runs the desugarer (Prototypes/6/L2/programs/boot/desugar.l2) on each library and each file, so its output is the build with the desugarer, testdata/corpus2500_desugar.txt. testdata/corpus2500.txt is the four-stage build, from before the desugarer was added; it is kept as the baseline, and the Go build runs it without the desugar stage.
 
 const ProgramFile = require "../../../6/L2/programfile"
 const Compile = require "../../measure/compile"
@@ -29,6 +30,32 @@ const FUEL_LAYOUT = 1e10
 const FUEL_LEX = 1e8
 const FUEL_PARSE = 5e8
 const FUEL_CHECK = 1e10
+const FUEL_DESUGAR = 1e11
+
+-- A cell of two values, and a list of values, as the machine's values.
+local function cellOf(a: Value, b: Value): Value
+	const c: Types.Cell = { kind = "cell", head = a, tail = b }
+
+	return c
+end
+
+local function listOf(items: { Value }): Value
+	local v: Value = Format.NIL
+
+	for i = #items, 1, -1 do
+		v = cellOf(items[i], v)
+	end
+
+	return v
+end
+
+-- The input of the desugarer: (imports . (declarations . (expression . (tests . (import codes . input test))))), with the parse's payload (declarations . expression), no checks (the corpus has none), and no input check (the checker's input test is not part of the build yet).
+local function desugarInput(names: Value, parsed: Value, codes: Value): Value
+	const pair = parsed :: Types.Cell
+	const noInputCheck: Types.Con = { kind = "con", tag = 0, payload = Format.NIL }
+
+	return cellOf(names, cellOf(pair.head, cellOf(pair.tail, cellOf(Format.NIL, cellOf(codes, noInputCheck)))))
+end
 
 const function readFile(path: string): string
 	const handle = fs.open(path)
@@ -117,10 +144,12 @@ const layoutC = Compile.compile(readFile "boot/layout.l2", "boot/layout.l2")
 const lexC = Compile.compile(readFile(BOOT6 .. "lex.l2"), "lex.l2")
 const parseC = Compile.compile(readFile(BOOT6 .. "parse.l2"), "parse.l2")
 const checkC = Compile.compile(readFile "boot/types.l2", "boot/types.l2")
+const desugarC = Compile.compile(readFile(BOOT6 .. "desugar.l2"), "boot/desugar.l2")
 print(`# program layout {hex(program(layoutC, "layout"))}`)
 print(`# program lex {hex(program(lexC, "lex"))}`)
 print(`# program parse {hex(program(parseC, "parse"))}`)
 print(`# program check {hex(program(checkC, "check"))}`)
+print(`# program desugar {hex(program(desugarC, "desugar"))}`)
 -- The corpus: the four boot files of the Phase 0 harness, then the standard library (Prototype 6's lib folder, 20 files), which tops the corpus up to 2,500 lines and more. A library file is named by its path from the programs folder (lib/...), and its label is that path.
 const corpus = { "lex.l2", "parse.l2", "layout.l2", "types.l2" }
 
@@ -158,6 +187,7 @@ for _, file in corpus do
 	const imports = parsedFile.imports
 	local expects: { string } = {}
 	local libraries: { Value } = {}
+	local libraryCodes: { Value } = {}
 	local refused: string? = nil
 
 	for _, imp in imports do
@@ -189,6 +219,17 @@ for _, file in corpus do
 
 		const library: Types.Cell = { kind = "cell", head = bytesValue(imp.name), tail = parsedPayload }
 		table.insert(libraries, library)
+
+		-- The library's machine expression, which the file's desugarer wraps around the file.
+		const libDesugared = stage(desugarC, desugarInput(Format.NIL, parsedPayload, Format.NIL), FUEL_DESUGAR)
+		const libCode = payloadOf(libDesugared)
+
+		if libCode == nil then
+			refused = `{imp.file} desugar`
+			break
+		end
+
+		table.insert(libraryCodes, libCode)
 	end
 
 	if refused ~= nil then
@@ -242,6 +283,16 @@ for _, file in corpus do
 
 	const checked = stage(checkC, request, FUEL_CHECK)
 	print(`expect {file} check {describe(checked)}`)
+
+	-- The file's desugarer, with the names and machine expressions of its imports.
+	local importNames: { Value } = {}
+
+	for _, imp in imports do
+		table.insert(importNames, bytesValue(imp.name))
+	end
+
+	const desugared = stage(desugarC, desugarInput(listOf(importNames), parsedPayload, listOf(libraryCodes)), FUEL_DESUGAR)
+	print(`expect {file} desugar {describe(desugared)}`)
 end
 
 print(`# corpus: {bytes} bytes, {lines} lines`)
