@@ -106,6 +106,10 @@ Primitives are the functions the machine provides. They are written as names, wi
 
 `@` (kind) returns the tag of a value as an integer, using the same numbers as L1: 0 Int, 1 Nil, 2 Pair, 3 Fn, 4 Pin.
 
+`equal` (tag 13, two arguments) is deep equality, and gives 1 or 0. Two values are equal when they have the same kind and the same contents: integers by value, nil, pairs by head and tail, and constructors by tag and payload. `=` stays the integer comparison, so it still refuses other values. A function (kind 3) or a suspended value (kind 6) is an error when the comparison reaches it.
+
+Its steps: each pair of values the comparison visits costs one step, charged before the pair is looked at. The pairs are visited in order, the two values first and then the heads and the tails of cells, and the comparison stops at the first difference. So `equal` of two integers costs one step, the same as `=`, and two lists cost one step for each cell and for each head, and one more for the nil that ends them. Running out of fuel in the middle ends the run at that step, as for any step.
+
 ## 7. Pins and fix
 
 `pin e` suspends `e`. `force p` runs a suspended expression. `fix f` gives the fixed point of a function, as in L1. These are the only operations on suspended expressions.
@@ -377,5 +381,6 @@ These were open, and are now settled:
 9. Tag numbers: a user sum's constructors are numbered from 0 in declaration order, so `Ok` is 0 and `Err` is 1 (section 13.4). nil is `~`, and strings are lists of bytes (section 5).
 10. `Dyn` values are checked only by an explicit `check`, which gives a `Result` (section 13.5).
 11. Nullary constructors have payload `~`, and several fields are one pair (section 13.4).
+12. Deep equality is a primitive, `equal` (section 6), charged one step per pair of values visited. Equality on data is needed by the library (`lib/README.md`, "Not here"), and a derived equality per type would need a generated function for each type, with the same fuel question for each. `=` keeps its integer meaning, so the existing programs and their step counts do not change. Functions are refused, since the comparison of two laws by their text is not what a program means by equal.
 
 Nothing is open in the draft. The `untyped` form, which is the source of `Dyn` (section 13.5), is implemented in both compilers. The remaining work is the checker's coverage: its parity run skips three programs (section 13.7).
