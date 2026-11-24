@@ -142,4 +142,19 @@ return {
 		text = "h\n---\n---\nfn x\n\tx\n---\n\n",
 		reason = "at least one test",
 	},
+	{
+		name = "a top-level pair written without parentheses",
+		text = "h\n---\n---\nlet f = (fn x\n\tx)\n(f 1) . (f [1])\n---\n1 => 1 fuel 10\n",
+		reason = "unexpected . after the expression",
+	},
+	{
+		name = "a nested pattern (a pair inside a constructor's arm)",
+		text = "h\n---\n---\ntype Tree = Leaf | Node (Tree . Tree)\n\nfn x\n\tmatch x {\n\t\tLeaf -> 0\n\t\tNode (l . r) -> 1\n\t}\n---\n1 => 1 fuel 10\n",
+		reason = "expected -> here",
+	},
+	{
+		name = "a literal in a record pattern (fields bind names or _)",
+		text = "h\n---\n---\ntype MS = MS {\n\tst: Int\n\tfixed: Int\n}\n\nfn x\n\tmatch x {\n\t\tMS {\n\t\t\tst = 1\n\t\t\tfixed = f\n\t\t} -> f\n\t}\n---\n1 => 1 fuel 10\n",
+		reason = "expected sym here",
+	},
 }
