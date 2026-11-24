@@ -1,0 +1,9 @@
+Early return: a Result input, passed through or unwrapped.
+---
+---
+fn r
+	let v = (r?)
+	Ok (+ v 1)
+---
+Ok 4 => Ok 5 fuel 100000
+Err "no" => Err "no" fuel 100000
