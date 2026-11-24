@@ -50,10 +50,15 @@ func TestJetHashesAreInTheChecker(t *testing.T) {
 		laws(t, prog.Body, seen)
 
 		// The corpus's helpers (corpusjets.go) are laws of the corpus's stage programs, not of the checker's, so a jet may name a law of either.
-		data := readCorpus(t)
+		// The desugarer's laws are in the build with the desugarer (testdata/corpus2500_desugar.txt), so the jets of the build are looked up in both corpora.
+		for _, path := range []string{"testdata/corpus.txt", "testdata/corpus2500_desugar.txt"} {
+			t.Setenv("CORPUS", path)
 
-		for _, p := range data.programs {
-			laws(t, p.Body, seen)
+			data := readCorpus(t)
+
+			for _, p := range data.programs {
+				laws(t, p.Body, seen)
+			}
 		}
 
 		for h := range jets {

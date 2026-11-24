@@ -16,7 +16,12 @@ func TestCorpusProfile(t *testing.T) {
 
 	owners := map[[32]byte]string{}
 
-	raw, err := os.ReadFile("testdata/corpus.txt")
+	path := os.Getenv("CORPUS")
+	if path == "" {
+		path = "testdata/corpus.txt"
+	}
+
+	raw, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
