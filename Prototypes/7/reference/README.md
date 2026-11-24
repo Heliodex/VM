@@ -18,8 +18,8 @@ Run each from this folder with `lute run <file>`. The outputs are in `*.txt` bes
 
 ## Results
 
-- `interp_run.luau`: **37 of 37** checks pass (the pin checks went with decision 16). The step count of `call (lit inc) (lit 41)` is 7, worked out by hand.
-- `format_run.luau`: **49 of 49** checks pass.
+- `interp_run.luau`: **36 of 36** checks pass (the pin and case checks went with decisions 16 and 17). The step count of `call (lit inc) (lit 41)` is 7, worked out by hand.
+- `format_run.luau`: **51 of 51** checks pass, including the refusal of the reserved value tag 7 and the unused form tag 19.
 - `cross_run.luau`: **193 agree**, 4 differ on purpose (named below), **0 disagree**. Prototype 5's 50 examples and Prototype 6's 147 L2 program tests (all 44 files) are covered.
 
 ## What differs, and why
@@ -35,8 +35,10 @@ The exit test asks for the same fuel as Prototype 6. It is not met, by design: t
 
 | Set | Prototype's steps | Reference's steps |
 | --- | ---: | ---: |
-| Prototype 5 examples (50) | 786,116 | 624,051 |
-| L2 program tests (147), on the values | 312,543 | 339,092 |
+| Prototype 5 examples (50) | 786,116 | 514,031 |
+| L2 program tests (147), on the values | 312,543 | 120,647 |
+
+The table gives the reference's steps on the lowered programs as they are now. Phase 3 reported 624,051 and 339,092. The counts fell because the lowering makes smaller core programs: a recursive function is one law (`445f28b`), a chain of lambdas is one law of several arguments (`808f3d3`), an application of a lambda is a `let` and a closed value is a constant (`aed7bce`, `17d7a29`, `d4e718d`). The interpreter's step rule did not change: the 36 checks that Phase 3's run and this one share give the same results and the same steps, including the spec's examples.
 
 The reference is given a budget of 20 times the other machine's fuel, so a program that runs out of fuel on the other machine must also run out on the reference, and one that finishes must finish.
 
@@ -46,11 +48,11 @@ The reference is given a budget of 20 times the other machine's fuel, so a progr
 - A `pin` becomes a `delay` of a call of a closed law, so it is a thunk.
 - A variable with no binder (an unbound name) gives a slot that no frame has, so it fails at run time, as the machine's "no variable" error does.
 - `index n` becomes a chain of `head` and `tail` primitives, in the order of the address bits.
-- `tagof` and `payload` become the primitives 12 and 13 (added to the spec in this phase; see below).
+- `tagof` and `payload` become the primitives 10 and 11, and a `cell` becomes `cons`, primitive 12 (SPEC.md section 4). In Phase 3 they were 12 and 13, and `cons` was 14; decision 16 renumbered them.
 
 ## Changes to the spec in this phase
 
-- **Constructor tags are read by primitives.** `tagof` (12) and `payload` (13) were added. Lowering Prototype 6's expressions showed that the core could not read a constructor's tag for an open set of tags. The form count stays at eleven (SPEC.md decision 9).
+- **Constructor tags are read by primitives.** `tagof` and `payload` were added (as 12 and 13 in this phase; 10 and 11 since decision 16). Lowering Prototype 6's expressions showed that the core could not read a constructor's tag for an open set of tags. The form count stays at eleven (SPEC.md decision 9).
 - **Integers are unbounded**, and that is now the reference's behaviour (decision 8).
 
 ## Open decisions
