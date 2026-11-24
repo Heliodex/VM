@@ -208,7 +208,7 @@ local function check(name: string, src: string)
 
 	if host == nil or l2 == nil then
 		skipped += 1
-		print(`SKIP  {name}: the parser refuses it`)
+		print(`SKIP  {name}: the {if host == nil then "Luau" else "L2"} parser refuses it`)
 		return
 	end
 
@@ -253,7 +253,7 @@ local CASES: { { name: string; src: string } } = {
 	{ name = "head of a list"; src = "head [1 2]" },
 	{ name = "tail of a list"; src = "tail [1 2]" },
 	{ name = "pin and force"; src = "force (pin 1)" },
-	{ name = "a fn of two names"; src = "fn (x y) (- x y)" },
+	{ name = "a fn of two names"; src = "fn (x y)\n\t(- x y)" },
 	{ name = "a fn of one name"; src = "fn x\n\t(+ x 1)" },
 	{ name = "a let"; src = "let x = 3\nx" },
 	{ name = "a let shadowing a prim name"; src = "let x = 3\n(+ x x)" },
@@ -262,17 +262,17 @@ local CASES: { { name: string; src: string } } = {
 	{ name = "Ok applied"; src = "Ok 5" },
 	{ name = "Err applied to a string"; src = "Err \"x\"" },
 	{ name = "Ok as a value"; src = "Ok" },
-	{ name = "a match on Result"; src = "match (Ok 1)\n\tOk v -> v\n\tErr e -> 0" },
-	{ name = "a match with a wildcard payload"; src = "match (Ok 1)\n\tOk _ -> 2\n\t_ -> 3" },
-	{ name = "a match that binds the value"; src = "match 5\n\tx -> (+ x 1)" },
-	{ name = "a match on a fn argument"; src = "fn r\n\tmatch r\n\t\tOk v -> v\n\t\tErr e -> 0" },
+	{ name = "a match on Result"; src = "match (Ok 1) {\n\tOk v -> v\n\tErr e -> 0\n}" },
+	{ name = "a match with a wildcard payload"; src = "match (Ok 1) {\n\tOk _ -> 2\n\t_ -> 3\n}" },
+	{ name = "a match that binds the value"; src = "match 5 {\n\tx -> (+ x 1)\n}" },
+	{ name = "a match on a fn argument"; src = "fn r\n\tmatch r {\n\t\tOk v -> v\n\t\tErr e -> 0\n\t}" },
 	{ name = "an unbound name"; src = "y" },
 	{ name = "a binder that is a primitive"; src = "let + = 1\n2" },
 	{ name = "a binder that is a constructor"; src = "let Foo = 1\n2" },
-	{ name = "a fn with a name twice"; src = "fn (x x) x" },
+	{ name = "a fn with a name twice"; src = "fn (x x)\n\tx" },
 	{ name = "a letrec of a non-fn"; src = "letrec x = 1\nx" },
-	{ name = "an arm after a catch-all"; src = "match 1\n\t_ -> 2\n\tOk v -> 3" },
-	{ name = "an unknown constructor in a match"; src = "match 1\n\tFoo v -> 2" },
+	{ name = "an arm after a catch-all"; src = "match 1 {\n\t_ -> 2\n\tOk v -> 3\n}" },
+	{ name = "an unknown constructor in a match"; src = "match 1 {\n\tFoo v -> 2\n}" },
 	{ name = "a constructor applied to nothing"; src = "Err" },
 	{ name = "untyped"; src = "untyped 5" },
 }
