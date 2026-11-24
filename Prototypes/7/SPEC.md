@@ -1,6 +1,6 @@
 # Prototype 7: the core specification
 
-Status: draft for Phase 3. Every rule the reference interpreter needs is here. Where the plan left a choice open, the default the plan recommends is taken and listed under "Decisions taken" at the end.
+Status: in force for Phases 3 to 8. Every rule the reference interpreter and the Go machine need is here. Where the plan left a choice open, the default the plan recommends is taken and listed under "Decisions taken" at the end. A later change is recorded there with its reason.
 
 The core is what a surface language compiles to. It has nine forms and thirteen primitives, and nothing else. Recursion, data structures, strings and effects are built on top of these, or are added later with a rule of their own.
 
