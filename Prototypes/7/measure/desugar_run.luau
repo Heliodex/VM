@@ -10,8 +10,8 @@
 const Checker = require "../../6/L2/checker"
 const Desugar = require "../../6/L2/desugar"
 const L2 = require "../../6/L2/l2"
-const Parser = require "../../6/L2/parser"
 const Layout = require "../../6/L2/layout"
+const Parser = require "../../6/L2/parser"
 const ProgramFile = require "../../6/L2/programfile"
 const VM = require "../../6/interpreter/vm"
 const fs = require "@lute/fs"
@@ -155,6 +155,7 @@ showCode = function(v: VM.Value): string
 		return `(I {tostring(pair.head)} {showCode(pair.tail)})`
 	elseif con.tag == 7 then
 		const rest = pair.tail :: VM.Cell
+
 		return `(IF {showCode(pair.head)} {showCode(rest.head)} {showCode(rest.tail)})`
 	elseif con.tag == 8 then
 		return `(P {showCode(p)})`
@@ -171,6 +172,7 @@ showCode = function(v: VM.Value): string
 	end
 
 	const rest = pair.tail :: VM.Cell
+
 	return `(R {tostring(pair.head)} {showCode(rest.head)} {showCode(rest.tail)})`
 end
 
@@ -296,6 +298,7 @@ local function hostExpr(src: string, imports: { string }, importExprs: { any }):
 	const program = parsed :: Parser.Program
 	const ok, res = pcall(function()
 		const ctors = Desugar.buildCtors(program.decls)
+
 		return Desugar.wrapImports(Desugar.desugarExpr(program.expr, imports, ctors), importExprs)
 	end)
 
@@ -347,13 +350,22 @@ end
 local function report(name: string, host: string?, l2: string?)
 	if host == nil or l2 == nil then
 		skipped += 1
-		print(`SKIP  {name}: the {if host == nil then "Luau" else "L2"} parser refuses it`)
+		print(
+			`SKIP  {name}: the {
+				if host == nil then
+					"Luau"
+				else
+					"L2"
+			} parser refuses it`
+		)
+
 		return
 	end
 
 	if string.find(l2, "not in the first slice", 1, true) ~= nil then
 		skipped += 1
 		print(`SKIP  {name}: {l2}`)
+
 		return
 	end
 
@@ -385,6 +397,7 @@ local function checkProgram(name: string, src: string)
 
 	if not parsedOk then
 		report(name, nil, nil)
+
 		return
 	end
 
@@ -394,6 +407,7 @@ local function checkProgram(name: string, src: string)
 	if not checked then
 		skipped += 1
 		print(`SKIP  {name}: the Luau checker refuses it`)
+
 		return
 	end
 
@@ -415,7 +429,7 @@ end
 
 local EXPRESSIONS: { { name: string; src: string } } = {
 	{ name = "an integer"; src = "5" },
-	{ name = "a string"; src = "\"ab\"" },
+	{ name = "a string"; src = '"ab"' },
 	{ name = "nil"; src = "~" },
 	{ name = "a pair"; src = "(1 . 2)" },
 	{ name = "a list"; src = "[1 2 3]" },
@@ -442,7 +456,7 @@ local EXPRESSIONS: { { name: string; src: string } } = {
 	{ name = "a letrec"; src = "letrec f = fn n\n\t(if (< n 1) 0 (f (- n 1)))\n(f 3)" },
 	{ name = "an if"; src = "if 1 2 3" },
 	{ name = "Ok applied"; src = "Ok 5" },
-	{ name = "Err applied to a string"; src = "Err \"x\"" },
+	{ name = "Err applied to a string"; src = 'Err "x"' },
 	{ name = "Ok as a value"; src = "Ok" },
 	{ name = "a match on Result"; src = "match (Ok 1) {\n\tOk v -> v\n\tErr e -> 0\n}" },
 	{ name = "a match with a wildcard payload"; src = "match (Ok 1) {\n\tOk _ -> 2\n\t_ -> 3\n}" },
@@ -478,9 +492,24 @@ local EXPRESSIONS: { { name: string; src: string } } = {
 	{ name = "a sum declared twice"; src = "type A = Foo | Bar\ntype B = Baz | Foo\nFoo" },
 	{ name = "a mutual group"; src = "letrec {\n\tf = fn n\n\t\t(if n 0 (g (- n 1)))\n\tg = fn n\n\t\t(if n 1 (f (- n 1)))\n\t(f 3)\n}" },
 	{ name = "a mutual group that binds a non-fn"; src = "letrec {\n\tf = 1\n\t(f 3)\n}" },
+	{ name = "a record named without its fields"; src = "type P = P {\n\tx: Int\n}\nP" },
+	{ name = "a record field given twice"; src = "type P = P {\n\tx: Int\n}\nP {\n\tx = 1\n\tx = 2\n}" },
+	{ name = "a record pattern of a constructor that is not a record"; src = "match 1 {\n\tFoo {\n\t\tx = a\n\t} -> a\n}" },
+	{ name = "a record pattern with a field the record lacks"; src = "type P = P {\n\tx: Int\n}\nmatch (P {\n\tx = 1\n}) {\n\tP {\n\t\tz = a\n\t} -> a\n}" },
+	{ name = "a record pattern that names a field twice"; src = "type P = P {\n\tx: Int\n}\nmatch (P {\n\tx = 1\n}) {\n\tP {\n\t\tx = a\n\t\tx = b\n\t} -> a\n}" },
+	{ name = "a record pattern that misses a field"; src = "type P = P {\n\tx: Int\n\ty: Int\n}\nmatch (P {\n\tx = 1\n\ty = 2\n}) {\n\tP {\n\t\tx = a\n\t} -> a\n}" },
+	{ name = "a bind to a constructor with no payload"; src = "type S = A | B\nmatch A {\n\tB x -> 1\n\t_ -> 2\n}" },
+	{ name = "a record constructor matched as a sum"; src = "type P = P {\n\tx: Int\n}\nmatch (P {\n\tx = 1\n}) {\n\tP v -> 1\n}" },
+	{ name = "a with on a field that is not a record field"; src = "let z = 1\nwith z {\n\tx = 2\n}" },
+	{ name = "a with that gives a field twice"; src = "type P = P {\n\tx: Int\n\ty: Int\n}\nlet p = (P {\n\tx = 1\n\ty = 2\n})\nwith p {\n\ty = 5\n\ty = 6\n}" },
+	{ name = "an early return in a let value that is not the result"; src = "fn r\n\tlet v = (if r ((Ok 1)?) 2)\n\tv" },
+	{ name = "an early return in an argument of a call that is not the result"; src = "fn r\n\tlet v = ((+ 1 (Ok 2)?))\n\tv" },
+	{ name = "a catch-all bound name"; src = "match 1 {\n\tx -> x\n}" },
+	{ name = "a fn parameter that is a constructor"; src = "fn Foo\n\t1" },
+	{ name = "a let of the underscore"; src = "let _ = 1\n2" },
+	{ name = "a type declared with a record and a sum of the same name"; src = "type P = P {\n\tx: Int\n}\ntype Q = P | R\nP { x = 1 }" },
 	{ name = "a shadowed import"; src = "let reverse = 2\nreverse" },
 }
-
 local PROGRAMS: { { name: string; src: string } } = {
 	{ name = "a check of an integer"; src = "fn x\n\tmatch (check (untyped x)) {\n\t\tOk v -> (+ v 1)\n\t\tErr e -> 0\n}" },
 	{ name = "a check of a pair"; src = "fn x\n\tmatch (check (untyped x)) {\n\t\tOk v -> (fst v)\n\t\tErr e -> 0\n}" },
@@ -489,8 +518,6 @@ local PROGRAMS: { { name: string; src: string } } = {
 	{ name = "the input of a program that is a pair"; src = "fn p\n\t(fst p)" },
 	{ name = "a program that returns a constructor"; src = "fn x\n\tOk x" },
 }
-
-
 -- The four-section program files of the L2 programs folder: the program section is desugared as a program is, with stand-in machine expressions for its imports (the same on both sides).
 local CORPUS = { "add_one", "block_let", "boot/layout", "boot/lex", "boot/parse", "boot/types", "cons", "division", "double", "fact", "forms", "head", "imports", "let_block", "letrec_block", "lib/abs", "lib/append", "lib/contains", "lib/filter", "lib/fold", "lib/gcd", "lib/insert", "lib/length", "lib/map", "lib/max", "lib/min", "lib/ninefold", "lib/nth", "lib/range", "lib/reverse", "lib/sort", "lib/sum", "lib/take", "lib/triple", "lib/unwrap_or", "mutual", "option", "pairs", "record_middle", "records", "remainder", "result", "sum_list", "tree" }
 
@@ -514,7 +541,7 @@ local function checkCorpus(path: string)
 	report(`corpus {path}`, host, l2)
 end
 
-print("desugar_run: the L2 desugarer against the Luau desugarer")
+print "desugar_run: the L2 desugarer against the Luau desugarer"
 
 for _, c in EXPRESSIONS do
 	-- A case that a checker's test would be needed for is skipped by l2Outcome: its checks are empty here.

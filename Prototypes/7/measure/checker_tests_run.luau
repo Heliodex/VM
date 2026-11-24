@@ -91,27 +91,6 @@ local function itemsOf(v: VM.Value): { VM.Value }
 	return out
 end
 
--- Renames the type variables of a text by where they first appear: ?12 and ?7 become ?a and ?b.
-local function canon(s: string): string
-	local names: { [string]: string } = {}
-	local count = 0
-
-	return (
-		string.gsub(
-			s,
-			"%?(%d+)",
-			function(id: string): string
-				if names[id] == nil then
-					count += 1
-					names[id] = `?v{count}`
-				end
-
-				return names[id]
-			end
-		)
-	)
-end
-
 -- The keys of recursive tests, renamed by where they first appear.
 local function keyName(keys: { [string]: string }, key: string): string
 	if keys[key] == nil then
@@ -173,9 +152,11 @@ local function showVmTest(v: VM.Value, keys: { [string]: string }): string
 		return "P"
 	elseif con.tag == 5 then
 		const pr = p :: VM.Cell
+
 		return `(p {showVmTest(pr.head, keys)} {showVmTest(pr.tail, keys)})`
 	elseif con.tag == 6 then
 		const pr = p :: VM.Cell
+
 		return `(l {showVmTest(pr.head, keys)} {showVmTest(pr.tail, keys)})`
 	elseif con.tag == 7 then
 		local items: { string } = {}
@@ -190,6 +171,7 @@ local function showVmTest(v: VM.Value, keys: { [string]: string }): string
 		return `(r {keyName(keys, textOf(p))})`
 	elseif con.tag == 9 then
 		const pr = p :: VM.Cell
+
 		return `(x {keyName(keys, textOf(pr.head))} {showVmTest(pr.tail, keys)})`
 	end
 
@@ -241,6 +223,7 @@ local function check(name: string, laid: string, imports: { { name: string; file
 		if libBoot == nil then
 			skipped += 1
 			print(`SKIP  {name}: the L2 parser refuses the import {imp.file}`)
+
 			return
 		end
 
@@ -254,6 +237,7 @@ local function check(name: string, laid: string, imports: { { name: string; file
 	if not hostOk then
 		skipped += 1
 		print(`SKIP  {name}: the Luau checker refuses it`)
+
 		return
 	end
 
@@ -262,6 +246,7 @@ local function check(name: string, laid: string, imports: { { name: string; file
 	if bootProgram == nil then
 		skipped += 1
 		print(`SKIP  {name}: the L2 parser refuses it`)
+
 		return
 	end
 
@@ -270,6 +255,7 @@ local function check(name: string, laid: string, imports: { { name: string; file
 	if out == nil then
 		skipped += 1
 		print(`SKIP  {name}: the L2 checker does not finish`)
+
 		return
 	end
 
@@ -281,15 +267,23 @@ local function check(name: string, laid: string, imports: { { name: string; file
 	const errs = itemsOf(restPair.head)
 
 	if #errs > 0 then
-		table.insert(problems, `the L2 checker reports errors: {table.concat((function(): { string }
-			local t: { string } = {}
+		table.insert(
+			problems,
+			`the L2 checker reports errors: {
+				table.concat(
+					(function(): { string }
+						local t: { string } = {}
 
-			for _, e in errs do
-				table.insert(t, textOf(e))
-			end
+						for _, e in errs do
+							table.insert(t, textOf(e))
+						end
 
-			return t
-		end)(), "; ")}`)
+						return t
+					end)(),
+					"; "
+				)
+			}`
+		)
 	end
 
 	-- The checks: each check node of the Luau checker, found by its position in the L2 checker's list.
@@ -318,8 +312,8 @@ local function check(name: string, laid: string, imports: { { name: string; file
 			if found == nil then
 				table.insert(problems, `no L2 check at {node.at.line}:{node.at.col}`)
 			else
-				const expectV = canon(textOf(found.head))
-				const expectL = canon(node.expect)
+				const expectV = textOf(found.head)
+				const expectL = node.expect
 
 				if expectV ~= expectL then
 					table.insert(problems, `check at {node.at.line}:{node.at.col}: expects "{expectV}", the Luau checker "{expectL}"`)
@@ -360,8 +354,8 @@ local function check(name: string, laid: string, imports: { { name: string; file
 			table.insert(problems, `input test {testV}, the Luau checker {testL}`)
 		end
 
-		const expectV = canon(textOf(pr.tail))
-		const expectL = canon(result.inputExpect)
+		const expectV = textOf(pr.tail)
+		const expectL = result.inputExpect
 
 		if expectV ~= expectL then
 			table.insert(problems, `input text "{expectV}", the Luau checker "{expectL}"`)
@@ -384,7 +378,6 @@ end
 
 -- The program files of the L2 programs folder, with their imports.
 local CORPUS = { "add_one", "block_let", "boot/layout", "boot/lex", "boot/parse", "boot/types", "cons", "division", "double", "fact", "forms", "head", "imports", "let_block", "letrec_block", "lib/abs", "lib/append", "lib/contains", "lib/filter", "lib/fold", "lib/gcd", "lib/insert", "lib/length", "lib/map", "lib/max", "lib/min", "lib/ninefold", "lib/nth", "lib/range", "lib/reverse", "lib/sort", "lib/sum", "lib/take", "lib/triple", "lib/unwrap_or", "mutual", "option", "pairs", "record_middle", "records", "remainder", "result", "sum_list", "tree" }
-
 -- Programs with checks, as the Luau checker needs them: a function of its input.
 local CHECKS: { { name: string; src: string } } = {
 	{ name = "a check of an integer"; src = "fn x\n\tmatch (check (untyped x)) {\n\t\tOk v -> (+ v 1)\n\t\tErr e -> 0\n}" },
@@ -392,12 +385,18 @@ local CHECKS: { { name: string; src: string } } = {
 	{ name = "a check of a list"; src = "fn x\n\tmatch (check (untyped x)) {\n\t\tOk v -> (@ v)\n\t\tErr e -> 0\n}" },
 	{ name = "a check of a user sum"; src = "type Shape = Circle Int | Dot\nlet area = fn s\n\tmatch s {\n\t\tCircle r -> r\n\t\tDot -> 0\n}\nfn x\n\tmatch (check (untyped x)) {\n\t\tOk v -> (area v)\n\t\tErr e -> 0\n}" },
 	{ name = "a check of a recursive list of integers"; src = "type L = Nil2 | Cons2 (Int . L)\nletrec len = fn t\n\tmatch t {\n\t\tNil2 -> 0\n\t\tCons2 p -> (+ 1 (len (snd p)))\n\t}\nfn x\n\tmatch (check (untyped x)) {\n\t\tOk v -> (len v)\n\t\tErr e -> 0\n}" },
+	{ name = "a check of a recursive sum with a pair"; src = "type T = Leaf | Node (T . Int)\nletrec depth = fn t\n\tmatch t {\n\t\tLeaf -> 0\n\t\tNode p -> (+ 1 (depth (fst p)))\n\t}\nfn x\n\tmatch (check (untyped x)) {\n\t\tOk v -> (depth v)\n\t\tErr e -> 0\n}" },
+	{ name = "a check of a list of user sums"; src = "type C = Red | Blue Int\nfn x\n\tmatch (check (untyped x)) {\n\t\tOk v -> (cons v ~)\n\t\tErr e -> ~\n}" },
+	{ name = "a check in a let"; src = "fn x\n\tlet r = (check (untyped x))\n\tmatch r {\n\t\tOk v -> (+ v 1)\n\t\tErr e -> 0\n}" },
+	{ name = "a check of a record"; src = "type P = P {\n\tx: Int\n\ty: Int\n}\nfn x\n\tmatch (check (untyped x)) {\n\t\tOk v -> (match v {\n\t\t\tP {\n\t\t\t\tx = a\n\t\t\t\ty = b\n\t\t\t} -> (+ a b)\n\t\t})\n\t\tErr e -> 0\n}" },
 	{ name = "the input of a program"; src = "fn x\n\t(+ x 1)" },
 	{ name = "the input of a program that is a pair"; src = "fn p\n\t(fst p)" },
 	{ name = "a program that returns a constructor"; src = "fn x\n\tOk x" },
+	{ name = "a check of a polymorphic pair"; src = "fn x\n\tmatch (check (untyped x)) {\n\t\tOk v -> (fst v)\n\t\tErr e -> 0\n}" },
+	{ name = "the input of a polymorphic pair"; src = "fn p\n\t(fst p)" },
+	{ name = "a check of a list"; src = "fn x\n\tmatch (check (untyped x)) {\n\t\tOk v -> (cons v ~)\n\t\tErr e -> ~\n}" },
 }
-
-print("checker_tests_run: the L2 checker's tests against the Luau checker's")
+print "checker_tests_run: the L2 checker's tests against the Luau checker's"
 
 for _, c in CHECKS do
 	check(c.name, c.src, {})
