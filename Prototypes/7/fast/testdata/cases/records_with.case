@@ -1,0 +1,24 @@
+Records: a literal, an accessor, a with, and a match.
+---
+---
+type Point = Point {
+	x: Int
+	y: Int
+}
+fn x
+	let p = (Point {
+		x = x
+		y = 2
+	})
+	let q = (with p {
+		y = 9
+	})
+	match q {
+		Point {
+			x = a
+			y = b
+		} -> (+ a b)
+	}
+---
+1 => 10 fuel 100000
+5 => 14 fuel 100000
