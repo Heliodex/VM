@@ -64,43 +64,13 @@ func bytesOf(b []byte) Value {
 	return v
 }
 
-// outcomeText is an outcome in the cases' form: "value <hex>", "error <message>" or "out_of_fuel".
-func outcomeText(t *testing.T, o Outcome) string {
-	t.Helper()
-
-	switch o.Status {
-	case "value":
-		b, err := EncodeValue(o.Value)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		return "value " + hex.EncodeToString(b)
-	case "error":
-		return "error " + o.Message
-	}
-
-	return o.Status
-}
-
-// payloadOf is a stage's result payload, when the stage went through (a tagged result of tag 0).
-func payloadOf(o Outcome) (Value, bool) {
-	if o.Status != "value" {
-		return nil, false
-	}
-
-	c, ok := o.Value.(*Con)
-	if !ok || c.Tag != 0 {
-		return nil, false
-	}
-
-	return c.Payload, true
-}
-
 // desugarInput is the input of the desugarer: (imports . (declarations . (expression . (tests . (import codes . input test))))), with the names of the imports, the parse's payload (declarations . expression), no checks (the corpus has none), the import codes, and no input check.
 func desugarInput(names, parsed, codes Value) Value {
+	noInputCheck := &Con{
+		Tag: 0,
+		Payload: NIL,
+	}
 	pair := parsed.(*Cell)
-	noInputCheck := &Con{Tag: 0, Payload: NIL}
 
 	return &Cell{
 		Head: names,
@@ -134,6 +104,39 @@ func listOf(items []Value) Value {
 	return v
 }
 
+// outcomeText is an outcome in the cases' form: "value <hex>", "error <message>" or "out_of_fuel".
+func outcomeText(t *testing.T, o Outcome) string {
+	t.Helper()
+
+	switch o.Status {
+	case "value":
+		b, err := EncodeValue(o.Value)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		return "value " + hex.EncodeToString(b)
+	case "error":
+		return "error " + o.Message
+	}
+
+	return o.Status
+}
+
+// payloadOf is a stage's result payload, when the stage went through (a tagged result of tag 0).
+func payloadOf(o Outcome) (Value, bool) {
+	if o.Status != "value" {
+		return nil, false
+	}
+
+	c, ok := o.Value.(*Con)
+	if !ok || c.Tag != 0 {
+		return nil, false
+	}
+
+	return c.Payload, true
+}
+
 // buildFile runs one file's build: its imports, then the file. It gives each stage's outcome, and the steps and time.
 func buildFile(data corpusData, f *corpusFile) (map[string]Outcome, buildStats, error) {
 	var st buildStats
@@ -148,9 +151,7 @@ func buildFile(data corpusData, f *corpusFile) (map[string]Outcome, buildStats, 
 		return o, p, ok
 	}
 
-	var libraries []Value
-
-	var libraryCodes []Value
+	var libraries, libraryCodes []Value
 
 	for _, imp := range f.imports {
 		laid, laidPayload, ok := run("layout", bytesOf(imp.raw), fuelLayout)
@@ -234,6 +235,7 @@ func buildFile(data corpusData, f *corpusFile) (map[string]Outcome, buildStats, 
 
 	// The file's desugarer, with the names and the machine expressions of its imports.
 	var importNames []Value
+
 	for _, imp := range f.imports {
 		importNames = append(importNames, bytesOf([]byte(imp.name)))
 	}
@@ -242,6 +244,7 @@ func buildFile(data corpusData, f *corpusFile) (map[string]Outcome, buildStats, 
 		desugared, _, _ := run("desugar", desugarInput(listOf(importNames), parsedPayload, listOf(libraryCodes)), fuelDesugar)
 		outs["desugar"] = desugared
 	}
+
 	st.elapsed = time.Since(start)
 
 	return outs, st, nil
@@ -329,6 +332,7 @@ func TestCorpus(t *testing.T) {
 		}
 
 		stages := []string{"layout", "lex", "parse", "check"}
+
 		if _, ok := f.expect["desugar"]; ok {
 			stages = append(stages, "desugar")
 		}

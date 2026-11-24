@@ -10,17 +10,13 @@ import (
 
 // refusalFixture is one line of testdata/refusals.txt: a malformed program, the stage that refuses it (reader for the file reader), and the message the bootstrapped compile gives (gen/refusals.luau).
 type refusalFixture struct {
-	stage string
-	text string
-	reason string
-	message string
+	stage, text, reason, message string
 }
 
 func readRefusalFixture(t *testing.T) []refusalFixture {
 	t.Helper()
 
 	f, err := os.Open("testdata/refusals.txt")
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -28,22 +24,23 @@ func readRefusalFixture(t *testing.T) []refusalFixture {
 	defer f.Close()
 
 	var out []refusalFixture
+
 	sc := bufio.NewScanner(f)
+
 	sc.Buffer(make([]byte, 1<<20), 1<<30)
 
 	for sc.Scan() {
 		fields := strings.Fields(sc.Text())
-
 		if len(fields) != 5 || fields[0] != "refusal" {
 			t.Fatalf("refusals.txt: a line that is not a refusal line: %q", sc.Text())
 		}
 
 		var fx refusalFixture
+
 		fx.stage = fields[1]
 
 		for i, dst := range []*string{&fx.text, &fx.reason, &fx.message} {
 			b, err := hex.DecodeString(fields[2+i])
-
 			if err != nil {
 				t.Fatalf("refusals.txt: %v", err)
 			}
@@ -64,21 +61,19 @@ func readRefusalFixture(t *testing.T) []refusalFixture {
 // TestRefusals checks that each malformed program is refused by the stage that finds its fault, with a message that names the case's reason. The reader refuses a file before any stage runs.
 func TestRefusals(t *testing.T) {
 	stages, err := SeedStages()
-
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	cases := readRefusalFixture(t)
-	exact := 0
+
+	var exact int
 
 	for _, fx := range cases {
 		if fx.stage == "reader" {
 			_, err := ParseProgramFile(fx.text)
-
 			if err == nil {
 				t.Errorf("the reader accepts a malformed file (%s)", fx.reason)
-
 				continue
 			}
 
@@ -94,24 +89,19 @@ func TestRefusals(t *testing.T) {
 		}
 
 		_, err := stages.Compile(fx.text, "malformed.prog", FileLoader(""))
-
 		if err == nil {
 			t.Errorf("the stages accept a malformed program: %s", fx.reason)
-
 			continue
 		}
 
 		message := err.Error()
-
 		if fx.stage != "import" && !strings.HasPrefix(message, fx.stage+":") {
 			t.Errorf("%s: refused by another stage: %q", fx.reason, message)
-
 			continue
 		}
 
 		if !strings.Contains(message, fx.reason) {
 			t.Errorf("%s: %s refuses it with %q, the case expects %q", fx.stage, fx.reason, message, fx.reason)
-
 			continue
 		}
 

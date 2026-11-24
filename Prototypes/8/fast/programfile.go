@@ -6,32 +6,88 @@ import (
 	"strings"
 )
 
-// The L2 program file (Prototypes/6/L2/programfile.luau): four sections, separated by three lines that hold only ---. The first is a header, the second the imports (name = path), the third the program, and the fourth the tests. A test is an input, =>, an output, and fuel; it may span lines that start with a space or a tab.
-//
-// The program section is text, as the file has it: the compiler lays it out (a file named .l2 is indented).
+type (
+	// The L2 program file (Prototypes/6/L2/programfile.luau): four sections, separated by three lines that hold only ---. The first is a header, the second the imports (name = path), the third the program, and the fourth the tests. A test is an input, =>, an output, and fuel; it may span lines that start with a space or a tab.
+	//
+	// The program section is text, as the file has it: the compiler lays it out (a file named .l2 is indented).
 
-// ProgramImport is an import: its name in the program, and the path of its file.
-type ProgramImport struct {
-	Line int
-	Name string
-	File string
+	// ProgramImport is an import: its name in the program, and the path of its file.
+	ProgramImport struct {
+		Line int
+		Name, File string
+	}
+
+	// ProgramTest is a test: its input and its output (expressions of the program), its fuel, and its outcome: value, error, out_of_fuel or not_data.
+	ProgramTest struct {
+		Line int
+		Input, Output, Outcome string
+		Fuel int64
+	}
+
+	// ProgramFile is a program file split into its sections.
+	ProgramFile struct {
+		Header string
+		Imports []ProgramImport
+		Program string
+		Tests []ProgramTest
+	}
+)
+
+// parseProgramImport reads name = path.
+func parseProgramImport(text string, line int) (ProgramImport, error) {
+	name, file, ok := strings.Cut(text, "=")
+	name = strings.TrimSpace(name)
+	file = strings.TrimSpace(file)
+
+	if !ok || name == "" || file == "" || strings.ContainsAny(name+file, " \t") {
+		return ProgramImport{}, fmt.Errorf("line %d: an import is name = path, but this is %s", line, text)
+	}
+
+	return ProgramImport{
+		Line: line,
+		Name: name,
+		File: file,
+	}, nil
 }
 
-// ProgramTest is a test: its input and its output (expressions of the program), its fuel, and its outcome: value, error, out_of_fuel or not_data.
-type ProgramTest struct {
-	Line int
-	Input string
-	Output string
-	Outcome string
-	Fuel int64
-}
+// parseProgramTest reads input => output fuel n.
+func parseProgramTest(text string, line int) (ProgramTest, error) {
+	before, after, ok := strings.Cut(text, " => ")
+	if !ok {
+		return ProgramTest{}, fmt.Errorf("line %d: a test needs => between its input and its output", line)
+	}
 
-// ProgramFile is a program file split into its sections.
-type ProgramFile struct {
-	Header string
-	Imports []ProgramImport
-	Program string
-	Tests []ProgramTest
+	input := strings.TrimSpace(before)
+	rest := after
+	before0, after0, ok0 := strings.Cut(rest, " fuel ")
+
+	if !ok0 {
+		return ProgramTest{}, fmt.Errorf("line %d: a test needs fuel and a number of steps after its output", line)
+	}
+
+	output := strings.TrimSpace(before0)
+	fuelText := strings.TrimSpace(after0)
+	fuel, err := strconv.ParseInt(fuelText, 10, 64)
+
+	if err != nil || fuel <= 0 {
+		return ProgramTest{}, fmt.Errorf("line %d: fuel must be a whole number above zero, not %s", line, fuelText)
+	}
+
+	test := ProgramTest{
+		Line: line,
+		Input: input,
+		Output: output,
+		Outcome: "value",
+		Fuel: fuel,
+	}
+
+	switch output {
+	case "error", "not_data", "out_of_fuel":
+		test.Outcome = output
+		test.Output = ""
+	}
+
+	return test, nil
 }
 
 // ParseProgramFile splits a program file into its sections, as programfile.luau's parse does.
@@ -56,18 +112,18 @@ func ParseProgramFile(text string) (*ProgramFile, error) {
 	}
 
 	first, second, third := separators[0], separators[1], separators[2]
-	file := &ProgramFile{Header: strings.Join(lines[:first], "\n")}
+	file := &ProgramFile{
+		Header: strings.Join(lines[:first], "\n"),
+	}
 	seen := map[string]bool{}
 
 	for i := first + 1; i < second; i++ {
 		line := strings.TrimSpace(lines[i])
-
 		if line == "" {
 			continue
 		}
 
 		imp, err := parseProgramImport(line, i+1)
-
 		if err != nil {
 			return nil, err
 		}
@@ -84,12 +140,11 @@ func ParseProgramFile(text string) (*ProgramFile, error) {
 	for i := third + 1; i < len(lines); {
 		if strings.TrimSpace(lines[i]) == "" {
 			i++
-
 			continue
 		}
 
-		start := i
 		parts := []string{lines[i]}
+		start := i
 		i++
 
 		for i < len(lines) && strings.TrimSpace(lines[i]) != "" && (lines[i][0] == ' ' || lines[i][0] == '\t') {
@@ -98,7 +153,6 @@ func ParseProgramFile(text string) (*ProgramFile, error) {
 		}
 
 		test, err := parseProgramTest(strings.Join(parts, "\n"), start+1)
-
 		if err != nil {
 			return nil, err
 		}
@@ -113,52 +167,4 @@ func ParseProgramFile(text string) (*ProgramFile, error) {
 	file.Program = strings.Join(lines[second+1:third], "\n")
 
 	return file, nil
-}
-
-// parseProgramImport reads name = path.
-func parseProgramImport(text string, line int) (ProgramImport, error) {
-	name, file, ok := strings.Cut(text, "=")
-	name = strings.TrimSpace(name)
-	file = strings.TrimSpace(file)
-
-	if !ok || name == "" || file == "" || strings.ContainsAny(name+file, " \t") {
-		return ProgramImport{}, fmt.Errorf("line %d: an import is name = path, but this is %s", line, text)
-	}
-
-	return ProgramImport{Line: line, Name: name, File: file}, nil
-}
-
-// parseProgramTest reads input => output fuel n.
-func parseProgramTest(text string, line int) (ProgramTest, error) {
-	arrow := strings.Index(text, " => ")
-
-	if arrow < 0 {
-		return ProgramTest{}, fmt.Errorf("line %d: a test needs => between its input and its output", line)
-	}
-
-	input := strings.TrimSpace(text[:arrow])
-	rest := text[arrow+4:]
-	fuelAt := strings.Index(rest, " fuel ")
-
-	if fuelAt < 0 {
-		return ProgramTest{}, fmt.Errorf("line %d: a test needs fuel and a number of steps after its output", line)
-	}
-
-	output := strings.TrimSpace(rest[:fuelAt])
-	fuelText := strings.TrimSpace(rest[fuelAt+6:])
-	fuel, err := strconv.ParseInt(fuelText, 10, 64)
-
-	if err != nil || fuel <= 0 {
-		return ProgramTest{}, fmt.Errorf("line %d: fuel must be a whole number above zero, not %s", line, fuelText)
-	}
-
-	test := ProgramTest{Line: line, Input: input, Output: output, Outcome: "value", Fuel: fuel}
-
-	switch output {
-	case "error", "out_of_fuel", "not_data":
-		test.Outcome = output
-		test.Output = ""
-	}
-
-	return test, nil
 }

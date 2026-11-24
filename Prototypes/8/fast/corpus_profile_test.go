@@ -15,8 +15,8 @@ func TestCorpusProfile(t *testing.T) {
 	}
 
 	owners := map[[32]byte]string{}
-
 	path := os.Getenv("CORPUS")
+
 	if path == "" {
 		path = "testdata/corpus.txt"
 	}
