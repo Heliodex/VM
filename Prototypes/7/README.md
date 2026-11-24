@@ -1,6 +1,6 @@
 # Prototype 7: a cost-first core
 
-Status: implemented through Phase 8. The speed target is met on this host, measured directly on a 2,500-line corpus with a margin of about 13% (see Phase 8). The plan is written in order of work: the measurements come first, and each phase has an exit test.
+Status: implemented through Phase 8. The speed target is met for the front end on this host, measured directly on a 2,500-line corpus with a margin of about 13% (see Phase 8). With the desugarer the 2,500-line build takes a median of 1.26 s; that is accepted as the full compiler's time, and the 1 s target is not met for it (`fast/README.md`). The plan is written in order of work: the measurements come first, and each phase has an exit test.
 
 ## Goal
 
@@ -44,9 +44,9 @@ The build's stages, as they stand:
 
 - **Layout** (`boot/layout.l2`): on the VM, from the raw indented program section. Measured by the Phase 0 harness, and its output must equal the host layout's.
 - **Lex, parse, check** (`boot/lex.l2`, `boot/parse.l2`, `boot/types.l2`): on the VM. The check is partial today (some forms report "this form is not checked yet") and has no import support yet.
-- **Desugar**: bootstrapped in `Prototypes/6/L2/programs/boot/desugar.l2`, and checked against the host desugarer on the program files and the checks (`measure/desugar_run.luau`). It is not yet counted in the timed build; it joins the build when its steps are measured.
+- **Desugar**: bootstrapped in `Prototypes/6/L2/programs/boot/desugar.l2`, and checked against the host desugarer on the program files and the checks (`measure/desugar_run.luau`). It is counted in the build with the desugarer (`testdata/corpus2500_desugar.txt`): 381,160,207 steps and a median of 1.26 s, with jets on its two hottest laws (`fast/desugarjets.go`).
 
-So the target as stated is for a *bootstrapped front end*, layout through check. The full-compiler target waits for desugar to be bootstrapped.
+So the target as stated is for a *bootstrapped front end*, layout through check. The full compiler, with the desugarer, is the 1.26 s build above. The user accepted that time in place of the 1 s target for it.
 
 **The build corpus.** The four boot files, which are the bootstrapped front end today (`Prototypes/6/L2/programs/boot/`: `layout.l2`, `lex.l2`, `parse.l2`, `types.l2`, 2,235 lines in all). The target size is 2,500 lines, so the corpus is 265 lines short. The top-up is done: the standard library (Prototype 6's `lib` folder, 20 files, 355 lines) makes the corpus 24 files and 2,590 lines, so it is larger than the target. The corpus is re-measured when the bootstrapped compiler gains desugar, so the full compiler is measured as one piece. The size 2,500 is the project owner's figure. Note that Prototype 5's Luau L2 implementation is 4,478 lines in nine files, and the Luau pieces that the bootstrap replaces (lexer, parser, layout, checker, desugarer) total about 3,700 of those lines, so 2,500 lines is smaller than the old implementation.
 

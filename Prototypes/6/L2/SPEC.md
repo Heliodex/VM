@@ -1,8 +1,8 @@
 # L2: specification draft
 
-Status: draft. Every question in the draft is decided; section 14 records them.
+Status: draft. Every question in the draft is decided; section 14 records them. The reference implementation is the L2 compiler written in L2 (section 11), and the Luau compiler is its oracle.
 
-L2 is the next language on the machine in `interpreter/`. It keeps what L1 learned, changes the surface syntax, and adds tagged values. The reference implementation is written in Luau. L2 is bootstrapped in L2 only after its surface is stable.
+L2 is the next language on the machine in `interpreter/`. It keeps what L1 learned, changes the surface syntax, and adds tagged values. The reference implementation is the L2 compiler written in L2, in `programs/boot/`, run on the machine. The Luau compiler in `L2/` is the oracle that checks it (section 11). L2 was bootstrapped once its surface was stable.
 
 ## 1. Goals
 
@@ -192,7 +192,9 @@ Early return needs no machine change: `?` is a rewrite (section 9.2). The expres
 - Parse to a syntax tree with positions.
 - Desugar: `fn (x y)` to nested `lam`, infix (if added) to primitives, `let` to an application of `lam`, `letrec`-style recursion to `fix` as in L1.
 - Compile to the machine's `Expr`.
-- Tests: L2 programs use the four-section program-file format of L1 (header, imports, program, tests), in `L2/programs/`. A test is an input, `=>`, an output, and fuel. A test may span lines: a line that starts with a space or a tab continues the test before it, so a function in an input breaks before its body like any other function. L1 programs are not ported; they stay as they are. L2 programs are tested against their own expected results, and the L2 reader and checker have their own test runner in the L2 module.
+- Each stage above is an L2 program in `programs/boot/` (layout, tokenizer, parser, checker, desugarer), run on the machine. Imports are compiled the same way. The Luau compiler gives the same results on the program files and the cases, which the parity runs of Prototype 7 (`measure/`) check.
+- A malformed program is refused by the stage that finds the fault, with the reason in `malformed.luau`, which both the Luau runner and the bootstrapped runner read. A file that the host reader refuses before any stage runs is refused there; that part is not bootstrapped.
+- Tests: L2 programs use the four-section program-file format of L1 (header, imports, program, tests), in `L2/programs/`. A test is an input, `=>`, an output, and fuel. A test may span lines: a line that starts with a space or a tab continues the test before it, so a function in an input breaks before its body like any other function. L1 programs are not ported; they stay as they are. L2 programs are tested against their own expected results by `l2_run.luau`, through the Luau compiler. The bootstrapped compiler's runner (`measure/boot_pipeline_run.luau` in Prototype 7) runs the same tests through the bootstrapped stages.
 
 ## 12. Layout and binding rules
 
@@ -326,7 +328,7 @@ The result of `?` on `Result a e` is `a`, and the enclosing function must return
 
 A quoted program, or a program decoded from binary, is untyped. Evaluating it gives a value of type `Dyn`.
 
-- `untyped e` gives the value of `e` the type `Dyn`, with no test. It is how a program makes an untyped value, since any value can be seen as untyped data. A `Dyn` value is used at a specific type only through `check e`, which is written in the program. `check e` gives `Ok e` when the value has the shape of the type its use gives it, and `Err` with the message `expected` and the type, such as `expected Int`, when it does not. An `Int` must be an integer, a pair must be a pair, and a constructor must have the declared tag. Without a check, a `Dyn` value used at `Int` is a type error, such as `expected Int, but this is Dyn`.
+- `untyped e` gives the value of `e` the type `Dyn`, with no test. It is how a program makes an untyped value, since any value can be seen as untyped data. A `Dyn` value is used at a specific type only through `check e`, which is written in the program. `check e` gives `Ok e` when the value has the shape of the type its use gives it, and `Err` with the message `expected` and the type, such as `expected Int`, when it does not. The type in the message numbers its type variables from 1, in the order they first appear, so two unknowns in a pair are `expected (?1 . ?2)` on either compiler. An `Int` must be an integer, a pair must be a pair, and a constructor must have the declared tag. Without a check, a `Dyn` value used at `Int` is a type error, such as `expected Int, but this is Dyn`.
 - A typed value passed into untyped code is not checked, and it is still a valid value of its type.
 
 So a program can run untyped code, and the types it has are kept at the boundary by an explicit check. The check is part of the surface language's compiled form, not the machine, and a failed check is a value, so it can be matched and handled like any other error.
@@ -358,7 +360,7 @@ The payload check is deep: a `Dyn` value used as `Result Int Str` checks the pay
 
 ### 13.7 The bootstrap
 
-The L2 compiler written in L2 is checked as a surface program, so it is typed. Its output, the quoted form, is untyped, which is the same situation as any other quoted code.
+The L2 compiler written in L2 is checked as a surface program, so it is typed. Its stages are program files in `programs/boot/`: `layout.l2`, `lex.l2`, `parse.l2`, `types.l2` (the checker, which also gives the tests of its checks and of its input), and `desugar.l2`. Its output, the quoted form, is untyped, which is the same situation as any other quoted code. The checker's parity run (`infer_run_variant.luau`, Prototype 7) compares 161 programs and skips three, because the parser refuses them or a form is not handled yet.
 
 ## 14. Decided questions
 
@@ -376,4 +378,4 @@ These were open, and are now settled:
 10. `Dyn` values are checked only by an explicit `check`, which gives a `Result` (section 13.5).
 11. Nullary constructors have payload `~`, and several fields are one pair (section 13.4).
 
-Nothing is open in the draft. The remaining work is implementation: a surface form that produces untyped values, which is the source of `Dyn` (section 13.5).
+Nothing is open in the draft. The `untyped` form, which is the source of `Dyn` (section 13.5), is implemented in both compilers. The remaining work is the checker's coverage: its parity run skips three programs (section 13.7).
