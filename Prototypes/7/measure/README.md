@@ -225,3 +225,18 @@ Of 151M steps: the binding trie's `findB` is about 33% (its per-level division a
 Tried: in the environment's child walks (`envKid`, `envPut`), `lookupM` and `memberI`, replacing the closure call `tl rest` with a `match (tail rest)` so the walk used the builtin directly. The answers were the same (160 of 160), but the checker on `types.l2` took 151,856,891 steps, against 151,336,815 before: 0.3% more. A `match` on the builtin's `Result` costs about as much as the closure call it replaces. The change is reverted.
 
 What this says: the list-accessor cost is the language's `Result` wrapping of `head` and `tail` (and of `/`), not the closure call. The checker's code cannot remove it. The remedy is a core primitive that reads a list without a `Result` (Phase 2), or a jet for the hot list operations (Phase 5).
+
+## The L2 desugarer, in L2 (slice 1)
+
+The desugarer was host-only (`Prototypes/6/L2/desugar.luau`), so the build's last stage was not counted. `boot/desugar.l2` is an L2 port of it, as a variant until it matches the host on the whole suite. It takes the boot parser's tree (`EInt`, `EName`, ... as in `boot/parse.l2`) and gives `Ok` of a machine expression, or `Err` with the host's message (the same `line L, column C:` text). The expression is a value of type `Code`, which has one constructor for each operation of `interpreter/vm.luau` (`QInt`, `CVar`, `CLam`, `CApp`, `CIf`, and so on).
+
+Slice 1 covers literals, names, lists, pairs, application, `fn`, `let`, `letrec`, `if`, `match` on `Result` (and on the built-in constructors), the checked primitives (`/` and `%` give `Err` on zero, `head` and `tail` on nil) and `untyped`. Everything else gives an error that names the form: `?`, `check`, mutual groups, records and `with`, and user sums (type declarations are not read yet).
+
+`desugar_run.luau` checks it on the VM. Each input goes through the boot lexer and parser, then through the L2 desugarer, and through the Luau parser and desugarer. Both outputs are printed in one notation, so the comparison is exact. Slice 1 agrees on 42 of 42 compared inputs. One input, a capitalised `let` binder, is refused by the Luau parser before the desugarer runs, so it is skipped.
+
+Two things the port depends on:
+
+- **Lists are not pairs to the checker.** `fst` and `snd` have pair types, so a list taken apart with them makes its type infinite. Lists are taken apart with `hd` and `tl`, which use `head` and `tail` and give a default on nil.
+- **The compile name matters.** A file compiled under a name that does not start with `boot/` fails to parse, so the boot files are compiled as `boot/...`.
+
+Still to do, in order: `?` (the early-return rewrite, `contextify` and `collect`), user sums (`buildCtors`, the constructor tags of `type` declarations), records and `with`, `check` and `untyped` with their run-time tests, mutual groups (`mutualSurface`), and imports (`wrapImports`, `boundary`). Then the parity run over the L2 program files and the corpus, and the step count of the L2 desugarer on the 2,500-line corpus.
