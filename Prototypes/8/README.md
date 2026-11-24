@@ -13,7 +13,7 @@ Further implementations of the machine go beside `fast/`, each as its own module
 
 - The seed compiler is its own fixed point: the five stages, compiled by the seed, give the seed's bytes.
 - All 148 program tests, and every parity fixture, pass on the Go machine.
-- The Luau code is still present under `Prototypes/6` and `Prototypes/7` until it is removed. Those folders hold symlinks to `l2/` and `fast/testdata/`, so the Luau tools still resolve while they exist. The generators in `Prototypes/7/fast/gen/` are Luau and run from `Prototypes/7/measure/`.
+- The Luau implementations were removed from Prototypes 6 and 7; they remain in git history. Everything the tests need is in `l2/` and `fast/testdata/`, so the suite does not depend on them.
 
 ## Commands
 

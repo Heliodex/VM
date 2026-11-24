@@ -1,3 +1,5 @@
+> **Note (Prototype 8):** the Luau code in this prototype (`measure/`, `reference/`, and the fixture generators in `fast/gen/`) was removed. The Go machine and its fixtures are in `Prototypes/8/fast/`. The rest of this document is kept as the record of the prototype; the file names it mentions are in git history.
+
 # Prototype 7: a cost-first core
 
 Status: implemented through Phase 8. The speed target is met for the front end on this host, measured directly on a 2,500-line corpus with a margin of about 13% (see Phase 8). With the desugarer the 2,500-line build takes a median of 1.31 s at the close-out measurement; that is accepted as the full compiler's time, and the 1 s target is not met for it (`fast/README.md`). The plan is written in order of work: the measurements come first, and each phase has an exit test.

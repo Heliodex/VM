@@ -1,3 +1,5 @@
+> **Note (Prototype 8):** the Luau implementations in this folder were removed. The L2 sources are in `Prototypes/8/l2/`, and the machine and the compiler driver are in `Prototypes/8/fast/`. The rest of this document is kept as the record of the prototype; the file names it mentions (`*.luau`) are in git history.
+
 # Prototype 5: a reference interpreter
 
 A strict, sequential interpreter for a small functional language with native data: integers, cells (pairs), nil, closures and pins. It is the spec for later prototypes, so any other implementation should agree with it on the examples in `examples/`.
