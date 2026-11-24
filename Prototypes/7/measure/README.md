@@ -256,3 +256,15 @@ The checker (`boot/types.l2`, request `InferT`) gives the tests the build needs.
 
 What this does not cover yet: the layout, the checker and the lexer are the Prototype 7 variants, not Prototype 6's canonical files (the checker's `InferT` and the variant layout are not in Prototype 6); the programs run on the Luau machine; and the refusal cases of `l2_run.luau` (the malformed programs) are not run through the bootstrapped compiler.
 
+## Promotion, and the runners of the bootstrapped compiler
+
+The checker (`types.l2`) and the layout (`layout.l2`) are promoted: their canonical files are now `Prototypes/6/L2/programs/boot/`, and `measure/boot/` links to them, so the scripts here read the promoted files without a change. The checker's expected-type strings number their type variables from 1 by where they first appear, on both checkers, so a check's runtime message does not depend on which checker wrote it.
+
+`boot_pipeline.luau` is the bootstrapped compiler as a module: a program file given as text goes through the layout, the tokenizer, the parser, the checker and the desugarer, each an L2 program on the VM, and its imports are compiled the same way. The layout is applied only to a file named `.l2`, as the host applies it. `boot_pipeline_run.luau` runs the 45 program files' tests through it: 148 of 148 pass.
+
+`boot_refusals_run.luau` runs the 28 malformed programs of `Prototypes/6/L2/malformed.luau` through the stages. The stage that finds the fault must give the reason the case names: 28 of 28 agree. One case is refused by the host's file reader before any stage runs, so that part is not bootstrapped; the import of a missing file gives the host's text without its line number.
+
+`cases_run.luau` runs six case files in `measure/cases` (a checker failure at the input boundary with its message, records with a `with` and a `match`, a mutual group, an early return, a user sum, and an import) on the host compiler and on the bootstrapped one, and checks each test against its expected outcome: 13 of 13 checks pass on both.
+
+The parity runs were widened as well: `desugar_run.luau` has 131 compared inputs (up from 117: records, `with`, early return and binding errors); `checker_tests_run.luau` has 59, with the expected-type strings now compared exactly (they were compared up to renaming before).
+

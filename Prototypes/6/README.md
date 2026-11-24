@@ -49,10 +49,13 @@ The second language is **L2** (language 2). It is typed, and it has the surface 
 | `l2_run.luau` | Runs every L2 program file and its tests, and checks that malformed programs are refused. |
 | `checker_run.luau` | Checks the type checker: inferred types, the type errors, and `check` and `untyped` on untyped values. |
 | `L2/programs/boot/lex.l2` | The L2 tokenizer, written in L2: the first stage of the L2 compiler in L2. |
+| `L2/programs/boot/layout.l2` | The L2 layout layer in L2: the indented source to the bracketed source. It is the variant the bootstrapped build uses (difference lists, linear in the lines). |
+| `L2/programs/boot/desugar.l2` | The L2 desugarer in L2: the stage after the checker that gives the machine's expressions. It is checked against `desugar.luau` by `Prototypes/7/measure/desugar_run.luau`. |
+| `L2/malformed.luau` | The malformed L2 programs, each with the reason it should be refused. `l2_run.luau` and the bootstrapped compiler's refusal runner (`Prototypes/7/measure/boot_refusals_run.luau`) both read it. |
 | `lex_run.luau` | Checks the L2 tokenizer against the Luau lexer on every program file and a set of edge cases. |
 | `L2/programs/boot/parse.l2` | The L2 parser, written in L2: stage 2 of the L2 compiler in L2. It reads the tokenizer's output. |
 | `parse_run.luau` | Checks the L2 parser, run on the tokenizer's output, against the Luau parser on every L2 program file and a set of cases that reach each error. |
-| `L2/programs/boot/types.l2` | The L2 checker in L2, with no mutation: the types, the state, unification, generalisation, and type inference for the core forms. |
+| `L2/programs/boot/types.l2` | The L2 checker in L2, with no mutation: the types, the state, unification, generalisation, and type inference for the core forms. It also gives the tests of the checks and of the input (request `InferT`), with the expected types numbered as the host checker numbers them. |
 | `L2/programs/boot/desugar.l2` | The L2 desugarer, written in L2: the stage after the checker that gives the machine's expressions. It is checked against `desugar.luau` on the program files, the imports, the checks and the input boundary by `Prototypes/7/measure/desugar_run.luau`. |
 | `infer_run.luau` | Checks the L2 checker against the Luau checker on the programs of every L2 program file, and a set of cases for each form and error. Type variables are renamed by where they first appear, so numbering does not matter. |
 
