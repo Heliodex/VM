@@ -163,7 +163,12 @@ do
 		elseif p5.status == "error" then
 			const r = Interp.runForm(Lower.expr(ex.program), NIL, 20 * ex.fuel)
 			ok = r.status == "error"
-			detail = `machine error {messageOf(p5)}, reference {r.status} {messageOf(r)}`
+			detail = `machine error {messageOf(p5)}, reference {r.status} {
+				if r.status == "value" then
+					"(an exact integer)"
+				else
+					messageOf(r)
+			}`
 
 			if not ok and r.status == "value" and string.find(messageOf(p5), "out of range", 1, true) ~= nil then
 				explained = "the integer range: the reference has no size limit, so the result is exact"
