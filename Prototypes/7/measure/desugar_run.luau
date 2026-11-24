@@ -11,6 +11,8 @@ const Checker = require "../../6/L2/checker"
 const Desugar = require "../../6/L2/desugar"
 const L2 = require "../../6/L2/l2"
 const Parser = require "../../6/L2/parser"
+const Layout = require "../../6/L2/layout"
+const ProgramFile = require "../../6/L2/programfile"
 const VM = require "../../6/interpreter/vm"
 const fs = require "@lute/fs"
 
@@ -306,13 +308,13 @@ end
 
 -- The outcome of the L2 desugarer on a parse of the source, with the given imports, checks and input test.
 local function l2Outcome(src: string, imports: { string }, importExprs: { any }, checks: { VM.Value }, inputTest: VM.Value): string?
-	const tokenized = L2.run(tokenizer, bytesValue(src), 1e8)
+	const tokenized = L2.run(tokenizer, bytesValue(src), 1e10)
 
 	if tokenized.status ~= "value" then
 		return nil
 	end
 
-	const parsed = L2.run(parser, (tokenized.value :: VM.Con).payload, 5e8)
+	const parsed = L2.run(parser, (tokenized.value :: VM.Con).payload, 5e10)
 
 	if parsed.status ~= "value" or (parsed.value :: VM.Con).tag ~= 0 then
 		return nil
@@ -327,7 +329,7 @@ local function l2Outcome(src: string, imports: { string }, importExprs: { any },
 	end
 
 	const input = inputValue(imports, parts.head, parts.tail, checks, codes, inputTest)
-	const result = L2.run(desugarer, input, 1e9)
+	const result = L2.run(desugarer, input, 1e11)
 
 	if result.status ~= "value" then
 		return `machine {result.status}`
@@ -488,6 +490,30 @@ local PROGRAMS: { { name: string; src: string } } = {
 	{ name = "a program that returns a constructor"; src = "fn x\n\tOk x" },
 }
 
+
+-- The four-section program files of the L2 programs folder: the program section is desugared as a program is, with stand-in machine expressions for its imports (the same on both sides).
+local CORPUS = { "add_one", "block_let", "boot/layout", "boot/lex", "boot/parse", "boot/types", "cons", "division", "double", "fact", "forms", "head", "imports", "let_block", "letrec_block", "lib/abs", "lib/append", "lib/contains", "lib/filter", "lib/fold", "lib/gcd", "lib/insert", "lib/length", "lib/map", "lib/max", "lib/min", "lib/ninefold", "lib/nth", "lib/range", "lib/reverse", "lib/sort", "lib/sum", "lib/take", "lib/triple", "lib/unwrap_or", "mutual", "option", "pairs", "record_middle", "records", "remainder", "result", "sum_list", "tree" }
+
+local function checkCorpus(path: string)
+	const file = ProgramFile.parse(readFile(`../../6/L2/programs/{path}.l2`), path)
+	const imports: { string } = {}
+
+	for _, import in file.imports do
+		table.insert(imports, import.name)
+	end
+
+	const body = Layout.layout(file.program)
+	const codes: { any } = {}
+
+	for _ in imports do
+		table.insert(codes, VM.int(0))
+	end
+
+	const host = hostExpr(body, imports, codes)
+	const l2 = l2Outcome(body, imports, codes, {}, conValue(0, VM.NIL))
+	report(`corpus {path}`, host, l2)
+end
+
 print("desugar_run: the L2 desugarer against the Luau desugarer")
 
 for _, c in EXPRESSIONS do
@@ -501,6 +527,10 @@ checkExpr("an import shadowed", "let reverse = 2\nreverse", { "reverse" }, { VM.
 
 for _, c in PROGRAMS do
 	checkProgram(c.name, c.src)
+end
+
+for _, path in CORPUS do
+	checkCorpus(path)
 end
 
 print(`{agreed} agree of {total} compared, {skipped} skipped, {failures} disagree`)

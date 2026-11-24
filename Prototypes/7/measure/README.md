@@ -226,17 +226,22 @@ Tried: in the environment's child walks (`envKid`, `envPut`), `lookupM` and `mem
 
 What this says: the list-accessor cost is the language's `Result` wrapping of `head` and `tail` (and of `/`), not the closure call. The checker's code cannot remove it. The remedy is a core primitive that reads a list without a `Result` (Phase 2), or a jet for the hot list operations (Phase 5).
 
-## The L2 desugarer, in L2 (slice 1)
+## The L2 desugarer, in L2
 
-The desugarer was host-only (`Prototypes/6/L2/desugar.luau`), so the build's last stage was not counted. `boot/desugar.l2` is an L2 port of it, as a variant until it matches the host on the whole suite. It takes the boot parser's tree (`EInt`, `EName`, ... as in `boot/parse.l2`) and gives `Ok` of a machine expression, or `Err` with the host's message (the same `line L, column C:` text). The expression is a value of type `Code`, which has one constructor for each operation of `interpreter/vm.luau` (`QInt`, `CVar`, `CLam`, `CApp`, `CIf`, and so on).
+The desugarer was host-only (`Prototypes/6/L2/desugar.luau`), so the build's last stage was not counted. `boot/desugar.l2` is an L2 port of it, as a variant until it matches the host on the whole suite. It takes the boot parser's tree and gives `Ok` of a machine expression, or `Err` with the host's message (the same `line L, column C:` text). The expression is a value of type `Code`, with one constructor for each operation of `interpreter/vm.luau`.
 
-Slice 1 covers literals, names, lists, pairs, application, `fn`, `let`, `letrec`, `if`, `match` on `Result` (and on the built-in constructors), the checked primitives (`/` and `%` give `Err` on zero, `head` and `tail` on nil) and `untyped`. Everything else gives an error that names the form: `?`, `check`, mutual groups, records and `with`, and user sums (type declarations are not read yet).
+Its input is the program as the boot parser gives it, with the names of its imports, the machine expressions of those imports (stand-ins in the harness, the same on both sides), the checks of the program with their tests, and the test of its input. The checker gives those tests, so the port takes them as input: a check's test is found by the position of its `check`, and the program's input is checked at the boundary, as the host does.
 
-`desugar_run.luau` checks it on the VM. Each input goes through the boot lexer and parser, then through the L2 desugarer, and through the Luau parser and desugarer. Both outputs are printed in one notation, so the comparison is exact. Slice 1 agrees on 42 of 42 compared inputs. One input, a capitalised `let` binder, is refused by the Luau parser before the desugarer runs, so it is skipped.
+What it covers: literals, names, lists, pairs, application, `fn`, `let`, `letrec`, `if`, `match` (on `Result`, on the program's sums, and on records), the checked primitives (`/` and `%` give `Err` on zero, `head` and `tail` on nil), early return (`?`, hoisted into a match around the function body as the host does), user sums and records (the constructor table is built from the `type` declarations, with the host's already-declared errors), record literals, record patterns and `with`, `check` and `untyped` with their run-time tests (a predicate per test, as the host compiles it), mutual groups (`letrec` blocks, built as a fix over a tag dispatch), imports in scope, and the boundary check of the input.
 
-Two things the port depends on:
+`desugar_run.luau` checks it on the VM. Each input goes through the boot lexer and parser, then through the L2 desugarer, and through the Luau parser and desugarer. Both outputs are printed in one notation, so the comparison is exact. There are two kinds of input. An expression is desugared without a checker, with its imports in scope. A program is checked by the Luau checker first, and its checks and its input test are given to the L2 side as the checker gives them. The 44 L2 program files of `Prototypes/6/L2/programs` are checked too, each program section with its imports.
 
-- **Lists are not pairs to the checker.** `fst` and `snd` have pair types, so a list taken apart with them makes its type infinite. Lists are taken apart with `hd` and `tl`, which use `head` and `tail` and give a default on nil.
+Result: 117 of 117 compared inputs agree, and none disagrees. One input, a `letrec` block that binds a non-fn, is refused by the Luau parser before the desugarer runs, so it is skipped.
+
+Things the port depends on:
+
+- **Lists are not pairs to the checker.** `fst` and `snd` have pair types, so a list taken apart with them makes its type infinite. Lists are taken apart with `hd` and `tl`, which use `head` and `tail` and give a default on nil. The primitives `head` and `tail` give a `Result`, so the code that needs the unwrapped tail uses `tl`.
 - **The compile name matters.** A file compiled under a name that does not start with `boot/` fails to parse, so the boot files are compiled as `boot/...`.
+- **Top-level definitions see only the ones above them**, and the functions that call each other are in one `letrec`, inside the program's function, where they also see that program's constructors and checks.
 
-Still to do, in order: `?` (the early-return rewrite, `contextify` and `collect`), user sums (`buildCtors`, the constructor tags of `type` declarations), records and `with`, `check` and `untyped` with their run-time tests, mutual groups (`mutualSurface`), and imports (`wrapImports`, `boundary`). Then the parity run over the L2 program files and the corpus, and the step count of the L2 desugarer on the 2,500-line corpus.
+Not done: promoting the file to `Prototypes/6/L2/programs/boot/` (the decision was to promote once it matches, and it now matches on the suite; that is a change to Prototype 6, so it is left to the user), and the desugarer's step count on the 2,500-line corpus.
