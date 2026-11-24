@@ -716,8 +716,8 @@ func letNode(e, b *Node) *Node {
 	return &Node{Op: OpLet, Kids: []*Node{e, b}}
 }
 
-// ConvertLaw turns the desugarer's output for a program (a Code value) into the program law the machine runs: the law of arity 1, whose body applies the program's expression to its input (argument 1), as the host's program does. It is an error when the value is not a Code value, or when the lowering would refuse it.
-func ConvertLaw(code Value) (law *Law, err error) {
+// ConvertForm lowers the desugarer's output for an expression (a Code value) to its form, which the machine runs on an input as its body (RunBody). It is an error when the value is not a Code value, or when the lowering would refuse it.
+func ConvertForm(code Value) (form *Node, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			if ce, ok := r.(convError); ok {
@@ -730,9 +730,18 @@ func ConvertLaw(code Value) (law *Law, err error) {
 		}
 	}()
 
-	e := codeToExpr(code)
 	w := &lowerer{}
-	form := w.lowerExpr(e)
+
+	return w.lowerExpr(codeToExpr(code)), nil
+}
+
+// ConvertLaw turns the desugarer's output for a program (a Code value) into the program law the machine runs: the law of arity 1, whose body applies the program's expression to its input (argument 1), as the host's program does. It is an error when the value is not a Code value, or when the lowering would refuse it.
+func ConvertLaw(code Value) (*Law, error) {
+	form, err := ConvertForm(code)
+
+	if err != nil {
+		return nil, err
+	}
 
 	return &Law{Arity: 1, Body: callNode(form, []*Node{argNode(1)})}, nil
 }
