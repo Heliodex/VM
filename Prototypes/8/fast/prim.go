@@ -74,6 +74,8 @@ func prim(tag int, vals []Value) (Value, string) {
 			Head: vals[0],
 			Tail: vals[1],
 		}, ""
+	case primEqual:
+		panic("fast: equal is run by the machine, which charges its steps (equal.go)")
 	}
 
 	return nil, fmt.Sprintf("primitive %d does not exist", tag)
