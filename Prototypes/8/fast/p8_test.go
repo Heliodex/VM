@@ -222,3 +222,56 @@ func TestProgramFile(t *testing.T) {
 		}
 	}
 }
+
+// TestCompilerFile checks that a compiler written as a P8 file reads back to the same stages, and that a compiler read from the file compiles a program the way the seed does.
+func TestCompilerFile(t *testing.T) {
+	seed, err := SeedStages()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	b, err := StagesBundle(seed, 5)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	data, err := b.Encode()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stages, gen, err := ReadCompiler(data)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if gen != 5 {
+		t.Errorf("the generation reads back as %d, want 5", gen)
+	}
+
+	same, differ, err := SameStages(seed, stages)
+
+	if err != nil || !same {
+		t.Fatalf("the stages read back differently (%v, %v)", differ, err)
+	}
+
+	text, ok := programLoader("lib/abs.l2")
+
+	if !ok {
+		t.Fatal("no lib/abs.l2")
+	}
+
+	c, err := stages.Compile(text, "lib/abs.l2", programLoader)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got := c.Run(Small(-7), 1<<20); got.Status != "value" || got.Value != Small(7) {
+		t.Errorf("abs -7 with the compiler from the file: %s %v", got.Status, got.Value)
+	}
+}

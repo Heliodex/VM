@@ -44,7 +44,17 @@ The checksum is checked before the entries are read, so a damaged file is refuse
 
 ## Generation
 
-The generation says how many compiler rounds made the programs in the file. The seed is generation 2: its stages were compiled by a compiler that itself came from the host's lowering. `l2 seed` compiles the stages with the seed and writes the result with generation one more than the seed's. When the result is a fixed point, its programs are the same bytes as the seed's, and only the generation moves on.
+The generation says how many compiler rounds made the programs in the file. The seed is generation 2: its stages were compiled by a compiler that itself came from the host's lowering. `l2 seed -compiler c.p8 -out next.p8` compiles the stage sources with the compiler in `c.p8` and writes the result with generation one more than `c.p8`'s. The result is a fixed point when compiling the sources with it gives the same programs again; `l2 seed` says which it is. A fixed point differs from its predecessor only in the generation field.
+
+## Iterating on the compiler
+
+A compiler is one P8 file, holding its five stages (`layout`, `lex`, `parse`, `check`, `desugar`). To change the language, edit the stage sources under the programs folder, then:
+
+1. `l2 seed -compiler current.p8 -out next.p8` compiles the edited sources with the current compiler.
+2. `l2 run -compiler next.p8 file.l2` (or `eval`, or `build`) tests the programs with the new compiler.
+3. Repeat step 1 from `next.p8` until `seed` reports a fixed point.
+
+The seed in the build is the compiler that the test suite uses; replacing it with a fixed point makes the change the default.
 
 ## Relation to the other formats
 

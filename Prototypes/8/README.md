@@ -16,6 +16,10 @@ Further implementations of the machine go beside `fast/`, each as its own module
 - All 148 program tests, and every parity fixture, pass on the Go machine.
 - The Luau implementations were removed from Prototypes 6 and 7; they remain in git history. Everything the tests need is in `l2/` and `fast/testdata/`, so the suite does not depend on them.
 
+## Iterating on the language
+
+The compiler is a P8 file of its five stages. Edit the stage sources in `l2/programs/boot/`, build the next compiler from the current one, test with it, and repeat until it is a fixed point (see `FORMAT.md`, "Iterating on the compiler").
+
 ## Commands
 
 From `Prototypes/8/fast`:
@@ -26,4 +30,5 @@ From `Prototypes/8/fast`:
     go run ./cmd/l2 eval -o v.p8 file.l2 expr  ... and write the value as a P8 file
     go run ./cmd/l2 build -o prog.p8 file.l2   compile a program file to a P8 file
     go run ./cmd/l2 exec prog.p8 [input.p8]    run a compiled program, without the compiler
-    go run ./cmd/l2 seed -out seed.p8          rebuild the seed, and check that it is a fixed point
+    go run ./cmd/l2 seed -out next.p8 [-compiler c.p8]  compile the stage sources, as the next generation of the compiler
+    go run ./cmd/l2 run -compiler c.p8 file.l2 ...      any command takes -compiler, for a compiler other than the seed

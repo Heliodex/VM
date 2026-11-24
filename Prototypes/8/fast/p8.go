@@ -269,3 +269,45 @@ func ValueBundle(v Value) (Bundle, error) {
 
 	return Bundle{Entries: []Entry{{Name: "value", Payload: payload}}}, nil
 }
+
+// ReadCompiler reads a compiler from a P8 file's bytes: its five stages, and the generation it records.
+func ReadCompiler(data []byte) (Stages, uint64, error) {
+	b, err := DecodeBundle(data)
+
+	if err != nil {
+		return nil, 0, err
+	}
+
+	stages, err := StagesFromBundle(b)
+
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return stages, b.Generation, nil
+}
+
+// SameStages reports whether two compilers have the same programs, stage by stage, and the stages that differ.
+func SameStages(a, b Stages) (bool, []string, error) {
+	var differ []string
+
+	for _, name := range stageNames {
+		x, err := EncodeProgram(a[name])
+
+		if err != nil {
+			return false, nil, err
+		}
+
+		y, err := EncodeProgram(b[name])
+
+		if err != nil {
+			return false, nil, err
+		}
+
+		if !bytes.Equal(x, y) {
+			differ = append(differ, name)
+		}
+	}
+
+	return len(differ) == 0, differ, nil
+}

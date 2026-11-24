@@ -4,9 +4,11 @@
 //	l2 eval [-root dir] [-o out.p8] file.l2 expr  evaluate an expression with the file's declarations in scope; -o writes the value as a P8 file
 //	l2 build [-root dir] -o out.p8 file.l2      compile a program file to a P8 file
 //	l2 exec file.p8 [input.p8]                  run a compiled program on an input (a P8 value file; nil when absent)
-//	l2 seed [-root dir] -out file.p8 [-generation n]  compile the compiler's stages with the seed, check that the result is a fixed point, and write the stages
+//	l2 seed [-root dir] [-compiler c.p8] -out next.p8  compile the compiler's stage sources with a compiler, and write the result as the next generation
 //
-// Flags come before the file arguments. The root is the programs folder, which imports and the compiler's sources are paths under (default ../l2/programs/ from Prototypes/8/fast).
+// Every command that compiles takes -compiler c.p8: the compiler to use, a P8 file of the five stages (default: the seed, testdata/seed.p8). Flags come before the file arguments. The root is the programs folder, which imports and the compiler's sources are paths under (default ../l2/programs/ from Prototypes/8/fast).
+//
+// Iterating on the language: edit the stage sources under the root, then compile them with the current compiler (l2 seed -compiler current.p8 -out next.p8), test with the next compiler (l2 run -compiler next.p8 file.l2), and repeat from next.p8 until seed reports a fixed point.
 package main
 
 import (
@@ -58,14 +60,41 @@ func fail(err error) {
 	os.Exit(1)
 }
 
-// compile compiles a program file under the root, with the seed.
-func compile(root, file string) (*fast.Compiled, string) {
-	stages, err := fast.SeedStages()
+// loadCompiler reads the compiler from a P8 file, or the seed when path is empty, and the generation it records.
+func loadCompiler(path string) (fast.Stages, uint64) {
+	if path == "" {
+		stages, err := fast.SeedStages()
+
+		if err != nil {
+			fail(err)
+		}
+
+		gen, err := fast.SeedGeneration()
+
+		if err != nil {
+			fail(err)
+		}
+
+		return stages, gen
+	}
+
+	data, err := os.ReadFile(path)
 
 	if err != nil {
 		fail(err)
 	}
 
+	stages, gen, err := fast.ReadCompiler(data)
+
+	if err != nil {
+		fail(fmt.Errorf("%s: %w", path, err))
+	}
+
+	return stages, gen
+}
+
+// compile compiles a program file under the root, with the stages.
+func compile(stages fast.Stages, root, file string) (*fast.Compiled, string) {
 	name, err := filepath.Rel(root, file)
 
 	if err != nil || strings.HasPrefix(name, "..") {
@@ -120,13 +149,15 @@ func readBundle(path string) fast.Bundle {
 func run(args []string) {
 	fs := flag.NewFlagSet("run", flag.ExitOnError)
 	root := fs.String("root", defaultRoot, "the programs folder")
+	compiler := fs.String("compiler", "", "a P8 file holding the compiler (default: the seed)")
 	fs.Parse(args)
 
 	if fs.NArg() != 1 {
 		usage()
 	}
 
-	c, text := compile(*root, fs.Arg(0))
+	stages, _ := loadCompiler(*compiler)
+	c, text := compile(stages, *root, fs.Arg(0))
 	file, err := fast.ParseProgramFile(text)
 
 	if err != nil {
@@ -184,13 +215,15 @@ func eval(args []string) {
 	fs := flag.NewFlagSet("eval", flag.ExitOnError)
 	root := fs.String("root", defaultRoot, "the programs folder")
 	out := fs.String("o", "", "write the value to this P8 file")
+	compiler := fs.String("compiler", "", "a P8 file holding the compiler (default: the seed)")
 	fs.Parse(args)
 
 	if fs.NArg() != 2 {
 		usage()
 	}
 
-	c, _ := compile(*root, fs.Arg(0))
+	stages, _ := loadCompiler(*compiler)
+	c, _ := compile(stages, *root, fs.Arg(0))
 	v, err := c.Eval(fs.Arg(1))
 
 	if err != nil {
@@ -216,18 +249,15 @@ func build(args []string) {
 	fs := flag.NewFlagSet("build", flag.ExitOnError)
 	root := fs.String("root", defaultRoot, "the programs folder")
 	out := fs.String("o", "", "the P8 file to write")
+	compiler := fs.String("compiler", "", "a P8 file holding the compiler (default: the seed)")
 	fs.Parse(args)
 
 	if fs.NArg() != 1 || *out == "" {
 		usage()
 	}
 
-	c, _ := compile(*root, fs.Arg(0))
-	gen, err := fast.SeedGeneration()
-
-	if err != nil {
-		fail(err)
-	}
+	stages, gen := loadCompiler(*compiler)
+	c, _ := compile(stages, *root, fs.Arg(0))
 
 	b, err := fast.ProgramBundle(c.Law, gen)
 
@@ -286,21 +316,17 @@ func exec(args []string) {
 func seed(args []string) {
 	fs := flag.NewFlagSet("seed", flag.ExitOnError)
 	root := fs.String("root", defaultRoot, "the programs folder")
-	out := fs.String("out", "", "the P8 file to write the stages to")
-	generation := fs.Uint64("generation", 0, "the generation to record (0: the seed's own generation plus one)")
+	out := fs.String("out", "", "the P8 file to write the next generation of the compiler to")
+	compiler := fs.String("compiler", "", "a P8 file holding the compiler that compiles the sources (default: the seed)")
 	fs.Parse(args)
 
 	if fs.NArg() != 0 || *out == "" {
 		usage()
 	}
 
-	stages, err := fast.SeedStages()
+	stages, gen := loadCompiler(*compiler)
 
-	if err != nil {
-		fail(err)
-	}
-
-	// The generation the seed gives, then the one that gives: the compiler's fixed point is the one that gives itself.
+	// The stages the compiler gives from the sources, and then the stages that those give: the compiler is a fixed point when the two are the same.
 	next, err := fast.CompileStages(stages, *root)
 
 	if err != nil {
@@ -313,42 +339,25 @@ func seed(args []string) {
 		fail(err)
 	}
 
-	for _, name := range []string{"layout", "lex", "parse", "check", "desugar"} {
-		a, err := fast.EncodeProgram(next[name])
+	fixed, differ, err := fast.SameStages(next, again)
 
-		if err != nil {
-			fail(err)
-		}
-
-		b, err := fast.EncodeProgram(again[name])
-
-		if err != nil {
-			fail(err)
-		}
-
-		if string(a) != string(b) {
-			fail(fmt.Errorf("the stages are not a fixed point: the next generation's %s differs", name))
-		}
+	if err != nil {
+		fail(err)
 	}
 
-	gen := *generation
-
-	if gen == 0 {
-		seedGen, err := fast.SeedGeneration()
-
-		if err != nil {
-			fail(err)
-		}
-
-		gen = seedGen + 1
-	}
-
-	b, err := fast.StagesBundle(next, gen)
+	b, err := fast.StagesBundle(next, gen+1)
 
 	if err != nil {
 		fail(err)
 	}
 
 	writeBundle(*out, b)
-	fmt.Fprintf(os.Stderr, "l2: wrote the stages to %s, generation %d (a fixed point: the next generation has the same programs)\n", *out, gen)
+
+	if fixed {
+		fmt.Fprintf(os.Stderr, "l2: wrote generation %d to %s; it is a fixed point (the next generation has the same programs)\n", gen+1, *out)
+
+		return
+	}
+
+	fmt.Fprintf(os.Stderr, "l2: wrote generation %d to %s; it is not a fixed point yet (the next generation differs in %s). Run seed again with -compiler %s to continue.\n", gen+1, *out, strings.Join(differ, ", "), *out)
 }
