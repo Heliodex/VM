@@ -122,6 +122,27 @@ end
 M.runStage = runStage
 
 -- The desugarer's machine expression, as a value of type Code (the tags the desugarer declares), as an expression of the machine.
+-- Whether two expressions have the same form, as tables: the fixed point is recognised by its form, since codeToExpr makes new tables.
+local function sameForm(a: any, b: any): boolean
+	if type(a) ~= "table" or type(b) ~= "table" then
+		return a == b
+	end
+
+	for k, v in a do
+		if not sameForm(v, b[k]) then
+			return false
+		end
+	end
+
+	for k in b do
+		if a[k] == nil then
+			return false
+		end
+	end
+
+	return true
+end
+
 local function codeToExpr(v: VM.Value): any
 	const con = v :: VM.Con
 	const p = con.payload
@@ -140,7 +161,14 @@ local function codeToExpr(v: VM.Value): any
 	const pair = p :: VM.Cell
 
 	if tag == 4 then
-		return VM.app(codeToExpr(pair.head), codeToExpr(pair.tail))
+		-- The desugarer's fixed point (fixCode) is the machine's VM.fix: the lowering finds it by its identity, so the same form is given the identity.
+		local f = codeToExpr(pair.head)
+
+		if sameForm(f, VM.fix) then
+			f = VM.fix
+		end
+
+		return VM.app(f, codeToExpr(pair.tail))
 	elseif tag == 5 then
 		return VM.cell(codeToExpr(pair.head), codeToExpr(pair.tail))
 	elseif tag == 6 then
