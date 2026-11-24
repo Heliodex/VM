@@ -500,3 +500,261 @@ func FormatValue(v Value) string {
 
 	return fmt.Sprintf("<%T>", v)
 }
+
+// canonVars renames the type variables of a message by where they first appear: ?12 and ?7 become ?v1 and ?v2, so two checkers that number them differently agree.
+func canonVars(s string) string {
+	names := map[string]string{}
+	var b strings.Builder
+
+	for i := 0; i < len(s); i++ {
+		if s[i] != '?' {
+			b.WriteByte(s[i])
+
+			continue
+		}
+
+		j := i + 1
+
+		for j < len(s) && s[j] >= '0' && s[j] <= '9' {
+			j++
+		}
+
+		if j == i+1 {
+			b.WriteByte('?')
+
+			continue
+		}
+
+		id := s[i+1 : j]
+
+		if names[id] == "" {
+			names[id] = fmt.Sprintf("?v%d", len(names)+1)
+		}
+
+		b.WriteString(names[id])
+		i = j - 1
+	}
+
+	return b.String()
+}
+
+// CheckText is the outcome of the pure checker (request Infer, tag 3) on a program's source, read as the parity run reads it: the source is tokenized and parsed as it is, and the outcome is "type <t>" or "error <messages>", with the type variables renamed by where they first appear. ok is false when the parser refuses the source, or when a form is not handled yet.
+func (s Stages) CheckText(src string) (string, bool) {
+	tokens, err := s.run("lex", pipeBytes([]byte(src)), stageFuelLex)
+
+	if err != nil {
+		return "", false
+	}
+
+	tokenPayload, err := resultPayload(tokens)
+
+	if err != nil {
+		return "", false
+	}
+
+	parsed, err := s.run("parse", tokenPayload, stageFuelParse)
+
+	if err != nil {
+		return "", false
+	}
+
+	program, err := resultPayload(parsed)
+
+	if err != nil {
+		return "", false
+	}
+
+	checked := RunBody(s["check"].Body, &Con{Tag: 3, Payload: program}, stageFuelCheck)
+
+	if checked.Status != "value" {
+		return "the checker " + checked.Status, true
+	}
+
+	out, ok := checked.Value.(*Cell)
+
+	if !ok {
+		return "", false
+	}
+
+	text := pipeText(out.Head)
+	errsCell, ok := out.Tail.(*Cell)
+
+	if !ok {
+		return "", false
+	}
+
+	var errs []string
+
+	for cur := errsCell.Head; ; {
+		c, ok := cur.(*Cell)
+
+		if !ok {
+			break
+		}
+
+		errs = append(errs, pipeText(c.Head))
+		cur = c.Tail
+	}
+
+	if strings.Contains(text, "this form is not checked yet") {
+		return "", false
+	}
+
+	for _, e := range errs {
+		if strings.Contains(e, "this form is not checked yet") {
+			return "", false
+		}
+	}
+
+	if len(errs) == 0 {
+		return "type " + canonVars(text), true
+	}
+
+	return "error " + canonVars(strings.Join(errs, "\n")), true
+}
+
+// FormatCode is a Code value (the desugarer's output) in the notation of the parity run (measure/desugar_run.luau's showCode): Q n, N, V i, (L body), (A f a), (C h t), (I n e), (IF c t e), (P e), (F e), (K tag e), (T e), (Y e), (R tag a) or (R tag a b).
+func FormatCode(v Value) string {
+	con, ok := v.(*Con)
+
+	if !ok {
+		return fmt.Sprintf("<%T>", v)
+	}
+
+	pair := func() *Cell {
+		c, _ := con.Payload.(*Cell)
+
+		return c
+	}
+
+	switch con.Tag {
+	case 0:
+		return fmt.Sprintf("Q%s", FormatValue(con.Payload))
+	case 1:
+		return "N"
+	case 2:
+		return fmt.Sprintf("V%s", FormatValue(con.Payload))
+	case 3:
+		return "(L " + FormatCode(con.Payload) + ")"
+	case 4:
+		p := pair()
+		return "(A " + FormatCode(p.Head) + " " + FormatCode(p.Tail) + ")"
+	case 5:
+		p := pair()
+		return "(C " + FormatCode(p.Head) + " " + FormatCode(p.Tail) + ")"
+	case 6:
+		p := pair()
+		return "(I " + FormatValue(p.Head) + " " + FormatCode(p.Tail) + ")"
+	case 7:
+		p := pair()
+		rest := p.Tail.(*Cell)
+		return "(IF " + FormatCode(p.Head) + " " + FormatCode(rest.Head) + " " + FormatCode(rest.Tail) + ")"
+	case 8:
+		return "(P " + FormatCode(con.Payload) + ")"
+	case 9:
+		return "(F " + FormatCode(con.Payload) + ")"
+	case 10:
+		p := pair()
+		return "(K " + FormatValue(p.Head) + " " + FormatCode(p.Tail) + ")"
+	case 11:
+		return "(T " + FormatCode(con.Payload) + ")"
+	case 12:
+		return "(Y " + FormatCode(con.Payload) + ")"
+	case 13:
+		p := pair()
+		return "(R " + FormatValue(p.Head) + " " + FormatCode(p.Tail) + ")"
+	}
+
+	p := pair()
+	rest := p.Tail.(*Cell)
+
+	return "(R " + FormatValue(p.Head) + " " + FormatCode(rest.Head) + " " + FormatCode(rest.Tail) + ")"
+}
+
+// DesugarText is the outcome of the desugarer on a source, in the notation of the parity run: "value <code>" or "error <message>". The source is parsed as it is. With checked, it is checked first (request InferT with no libraries), and its check nodes and input test go to the desugarer; otherwise the desugarer gets no checks and no input test, and the imports are given the integer values (their machine expressions). ok is false when the parser refuses the source, or the checker does.
+func (s Stages) DesugarText(src string, imports []string, values []int64, checked bool) (string, bool) {
+	tokens, err := s.run("lex", pipeBytes([]byte(src)), stageFuelLex)
+
+	if err != nil {
+		return "", false
+	}
+
+	tokenPayload, err := resultPayload(tokens)
+
+	if err != nil {
+		return "", false
+	}
+
+	parsedOut, err := s.run("parse", tokenPayload, stageFuelParse)
+
+	if err != nil {
+		return "", false
+	}
+
+	parsed, err := resultPayload(parsedOut)
+
+	if err != nil {
+		return "", false
+	}
+
+	var checks, inputTest Value = NIL, &Con{Tag: 0, Payload: NIL}
+
+	if checked {
+		request := &Con{Tag: 5, Payload: &Cell{Head: NIL, Tail: parsed}}
+		result := RunBody(s["check"].Body, request, stageFuelCheck)
+
+		if result.Status != "value" {
+			return "", false
+		}
+
+		pair, ok := result.Value.(*Cell)
+
+		if !ok {
+			return "", false
+		}
+
+		errs, ok := pair.Tail.(*Cell)
+
+		if !ok || errs.Head != NIL {
+			return "", false
+		}
+
+		rest, ok := errs.Tail.(*Cell)
+
+		if !ok {
+			return "", false
+		}
+
+		checks, inputTest = rest.Head, rest.Tail
+	}
+
+	names := make([]Value, len(imports))
+
+	for i, n := range imports {
+		names[i] = pipeBytes([]byte(n))
+	}
+
+	codes := make([]Value, len(values))
+
+	for i, v := range values {
+		codes[i] = &Con{Tag: 0, Payload: Small(v)}
+	}
+
+	out, err := s.runDesugar(stageInput(pipeList(names), parsed, checks, pipeList(codes), inputTest))
+
+	if err != nil {
+		return "", false
+	}
+
+	con, ok := out.(*Con)
+
+	if !ok {
+		return "", false
+	}
+
+	if con.Tag == 0 {
+		return "value " + FormatCode(con.Payload), true
+	}
+
+	return "error " + pipeText(con.Payload), true
+}
