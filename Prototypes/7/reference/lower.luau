@@ -13,7 +13,7 @@
 --   var i                   arg (the slot the map gives the variable's level)
 --   lam body                a law of arity (free + 1), or of the chain's arguments: lit law, or call (lit law) applied to the free variables
 --   pin e                   delay (call (lit law) nil free...): a law of arity (free + 1), its first argument a dummy
---   cell a b                prim cons a b (primitive 14)
+--   cell a b                prim cons a b (primitive 12)
 --   index n e               prim head or tail, once per step of n's binary address
 --   force e                 force e
 --   if c t e                if c t e
@@ -22,8 +22,8 @@
 --   letrec (fix of a lambda) a recursive law: arg 0 is the law itself
 --   prim tag a b            prim (the core's tag of the same name)
 --   construct tag e         con tag e
---   tagof e                 prim 12 e
---   payload e               prim 13 e
+--   tagof e                 prim 10 e
+--   payload e               prim 11 e
 
 const Primitives = require "../../6/interpreter/primitives"
 const VM = require "../../6/interpreter/vm"
