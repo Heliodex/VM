@@ -41,7 +41,7 @@ end
 
 const tokenizer = L2.compile(readFile "../../6/L2/programs/boot/lex.l2", resolve, "boot/lex.l2")
 const parser = L2.compile(readFile "../../6/L2/programs/boot/parse.l2", resolve, "boot/parse.l2")
-const desugarer = L2.compile(readFile "boot/desugar.l2", resolve, "boot/desugar.l2")
+const desugarer = L2.compile(readFile "../../6/L2/programs/boot/desugar.l2", resolve, "boot/desugar.l2")
 
 -- The bytes of a string, as a list of integers.
 local function bytesValue(s: string): VM.Value

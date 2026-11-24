@@ -228,7 +228,7 @@ What this says: the list-accessor cost is the language's `Result` wrapping of `h
 
 ## The L2 desugarer, in L2
 
-The desugarer was host-only (`Prototypes/6/L2/desugar.luau`), so the build's last stage was not counted. `boot/desugar.l2` is an L2 port of it, as a variant until it matches the host on the whole suite. It takes the boot parser's tree and gives `Ok` of a machine expression, or `Err` with the host's message (the same `line L, column C:` text). The expression is a value of type `Code`, with one constructor for each operation of `interpreter/vm.luau`.
+The desugarer was host-only (`Prototypes/6/L2/desugar.luau`), so the build's last stage was not counted. `Prototypes/6/L2/programs/boot/desugar.l2` is an L2 port of it. It was a variant in `measure/boot/` until it matched the host on the whole suite, and it is now promoted to Prototype 6's boot folder. It takes the boot parser's tree and gives `Ok` of a machine expression, or `Err` with the host's message (the same `line L, column C:` text). The expression is a value of type `Code`, with one constructor for each operation of `interpreter/vm.luau`.
 
 Its input is the program as the boot parser gives it, with the names of its imports, the machine expressions of those imports (stand-ins in the harness, the same on both sides), the checks of the program with their tests, and the test of its input. The checker gives those tests, so the port takes them as input: a check's test is found by the position of its `check`, and the program's input is checked at the boundary, as the host does.
 
@@ -244,4 +244,4 @@ Things the port depends on:
 - **The compile name matters.** A file compiled under a name that does not start with `boot/` fails to parse, so the boot files are compiled as `boot/...`.
 - **Top-level definitions see only the ones above them**, and the functions that call each other are in one `letrec`, inside the program's function, where they also see that program's constructors and checks.
 
-Not done: promoting the file to `Prototypes/6/L2/programs/boot/` (the decision was to promote once it matches, and it now matches on the suite; that is a change to Prototype 6, so it is left to the user), and the desugarer's step count on the 2,500-line corpus.
+Promoted: the file moved to `Prototypes/6/L2/programs/boot/desugar.l2` (its history follows it), and `desugar_run.luau` reads it from there. `l2_run.luau` in Prototype 6 runs its smoke test. Not done: the desugarer's step count on the 2,500-line corpus, and putting it into the timed build.

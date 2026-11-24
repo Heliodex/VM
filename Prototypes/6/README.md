@@ -53,6 +53,7 @@ The second language is **L2** (language 2). It is typed, and it has the surface 
 | `L2/programs/boot/parse.l2` | The L2 parser, written in L2: stage 2 of the L2 compiler in L2. It reads the tokenizer's output. |
 | `parse_run.luau` | Checks the L2 parser, run on the tokenizer's output, against the Luau parser on every L2 program file and a set of cases that reach each error. |
 | `L2/programs/boot/types.l2` | The L2 checker in L2, with no mutation: the types, the state, unification, generalisation, and type inference for the core forms. |
+| `L2/programs/boot/desugar.l2` | The L2 desugarer, written in L2: the stage after the checker that gives the machine's expressions. It is checked against `desugar.luau` on the program files, the imports, the checks and the input boundary by `Prototypes/7/measure/desugar_run.luau`. |
 | `infer_run.luau` | Checks the L2 checker against the Luau checker on the programs of every L2 program file, and a set of cases for each form and error. Type variables are renamed by where they first appear, so numbering does not matter. |
 
 ## Running

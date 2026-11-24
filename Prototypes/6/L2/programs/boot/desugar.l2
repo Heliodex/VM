@@ -801,4 +801,4 @@ fn input
 			(Ok (finishTop (wrapImports code importCodes) inputTest))
 	(finalize body scope importCodes inputTest)
 ---
-(~ . (~ . ((EInt (5 . (1 . 1))) . (~ . (~ . ~))))) => Ok (QInt 5) fuel 100000
+(~ . (~ . (EInt (5 . (1 . 1)) . (~ . (~ . NoInputCheck))))) => Ok (QInt 5) fuel 100000

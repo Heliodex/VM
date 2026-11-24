@@ -44,7 +44,7 @@ The build's stages, as they stand:
 
 - **Layout** (`boot/layout.l2`): on the VM, from the raw indented program section. Measured by the Phase 0 harness, and its output must equal the host layout's.
 - **Lex, parse, check** (`boot/lex.l2`, `boot/parse.l2`, `boot/types.l2`): on the VM. The check is partial today (some forms report "this form is not checked yet") and has no import support yet.
-- **Desugar**: not bootstrapped. It runs on the host, so it is not counted in the build. When it is bootstrapped, it joins the build.
+- **Desugar**: bootstrapped in `Prototypes/6/L2/programs/boot/desugar.l2`, and checked against the host desugarer on the program files and the checks (`measure/desugar_run.luau`). It is not yet counted in the timed build; it joins the build when its steps are measured.
 
 So the target as stated is for a *bootstrapped front end*, layout through check. The full-compiler target waits for desugar to be bootstrapped.
 
