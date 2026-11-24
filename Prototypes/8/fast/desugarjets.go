@@ -4,7 +4,7 @@ import (
 	"encoding/hex"
 )
 
-// The jets for the desugarer (Prototypes/6/L2/programs/boot/desugar.l2), the stage the 2,500-line build runs after the check. Each one is keyed by its law's hash and fitted to the steps with the jets off (desugarfit_test.go). A jet also checks that the laws it calls are the desugarer's own (the head function is the hdOr law, the name comparison is the desugarer's same), so a call of another law runs the body.
+// The jets for the desugarer (Prototypes/8/l2/programs/boot/desugar.l2), the stage the 2,500-line build runs after the check. Each one is keyed by its law's hash and fitted to the steps with the jets off (desugarfit_test.go). A jet also checks that the laws it calls are the desugarer's own (the head function is the hdOr law, the name comparison is the desugarer's same), so a call of another law runs the body.
 
 // mustHash is the 32 bytes of a law's content hash, as written in the hex of this file.
 func mustHash(s string) [32]byte {

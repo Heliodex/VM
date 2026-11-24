@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-const programsRoot = "../../6/L2/programs/"
+const programsRoot = "../l2/programs/"
 
 // programFixture is one line of testdata/programs.txt: a test's input and output, as the bootstrapped compile gives them (gen/programs.luau). A "-" is a value that holds a function, which the fixture does not cover.
 type programFixture struct {

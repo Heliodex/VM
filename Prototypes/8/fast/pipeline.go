@@ -11,7 +11,7 @@ import (
 
 // The pipeline (Prototype 8): the L2 compiler, run on the machine, and the program it gives, run on the machine.
 //
-// The compiler is five stage programs, each a law: the layout, the tokenizer, the parser, the checker and the desugarer (Prototypes/6/L2/programs/boot). A program file is compiled by running them in turn, as boot_pipeline.luau does: its imports first, each compiled the same way; then the program's own section. The desugarer's output is a Code value, which converter.go turns into the law the machine runs.
+// The compiler is five stage programs, each a law: the layout, the tokenizer, the parser, the checker and the desugarer (Prototypes/8/l2/programs/boot). A program file is compiled by running them in turn, as boot_pipeline.luau does: its imports first, each compiled the same way; then the program's own section. The desugarer's output is a Code value, which converter.go turns into the law the machine runs.
 //
 // The stage programs are the seed (testdata/stages.txt): the compiler's first generation, compiled from the stage sources. A stage source compiled by the seed gives the same bytes as the seed, which is the fixed point that pipeline_test.go checks.
 
@@ -392,7 +392,7 @@ func (c *Compiled) Run(input Value, fuel int64) Outcome {
 	return Run(c.Law, input, fuel)
 }
 
-// StageSources are the sources of the stage programs, by stage, relative to the programs folder (Prototypes/6/L2/programs).
+// StageSources are the sources of the stage programs, by stage, relative to the programs folder (Prototypes/8/l2/programs).
 var StageSources = map[string]string{
 	"layout": "boot/layout.l2",
 	"lex": "boot/lex.l2",

@@ -4,7 +4,7 @@
 //	l2 eval [-root dir] file.l2 expr     evaluate an expression with the file's declarations in scope
 //	l2 seed [-root dir] [-out file]      compile the compiler's stages with the seed, and check that the result is a fixed point; write the stages
 //
-// The root is the programs folder, which imports and the compiler's sources are paths under (default ../../6/L2/programs/ from Prototypes/7/fast).
+// The root is the programs folder, which imports and the compiler's sources are paths under (default ../l2/programs/ from Prototypes/8/fast).
 package main
 
 import (
@@ -14,10 +14,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"proto7fast"
+	"proto8fast"
 )
 
-const defaultRoot = "../../6/L2/programs/"
+const defaultRoot = "../l2/programs/"
 
 func usage() {
 	fmt.Fprintln(os.Stderr, "usage: l2 run [-root dir] file.l2")

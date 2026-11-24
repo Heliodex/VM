@@ -7,7 +7,7 @@ import (
 
 // The converter (Prototype 8): the L2 compiler's output, turned into the law the machine runs.
 //
-// The desugarer (Prototypes/6/L2/programs/boot/desugar.l2) gives a Code value: its constructors, numbered as the type Code is declared (QInt 0 to CPrim2 14). The first step reads that value as an expression of the Prototype 6 machine, as boot_pipeline.luau's codeToExpr does. The second lowers it to the core, as reference/lower.luau does: every law is closed, so a lambda or a pin is closed by lambda lifting; a let, a constant and a fixed point of lambdas (a recursive function) each take the form the lowering gives them. The bytes of the result are the bytes the lowering gives for the same program (convert_test.go checks them against testdata/convert.txt).
+// The desugarer (Prototypes/8/l2/programs/boot/desugar.l2) gives a Code value: its constructors, numbered as the type Code is declared (QInt 0 to CPrim2 14). The first step reads that value as an expression of the Prototype 6 machine, as boot_pipeline.luau's codeToExpr does. The second lowers it to the core, as reference/lower.luau does: every law is closed, so a lambda or a pin is closed by lambda lifting; a let, a constant and a fixed point of lambdas (a recursive function) each take the form the lowering gives them. The bytes of the result are the bytes the lowering gives for the same program (convert_test.go checks them against testdata/convert.txt).
 
 // xop is the kind of an expression of the Prototype 6 machine (the forms of the Luau VM.Expr).
 type xop uint8
