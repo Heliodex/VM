@@ -2,7 +2,6 @@ package fast
 
 import (
 	_ "embed"
-	"encoding/hex"
 	"fmt"
 	"os"
 	"strings"
@@ -13,10 +12,10 @@ import (
 //
 // The compiler is five stage programs, each a law: the layout, the tokenizer, the parser, the checker and the desugarer (Prototypes/8/l2/programs/boot). A program file is compiled by running them in turn, as boot_pipeline.luau does: its imports first, each compiled the same way; then the program's own section. The desugarer's output is a Code value, which converter.go turns into the law the machine runs.
 //
-// The stage programs are the seed (testdata/stages.txt): the compiler's first generation, compiled from the stage sources. A stage source compiled by the seed gives the same bytes as the seed, which is the fixed point that pipeline_test.go checks.
+// The stage programs are the seed (testdata/seed.p8, a P8 file, Prototypes/8/FORMAT.md): the compiler's second generation, compiled from the stage sources. A stage source compiled by the seed gives the same bytes as the seed, which is the fixed point that pipeline_test.go checks.
 
-//go:embed testdata/stages.txt
-var seedSource string
+//go:embed testdata/seed.p8
+var seedSource []byte
 
 // The fuel of each stage, as the corpus build gives it (corpus_test.go).
 const (
@@ -33,56 +32,33 @@ type Stages map[string]*Law
 
 var (
 	seedOnce sync.Once
+	seedBundle Bundle
 	seedStages Stages
 	seedErr error
 )
 
-// SeedStages are the stage programs of testdata/stages.txt, which is embedded in the build.
-func SeedStages() (Stages, error) {
+// SeedBundle is the seed as a P8 file (testdata/seed.p8, embedded in the build).
+func SeedBundle() (Bundle, error) {
 	seedOnce.Do(func() {
-		seedStages, seedErr = ParseStages(seedSource)
+		seedBundle, seedErr = DecodeBundle(seedSource)
+
+		if seedErr != nil {
+			return
+		}
+
+		seedStages, seedErr = StagesFromBundle(seedBundle)
 	})
 
-	return seedStages, seedErr
+	return seedBundle, seedErr
 }
 
-// ParseStages reads stage programs from text: a line stage <name> <hex>, one per stage.
-func ParseStages(text string) (Stages, error) {
-	out := Stages{}
-
-	for _, line := range strings.Split(text, "\n") {
-		fields := strings.Fields(line)
-
-		if len(fields) == 0 {
-			continue
-		}
-
-		if len(fields) != 3 || fields[0] != "stage" {
-			return nil, fmt.Errorf("stages: a line that is not a stage line: %.40q", line)
-		}
-
-		b, err := hex.DecodeString(fields[2])
-
-		if err != nil {
-			return nil, fmt.Errorf("stages: %s: %w", fields[1], err)
-		}
-
-		law, err := DecodeProgram(b)
-
-		if err != nil {
-			return nil, fmt.Errorf("stages: %s: %w", fields[1], err)
-		}
-
-		out[fields[1]] = law
+// SeedStages are the stage programs of the seed.
+func SeedStages() (Stages, error) {
+	if _, err := SeedBundle(); err != nil {
+		return nil, err
 	}
 
-	for _, name := range []string{"layout", "lex", "parse", "check", "desugar"} {
-		if out[name] == nil {
-			return nil, fmt.Errorf("stages: no %s stage", name)
-		}
-	}
-
-	return out, nil
+	return seedStages, nil
 }
 
 // pipeBytes is a list of bytes, as the stages read text.
@@ -442,29 +418,6 @@ func CompileStages(from Stages, root string) (Stages, error) {
 	return next, nil
 }
 
-// WriteStages writes stages as text, the format ParseStages reads, with the stages in a fixed order.
-func WriteStages(s Stages) (string, error) {
-	var b strings.Builder
-
-	for _, name := range []string{"layout", "lex", "parse", "check", "desugar"} {
-		law := s[name]
-
-		if law == nil {
-			return "", fmt.Errorf("no %s stage", name)
-		}
-
-		bytes, err := EncodeProgram(law)
-
-		if err != nil {
-			return "", fmt.Errorf("%s: %w", name, err)
-		}
-
-		fmt.Fprintf(&b, "stage %s %s\n", name, hex.EncodeToString(bytes))
-	}
-
-	return b.String(), nil
-}
-
 // FormatValue is a value as text: an integer, ~ for nil, [a b] for a list, (a . b) for a pair, and K<tag>(payload) for a constructor. A law is <law>.
 func FormatValue(v Value) string {
 	switch x := v.(type) {
@@ -757,4 +710,15 @@ func (s Stages) DesugarText(src string, imports []string, values []int64, checke
 	}
 
 	return "error " + pipeText(con.Payload), true
+}
+
+// SeedGeneration is the generation of the seed's stages: the compiler's second generation (TestSeedGenerations).
+func SeedGeneration() (uint64, error) {
+	b, err := SeedBundle()
+
+	if err != nil {
+		return 0, err
+	}
+
+	return b.Generation, nil
 }
