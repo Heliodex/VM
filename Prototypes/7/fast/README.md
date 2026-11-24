@@ -106,3 +106,19 @@ The compiler runs on this machine. `pipeline.go` runs the five stage programs (l
 - `cmd/l2`: `l2 run [-root dir] file.l2` runs a program file's tests (printing each value), `l2 eval file.l2 expr` evaluates an expression, and `l2 seed` writes the stages. The root is the programs folder, which imports are read under (default `../../6/L2/programs/`).
 
 Timings on this host, one run each, from the driver: `lib/abs.l2` (three tests) about 0.08 s, including loading the seed. `boot/types.l2` (19 tests, the checker itself) about 3.2 s. The compile is most of that; it is the stage programs running, with no jets on the stage laws beyond the corpus's own.
+
+## The parity fixtures (Prototype 8, step 1)
+
+Each Luau oracle that the Go side must agree with is exported as a fixture in `testdata/`, written by a generator in `gen/` while the Luau code still exists. The Go tests read the fixtures, not the Luau code.
+
+| Fixture | Generator | Test | What it checks |
+| --- | --- | --- | --- |
+| `programs.txt` | `gen/programs.luau` | `programs_test.go` | the 148 tests of the 45 program files: input and output encodings, and the run on the Go machine |
+| `refusals.txt` | `gen/refusals.luau` | `refusals_test.go` | the 31 malformed programs: the stage that refuses each, and its reason |
+| `checker.txt` | `gen/checker.luau` (sources in `gen/checker_sources.luau`) | `checker_test.go` | the pure checker's outcome on 164 sources: 161 agree, 3 skipped |
+| `layout.txt` | `gen/layout.luau` | `layout_test.go` | the layout stage on 1,284 inputs (about 70 s) |
+| `cases/`, `l2cases.txt` | `gen/cases.luau` | `cases_test.go` | the 6 case programs and their 13 tests |
+| `desugar.txt` | `gen/desugar.luau` | `desugar_test.go` | the desugarer's outcome on 87 expressions and programs: 87 agree, 3 skipped |
+| `convert.txt` | `gen/convert.luau` | `convert_test.go` | the converter's law and the desugarer's Code value, for 17 files |
+
+The desugarer parity's corpus of 44 library-style programs is not exported: the program-file tests and the converter fixture cover the same forms.
