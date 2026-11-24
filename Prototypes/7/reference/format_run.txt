@@ -19,7 +19,6 @@ PASS  round trip: a list of 5000 integers  -> same
 PASS  round trip: a constructor  -> same
 PASS  round trip: a law  -> same
 PASS  round trip: a partial application  -> same
-PASS  round trip: a pin of a list  -> same
 PASS  the program inc is written as the spec says  -> 02 01 1a 00 11 01 10 02 01
 PASS  round trip program: inc  -> same
 PASS  round trip program: length  -> same
@@ -40,13 +39,14 @@ PASS  refused: bytes after a value  -> binary: there are bytes after the value
 PASS  refused: a law whose body is not a form  -> binary: tag 0 is not a form
 PASS  refused: a program of arity 2  -> binary: a program is a law of arity 1
 PASS  refused: an unknown form tag  -> binary: tag 27 is not a form
-PASS  refused: a primitive of tag 14  -> binary: primitive 14 does not exist
-PASS  refused: a case with the tag 0 twice  -> binary: the case has tag 0 twice
+PASS  refused: a primitive of tag 15  -> binary: primitive 15 does not exist
+PASS  refused: the tag of the removed case form is not a form  -> binary: tag 21 is not a form
+PASS  refused: the unused form tag 19 is not a form  -> binary: tag 19 is not a form
+PASS  refused: the reserved value tag 7 (a pin in Prototypes 5 and 6) is refused  -> binary: tag 7 is not a value
 PASS  refused: a partial application with no fewer arguments than its arity  -> binary: a partial application has fewer arguments than its law's arity, and at least one
 PASS  refused: a program with bytes after it  -> binary: there are bytes after the program
 PASS  refused: an index past 2^53 - 1 (a position, not an integer value)  -> binary: a position is past 2^53 - 1, the largest position
 PASS  a thunk has no binary form  -> binary: a thunk has no binary form
-PASS  a pin of a thunk has no binary form  -> binary: a pin of a thunk has no binary form
 PASS  a program must be a law of arity 1  -> binary: a program is a law of arity 1
 PASS  a prim with the wrong number of arguments is refused  -> binary: primitive 0 takes 2 arguments, but is given 1
 51 of 51 checks pass

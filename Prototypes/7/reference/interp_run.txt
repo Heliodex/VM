@@ -25,11 +25,7 @@ PASS  the remainder has the sign of the divisor, for 300 pairs  -> 0 failures
 PASS  add and sub are inverse, for 300 pairs  -> 0 failures
 PASS  mul is commutative, for 300 pairs  -> 0 failures
 PASS  2^53 - 1 is a number, the largest one  -> 9007199254740991
-PASS  equal pins are the same object  -> value
-PASS  unpin gives back the value  -> value
-PASS  a pin of a thunk is an error  -> error a thunk cannot be pinned
 PASS  head of a value that is not a cell is an error  -> error head of a value that is not a cell
-PASS  a case with no branch for the tag is an error  -> error no branch for the constructor's tag 2
 PASS  calling a value that is not a function is an error  -> error a call of a value that is not a function
 PASS  forcing a value that is not a thunk is an error  -> error force of a value that is not a thunk
 PASS  an if on a value that is not an integer is an error  -> error if needs an integer condition
@@ -38,4 +34,4 @@ PASS  a let chain 20,000 deep returns its input  -> value in 40001 steps
 PASS  length of 5000 elements is 5000, by self-reference  -> value 5000 in 60007 steps
 PASS  a program and its body give the same value  -> 42 and 42
 PASS  a program costs one more step than its body, for its law entry  -> 4 against 3
-40 of 40 checks pass
+36 of 36 checks pass
