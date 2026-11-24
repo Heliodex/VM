@@ -1,7 +1,0 @@
-Prototype 5 examples: 50 run; steps by the machine 786116, by the reference 514031
-L2 programs: 44 files, 147 tests run, 0 inputs skipped (they do not parse as values); steps by the machine 312543, by the reference 120647 on the values
-EXPLAINED P5 example kind of a pin: machine value, reference value  (a Prototype 5 pin is a suspended expression, which the core models as a thunk: kind 6, not 4)
-EXPLAINED P5 example addition past the largest integer is an error: machine error add result is out of range, reference value (an exact integer) (the integer range: the reference has no size limit, so the result is exact)
-EXPLAINED P5 example multiplication past the largest integer is an error: machine error mul result is out of range, reference value (an exact integer) (the integer range: the reference has no size limit, so the result is exact)
-EXPLAINED P5 example subtraction past the smallest integer is an error: machine error sub result is out of range, reference value (an exact integer) (the integer range: the reference has no size limit, so the result is exact)
-193 agree, 4 differ on purpose (named above), 0 disagree

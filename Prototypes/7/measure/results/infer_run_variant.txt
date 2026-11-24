@@ -1,5 +1,0 @@
-160 of 160 programs give the same type or errors as the Luau checker (108 types, 52 errors, 3 skipped: the parser refuses them or a form is not handled yet)
-
-real	1m25.258s
-user	1m24.935s
-sys	0m0.057s
