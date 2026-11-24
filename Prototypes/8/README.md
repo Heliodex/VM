@@ -5,7 +5,8 @@ This prototype keeps only the code that runs L2 programs: the virtual machine, t
 ## Layout
 
 - `l2/`: the L2 sources, shared by every implementation of the machine. `l2/programs/` holds the program files (45, with `boot/` for the five compiler stages and `lib/` for the standard library). `l2/SPEC.md`, `RECORDS.md` and `INDENTATION.md` are the language's specification.
-- `fast/`: the Go implementation. The machine (`eval.go`, `format.go`, `hash.go`, `jets.go` and the jet files, `memo.go`, `node.go`, `prim.go`, `value.go`), the converter (`convert.go`), the pipeline that runs the compiler's stages (`pipeline.go`, `programfile.go`), the seed compiler (`testdata/stages.txt`), and the driver (`cmd/l2`). Its README describes the machine and the fixtures.
+- `FORMAT.md`: the P8 file format, for compiled programs, values and the compiler's stages (`.p8`).
+- `fast/`: the Go implementation. The machine (`eval.go`, `format.go`, `hash.go`, `jets.go` and the jet files, `memo.go`, `node.go`, `prim.go`, `value.go`), the converter (`convert.go`), the pipeline that runs the compiler's stages (`pipeline.go`, `programfile.go`), the seed compiler (`testdata/seed.p8`), and the driver (`cmd/l2`). Its README describes the machine and the fixtures.
 
 Further implementations of the machine go beside `fast/`, each as its own module, and read the same `l2/` sources.
 
@@ -19,7 +20,10 @@ Further implementations of the machine go beside `fast/`, each as its own module
 
 From `Prototypes/8/fast`:
 
-    go test ./...                       the whole suite (about two minutes)
-    go run ./cmd/l2 run file.l2         run a program file's tests
-    go run ./cmd/l2 eval file.l2 expr   evaluate an expression in the file's scope
-    go run ./cmd/l2 seed                rebuild the seed, and check that it is a fixed point
+    go test ./...                              the whole suite (about two minutes)
+    go run ./cmd/l2 run file.l2                run a program file's tests
+    go run ./cmd/l2 eval file.l2 expr          evaluate an expression in the file's scope
+    go run ./cmd/l2 eval -o v.p8 file.l2 expr  ... and write the value as a P8 file
+    go run ./cmd/l2 build -o prog.p8 file.l2   compile a program file to a P8 file
+    go run ./cmd/l2 exec prog.p8 [input.p8]    run a compiled program, without the compiler
+    go run ./cmd/l2 seed -out seed.p8          rebuild the seed, and check that it is a fixed point
