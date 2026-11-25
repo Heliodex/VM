@@ -24,7 +24,7 @@ Tokens, separated by whitespace or by delimiters:
 - A token that starts with a digit, or with `-` and a digit, must be a whole integer. So `1-2` is a lexical error. Names such as `x-1` are single symbols.
 - Strings: `"..."` with the escapes `\"`, `\\`, `\n`, `\t`, `\0`. A string is a list of codepoints (see section 5), so `"é"` is one character, not two bytes.
 - Symbols (names and operators): a maximal run of characters that are not whitespace, `(`, `)`, `[`, `]`, `{`, `}`, `"`, `;`, or `.`. A symbol cannot start with a digit.
-- The dot `.` is a token of its own, used only in pairs, so `(1 . 2)` is a pair and `(1.2)` is a lexical error. The arrow `->` is a token of its own, reserved for match arms. A `-` is never part of an arrow, so `x->y` is `x`, `->`, `y`.
+- A pair is written `⟨a b⟩`, the angled brackets U+27E8 and U+27E9, or with a dot, `(a . b)`. The dot `.` is a token of its own, used only in the dot form, so `(1 . 2)` is a pair and `(1.2)` is a lexical error. The angled brackets are tokens of their own, and a pair's parts in them are atoms. The arrow `->` is a token of its own, reserved for match arms. A `-` is never part of an arrow, so `x->y` is `x`, `->`, `y`.
 - Comments: `;` to the end of the line.
 - Delimiters: `(`, `)`, `[`, `]`, `{`, `}`, `.`, and `->`.
 
@@ -45,7 +45,7 @@ app    ::= atom+                application, curried: f a b is (f a) b
          | "match" expr "{" newline arm+ "}"    (section 9.3; arms are multi-line, section 12)
 atom   ::= integer | string | name | "~" | list | pair | "(" expr ")"
 list   ::= "[" expr* "]"        a proper list
-pair   ::= "(" expr "." expr ")"
+pair   ::= "⟨" atom atom "⟩" | "(" expr "." expr ")"
 params ::= name | "(" name+ ")"
 arm     ::= pattern "->" expr     the body ends at the end of its line (section 12)
 pattern ::= Name                  a constructor with no payload, e.g. None
@@ -57,7 +57,7 @@ pattern ::= Name                  a constructor with no payload, e.g. None
 
 `?` ends an application, so `parse s?` is `(parse s)?`, and it applies to the whole call on its left. To apply `?` to an argument, wrap it in parentheses: `g (parse s)?`. `?` appears at most once at the end of an application, so `f x? y` and `e??` are syntax errors. `?` is not an atom.
 
-The grammar needs one token of lookahead: `(` starts a pair if the token after the first expression is `.`, and a group otherwise. The parser decides at the closing `)` or `.` after its first expression, so a group and a pair share one prefix. Implementations may use a small backtrack buffer.
+The grammar needs one token of lookahead: `(` starts a dot pair if the token after the first expression is `.`, and a group otherwise. The parser decides at the closing `)` or `.` after its first expression, so a group and a dot pair share one prefix. The angled form has no such prefix: `⟨` always starts a pair of two atoms. Implementations may use a small backtrack buffer.
 
 ### 3.2 Application
 
@@ -100,7 +100,7 @@ A string is a list of Int values, each a Unicode codepoint: from 0 to 0x10FFFF, 
 
 A constructor is written by its name, applied to its payload: `Ok 5`, `Err "x"`, and `None` for a constructor with no payload. The printer writes it the same way, so the text reads back to the same value. Its data form is a tag and a payload. In the data text it is `con TAG PAYLOAD`, as in `con 0 5`, and in the binary format it is tag byte 4 followed by the tag and the payload. The data text uses the number, since it is interchange and not surface syntax, and `(0 . 5)` would read as an ordinary pair. Only the surface printer writes names.
 
-A list `[a b c]` is the pair chain `(a . (b . (c . ~)))`. A pair `(a . b)` is one pair cell, which is not a list unless `b` is a list. A list's items are whole expressions, so a pair inside a list needs parentheses: `[1 (2 . 3)]` is the list of 1 and the pair `(2 . 3)`. A dot inside brackets is a syntax error, so `[1 2 . 3]` is refused. An improper list is written as nested pairs, `(1 . (2 . 3))`. The printer writes a list with brackets and a pair with a dot, so the two forms never print the same way.
+A list `[a b c]` is the pair chain `⟨a ⟨b ⟨c ~⟩⟩⟩`, which is also `(a . (b . (c . ~)))`. A pair `⟨a b⟩` (or `(a . b)`) is one pair cell, which is not a list unless `b` is a list. A list's items are atoms, as a pair's parts are, so a call inside a list or a pair needs parentheses: `[1 (f 2)]` is the list of 1 and the call `(f 2)`. A dot inside brackets is a syntax error, so `[1 2 . 3]` and `⟨1 . 2⟩` are refused. An improper list is written as nested pairs, `⟨1 ⟨2 3⟩⟩`. The printer writes a list with brackets and a pair with the angled brackets, so the two forms never print the same way.
 
 ## 6. Primitives
 
@@ -267,7 +267,7 @@ The first version has a small static type system for surface programs. Quoted an
 
 ```
 t ::= Int                 an integer
-    | (t . t)             a pair
+    | ⟨t t⟩              a pair (also (t . t))
     | t -> t              a function, curried
     | Pin t               a suspended value (section 7)
     | a                   a type variable
@@ -348,7 +348,7 @@ Only constructors carry a tag of their own. Every other value's kind comes from 
 | Type | Kind | Extra tag | Dyn check |
 |---|---|---|---|
 | `Int` | 0, a number | none | the value is an integer in range |
-| `(a . b)` | 2, a pair | none | kind 2, then check `a` and `b` |
+| `⟨a b⟩` or `(a . b)` | 2, a pair | none | kind 2, then check `a` and `b` |
 | `[a]` | 1 for nil, or 2 for a pair | none | kind 1, or kind 2 then check the item and the rest of the list |
 | `a -> b` | 3, a function | none | kind 3; arity is not checked |
 | `Pin a` | 4, a pin | none | kind 4 |
@@ -377,7 +377,7 @@ These were open, and are now settled:
 3. The results model is a built-in sum `Result`, with `?` and `match` (section 9).
 4. The dispatch expressions are `tagof` and `payload` (section 9.4).
 5. Layout: newlines separate `match` arms and end a `let` value, a body continues only inside parentheses, indentation is deferred, `let` is non-recursive, `letrec` is for recursion (section 12).
-6. A dot inside brackets is a syntax error, and nested pairs are written with parentheses (section 5).
+6. A dot inside brackets is a syntax error. Pairs are written `⟨a b⟩` (the angled form, the printer’s form) or `(a . b)` (still read; it may be retired later), and nested pairs are written with the angled brackets or with parentheses (section 5).
 7. Constructor text syntax: a capitalised name applied by juxtaposition, and a bare name for a constructor with no payload (section 5).
 8. Constructor data form: `con TAG PAYLOAD` in the data text and tag byte 4 in the binary format (section 5).
 9. Tag numbers: a user sum's constructors are numbered from 0 in declaration order, so `Ok` is 0 and `Err` is 1 (section 13.4). nil is `~`, and strings are lists of codepoints (section 5).
