@@ -119,7 +119,7 @@ A memo key is the law's hash and the hashes of its arguments (`memo.go`). A jet 
 
 The compiler runs on this machine. `pipeline.go` runs the five stage programs, and `convert.go` turns the desugarer's output into the law the machine runs.
 
-- `testdata/seed.p8` is the seed: a P8 file holding the five stage programs (generation 3; see `FORMAT.md`). It is embedded in the build. `TestSeedFixedPoint` and `TestSeedGenerations` check that the seed compiles its own stage sources to itself. `l2 seed` rebuilds it and reports whether it is a fixed point.
+- `testdata/seed.p8` is the seed: a P8 file holding the five stage programs (generation 5; see `FORMAT.md`). It is embedded in the build. `TestSeedFixedPoint` and `TestSeedGenerations` check that the seed compiles its own stage sources to itself. `l2 seed` rebuilds it and reports whether it is a fixed point.
 - `programs_test.go` runs the 148 tests of the 45 program files through the Go pipeline: each input and output expression is evaluated, the program runs on the machine, and both must give the encodings in `testdata/programs.txt`.
 - `cmd/l2`: `l2 run [-root dir] file.l2` runs a program file's tests (printing each value), `l2 eval file.l2 expr` evaluates an expression, `l2 build`, `l2 exec` and `l2 seed` work with P8 files, and any command takes `-compiler c.p8`. The root is the programs folder, which imports are read under (default `../l2/programs/`).
 
