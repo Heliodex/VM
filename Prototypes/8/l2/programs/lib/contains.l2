@@ -8,11 +8,11 @@ fn p
 		if (= (@ l) 1)
 			(Ok 0)
 		else
-			let h = ((head l)?)
+			let h = (head l)?
 			if (= h x)
 				(Ok 1)
 			else
-				let t = ((tail l)?)
+				let t = (tail l)?
 				(c t)
 	(c (snd p))
 ---
