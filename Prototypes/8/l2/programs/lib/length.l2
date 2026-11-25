@@ -7,7 +7,7 @@ fn xs
 		if (= (@ l) 1)
 			(Ok n)
 		else
-			let t = ((tail l)?)
+			let t = (tail l)?
 			(go t (+ n 1))
 	(go xs 0)
 ---
