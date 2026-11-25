@@ -302,7 +302,7 @@ Recursive functions (`letrec`) are checked monomorphically within their own body
 
 - `+ - *` have type `Int -> Int -> Int`.
 - `/` and `%` have type `Int -> Int -> Result Int [Int]`: a zero divisor gives `Err` with the reason, `division by zero` or `remainder by zero`.
-- `< =` have type `Int -> Int -> Int`, since the machine returns 0 or 1.
+- `<` has type `Int -> Int -> Int`, since the machine returns 0 or 1. `=` has type `a -> a -> Int` (decision 12): deep equality on any two values of one type, so a comparison of two functions is accepted by the checker and is an error at run time.
 - `@` has type `a -> Int`, the kind of any value.
 - `head` and `tail` have type `[a] -> Result a [Int]` and `[a] -> Result [a] [Int]`. On nil they give `Err` with the reason, `head of an empty list` or `tail of an empty list`. They take lists, so that a recursive function over a list is typed. A pair is not a list, so `head` of a pair is a type error.
 - `fst` and `snd` have type `(a . b) -> a` and `(a . b) -> b`. A pair is never nil, so they give the part with no Result. A pair whose parts have different types is taken apart this way, so `(1 . (2 . 3))` has `fst` of `1` and `snd` of `(2 . 3)`.
