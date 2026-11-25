@@ -100,7 +100,7 @@ A string is a list of Int values, each a Unicode codepoint: from 0 to 0x10FFFF, 
 
 A constructor is written by its name, applied to its payload: `Ok 5`, `Err "x"`, and `None` for a constructor with no payload. The printer writes it the same way, so the text reads back to the same value. Its data form is a tag and a payload. In the data text it is `con TAG PAYLOAD`, as in `con 0 5`, and in the binary format it is tag byte 4 followed by the tag and the payload. The data text uses the number, since it is interchange and not surface syntax, and `⟨0 5⟩` would read as an ordinary pair. Only the surface printer writes names.
 
-A list `[a b c]` is the pair chain `⟨a ⟨b ⟨c ~⟩⟩⟩`,. A pair `⟨a b⟩` is one pair cell, which is not a list unless `b` is a list. A list's items are atoms, as a pair's parts are, so a call inside a list or a pair needs parentheses: `[1 (f 2)]` is the list of 1 and the call `(f 2)`. A dot inside brackets is a syntax error, so `[1 2 . 3]` and `⟨1 . 2⟩` are refused. An improper list is written as nested pairs, `⟨1 ⟨2 3⟩⟩`. The printer writes a list with brackets and a pair with the angled brackets, so the two forms never print the same way.
+A list `[a b c]` is the pair chain `⟨a ⟨b ⟨c ~⟩⟩⟩`. A pair `⟨a b⟩` is one pair cell, which is not a list unless `b` is a list. A list's items are atoms, as a pair's parts are, so a call inside a list or a pair needs parentheses: `[1 (f 2)]` is the list of 1 and the call `(f 2)`. A dot inside brackets is a syntax error, so `[1 2 . 3]` and `⟨1 . 2⟩` are refused. An improper list is written as nested pairs, `⟨1 ⟨2 3⟩⟩`. The printer writes a list with brackets and a pair with the angled brackets, so the two forms never print the same way.
 
 ## 6. Primitives
 
