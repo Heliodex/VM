@@ -32,6 +32,8 @@ The compiler, the file format and the driver:
 - `pipeline.go`: runs the five stage programs (layout, tokenizer, parser, checker, desugarer) on the machine.
 - `programfile.go`: splits a program file into its four sections (header, imports, program, tests).
 - `p8.go`: the P8 container, which reads and writes `.p8` files (`FORMAT.md`, in the parent folder).
+- `print.go`, `print_test.go`: the printer, which turns a program's parse tree into the indented form (INDENTATION.md, section 11), and checks that each printed file compiles to the same program.
+- `indent_test.go`: the indented forms the layer takes (one-line ifs, blocks as values).
 - `cmd/l2/main.go`: the driver (see "Running" below).
 
 Tests, and their fixtures:

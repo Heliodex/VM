@@ -18,7 +18,7 @@ The alternative, a separate parser for indented code producing the same tree, du
 
 ## 3. Choosing a spelling per file
 
-A file is indented when its first line is `#indent` (a comment in L2 starts with `;`, so the marker is a `;` line, `; indent`). Without it, the file is bracketed. A file is one spelling, so no file mixes them. This keeps the rule simple, and it means the bootstrap can read its own files either way.
+A file is laid out by its name: a `.l2` file has its program section laid out, and the layer gives the bracketed text the parser reads. Since every program file is now written in the indented form (section 11), no marker is needed. The `#indent` marker of the first trial is gone.
 
 ## 4. The rule
 
@@ -150,3 +150,14 @@ Decided with the user, after the pair work:
 - **Migration split by file.** A pretty-printer turns the parse tree into the indented spelling, and each file is migrated in its own commit. Each file is checked by parsing the printed text and comparing the tree with the tree of the original file.
 
 The printer targets the indented forms in the table in section 10. The bracketed parser stays the core, so the layer's output for each file must parse to the same tree.
+
+### Status
+
+- **Brackets only inline, indentation for every block.** Every program file in `l2/programs` is in the indented form, printed by the printer (`fast/print.go`) from the parse tree, and each file compiles to the same program as before. The printer checks this for every file (`fast/print_test.go`).
+- **No braces in program sections.** The `{ }` forms are not written. The only braces left are in string literals.
+- **No multi-line brackets.** Each bracket is closed on its line.
+- **A test's record is indented too.** The inputs and outputs of a `.l2` file's tests are laid out (`Compiled.Eval`), and a test that spans lines continues with a tab, with ` => ` on its last line.
+- **Short forms on one line.** A one-line `if` is valid as the last line of a block and as an argument (`fast/indent_test.go`, `TestOneLineIf`). A match arm with a short body is one line.
+- **Blocks as values.** A let, a letrec binding or a record field can take a block as its value: the lines below its line (`TestBlockValues`).
+
+Open: a list or a pair is written inline, so a long one (the builtin table in `boot/types.l2`) is a long line. Breaking it needs a rule that names its parts with `let`, which is not decided.
