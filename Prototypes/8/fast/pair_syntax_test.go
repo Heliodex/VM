@@ -2,8 +2,8 @@ package fast
 
 import "testing"
 
-// ⟨a b⟩ is the pair (a . b): the same value, the same checked type, and the same desugared code. The dot form is still read.
-func TestAngledPairsAreDotPairs(t *testing.T) {
+// The angled pair ⟨a b c⟩ nests to the right: ⟨a ⟨b c⟩⟩. Its values print in the same form.
+func TestAngledPairValues(t *testing.T) {
 	stages, err := SeedStages()
 	if err != nil {
 		t.Fatal(err)
@@ -17,32 +17,31 @@ func TestAngledPairsAreDotPairs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pairs := [][2]string{
-		{"⟨1 2⟩", "(1 . 2)"},
-		{"⟨1 ⟨2 3⟩⟩", "(1 . (2 . 3))"},
-		{"[⟨1 2⟩ 3]", "[(1 . 2) 3]"},
-		{"⟨\"a\" ~⟩", "(\"a\" . ~)"},
-		{"⟨(+ 1 2) 2⟩", "((+ 1 2) . 2)"},
+	cases := []struct {
+		text, want string
+	}{
+		{"⟨1 2⟩", "⟨1 2⟩"},
+		{"⟨1 ⟨2 3⟩⟩", "⟨1 ⟨2 3⟩⟩"},
+		{"⟨1 2 3⟩", "⟨1 ⟨2 3⟩⟩"},
+		{"⟨1 2 3 4⟩", "⟨1 ⟨2 ⟨3 4⟩⟩⟩"},
+		{"[⟨1 2⟩ 3]", "[⟨1 2⟩ 3]"},
+		{"⟨\"a\" ~⟩", "[[97]]"},
+		{"⟨(+ 1 2) 2⟩", "⟨3 2⟩"},
 	}
 
-	for _, p := range pairs {
-		got, err := c.Eval(p[0])
+	for _, tc := range cases {
+		got, err := c.Eval(tc.text)
 		if err != nil {
-			t.Fatalf("%s: %v", p[0], err)
+			t.Fatalf("%s: %v", tc.text, err)
 		}
 
-		want, err := c.Eval(p[1])
-		if err != nil {
-			t.Fatalf("%s: %v", p[1], err)
-		}
-
-		if FormatValue(got) != FormatValue(want) {
-			t.Fatalf("%s gives %s, %s gives %s", p[0], FormatValue(got), p[1], FormatValue(want))
+		if FormatValue(got) != tc.want {
+			t.Fatalf("%s gives %s, want %s", tc.text, FormatValue(got), tc.want)
 		}
 	}
 }
 
-// The angled form has exactly two parts, and no dot inside it.
+// A pair with one part, a dot, or a missing bracket is refused, and so is the dot form.
 func TestAngledPairsAreRefusedWhenMalformed(t *testing.T) {
 	stages, err := SeedStages()
 	if err != nil {
@@ -56,32 +55,36 @@ func TestAngledPairsAreRefusedWhenMalformed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, text := range []string{"⟨1 . 2⟩", "⟨1 2 3⟩", "⟨1 2", "⟩", "⟨1⟩"} {
+	for _, text := range []string{"⟨1 . 2⟩", "⟨1 2", "⟩", "⟨1⟩", "(1 . 2)", "((fst 1) . 2)"} {
 		if _, err := c.Eval(text); err == nil {
 			t.Fatalf("%s: got a value, want an error", text)
 		}
 	}
 }
 
-// The checker gives the same type for ⟨a b⟩ as for (a . b), in an expression and in a type.
-func TestAngledPairsCheckLikeDotPairs(t *testing.T) {
+// The checker gives the angled pair's type, with each part in its own brackets where it needs them.
+func TestAngledPairTypes(t *testing.T) {
 	stages, err := SeedStages()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	for _, p := range [][2]string{
-		{"⟨1 2⟩", "(1 . 2)"},
-		{"⟨1 ⟨\"a\" 3⟩⟩", "(1 . (\"a\" . 3))"},
-	} {
-		got, ok := stages.CheckText(p[0])
-		want, okWant := stages.CheckText(p[1])
-		if !ok || !okWant {
-			t.Fatalf("%s or %s is refused by the checker", p[0], p[1])
+	cases := []struct {
+		text, want string
+	}{
+		{"fn x\n\t⟨1 2⟩", "type (?v1 -> ⟨Int Int⟩)"},
+		{"fn x\n\t⟨1 2 3⟩", "type (?v1 -> ⟨Int ⟨Int Int⟩⟩)"},
+		{"fn x\n\t⟨1 ⟨\"a\" 3⟩⟩", "type (?v1 -> ⟨Int ⟨[Int] Int⟩⟩)"},
+	}
+
+	for _, tc := range cases {
+		got, ok := stages.CheckText(tc.text)
+		if !ok {
+			t.Fatalf("%q is refused by the checker", tc.text)
 		}
 
-		if got != want {
-			t.Fatalf("%s checks as %q, %s as %q", p[0], got, p[1], want)
+		if got != tc.want {
+			t.Fatalf("%q checks as %q, want %q", tc.text, got, tc.want)
 		}
 	}
 }
