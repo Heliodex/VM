@@ -7,10 +7,10 @@ fn p
 		if (= (@ l) 1)
 			(Err "index out of range")
 		elseif (= n 0)
-			let h = ((head l)?)
+			let h = (head l)?
 			(Ok h)
 		else
-			let t = ((tail l)?)
+			let t = (tail l)?
 			(nth (- n 1) t)
 	(nth (fst p) (snd p))
 ---
