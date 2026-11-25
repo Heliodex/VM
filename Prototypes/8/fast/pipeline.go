@@ -23,6 +23,9 @@ type (
 		parsed, // the file's parse: (declarations . expression)
 		code Value // the desugarer's output
 		importNames, importCodes []Value
+
+		// indented is whether the file is a .l2 file: its expressions (the inputs and outputs of its tests) are laid out first, as its program section is.
+		indented bool
 	}
 )
 
@@ -404,6 +407,17 @@ func (c *Compiled) Eval(text string) (Value, error) {
 		return nil, err
 	}
 
+	if c.indented {
+		payload, err := c.stages.run("layout", input, stageFuelLayout)
+		if err != nil {
+			return nil, err
+		}
+
+		if input, err = resultPayload(payload); err != nil {
+			return nil, fmt.Errorf("layout: %w", err)
+		}
+	}
+
 	tokens, err := c.stages.run("lex", input, stageFuelLex)
 	if err != nil {
 		return nil, err
@@ -583,6 +597,7 @@ func (s Stages) Compile(text, name string, load Loader) (*Compiled, error) {
 		code: code,
 		importNames: importNames,
 		importCodes: importCodes,
+		indented: strings.HasSuffix(name, ".l2"),
 	}, nil
 }
 

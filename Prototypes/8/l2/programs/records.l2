@@ -12,14 +12,14 @@ fn m
 			fixed = 10
 	(+ (fixed n) (catch m))
 ---
-MS {
+MS
 	st = 1
 	fixed = 2
 	catch = 3
-	} => 13 fuel 1000
-MS {
+	 => 13 fuel 1000
+MS
 	st = 0
 	fixed = 0
 	catch = 0
-	} => 10 fuel 1000
+	 => 10 fuel 1000
 
