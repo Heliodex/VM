@@ -2,7 +2,9 @@ A user sum, and match on it. The arms are on their own lines, and the first arm 
 ---
 
 ---
-type Option a = None | Some a
+type Option a =
+	| None
+	| Some a
 fn o
 	match o
 		None -> 0
