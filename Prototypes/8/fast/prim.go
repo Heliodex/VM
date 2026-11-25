@@ -13,7 +13,8 @@ func bit(b bool) Value {
 
 // prim applies primitive tag to vals (SPEC.md section 4). It gives the result, or a message when the primitive is an error. The message is empty when there is none.
 func prim(tag int, vals []Value) (Value, string) {
-	if tag >= 0 && tag <= 6 && (!isInt(vals[0]) || !isInt(vals[1])) {
+	if tag >= 0 && tag <= 5 && (!isInt(vals[0]) || !isInt(vals[1])) {
+		// Tags 0 to 5 are the integer operations; = (6) is deep equality, below.
 		return nil, fmt.Sprintf("the integer operation %d needs integers", tag)
 	}
 
@@ -38,8 +39,13 @@ func prim(tag int, vals []Value) (Value, string) {
 		return modFloor(vals[0], vals[1]), ""
 	case 5:
 		return bit(compare(vals[0], vals[1]) < 0), ""
-	case 6:
-		return bit(compare(vals[0], vals[1]) == 0), ""
+	case primEq:
+		same, msg := deepEqual(vals[0], vals[1])
+		if msg != "" {
+			return nil, msg
+		}
+
+		return bit(same), ""
 	case 7:
 		return Small(KindOf(vals[0])), ""
 	case 8:
@@ -74,8 +80,6 @@ func prim(tag int, vals []Value) (Value, string) {
 			Head: vals[0],
 			Tail: vals[1],
 		}, ""
-	case primEqual:
-		panic("fast: equal is run by the machine, which charges its steps (equal.go)")
 	}
 
 	return nil, fmt.Sprintf("primitive %d does not exist", tag)

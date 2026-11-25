@@ -314,14 +314,6 @@ func (r *recRun) force(node *Node, env []Value) Value {
 func (r *recRun) prim(node *Node, env []Value) Value {
 	base := len(r.vs)
 	vals := r.operands(node.Kids, env)
-
-	if node.Tag == primEqual {
-		res := bit(r.equal(vals[0], vals[1]))
-		r.vs = r.vs[:base]
-
-		return res
-	}
-
 	res, msg := prim(node.Tag, vals)
 	r.vs = r.vs[:base]
 
