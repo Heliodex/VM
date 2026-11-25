@@ -1,6 +1,7 @@
 package fast
 
 import (
+	"slices"
 	"math/big"
 	"testing"
 )
@@ -18,8 +19,8 @@ func eqBody(a, b Value) *Node {
 func list(vals ...Value) Value {
 	var v Value = NIL
 
-	for i := len(vals) - 1; i >= 0; i-- {
-		v = &Cell{Head: vals[i], Tail: v}
+	for _, val := range slices.Backward(vals) {
+		v = &Cell{Head: val, Tail: v}
 	}
 
 	return v
