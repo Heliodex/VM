@@ -44,7 +44,7 @@ The checksum is checked before the entries are read, so a damaged file is refuse
 
 ## Generation
 
-The generation says how many compiler rounds made the programs in the file. The seed is generation 2: its stages were compiled by a compiler that itself came from the host's lowering. `l2 seed -compiler c.p8 -out next.p8` compiles the stage sources with the compiler in `c.p8` and writes the result with generation one more than `c.p8`'s. The result is a fixed point when compiling the sources with it gives the same programs again; `l2 seed` says which it is. A fixed point differs from its predecessor only in the generation field.
+The generation says how many compiler rounds made the programs in the file. The seed is generation 3: its stages were compiled by generation 2, the seed before the checker typed `=` as polymorphic, and generation 2 came from the host's lowering. `l2 seed -compiler c.p8 -out next.p8` compiles the stage sources with the compiler in `c.p8` and writes the result with generation one more than `c.p8`'s. The result is a fixed point when compiling the sources with it gives the same programs again; `l2 seed` says which it is. A fixed point differs from its predecessor only in the generation field.
 
 ## Iterating on the compiler
 
