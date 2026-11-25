@@ -8,12 +8,12 @@ fn p
 		if (= (@ l) 1)
 			(Ok (cons x ~))
 		else
-			let h = ((head l)?)
+			let h = (head l)?
 			if (< x h)
 				(Ok (cons x l))
 			else
-				let t = ((tail l)?)
-				let r = ((ins t)?)
+				let t = (tail l)?
+				let r = (ins t)?
 				(Ok (cons h r))
 	(ins (snd p))
 ---
