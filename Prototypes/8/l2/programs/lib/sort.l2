@@ -7,9 +7,9 @@ fn xs
 		if (= (@ l) 1)
 			(Ok ~)
 		else
-			let h = ((head l)?)
-			let t = ((tail l)?)
-			let r = ((s t)?)
+			let h = (head l)?
+			let t = (tail l)?
+			let r = (s t)?
 			(insert ⟨h r⟩)
 	(s xs)
 ---
