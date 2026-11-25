@@ -59,3 +59,19 @@ func TestOneLineIf(t *testing.T) {
 		}
 	}
 }
+
+// A let, a binding or a record field takes a block as its value: the lines below its line.
+func TestBlockValues(t *testing.T) {
+	probes := []string{
+		"Probe: a let whose value is a block if.\n---\n---\nfn x\n\tlet y =\n\t\tif (= x 0)\n\t\t\t1\n\t\telse\n\t\t\t2\n\t+ y 1\n---\n0 => 2 fuel 1000\n1 => 3 fuel 1000\n",
+		"Probe: a let whose value is a match.\n---\n---\ntype Opt =\n\t| No\n\t| Yes Int\nfn x\n\tlet y =\n\t\tmatch x\n\t\t\tYes n -> n\n\t\t\tNo -> 0\n\t+ y 1\n---\nYes 4 => 5 fuel 1000\nNo => 1 fuel 1000\n",
+		"Probe: a let whose value is an application across lines.\n---\n---\nfn x\n\tlet y =\n\t\t+\n\t\t\tx\n\t\t\t1\n\t* y 2\n---\n1 => 4 fuel 1000\n",
+		"Probe: a let whose value is a fn.\n---\n---\nfn x\n\tlet f = fn n\n\t\t+ n 1\n\tf x\n---\n0 => 1 fuel 1000\n2 => 3 fuel 1000\n",
+	}
+
+	for _, p := range probes {
+		if f := runProgramText(t, p); len(f) != 0 {
+			t.Fatalf("%q: failures %v", p[:30], f)
+		}
+	}
+}

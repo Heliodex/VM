@@ -153,6 +153,11 @@ let nameEq = fn l
 	let n = identLen l
 	if (if (= n 0) 0 (startsWith " = " (dropN l n)))
 		⟨1 (takeN l n) (dropN l (+ n 3))⟩
+	elseif (if (= n 0) 0 (= (lenL (dropN l n)) 2))
+		if (startsWith " =" (dropN l n))
+			⟨1 (takeN l n) ~⟩
+		else
+			⟨0 ~ ~⟩
 	else
 		⟨0 ~ ~⟩
 letrec rev2 = fn (l acc)
@@ -261,7 +266,13 @@ let anyKids = fn ks
 		1
 letrec
 	fieldValue = fn (value ln ks)
-		if (= (@ ks) 1)
+		if (= (@ value) 1)
+			if (= (@ ks) 1)
+				lineErr ln "a value is written on its line, or in the lines below it"
+			else
+				let s = (seq ks)?
+				Ok (dcat (lf "(") (dcat s (lf ")")))
+		elseif (= (@ ks) 1)
 			Ok (lf value)
 		else
 			expr (mkNode value ln ks)
