@@ -8,9 +8,9 @@ fn p
 		if (= (@ l) 1)
 			(Ok ~)
 		else
-			let h = ((head l)?)
-			let t = ((tail l)?)
-			let r = ((m t)?)
+			let h = (head l)?
+			let t = (tail l)?
+			let r = (m t)?
 			(Ok (cons (f h) r))
 	(m (snd p))
 ---
