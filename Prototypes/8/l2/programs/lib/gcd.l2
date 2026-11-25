@@ -7,7 +7,7 @@ fn p
 		if (= b 0)
 			(Ok a)
 		else
-			let r = ((% a b)?)
+			let r = (% a b)?
 			(g b r)
 	(g (fst p) (snd p))
 ---
