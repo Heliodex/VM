@@ -152,9 +152,9 @@ let findSub = fn (p l)
 let nameEq = fn l
 	let n = identLen l
 	if (if (= n 0) 0 (startsWith " = " (dropN l n)))
-		(1 . ((takeN l n) . (dropN l (+ n 3))))
+		⟨1 ⟨(takeN l n) (dropN l (+ n 3))⟩⟩
 	else
-		(0 . (~ . ~))
+		⟨0 ⟨~ ~⟩⟩
 letrec rev2 = fn (l acc)
 	if (= (@ l) 1)
 		acc
@@ -210,16 +210,16 @@ letrec rawsOf = fn (ls k)
 ; The tree: each line is a node, and the lines after it with a greater indent are its children.
 letrec kidsOf = fn (ls p)
 	if (= (@ ls) 1)
-		(~ . ~)
+		⟨~ ~⟩
 	else
 		let r = hdR ls
 		if (< p (rindent r))
 			let sub = kidsOf (tlOf ls) (rindent r)
 			let more = kidsOf (snd sub) p
 			let node = mkNode (rtext r) (rline r) (fst sub)
-			((cons node (fst more)) . (snd more))
+			⟨(cons node (fst more)) (snd more)⟩
 		else
-			(~ . ls)
+			⟨~ ls⟩
 let eqL = fn (a b)
 	if (= (lenL a) (lenL b))
 		startsWith a b
@@ -538,13 +538,13 @@ letrec
 			Ok (dcat (lf (ntext d)) (dcat (lf " {\n") (dcat (joinLines fs) (lf "\n}"))))
 	declsOf = fn rs
 		if (= (@ rs) 1)
-			Ok (~ . rs)
+			Ok ⟨~ rs⟩
 		elseif (startsWith "type " (ntext (hdN rs)))
 			let d = (declLine (hdN rs))?
 			let more = (declsOf (tlOf rs))?
-			Ok ((cons d (fst more)) . (snd more))
+			Ok ⟨(cons d (fst more)) (snd more)⟩
 		else
-			Ok (~ . rs)
+			Ok ⟨~ rs⟩
 	appendL = fn (a b)
 		if (= (@ a) 1)
 			b

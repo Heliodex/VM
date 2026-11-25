@@ -8,7 +8,7 @@ fn p
 		Ok v -> v
 		Err e -> (snd p)
 ---
-(Ok 5 . 9) => 5 fuel 1000
-(Err "bad" . 9) => 9 fuel 1000
-(Ok ~ . ~) => ~ fuel 1000
+⟨(Ok 5) 9⟩ => 5 fuel 1000
+⟨(Err "bad") 9⟩ => 9 fuel 1000
+⟨(Ok ~) ~⟩ => ~ fuel 1000
 

@@ -14,10 +14,10 @@ fn p
 			(if (pred h) (Ok (cons h r)) (Ok r))
 	(f (snd p))
 ---
-((fn x
-	(< x 3)) . [1 5 2 4]) => Ok [1 2] fuel 1000
-((fn x
-	(< x 3)) . ~) => Ok ~ fuel 1000
-((fn x
-	0) . [1 2]) => Ok ~ fuel 1000
+⟨(fn x
+	(< x 3)) [1 5 2 4]⟩ => Ok [1 2] fuel 1000
+⟨(fn x
+	(< x 3)) ~⟩ => Ok ~ fuel 1000
+⟨(fn x
+	0) [1 2]⟩ => Ok ~ fuel 1000
 

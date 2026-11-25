@@ -11,9 +11,9 @@ fn p
 			(g b r)
 	(g (fst p) (snd p))
 ---
-(12 . 18) => Ok 6 fuel 1000
-(7 . 13) => Ok 1 fuel 1000
-(0 . 5) => Ok 5 fuel 1000
-(9 . 0) => Ok 9 fuel 1000
-(100 . 75) => Ok 25 fuel 1000
+⟨12 18⟩ => Ok 6 fuel 1000
+⟨7 13⟩ => Ok 1 fuel 1000
+⟨0 5⟩ => Ok 5 fuel 1000
+⟨9 0⟩ => Ok 9 fuel 1000
+⟨100 75⟩ => Ok 25 fuel 1000
 

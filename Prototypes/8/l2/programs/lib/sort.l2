@@ -10,7 +10,7 @@ fn xs
 			let h = ((head l)?)
 			let t = ((tail l)?)
 			let r = ((s t)?)
-			(insert (h . r))
+			(insert ⟨h r⟩)
 	(s xs)
 ---
 ~ => Ok ~ fuel 100000

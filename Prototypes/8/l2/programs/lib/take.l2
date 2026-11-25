@@ -15,8 +15,8 @@ fn p
 			(Ok (cons h rest))
 	(t (fst p) (snd p))
 ---
-(2 . [1 2 3]) => Ok [1 2] fuel 1000
-(0 . [1 2]) => Ok ~ fuel 1000
-(5 . [1 2]) => Ok [1 2] fuel 1000
-(1 . ~) => Ok ~ fuel 1000
+⟨2 [1 2 3]⟩ => Ok [1 2] fuel 1000
+⟨0 [1 2]⟩ => Ok ~ fuel 1000
+⟨5 [1 2]⟩ => Ok [1 2] fuel 1000
+⟨1 ~⟩ => Ok ~ fuel 1000
 
