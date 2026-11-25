@@ -7,8 +7,8 @@ fn xs
 		if (= (@ l) 1)
 			(Ok acc)
 		else
-			let h = ((head l)?)
-			let t = ((tail l)?)
+			let h = (head l)?
+			let t = (tail l)?
 			(rev t (cons h acc))
 	(rev xs ~)
 ---
