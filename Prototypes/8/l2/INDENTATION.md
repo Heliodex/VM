@@ -138,3 +138,15 @@ Still to do, in order:
 
 1. Write the layer in L2 (`layout.prog`), checked against `layout.luau` on the same cases, as the lexer and parser stages were.
 2. Convert the L2 modules one at a time, starting with `types.prog`, each converted file checked to give the same tree as before.
+
+## 11. Direction: indentation for every block (decided)
+
+Decided with the user, after the pair work:
+
+- **Brackets only inline.** `(f x)`, `⟨a b⟩`, `[a b c]`, and a one-line `if` or `let` stay bracketed. A bracket means "on one line". A multi-line expression is an indented block.
+- **Indentation for every block.** A line that ends in a block-opening keyword (`fn`, `let`, `letrec`, `if`, `else`, `match`, `cond`, `type`, `with`) takes the indented lines below it as its block. The `{ }` forms (`match e { }`, `cond { }`, `with e { }`, `let { }`, record and sum blocks) are not used in indented files.
+- **Lists and pairs stay inline.** A list or a pair is written on one line. A part that is long is named with `let`.
+- **No mixing.** A file is indented or bracketed. The marker stays until the migration is done; afterwards every `.l2` file is indented and the marker is dropped.
+- **Migration split by file.** A pretty-printer turns the parse tree into the indented spelling, and each file is migrated in its own commit. Each file is checked by parsing the printed text and comparing the tree with the tree of the original file.
+
+The printer targets the indented forms in the table in section 10. The bracketed parser stays the core, so the layer's output for each file must parse to the same tree.
