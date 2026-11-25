@@ -9,8 +9,8 @@ fn p
 		if (= (@ l) 1)
 			(Ok acc)
 		else
-			let h = ((head l)?)
-			let t = ((tail l)?)
+			let h = (head l)?
+			let t = (tail l)?
 			(go (f ⟨acc h⟩) t)
 	(go init (snd (snd p)))
 ---
