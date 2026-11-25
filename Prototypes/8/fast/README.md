@@ -12,7 +12,7 @@ The machine:
 - `eval.go`: the evaluator, the one machine. A node is evaluated by a call that returns its value; a call in tail position is returned to a loop (`runBody`), so a loop of any length uses the stack of one call. Operands are kept on one stack. The steps, fuel, errors and outcomes are the spec's, form for form. A body owns its frame and gives it back to a per-run pool when nothing refers to it any more (`getFrame`, `putFrame`).
 - `machine.go`: the outcome type, `Run` and `RunBody`, and the step hook the profile uses.
 - `prim.go`: the thirteen primitives (pins were removed, SPEC.md decision 16).
-- `equal.go`, `equal_test.go`: the deep equality primitive, `equal` (tag 13, SPEC.md section 6 and decision 12). It is run by the machine, not by `prim`, because it charges one step for each pair of values it visits, and it stops at the first difference.
+- `equal.go`: the deep equality that `=` (tag 6) runs, `deepEqual` (SPEC.md section 6, decision 12). It is one step, like every primitive, and its walk is not charged for the size of its operands.
 - `hash.go`: the content hash, the implementation's keys (see "Keys" below).
 - `memo.go`: the memo (SPEC.md section 7).
 
