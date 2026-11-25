@@ -7,9 +7,9 @@ fn xs
 		if (= (@ l) 1)
 			(Ok 0)
 		else
-			let h = ((head l)?)
-			let t = ((tail l)?)
-			let r = ((s t)?)
+			let h = (head l)?
+			let t = (tail l)?
+			let r = (s t)?
 			(Ok (+ h r))
 	(s xs)
 ---
