@@ -16,11 +16,13 @@ Non-goals for now: a module system beyond imports, effects, a foreign-function i
 
 ## 2. Lexical structure
 
+A source is UTF-8 text. It is read as a list of codepoints, one for each character, and a file that is not valid UTF-8 is refused, with the offset of the first byte that is not part of a character. A surrogate (`U+D800` to `U+DFFF`) is not valid UTF-8, so it is refused too. Characters that are not ASCII may appear in strings, comments and symbols.
+
 Tokens, separated by whitespace or by delimiters:
 
 - Integers: a `-` immediately followed by digits is part of the integer, so `-5` is a literal. `- 5`, with a space, is the symbol `-` applied to 5. Range as in L1, from -(2^53 - 1) to 2^53 - 1.
 - A token that starts with a digit, or with `-` and a digit, must be a whole integer. So `1-2` is a lexical error. Names such as `x-1` are single symbols.
-- Strings: `"..."` with the escapes `\"`, `\\`, `\n`, `\t`, `\0`. A string is a list of bytes (see section 5).
+- Strings: `"..."` with the escapes `\"`, `\\`, `\n`, `\t`, `\0`. A string is a list of codepoints (see section 5), so `"é"` is one character, not two bytes.
 - Symbols (names and operators): a maximal run of characters that are not whitespace, `(`, `)`, `[`, `]`, `{`, `}`, `"`, `;`, or `.`. A symbol cannot start with a digit.
 - The dot `.` is a token of its own, used only in pairs, so `(1 . 2)` is a pair and `(1.2)` is a lexical error. The arrow `->` is a token of its own, reserved for match arms. A `-` is never part of an arrow, so `x->y` is `x`, `->`, `y`.
 - Comments: `;` to the end of the line.
@@ -94,7 +96,7 @@ Every value has a kind, which `@` reports (section 6). The kinds are:
 | 4    | Pin: a suspended expression (section 7)   |
 | 5    | Con: a constructor, a tag and a payload (section 8) |
 
-A string is a list of Int values, each from 0 to 255, so `"ab"` is `[97 98]`. nil is `~`.
+A string is a list of Int values, each a Unicode codepoint: from 0 to 0x10FFFF, except the surrogates 0xD800 to 0xDFFF. So `"ab"` is `[97 98]`, and `"é"` is `[233]`. nil is `~`.
 
 A constructor is written by its name, applied to its payload: `Ok 5`, `Err "x"`, and `None` for a constructor with no payload. The printer writes it the same way, so the text reads back to the same value. Its data form is a tag and a payload. In the data text it is `con TAG PAYLOAD`, as in `con 0 5`, and in the binary format it is tag byte 4 followed by the tag and the payload. The data text uses the number, since it is interchange and not surface syntax, and `(0 . 5)` would read as an ordinary pair. Only the surface printer writes names.
 
@@ -378,7 +380,7 @@ These were open, and are now settled:
 6. A dot inside brackets is a syntax error, and nested pairs are written with parentheses (section 5).
 7. Constructor text syntax: a capitalised name applied by juxtaposition, and a bare name for a constructor with no payload (section 5).
 8. Constructor data form: `con TAG PAYLOAD` in the data text and tag byte 4 in the binary format (section 5).
-9. Tag numbers: a user sum's constructors are numbered from 0 in declaration order, so `Ok` is 0 and `Err` is 1 (section 13.4). nil is `~`, and strings are lists of bytes (section 5).
+9. Tag numbers: a user sum's constructors are numbered from 0 in declaration order, so `Ok` is 0 and `Err` is 1 (section 13.4). nil is `~`, and strings are lists of codepoints (section 5).
 10. `Dyn` values are checked only by an explicit `check`, which gives a `Result` (section 13.5).
 11. Nullary constructors have payload `~`, and several fields are one pair (section 13.4).
 12. `=` is deep equality, at one step (section 6). Equality on data is needed by the library (`lib/README.md`, "Not here"), and a derived equality per type would need a generated function for each type. Keeping `=` at one step keeps it in the usual flow of primitives, where it costs what every other primitive costs. The price is that the fuel does not count the size of the values compared, which is the gap named in section 6. The four jet cases that recorded the old error of `=` on a non-integer (`fast/testdata/cases.txt`) now record the value the new `=` gives. The other integer operations still refuse non-integers.
