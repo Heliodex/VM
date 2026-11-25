@@ -129,8 +129,8 @@ func TestSeedFile(t *testing.T) {
 		t.Error("the seed does not encode to its own bytes")
 	}
 
-	if b.Generation != 9 {
-		t.Errorf("the seed is generation %d, want 9", b.Generation)
+	if b.Generation != 10 {
+		t.Errorf("the seed is generation %d, want 10", b.Generation)
 	}
 
 	if _, err := SeedStages(); err != nil {

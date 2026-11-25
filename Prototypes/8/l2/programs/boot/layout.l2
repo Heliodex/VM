@@ -367,6 +367,8 @@ letrec
 			withText n
 		elseif (if (isCapB (ntext n)) (if (= (@ (kids n)) 1) 0 (allFieldsOf (kids n))) 0)
 			recordText n
+		elseif (if (startsWith "if " (ntext n)) (= (@ (kids n)) 1) 0)
+			Ok (dcat (lf "(") (dcat (lf (ntext n)) (lf ")")))
 		elseif (= (@ (kids n)) 1)
 			Ok (lf (ntext n))
 		elseif (startsWith "fn " (ntext n))
@@ -453,7 +455,10 @@ letrec
 			Ok (dcat (lf "(if ") (dcat (lf (condOf b)) (dcat (lf "\n(") (dcat th (dcat (lf ")\n") (dcat rest (lf ")")))))))
 	ifText = fn (n rest)
 		if (= (@ (kids n)) 1)
-			lineErr (nline n) "an if needs its then-branch below it"
+			if (= (@ rest) 1)
+				Ok (dcat (lf "(") (dcat (lf (ntext n)) (lf ")")))
+			else
+				lineErr (nline n) "an if needs its then-branch below it"
 		else
 			let k = elifCount rest
 			let elifs = takeNodes rest k
