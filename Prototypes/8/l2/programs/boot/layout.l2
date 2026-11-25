@@ -152,9 +152,9 @@ let findSub = fn (p l)
 let nameEq = fn l
 	let n = identLen l
 	if (if (= n 0) 0 (startsWith " = " (dropN l n)))
-		⟨1 ⟨(takeN l n) (dropN l (+ n 3))⟩⟩
+		⟨1 (takeN l n) (dropN l (+ n 3))⟩
 	else
-		⟨0 ⟨~ ~⟩⟩
+		⟨0 ~ ~⟩
 letrec rev2 = fn (l acc)
 	if (= (@ l) 1)
 		acc

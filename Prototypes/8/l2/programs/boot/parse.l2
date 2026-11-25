@@ -24,40 +24,40 @@ type Kind =
 	| LAngle
 	| RAngle
 type Expr =
-	| EInt ⟨Int ⟨Int Int⟩⟩
-	| EStr ⟨[Int] ⟨Int Int⟩⟩
+	| EInt ⟨Int Int Int⟩
+	| EStr ⟨[Int] Int Int⟩
 	| ENil ⟨Int Int⟩
-	| EName ⟨[Int] ⟨Int Int⟩⟩
-	| EList ⟨[Expr] ⟨Int Int⟩⟩
-	| EPair ⟨Expr ⟨Expr ⟨Int Int⟩⟩⟩
-	| EApp ⟨Expr ⟨[Expr] ⟨Int Int⟩⟩⟩
-	| EFn ⟨[[Int]] ⟨Expr ⟨Int Int⟩⟩⟩
-	| ELet ⟨[Int] ⟨Expr ⟨Expr ⟨Int ⟨Int Int⟩⟩⟩⟩⟩
-	| EMutual ⟨[⟨[Int] ⟨Expr ⟨Int Int⟩⟩⟩] ⟨Expr ⟨Int Int⟩⟩⟩
-	| EIf ⟨Expr ⟨Expr ⟨Expr ⟨Int Int⟩⟩⟩⟩
-	| EMatch ⟨Expr ⟨[⟨Pat ⟨Expr ⟨Int Int⟩⟩⟩] ⟨Int Int⟩⟩⟩
-	| ETry ⟨Expr ⟨Int Int⟩⟩
-	| ECheck ⟨Expr ⟨Int Int⟩⟩
-	| EUntyped ⟨Expr ⟨Int Int⟩⟩
-	| ERec ⟨[Int] ⟨[⟨[Int] ⟨Expr ⟨Int Int⟩⟩⟩] ⟨Int Int⟩⟩⟩
-	| EWith ⟨Expr ⟨[⟨[Int] ⟨Expr ⟨Int Int⟩⟩⟩] ⟨Int Int⟩⟩⟩
+	| EName ⟨[Int] Int Int⟩
+	| EList ⟨[Expr] Int Int⟩
+	| EPair ⟨Expr Expr Int Int⟩
+	| EApp ⟨Expr [Expr] Int Int⟩
+	| EFn ⟨[[Int]] Expr Int Int⟩
+	| ELet ⟨[Int] Expr Expr Int Int Int⟩
+	| EMutual ⟨[⟨[Int] Expr Int Int⟩] Expr Int Int⟩
+	| EIf ⟨Expr Expr Expr Int Int⟩
+	| EMatch ⟨Expr [⟨Pat Expr Int Int⟩] Int Int⟩
+	| ETry ⟨Expr Int Int⟩
+	| ECheck ⟨Expr Int Int⟩
+	| EUntyped ⟨Expr Int Int⟩
+	| ERec ⟨[Int] [⟨[Int] Expr Int Int⟩] Int Int⟩
+	| EWith ⟨Expr [⟨[Int] Expr Int Int⟩] Int Int⟩
 type Pat =
-	| PCon ⟨[Int] ⟨[Int] ⟨Int Int⟩⟩⟩
-	| PBind ⟨[Int] ⟨Int Int⟩⟩
+	| PCon ⟨[Int] [Int] Int Int⟩
+	| PBind ⟨[Int] Int Int⟩
 	| PWild ⟨Int Int⟩
-	| PRec ⟨[Int] ⟨[⟨[Int] ⟨[Int] ⟨Int Int⟩⟩⟩] ⟨Int Int⟩⟩⟩
+	| PRec ⟨[Int] [⟨[Int] [Int] Int Int⟩] Int Int⟩
 type Ty =
-	| TName ⟨[Int] ⟨Int Int⟩⟩
-	| TApp ⟨[Int] ⟨[Ty] ⟨Int Int⟩⟩⟩
-	| TPair ⟨Ty ⟨Ty ⟨Int Int⟩⟩⟩
-	| TList ⟨Ty ⟨Int Int⟩⟩
-	| TFun ⟨Ty ⟨Ty ⟨Int Int⟩⟩⟩
+	| TName ⟨[Int] Int Int⟩
+	| TApp ⟨[Int] [Ty] Int Int⟩
+	| TPair ⟨Ty Ty Int Int⟩
+	| TList ⟨Ty Int Int⟩
+	| TFun ⟨Ty Ty Int Int⟩
 	| NoType
-	| TRec [⟨[Int] ⟨Ty ⟨Int Int⟩⟩⟩]
+	| TRec [⟨[Int] Ty Int Int⟩]
 let tok = fn ts
 	match (head ts)
 		Ok t -> t
-		Err e -> ⟨Eof ⟨0 ⟨0 0⟩⟩⟩
+		Err e -> ⟨Eof 0 0 0⟩
 let after = fn ts
 	match (tail ts)
 		Ok t -> t
@@ -218,7 +218,7 @@ let fieldBind = fn n
 	let nr = ((fieldName n)?)
 	let er = ((expectW (snd nr) 1 "=")?)
 	let vt = ((expectK (snd er) 1 13)?)
-	(if (isWord (fst vt) "_") (Ok ⟨⟨(fst nr) ⟨~ (at (tok n))⟩⟩ (snd vt)⟩) (if (if (isKw (fst vt)) 1 (isCapB (symOf (fst vt)))) (failTok (fst vt) "a field is bound to a lowercase name, or to _") (Ok ⟨⟨(fst nr) ⟨(symOf (fst vt)) (at (tok n))⟩⟩ (snd vt)⟩)))
+	(if (isWord (fst vt) "_") (Ok ⟨⟨(fst nr) ~ (at (tok n))⟩ (snd vt)⟩) (if (if (isKw (fst vt)) 1 (isCapB (symOf (fst vt)))) (failTok (fst vt) "a field is bound to a lowercase name, or to _") (Ok ⟨⟨(fst nr) (symOf (fst vt)) (at (tok n))⟩ (snd vt)⟩)))
 let recStart = fn (n sig)
 	(if (isNoRec sig) 0 (if (isCapB (symOf (tok n))) (= (kn (tok (after n))) 4) 0))
 let parsePattern = fn ts
@@ -228,10 +228,10 @@ let parsePattern = fn ts
 			(Ok ⟨(PWild (at t)) (after ts)⟩)
 		elseif (if (isCapB (symOf t)) (= (kn (tok (after ts))) 4) 0)
 			let fl = ((fieldLines (after ts) 1 fieldBind)?)
-			(Ok ⟨(PRec ⟨(symOf t) ⟨(fst fl) (at t)⟩⟩) (snd fl)⟩)
+			(Ok ⟨(PRec ⟨(symOf t) (fst fl) (at t)⟩) (snd fl)⟩)
 		elseif (isCapB (symOf t))
 			let nx = (tok (after ts))
-			(if (isWord nx "_") (Ok ⟨(PCon ⟨(symOf t) ⟨~ (at t)⟩⟩) (after (after ts))⟩) (if (patBindOk nx) (Ok ⟨(PCon ⟨(symOf t) ⟨(symOf nx) (at t)⟩⟩) (after (after ts))⟩) (Ok ⟨(PCon ⟨(symOf t) ⟨~ (at t)⟩⟩) (after ts)⟩)))
+			(if (isWord nx "_") (Ok ⟨(PCon ⟨(symOf t) ~ (at t)⟩) (after (after ts))⟩) (if (patBindOk nx) (Ok ⟨(PCon ⟨(symOf t) (symOf nx) (at t)⟩) (after (after ts))⟩) (Ok ⟨(PCon ⟨(symOf t) ~ (at t)⟩) (after ts)⟩)))
 		else
 			(Ok ⟨(PBind ⟨(symOf t) (at t)⟩) (after ts)⟩)
 	else
@@ -247,7 +247,7 @@ let parseSymAtom = fn (n t)
 let tyP = fn f
 	match f
 		TName p -> p
-		_ -> ⟨~ ⟨0 0⟩⟩
+		_ -> ⟨~ 0 0⟩
 let isCapTy = fn f
 	match f
 		TName p -> (isCapB (fst p))
@@ -280,7 +280,7 @@ let atOf = fn e
 let hdI = fn l
 	match (head l)
 		Ok i -> i
-		Err e -> ⟨0 ⟨~ ⟨(ENil ⟨0 0⟩) ⟨0 0⟩⟩⟩⟩
+		Err e -> ⟨0 ~ (ENil ⟨0 0⟩) 0 0⟩
 let itemName = fn i
 	(fst (snd i))
 let itemExpr = fn i
@@ -290,7 +290,7 @@ let itemAt = fn i
 let hdC = fn l
 	match (head l)
 		Ok c -> c
-		Err e -> ⟨0 ⟨(ENil ⟨0 0⟩) ⟨(ENil ⟨0 0⟩) ⟨0 0⟩⟩⟩⟩
+		Err e -> ⟨0 (ENil ⟨0 0⟩) (ENil ⟨0 0⟩) 0 0⟩
 let catchOf = fn c
 	(fst c)
 let testOf = fn c
@@ -310,13 +310,13 @@ let lineEnd = fn ts
 let condEnd = fn ts
 	(if (= (lineEnd ts) 1) (Ok 1) (failTok (tok ts) "a cond clause ends at the end of its line; wrap a longer body in parentheses"))
 letrec buildCond = fn l
-	(if (= (catchOf (hdC l)) 1) (bodyOf (hdC l)) (EIf ⟨(testOf (hdC l)) ⟨(bodyOf (hdC l)) ⟨(buildCond (after l)) (atC (hdC l))⟩⟩⟩))
+	(if (= (catchOf (hdC l)) 1) (bodyOf (hdC l)) (EIf ⟨(testOf (hdC l)) (bodyOf (hdC l)) (buildCond (after l)) (atC (hdC l))⟩))
 letrec hasCatch = fn l
 	(if (= (@ l) 1) 0 (if (= (catchOf (hdC l)) 1) 1 (hasCatch (after l))))
 letrec buildLets = fn l
-	(if (= (@ (after l)) 1) (itemExpr (hdI l)) (ELet ⟨(itemName (hdI l)) ⟨(itemExpr (hdI l)) ⟨(buildLets (after l)) ⟨0 (itemAt (hdI l))⟩⟩⟩⟩))
+	(if (= (@ (after l)) 1) (itemExpr (hdI l)) (ELet ⟨(itemName (hdI l)) (itemExpr (hdI l)) (buildLets (after l)) 0 (itemAt (hdI l))⟩))
 letrec bindsOf = fn l
-	(if (= (@ (after l)) 1) ~ (cons ⟨(itemName (hdI l)) ⟨(itemExpr (hdI l)) (itemAt (hdI l))⟩⟩ (bindsOf (after l))))
+	(if (= (@ (after l)) 1) ~ (cons ⟨(itemName (hdI l)) (itemExpr (hdI l)) (itemAt (hdI l))⟩ (bindsOf (after l))))
 letrec lastExpr = fn l
 	(if (= (@ (after l)) 1) (itemExpr (hdI l)) (lastExpr (after l)))
 fn toks
@@ -326,7 +326,7 @@ fn toks
 			let n = (norm (snd base) sig)
 			if (= (kn (tok n)) 7)
 				let r = ((parseType (after n) sig)?)
-				(Ok ⟨(TFun ⟨(fst base) ⟨(fst r) (at (tok n))⟩⟩) (snd r)⟩)
+				(Ok ⟨(TFun ⟨(fst base) (fst r) (at (tok n))⟩) (snd r)⟩)
 			else
 				(Ok ⟨(fst base) n⟩)
 		parseBaseType = fn (ts sig)
@@ -335,7 +335,7 @@ fn toks
 		baseTail = fn (f rest sig)
 			if (isCapTy f)
 				let args = ((parseTypeArgs rest sig)?)
-				(if (= (@ (fst args)) 1) (Ok ⟨f (snd args)⟩) (Ok ⟨(TApp ⟨(fst (tyP f)) ⟨(fst args) (snd (tyP f))⟩⟩) (snd args)⟩))
+				(if (= (@ (fst args)) 1) (Ok ⟨f (snd args)⟩) (Ok ⟨(TApp ⟨(fst (tyP f)) (fst args) (snd (tyP f))⟩) (snd args)⟩))
 			else
 				(Ok ⟨f rest⟩)
 		parseTypeArgs = fn (ts sig)
@@ -364,7 +364,7 @@ fn toks
 				(failTok (tok n) "a pair type needs two parts")
 			else
 				let r = ((angleRestT n t)?)
-				(closeAngle (TPair ⟨(fst a) ⟨(fst r) (at t)⟩⟩) (snd r))
+				(closeAngle (TPair ⟨(fst a) (fst r) (at t)⟩) (snd r))
 		angleRestT = fn (ts t)
 			let a = ((parseTypeAtom ts 0)?)
 			let n = (norm (snd a) 0)
@@ -372,7 +372,7 @@ fn toks
 				(Ok ⟨(fst a) (snd a)⟩)
 			else
 				let r = ((angleRestT n t)?)
-				(Ok ⟨(TPair ⟨(fst a) ⟨(fst r) (at t)⟩⟩) (snd r)⟩)
+				(Ok ⟨(TPair ⟨(fst a) (fst r) (at t)⟩) (snd r)⟩)
 		parseBrackType = fn (ts t)
 			let r = ((parseType ts 0)?)
 			let c = ((expectK (snd r) 0 3)?)
@@ -384,7 +384,7 @@ fn toks
 			let pr = ((paramsLoop (snd nameR))?)
 			let eqR = ((expectW (snd pr) 1 "=")?)
 			let cr = ((consLoop (snd eqR))?)
-			(Ok ⟨⟨(symOf (fst nameR)) ⟨(fst pr) ⟨(fst cr) (at start)⟩⟩⟩ (snd cr)⟩)
+			(Ok ⟨⟨(symOf (fst nameR)) (fst pr) (fst cr) (at start)⟩ (snd cr)⟩)
 		paramsLoop = fn ts
 			let n = (norm ts 1)
 			let t = (tok n)
@@ -403,7 +403,7 @@ fn toks
 			let u = ((requireCap (fst cr) "a constructor's name starts with a capital letter")?)
 			let pr = ((payloadOf (snd cr))?)
 			let n = (snd pr)
-			let con = ⟨(symOf (fst cr)) ⟨(fst pr) (at (fst cr))⟩⟩
+			let con = ⟨(symOf (fst cr)) (fst pr) (at (fst cr))⟩
 			if (isWord (tok n) "|")
 				let more = ((consLoop (after n))?)
 				(Ok ⟨(cons con (fst more)) (snd more)⟩)
@@ -419,21 +419,21 @@ fn toks
 			let nr = ((fieldName ts)?)
 			let c = ((expectK (snd nr) 1 14)?)
 			let ty = ((parseType (snd c) 1)?)
-			(Ok ⟨⟨(fst nr) ⟨(fst ty) (at (tok ts))⟩⟩ (snd ty)⟩)
+			(Ok ⟨⟨(fst nr) (fst ty) (at (tok ts))⟩ (snd ty)⟩)
 		parseFieldInit = fn ts
 			let nr = ((fieldName ts)?)
 			let er = ((expectW (snd nr) 1 "=")?)
 			let v = ((parseExpr (snd er) 1)?)
-			(Ok ⟨⟨(fst nr) ⟨(fst v) (at (tok ts))⟩⟩ (snd v)⟩)
+			(Ok ⟨⟨(fst nr) (fst v) (at (tok ts))⟩ (snd v)⟩)
 		parseRecLit = fn (n sig)
 			let t = (tok n)
 			let fl = ((fieldLines (after n) sig parseFieldInit)?)
-			(Ok ⟨(ERec ⟨(symOf t) ⟨(fst fl) (at t)⟩⟩) (snd fl)⟩)
+			(Ok ⟨(ERec ⟨(symOf t) (fst fl) (at t)⟩) (snd fl)⟩)
 		parseWith = fn (ts sig)
 			let start = (tok ts)
 			let base = ((parseAtom (after ts) (noRecSig sig))?)
 			let fl = ((fieldLines (snd base) sig parseFieldInit)?)
-			(Ok ⟨(EWith ⟨(fst base) ⟨(fst fl) (at start)⟩⟩) (snd fl)⟩)
+			(Ok ⟨(EWith ⟨(fst base) (fst fl) (at start)⟩) (snd fl)⟩)
 		parseExpr = fn (ts sig)
 			let n = (norm ts sig)
 			let t = (tok n)
@@ -445,7 +445,7 @@ fn toks
 		parseApp = fn (ts sig)
 			let h = ((parseAtom ts sig)?)
 			let as = ((argsLoop (snd h) sig)?)
-			(if (= (@ (fst as)) 1) (Ok ⟨(fst h) (snd as)⟩) (Ok ⟨(EApp ⟨(fst h) ⟨(fst as) (atOf (fst h))⟩⟩) (snd as)⟩))
+			(if (= (@ (fst as)) 1) (Ok ⟨(fst h) (snd as)⟩) (Ok ⟨(EApp ⟨(fst h) (fst as) (atOf (fst h))⟩) (snd as)⟩))
 		argsLoop = fn (ts sig)
 			let n = (norm ts sig)
 			if (atomStartT (tok n))
@@ -472,7 +472,7 @@ fn toks
 				(failTok (tok n) "a pair needs two parts")
 			else
 				let r = ((angleRestE n t)?)
-				(closeAngle (EPair ⟨(fst a) ⟨(fst r) (at t)⟩⟩) (snd r))
+				(closeAngle (EPair ⟨(fst a) (fst r) (at t)⟩) (snd r))
 		angleRestE = fn (ts t)
 			let a = ((parseAtom ts 0)?)
 			let n = (norm (snd a) 0)
@@ -480,7 +480,7 @@ fn toks
 				(Ok ⟨(fst a) (snd a)⟩)
 			else
 				let r = ((angleRestE n t)?)
-				(Ok ⟨(EPair ⟨(fst a) ⟨(fst r) (at t)⟩⟩) (snd r)⟩)
+				(Ok ⟨(EPair ⟨(fst a) (fst r) (at t)⟩) (snd r)⟩)
 		parseListExpr = fn (ts t)
 			let items = ((itemsLoop ts)?)
 			(Ok ⟨(EList ⟨(fst items) (at t)⟩) (snd items)⟩)
@@ -518,7 +518,7 @@ fn toks
 			if (= (kn (tok rest)) 9)
 				let n = (norm rest 0)
 				let b = ((parseExpr n sig)?)
-				(Ok ⟨(EFn ⟨names ⟨(fst b) (at start)⟩⟩) (snd b)⟩)
+				(Ok ⟨(EFn ⟨names (fst b) (at start)⟩) (snd b)⟩)
 			else
 				(failTok (tok rest) "a function's body starts on the line after its parameters")
 		parseCond = fn (ts sig)
@@ -539,20 +539,20 @@ fn toks
 				let b = ((parseExpr (snd ar) 1)?)
 				let ok = ((condEnd (snd b))?)
 				let more = ((clausesLoop (snd b) 1)?)
-				(Ok ⟨(cons ⟨1 ⟨(ENil ⟨0 0⟩) ⟨(fst b) (at (tok n))⟩⟩⟩ (fst more)) (snd more)⟩)
+				(Ok ⟨(cons ⟨1 (ENil ⟨0 0⟩) (fst b) (at (tok n))⟩ (fst more)) (snd more)⟩)
 			else
 				let tst = ((parseExpr n 1)?)
 				let ar = ((expectK (snd tst) 1 7)?)
 				let b = ((parseExpr (snd ar) 1)?)
 				let ok = ((condEnd (snd b))?)
 				let more = ((clausesLoop (snd b) 0)?)
-				(Ok ⟨(cons ⟨0 ⟨(fst tst) ⟨(fst b) (at (tok n))⟩⟩⟩ (fst more)) (snd more)⟩)
+				(Ok ⟨(cons ⟨0 (fst tst) (fst b) (at (tok n))⟩ (fst more)) (snd more)⟩)
 		parseBlock = fn (ts sig)
 			let start = (tok ts)
 			let br = ((expectK (after ts) sig 4)?)
 			if (= (kn (tok (snd br))) 9)
 				let its = ((blockItems (snd br) (isWord start "letrec") 0)?)
-				(if (isWord start "letrec") (Ok ⟨(EMutual ⟨(bindsOf (fst its)) ⟨(lastExpr (fst its)) (at start)⟩⟩) (snd its)⟩) (Ok ⟨(buildLets (fst its)) (snd its)⟩))
+				(if (isWord start "letrec") (Ok ⟨(EMutual ⟨(bindsOf (fst its)) (lastExpr (fst its)) (at start)⟩) (snd its)⟩) (Ok ⟨(buildLets (fst its)) (snd its)⟩))
 			else
 				(failTok (tok (snd br)) "a block needs a newline after {, before its first item")
 		blockItems = fn (ts rec seen)
@@ -567,12 +567,12 @@ fn toks
 			(if (= (kn (tok (snd v))) 9) (if (= rec 1) (if (isFnE (fst v)) (bindMore nr v rec) (failTok (fst nr) "a letrec block binds fns, so the functions can call each other")) (bindMore nr v rec)) (failTok (tok (snd v)) "a block binding ends at the end of its line; wrap a longer value in parentheses"))
 		bindMore = fn (nr v rec)
 			let more = ((blockItems (snd v) rec 0)?)
-			(Ok ⟨(cons ⟨1 ⟨(symOf (fst nr)) ⟨(fst v) (at (fst nr))⟩⟩⟩ (fst more)) (snd more)⟩)
+			(Ok ⟨(cons ⟨1 (symOf (fst nr)) (fst v) (at (fst nr))⟩ (fst more)) (snd more)⟩)
 		bodyItem = fn (n rec)
 			let b = ((parseExpr n 1)?)
 			if (= (lineEnd (snd b)) 1)
 				let more = ((blockItems (snd b) rec 1)?)
-				(Ok ⟨(cons ⟨0 ⟨~ ⟨(fst b) (at (tok n))⟩⟩⟩ (fst more)) (snd more)⟩)
+				(Ok ⟨(cons ⟨0 ~ (fst b) (at (tok n))⟩ (fst more)) (snd more)⟩)
 			else
 				(failTok (tok (snd b)) "a block's body ends at the end of its line; wrap a longer body in parentheses")
 		parseLet = fn (ts sig)
@@ -590,7 +590,7 @@ fn toks
 			if (= (kn (tok rest)) 9)
 				let n = (norm rest 0)
 				let b = ((parseExpr n 0)?)
-				(Ok ⟨(ELet ⟨name ⟨(fst v) ⟨(fst b) ⟨(if (isWord start "letrec") 1 0) (at start)⟩⟩⟩⟩) (snd b)⟩)
+				(Ok ⟨(ELet ⟨name (fst v) (fst b) (if (isWord start "letrec") 1 0) (at start)⟩) (snd b)⟩)
 			else
 				(failTok (tok rest) "a let value ends at the end of its line; wrap a longer value in parentheses")
 		parseIf = fn (ts sig)
@@ -598,7 +598,7 @@ fn toks
 			let c = ((parseAtom (after ts) sig)?)
 			let t = ((parseAtom (snd c) sig)?)
 			let e = ((parseAtom (snd t) sig)?)
-			(Ok ⟨(EIf ⟨(fst c) ⟨(fst t) ⟨(fst e) (at start)⟩⟩⟩) (snd e)⟩)
+			(Ok ⟨(EIf ⟨(fst c) (fst t) (fst e) (at start)⟩) (snd e)⟩)
 		parseMatch = fn (ts sig)
 			let start = (tok ts)
 			let sc = ((parseExpr (after ts) (noRecSig sig))?)
@@ -606,7 +606,7 @@ fn toks
 			let b = (snd br)
 			if (= (kn (tok b)) 9)
 				let arms = ((armsLoop b)?)
-				(if (= (@ (fst arms)) 1) (failTok start "a match needs at least one arm") (Ok ⟨(EMatch ⟨(fst sc) ⟨(fst arms) (at start)⟩⟩) (after (snd arms))⟩))
+				(if (= (@ (fst arms)) 1) (failTok start "a match needs at least one arm") (Ok ⟨(EMatch ⟨(fst sc) (fst arms) (at start)⟩) (after (snd arms))⟩))
 			else
 				(failTok (tok b) "a match needs a newline after {, before its first arm")
 		armsLoop = fn ts
@@ -620,7 +620,7 @@ fn toks
 				let r = (snd body)
 				if (isArmEnd (tok r))
 					let more = ((armsLoop r)?)
-					(Ok ⟨(cons ⟨(fst p) ⟨(fst body) (at (tok n))⟩⟩ (fst more)) (snd more)⟩)
+					(Ok ⟨(cons ⟨(fst p) (fst body) (at (tok n))⟩ (fst more)) (snd more)⟩)
 				else
 					(failTok (tok r) "an arm ends at the end of its line; wrap a longer body in parentheses")
 		parseCheck = fn (ts sig)
@@ -659,5 +659,5 @@ fn toks
 			(if (= (kn t) 9) 1 (= (kn t) 5))
 	(parseProgram toks)
 ---
-[⟨(Num 1) ⟨1 ⟨1 0⟩⟩⟩ ⟨Eof ⟨1 ⟨2 0⟩⟩⟩] => Ok ⟨~ (EInt ⟨1 ⟨1 1⟩⟩)⟩ fuel 100000
+[⟨(Num 1) 1 1 0⟩ ⟨Eof 1 2 0⟩] => Ok ⟨~ (EInt ⟨1 1 1⟩)⟩ fuel 100000
 
