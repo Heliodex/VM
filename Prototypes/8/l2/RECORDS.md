@@ -17,7 +17,7 @@ The reader has to count the chain to find a field, a constructor has to be given
 
 ## 2. Decision: records are sugar over the pairs we have
 
-A record is represented exactly as it is today: its fields, in declaration order, nested as pairs, the last field unwrapped. So `MS` with fields `st, fixed, name, ty, args, cov, catch` is `(st . (fixed . (name . (ty . (args . (cov . catch))))))`. This has three consequences:
+A record is represented exactly as it is today: its fields, in declaration order, nested as pairs, the last field unwrapped. So `MS` with fields `st, fixed, name, ty, args, cov, catch` is `⟨st ⟨fixed ⟨name ⟨ty ⟨args ⟨cov catch⟩⟩⟩⟩⟩⟩`. This has three consequences:
 
 - The machine does not change. The binary format and the code format do not change.
 - Existing code keeps working. Hand-written pairs and record values are the same value.

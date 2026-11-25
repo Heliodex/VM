@@ -24,7 +24,7 @@ Tokens, separated by whitespace or by delimiters:
 - A token that starts with a digit, or with `-` and a digit, must be a whole integer. So `1-2` is a lexical error. Names such as `x-1` are single symbols.
 - Strings: `"..."` with the escapes `\"`, `\\`, `\n`, `\t`, `\0`. A string is a list of codepoints (see section 5), so `"é"` is one character, not two bytes.
 - Symbols (names and operators): a maximal run of characters that are not whitespace, `(`, `)`, `[`, `]`, `{`, `}`, `"`, `;`, or `.`. A symbol cannot start with a digit.
-- A pair is written `⟨a b⟩`, the angled brackets U+27E8 and U+27E9, or with a dot, `(a . b)`. The dot `.` is a token of its own, used only in the dot form, so `(1 . 2)` is a pair and `(1.2)` is a lexical error. The angled brackets are tokens of their own, and a pair's parts in them are atoms. The arrow `->` is a token of its own, reserved for match arms. A `-` is never part of an arrow, so `x->y` is `x`, `->`, `y`.
+- A pair is written `⟨a b⟩`, with the angled brackets U+27E8 and U+27E9. Its parts are atoms, and a pair with more than two parts nests to the right, so `⟨a b c⟩` is `⟨a ⟨b c⟩⟩`. A dot `.` is a token, and it is a syntax error wherever it appears in an expression or a type, so `(1 . 2)` and `(1.2)` are refused. The arrow `->` is a token of its own, reserved for match arms. A `-` is never part of an arrow, so `x->y` is `x`, `->`, `y`.
 - Comments: `;` to the end of the line.
 - Delimiters: `(`, `)`, `[`, `]`, `{`, `}`, `.`, and `->`.
 
@@ -45,7 +45,7 @@ app    ::= atom+                application, curried: f a b is (f a) b
          | "match" expr "{" newline arm+ "}"    (section 9.3; arms are multi-line, section 12)
 atom   ::= integer | string | name | "~" | list | pair | "(" expr ")"
 list   ::= "[" expr* "]"        a proper list
-pair   ::= "⟨" atom atom "⟩" | "(" expr "." expr ")"
+pair   ::= "⟨" atom atom { atom } "⟩"
 params ::= name | "(" name+ ")"
 arm     ::= pattern "->" expr     the body ends at the end of its line (section 12)
 pattern ::= Name                  a constructor with no payload, e.g. None
@@ -57,7 +57,7 @@ pattern ::= Name                  a constructor with no payload, e.g. None
 
 `?` ends an application, so `parse s?` is `(parse s)?`, and it applies to the whole call on its left. To apply `?` to an argument, wrap it in parentheses: `g (parse s)?`. `?` appears at most once at the end of an application, so `f x? y` and `e??` are syntax errors. `?` is not an atom.
 
-The grammar needs one token of lookahead: `(` starts a dot pair if the token after the first expression is `.`, and a group otherwise. The parser decides at the closing `)` or `.` after its first expression, so a group and a dot pair share one prefix. The angled form has no such prefix: `⟨` always starts a pair of two atoms. Implementations may use a small backtrack buffer.
+A group is `(` expr `)`, and a pair is `⟨` followed by its atoms and `⟩`. The first token tells the parser which form it is, so no lookahead is needed.
 
 ### 3.2 Application
 
@@ -98,9 +98,9 @@ Every value has a kind, which `@` reports (section 6). The kinds are:
 
 A string is a list of Int values, each a Unicode codepoint: from 0 to 0x10FFFF, except the surrogates 0xD800 to 0xDFFF. So `"ab"` is `[97 98]`, and `"é"` is `[233]`. nil is `~`.
 
-A constructor is written by its name, applied to its payload: `Ok 5`, `Err "x"`, and `None` for a constructor with no payload. The printer writes it the same way, so the text reads back to the same value. Its data form is a tag and a payload. In the data text it is `con TAG PAYLOAD`, as in `con 0 5`, and in the binary format it is tag byte 4 followed by the tag and the payload. The data text uses the number, since it is interchange and not surface syntax, and `(0 . 5)` would read as an ordinary pair. Only the surface printer writes names.
+A constructor is written by its name, applied to its payload: `Ok 5`, `Err "x"`, and `None` for a constructor with no payload. The printer writes it the same way, so the text reads back to the same value. Its data form is a tag and a payload. In the data text it is `con TAG PAYLOAD`, as in `con 0 5`, and in the binary format it is tag byte 4 followed by the tag and the payload. The data text uses the number, since it is interchange and not surface syntax, and `⟨0 5⟩` would read as an ordinary pair. Only the surface printer writes names.
 
-A list `[a b c]` is the pair chain `⟨a ⟨b ⟨c ~⟩⟩⟩`, which is also `(a . (b . (c . ~)))`. A pair `⟨a b⟩` (or `(a . b)`) is one pair cell, which is not a list unless `b` is a list. A list's items are atoms, as a pair's parts are, so a call inside a list or a pair needs parentheses: `[1 (f 2)]` is the list of 1 and the call `(f 2)`. A dot inside brackets is a syntax error, so `[1 2 . 3]` and `⟨1 . 2⟩` are refused. An improper list is written as nested pairs, `⟨1 ⟨2 3⟩⟩`. The printer writes a list with brackets and a pair with the angled brackets, so the two forms never print the same way.
+A list `[a b c]` is the pair chain `⟨a ⟨b ⟨c ~⟩⟩⟩`,. A pair `⟨a b⟩` is one pair cell, which is not a list unless `b` is a list. A list's items are atoms, as a pair's parts are, so a call inside a list or a pair needs parentheses: `[1 (f 2)]` is the list of 1 and the call `(f 2)`. A dot inside brackets is a syntax error, so `[1 2 . 3]` and `⟨1 . 2⟩` are refused. An improper list is written as nested pairs, `⟨1 ⟨2 3⟩⟩`. The printer writes a list with brackets and a pair with the angled brackets, so the two forms never print the same way.
 
 ## 6. Primitives
 
@@ -267,7 +267,7 @@ The first version has a small static type system for surface programs. Quoted an
 
 ```
 t ::= Int                 an integer
-    | ⟨t t⟩              a pair (also (t . t))
+    | ⟨t t⟩              a pair
     | t -> t              a function, curried
     | Pin t               a suspended value (section 7)
     | a                   a type variable
@@ -275,7 +275,7 @@ t ::= Int                 an integer
     | Dyn                 a value from untyped code (13.4)
 ```
 
-A list of `t` has type `[t]`, a built-in recursive type. Its values are the pair chains of section 5, so a `[t]` value is `~` or a pair `(t . [t])`. The empty list is `~`, and it has type `[t]` for any `t`. A list literal `[a b c]` has type `[t]` when each item has type `t`. A pair and a list are different types, even though a list is a pair chain at run time: `(1 . ~)` has type `(Int . [Int])`, not `[Int]`, and `cons` builds a list from an item and a list (section 13.3).
+A list of `t` has type `[t]`, a built-in recursive type. Its values are the pair chains of section 5, so a `[t]` value is `~` or a pair `⟨t [t]⟩`. The empty list is `~`, and it has type `[t]` for any `t`. A list literal `[a b c]` has type `[t]` when each item has type `t`. A pair and a list are different types, even though a list is a pair chain at run time: `⟨1 ~⟩` has type `⟨Int [Int]⟩`, not `[Int]`, and `cons` builds a list from an item and a list (section 13.3).
 
 ### 13.2 Inference
 
@@ -307,7 +307,7 @@ Recursive functions (`letrec`) are checked monomorphically within their own body
 - `<` has type `Int -> Int -> Int`, since the machine returns 0 or 1. `=` has type `a -> a -> Int` (decision 12): deep equality on any two values of one type, so a comparison of two functions is accepted by the checker and is an error at run time.
 - `@` has type `a -> Int`, the kind of any value.
 - `head` and `tail` have type `[a] -> Result a [Int]` and `[a] -> Result [a] [Int]`. On nil they give `Err` with the reason, `head of an empty list` or `tail of an empty list`. They take lists, so that a recursive function over a list is typed. A pair is not a list, so `head` of a pair is a type error.
-- `fst` and `snd` have type `(a . b) -> a` and `(a . b) -> b`. A pair is never nil, so they give the part with no Result. A pair whose parts have different types is taken apart this way, so `(1 . (2 . 3))` has `fst` of `1` and `snd` of `(2 . 3)`.
+- `fst` and `snd` have type `⟨a b⟩ -> a` and `⟨a b⟩ -> b`. A pair is never nil, so they give the part with no Result. A pair whose parts have different types is taken apart this way, so `⟨1 ⟨2 3⟩⟩` has `fst` of `1` and `snd` of `⟨2 3⟩`.
 - `cons` has type `a -> [a] -> [a]`: `cons x xs` is the list with x in front of xs.
 - `if c t e` needs `c : Int`, and `t` and `e` must have the same type.
 - `pin e` has type `Pin t` when `e : t`, and `force` has type `Pin t -> t`.
@@ -326,7 +326,7 @@ Each constructor has a tag, from 0 up, by declaration order, so `Ok` is 0 and `E
 A constructor carries exactly one payload value. Two rules follow from that:
 
 - **No payload.** A constructor declared without a type has payload `~` (nil), and is written by its name alone. For example, `type Option a = None | Some a` gives `None` payload `~` and tag 0, and `Some a` tag 1.
-- **Several fields.** A constructor with several values takes one payload that is a pair, so `Point (1 . 2)` is a constructor whose payload is the pair. A tuple type is not needed, and the machine keeps one payload per constructor. `Ok v` has type `Result a e` when `v : a`. A `match` on a sum must cover every constructor, or have a wildcard arm (section 9.3). The arms' bodies must have the same type.
+- **Several fields.** A constructor with several values takes one payload that is a pair, so `Point ⟨1 2⟩` is a constructor whose payload is the pair. A tuple type is not needed, and the machine keeps one payload per constructor. `Ok v` has type `Result a e` when `v : a`. A `match` on a sum must cover every constructor, or have a wildcard arm (section 9.3). The arms' bodies must have the same type.
 
 The result of `?` on `Result a e` is `a`, and the enclosing function must return `Result b e`, with the same `e`.
 
@@ -334,7 +334,7 @@ The result of `?` on `Result a e` is `a`, and the enclosing function must return
 
 A quoted program, or a program decoded from binary, is untyped. Evaluating it gives a value of type `Dyn`.
 
-- `untyped e` gives the value of `e` the type `Dyn`, with no test. It is how a program makes an untyped value, since any value can be seen as untyped data. A `Dyn` value is used at a specific type only through `check e`, which is written in the program. `check e` gives `Ok e` when the value has the shape of the type its use gives it, and `Err` with the message `expected` and the type, such as `expected Int`, when it does not. The type in the message numbers its type variables from 1, in the order they first appear, so two unknowns in a pair are `expected (?1 . ?2)` on either compiler. An `Int` must be an integer, a pair must be a pair, and a constructor must have the declared tag. Without a check, a `Dyn` value used at `Int` is a type error, such as `expected Int, but this is Dyn`.
+- `untyped e` gives the value of `e` the type `Dyn`, with no test. It is how a program makes an untyped value, since any value can be seen as untyped data. A `Dyn` value is used at a specific type only through `check e`, which is written in the program. `check e` gives `Ok e` when the value has the shape of the type its use gives it, and `Err` with the message `expected` and the type, such as `expected Int`, when it does not. The type in the message numbers its type variables from 1, in the order they first appear, so two unknowns in a pair are `expected ⟨?1 ?2⟩` on either compiler. An `Int` must be an integer, a pair must be a pair, and a constructor must have the declared tag. Without a check, a `Dyn` value used at `Int` is a type error, such as `expected Int, but this is Dyn`.
 - A typed value passed into untyped code is not checked, and it is still a valid value of its type.
 
 So a program can run untyped code, and the types it has are kept at the boundary by an explicit check. The check is part of the surface language's compiled form, not the machine, and a failed check is a value, so it can be matched and handled like any other error.
@@ -348,7 +348,7 @@ Only constructors carry a tag of their own. Every other value's kind comes from 
 | Type | Kind | Extra tag | Dyn check |
 |---|---|---|---|
 | `Int` | 0, a number | none | the value is an integer in range |
-| `⟨a b⟩` or `(a . b)` | 2, a pair | none | kind 2, then check `a` and `b` |
+| `⟨a b⟩` or `⟨a b⟩` | 2, a pair | none | kind 2, then check `a` and `b` |
 | `[a]` | 1 for nil, or 2 for a pair | none | kind 1, or kind 2 then check the item and the rest of the list |
 | `a -> b` | 3, a function | none | kind 3; arity is not checked |
 | `Pin a` | 4, a pin | none | kind 4 |
@@ -377,7 +377,7 @@ These were open, and are now settled:
 3. The results model is a built-in sum `Result`, with `?` and `match` (section 9).
 4. The dispatch expressions are `tagof` and `payload` (section 9.4).
 5. Layout: newlines separate `match` arms and end a `let` value, a body continues only inside parentheses, indentation is deferred, `let` is non-recursive, `letrec` is for recursion (section 12).
-6. A dot inside brackets is a syntax error. Pairs are written `⟨a b⟩` (the angled form, the printer’s form) or `(a . b)` (still read; it may be retired later), and nested pairs are written with the angled brackets or with parentheses (section 5).
+6. A dot inside brackets is a syntax error, so the dot form `(a . b)` is refused. Pairs are written `⟨a b⟩`, and a pair with more than two parts nests to the right (section 2).
 7. Constructor text syntax: a capitalised name applied by juxtaposition, and a bare name for a constructor with no payload (section 5).
 8. Constructor data form: `con TAG PAYLOAD` in the data text and tag byte 4 in the binary format (section 5).
 9. Tag numbers: a user sum's constructors are numbered from 0 in declaration order, so `Ok` is 0 and `Err` is 1 (section 13.4). nil is `~`, and strings are lists of codepoints (section 5).
