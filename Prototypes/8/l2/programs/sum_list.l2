@@ -6,8 +6,8 @@ letrec total = fn l
 	if (= (@ l) 1)
 		(Ok 0)
 	else
-		let h = ((head l)?)
-		let t = ((total ((tail l)?))?)
+		let h = (head l)?
+		let t = (total ((tail l)?))?
 		(Ok (+ h t))
 total
 ---
