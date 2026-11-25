@@ -285,40 +285,6 @@ func pipeList(items []Value) Value {
 	return v
 }
 
-// pipeBytes is a list of bytes, as the stages read text.
-func pipeBytes(b []byte) Value {
-	items := make([]Value, len(b))
-
-	for i, c := range b {
-		items[i] = Small(c)
-	}
-
-	return pipeList(items)
-}
-
-// pipeText is the text of a list of bytes, for messages.
-func pipeText(v Value) string {
-	var b strings.Builder
-
-	for {
-		c, ok := v.(*Cell)
-		if !ok {
-			break
-		}
-
-		s, ok := c.Head.(Small)
-		if !ok {
-			b.WriteString("?")
-		} else {
-			b.WriteByte(byte(s))
-		}
-
-		v = c.Tail
-	}
-
-	return b.String()
-}
-
 // resultPayload is the payload of a stage's result: tag 0 is success, and tag 1 a message.
 func resultPayload(v Value) (Value, error) {
 	con, ok := v.(*Con)
@@ -335,7 +301,12 @@ func resultPayload(v Value) (Value, error) {
 
 // CheckText is the outcome of the pure checker (request Infer, tag 3) on a program's source, read as the parity run reads it: the source is tokenized and parsed as it is, and the outcome is "type <t>" or "error <messages>", with the type variables renamed by where they first appear. ok is false when the parser refuses the source, or when a form is not handled yet.
 func (s Stages) CheckText(src string) (string, bool) {
-	tokens, err := s.run("lex", pipeBytes([]byte(src)), stageFuelLex)
+	input, err := pipeSource(src)
+	if err != nil {
+		return "", false
+	}
+
+	tokens, err := s.run("lex", input, stageFuelLex)
 	if err != nil {
 		return "", false
 	}
@@ -428,7 +399,12 @@ func stageInput(names, parsed, checks, codes, inputTest Value) Value {
 
 // Eval evaluates an expression with the program's declarations and imports in scope, as boot_pipeline.luau's evalExpr does: the expression is read, desugared with the file's declarations, and run on the machine with no input. It gives the value.
 func (c *Compiled) Eval(text string) (Value, error) {
-	tokens, err := c.stages.run("lex", pipeBytes([]byte(text)), stageFuelLex)
+	input, err := pipeSource(text)
+	if err != nil {
+		return nil, err
+	}
+
+	tokens, err := c.stages.run("lex", input, stageFuelLex)
 	if err != nil {
 		return nil, err
 	}
@@ -489,7 +465,10 @@ func (s Stages) Compile(text, name string, load Loader) (*Compiled, error) {
 		return nil, err
 	}
 
-	section := pipeBytes([]byte(file.Program))
+	section, err := pipeSource(file.Program)
+	if err != nil {
+		return nil, err
+	}
 
 	if strings.HasSuffix(name, ".l2") {
 		payload, err := s.run("layout", section, stageFuelLayout)
@@ -534,10 +513,15 @@ func (s Stages) Compile(text, name string, load Loader) (*Compiled, error) {
 			return nil, fmt.Errorf("import %s: %w", imp.File, err)
 		}
 
-		importNames = append(importNames, pipeBytes([]byte(imp.Name)))
+		importName, err := pipeSource(imp.Name)
+		if err != nil {
+			return nil, fmt.Errorf("import %s: %w", imp.File, err)
+		}
+
+		importNames = append(importNames, importName)
 		importCodes = append(importCodes, lib.code)
 		libraries = append(libraries, &Cell{
-			Head: pipeBytes([]byte(imp.Name)),
+			Head: importName,
 			Tail: lib.parsed,
 		})
 	}
@@ -626,7 +610,12 @@ func CompileStages(from Stages, root string) (Stages, error) {
 
 // DesugarText is the outcome of the desugarer on a source, in the notation of the parity run: "value <code>" or "error <message>". The source is parsed as it is. With checked, it is checked first (request InferT with no libraries), and its check nodes and input test go to the desugarer; otherwise the desugarer gets no checks and no input test, and the imports are given the integer values (their machine expressions). ok is false when the parser refuses the source, or the checker does.
 func (s Stages) DesugarText(src string, imports []string, values []int64, checked bool) (string, bool) {
-	tokens, err := s.run("lex", pipeBytes([]byte(src)), stageFuelLex)
+	input, err := pipeSource(src)
+	if err != nil {
+		return "", false
+	}
+
+	tokens, err := s.run("lex", input, stageFuelLex)
 	if err != nil {
 		return "", false
 	}
@@ -686,7 +675,12 @@ func (s Stages) DesugarText(src string, imports []string, values []int64, checke
 	names := make([]Value, len(imports))
 
 	for i, n := range imports {
-		names[i] = pipeBytes([]byte(n))
+		name, err := pipeSource(n)
+		if err != nil {
+			return "", false
+		}
+
+		names[i] = name
 	}
 
 	codes := make([]Value, len(values))

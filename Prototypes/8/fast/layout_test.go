@@ -187,7 +187,12 @@ func TestLayoutParity(t *testing.T) {
 
 		n++
 
-		payload, err := stages.run("layout", pipeBytes([]byte(in.src)), stageFuelLayout)
+		source, err := pipeSource(in.src)
+		if err != nil {
+			t.Fatalf("%s: %v", in.name, err)
+		}
+
+		payload, err := stages.run("layout", source, stageFuelLayout)
 		if err != nil {
 			got = "the layout stage is " + err.Error()
 		} else if text, err := resultPayload(payload); err != nil {
