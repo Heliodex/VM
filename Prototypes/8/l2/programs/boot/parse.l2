@@ -21,6 +21,8 @@ type Kind =
 	| Sym [Int]
 	| Colon
 	| Comma
+	| LAngle
+	| RAngle
 type Expr =
 	| EInt (Int . (Int . Int))
 	| EStr ([Int] . (Int . Int))
@@ -84,6 +86,8 @@ let kn = fn t
 		Sym -> 13
 		Colon -> 14
 		Comma -> 15
+		LAngle -> 16
+		RAngle -> 17
 let isLine = fn s
 	(if (= s 1) 1 (= s 3))
 let isNoRec = fn s
@@ -119,11 +123,11 @@ let isKw = fn t
 let isCapB = fn w
 	(if (< (first w) 65) 0 (if (< 90 (first w)) 0 1))
 let atomStartT = fn t
-	(if (= (kn t) 11) 1 (if (= (kn t) 12) 1 (if (= (kn t) 0) 1 (if (= (kn t) 2) 1 (if (isSymT t) (if (isWord t "_") 0 (if (isKw t) 0 1)) 0)))))
+	(if (= (kn t) 11) 1 (if (= (kn t) 12) 1 (if (= (kn t) 0) 1 (if (= (kn t) 2) 1 (if (= (kn t) 16) 1 (if (isSymT t) (if (isWord t "_") 0 (if (isKw t) 0 1)) 0))))))
 let typeAtomStartT = fn t
-	(if (isSymT t) (if (isWord t "|") 0 1) (if (= (kn t) 0) 1 (= (kn t) 2)))
+	(if (isSymT t) (if (isWord t "|") 0 1) (if (= (kn t) 0) 1 (if (= (kn t) 16) 1 (= (kn t) 2))))
 let kindText = fn c
-	(if (= c 0) "(" (if (= c 1) ")" (if (= c 2) "[" (if (= c 3) "]" (if (= c 4) "{" (if (= c 5) "}" (if (= c 6) "." (if (= c 7) "->" (if (= c 8) "?" (if (= c 9) "NL" (if (= c 10) "eof" (if (= c 11) "int" (if (= c 12) "str" (if (= c 14) ":" (if (= c 15) "," "sym")))))))))))))))
+	(if (= c 0) "(" (if (= c 1) ")" (if (= c 2) "[" (if (= c 3) "]" (if (= c 4) "{" (if (= c 5) "}" (if (= c 6) "." (if (= c 7) "->" (if (= c 8) "?" (if (= c 9) "NL" (if (= c 10) "eof" (if (= c 11) "int" (if (= c 12) "str" (if (= c 14) ":" (if (= c 15) "," (if (= c 16) "⟨" (if (= c 17) "⟩" "sym")))))))))))))))))
 letrec showInt = fn n
 	if (< n 10)
 		(Ok (cons (+ 48 n) ~))
@@ -251,6 +255,9 @@ let isCapTy = fn f
 let closeParen = fn (ty ts)
 	let c = ((expectK ts 0 1)?)
 	(Ok (ty . (snd c)))
+let closeAngle = fn (ty ts)
+	let c = ((expectK ts 0 17)?)
+	(Ok (ty . (snd c)))
 let atOf = fn e
 	match e
 		EInt p -> (snd p)
@@ -342,7 +349,7 @@ fn toks
 		parseTypeAtom = fn (ts sig)
 			let n = (norm ts sig)
 			let t = (tok n)
-			(if (isSymT t) (Ok ((TName ((symOf t) . (at t))) . (after n))) (if (= (kn t) 0) (parseParenType (after n) t) (if (= (kn t) 2) (parseBrackType (after n) t) (failTok t "expected a type"))))
+			(if (isSymT t) (Ok ((TName ((symOf t) . (at t))) . (after n))) (if (= (kn t) 0) (parseParenType (after n) t) (if (= (kn t) 16) (parseAngleType (after n) t) (if (= (kn t) 2) (parseBrackType (after n) t) (failTok t "expected a type")))))
 		parseParenType = fn (ts t)
 			let r1 = ((parseType ts 0)?)
 			let n1 = (norm (snd r1) 0)
@@ -351,6 +358,11 @@ fn toks
 				(closeParen (TPair ((fst r1) . ((fst r2) . (at t)))) (snd r2))
 			else
 				(closeParen (fst r1) n1)
+		parseAngleType = fn (ts t)
+			let r1 = ((parseTypeAtom ts 0)?)
+			let n1 = (norm (snd r1) 0)
+			let r2 = ((parseTypeAtom n1 0)?)
+			(closeAngle (TPair ((fst r1) . ((fst r2) . (at t)))) (snd r2))
 		parseBrackType = fn (ts t)
 			let r = ((parseType ts 0)?)
 			let c = ((expectK (snd r) 0 3)?)
@@ -435,7 +447,7 @@ fn toks
 		parseAtom = fn (ts sig)
 			let n = (norm ts sig)
 			let t = (tok n)
-			(if (= (kn t) 11) (Ok ((EInt ((numOf t) . (at t))) . (after n))) (if (= (kn t) 12) (Ok ((EStr ((bytesOf t) . (at t))) . (after n))) (if (= (kn t) 0) (parseParenExpr (after n) t) (if (= (kn t) 2) (parseListExpr (after n) t) (if (= (kn t) 13) (if (recStart n sig) (parseRecLit n sig) (parseSymAtom n t)) (failTok t "expected a value here"))))))
+			(if (= (kn t) 11) (Ok ((EInt ((numOf t) . (at t))) . (after n))) (if (= (kn t) 12) (Ok ((EStr ((bytesOf t) . (at t))) . (after n))) (if (= (kn t) 0) (parseParenExpr (after n) t) (if (= (kn t) 16) (parseAngleExpr (after n) t) (if (= (kn t) 2) (parseListExpr (after n) t) (if (= (kn t) 13) (if (recStart n sig) (parseRecLit n sig) (parseSymAtom n t)) (failTok t "expected a value here")))))))
 		parseParenExpr = fn (ts t)
 			let r1 = ((parseExpr ts 0)?)
 			let n1 = (norm (snd r1) 0)
@@ -444,6 +456,11 @@ fn toks
 				(closeParen (EPair ((fst r1) . ((fst r2) . (at t)))) (snd r2))
 			else
 				(closeParen (fst r1) n1)
+		parseAngleExpr = fn (ts t)
+			let r1 = ((parseAtom ts 0)?)
+			let n1 = (norm (snd r1) 0)
+			let r2 = ((parseAtom n1 0)?)
+			(closeAngle (EPair ((fst r1) . ((fst r2) . (at t)))) (snd r2))
 		parseListExpr = fn (ts t)
 			let items = ((itemsLoop ts)?)
 			(Ok ((EList ((fst items) . (at t))) . (snd items)))

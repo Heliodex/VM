@@ -1,4 +1,4 @@
-The L2 tokenizer, written in L2, the first stage of the L2 compiler in L2. It takes the source as a list of bytes and gives Ok of the tokens, or Err with the message the Luau lexer gives. A token is (kind . (line . (col . spaced))): spaced is 1 when whitespace came before it. The list ends with an Eof token. Strings are checked against the Luau lexer on every program file.
+The L2 tokenizer, written in L2, the first stage of the L2 compiler in L2. It takes the source as a list of codepoints and gives Ok of the tokens, or Err with the message the Luau lexer gives. A token is (kind . (line . (col . spaced))): spaced is 1 when whitespace came before it. The list ends with an Eof token. Strings are checked against the Luau lexer on every program file.
 ---
 reverse = lib/reverse.l2
 append = lib/append.l2
@@ -20,6 +20,8 @@ type Kind =
 	| Sym [Int]
 	| Colon
 	| Comma
+	| LAngle
+	| RAngle
 let first = fn l
 	match (head l)
 		Ok c -> c
@@ -35,11 +37,11 @@ let isDigit = fn c
 let isSpace = fn c
 	(if (= c 32) 1 (if (= c 9) 1 (if (= c 13) 1 (= c 10))))
 let isSingle = fn c
-	(if (= c 40) 1 (if (= c 41) 1 (if (= c 91) 1 (if (= c 93) 1 (if (= c 123) 1 (if (= c 125) 1 (if (= c 58) 1 (if (= c 44) 1 (= c 63)))))))))
+	(if (= c 40) 1 (if (= c 41) 1 (if (= c 91) 1 (if (= c 93) 1 (if (= c 123) 1 (if (= c 125) 1 (if (= c 58) 1 (if (= c 44) 1 (if (= c 10216) 1 (if (= c 10217) 1 (= c 63)))))))))))
 let isDelim = fn c
 	(if (= c -1) 1 (if (isSpace c) 1 (if (isSingle c) 1 (if (= c 34) 1 (if (= c 59) 1 (= c 46))))))
 let kindOf = fn c
-	(if (= c 40) LParen (if (= c 41) RParen (if (= c 91) LBrack (if (= c 93) RBrack (if (= c 123) LBrace (if (= c 125) RBrace (if (= c 58) Colon (if (= c 44) Comma Question))))))))
+	(if (= c 40) LParen (if (= c 41) RParen (if (= c 91) LBrack (if (= c 93) RBrack (if (= c 123) LBrace (if (= c 125) RBrace (if (= c 58) Colon (if (= c 44) Comma (if (= c 10216) LAngle (if (= c 10217) RAngle Question))))))))))
 let escapeOf = fn e
 	(if (= e 34) 34 (if (= e 92) 92 (if (= e 110) 10 (if (= e 116) 9 (if (= e 48) 0 -2)))))
 let digitsOf = fn ws
