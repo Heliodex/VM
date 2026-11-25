@@ -82,7 +82,7 @@ func FileLoader(root string) Loader {
 	}
 }
 
-// FormatValue is a value as text: an integer, ~ for nil, [a b] for a list, (a . b) for a pair, and K<tag>(payload) for a constructor. A law is <law>.
+// FormatValue is a value as text: an integer, ~ for nil, [a b] for a list, ⟨a b⟩ for a pair, and K<tag>(payload) for a constructor. A law is <law>.
 func FormatValue(v Value) string {
 	switch x := v.(type) {
 	case *Cell:
@@ -105,7 +105,7 @@ func FormatValue(v Value) string {
 			return "[" + strings.Join(items, " ") + "]"
 		}
 
-		return "(" + FormatValue(x.Head) + " . " + FormatValue(x.Tail) + ")"
+		return "⟨" + FormatValue(x.Head) + " " + FormatValue(x.Tail) + "⟩"
 	case *Con:
 		return fmt.Sprintf("K%d(%s)", x.Tag, FormatValue(x.Payload))
 	case *Law:
