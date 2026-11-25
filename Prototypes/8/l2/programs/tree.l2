@@ -2,7 +2,9 @@ A tree is a leaf, or a node with a pair of subtrees. The check on the input is d
 ---
 
 ---
-type Tree = Leaf | Node ⟨Tree Tree⟩
+type Tree =
+	| Leaf
+	| Node ⟨Tree Tree⟩
 fn t
 	match t
 		Leaf -> 0
