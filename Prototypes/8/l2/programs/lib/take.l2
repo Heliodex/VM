@@ -9,9 +9,9 @@ fn p
 		elseif (= (@ l) 1)
 			(Ok ~)
 		else
-			let h = ((head l)?)
-			let r = ((tail l)?)
-			let rest = ((t (- n 1) r)?)
+			let h = (head l)?
+			let r = (tail l)?
+			let rest = (t (- n 1) r)?
 			(Ok (cons h rest))
 	(t (fst p) (snd p))
 ---
