@@ -37,13 +37,77 @@ let isDigit = fn c
 let isSpace = fn c
 	(if (= c 32) 1 (if (= c 9) 1 (if (= c 13) 1 (= c 10))))
 let isSingle = fn c
-	(if (= c 40) 1 (if (= c 41) 1 (if (= c 91) 1 (if (= c 93) 1 (if (= c 123) 1 (if (= c 125) 1 (if (= c 58) 1 (if (= c 44) 1 (if (= c 10216) 1 (if (= c 10217) 1 (= c 63)))))))))))
+	if (= c 40)
+		1
+	elseif (= c 41)
+		1
+	elseif (= c 91)
+		1
+	elseif (= c 93)
+		1
+	elseif (= c 123)
+		1
+	elseif (= c 125)
+		1
+	elseif (= c 58)
+		1
+	elseif (= c 44)
+		1
+	elseif (= c 10216)
+		1
+	elseif (= c 10217)
+		1
+	else
+		(= c 63)
 let isDelim = fn c
-	(if (= c -1) 1 (if (isSpace c) 1 (if (isSingle c) 1 (if (= c 34) 1 (if (= c 59) 1 (= c 46))))))
+	if (= c -1)
+		1
+	elseif (isSpace c)
+		1
+	elseif (isSingle c)
+		1
+	elseif (= c 34)
+		1
+	elseif (= c 59)
+		1
+	else
+		(= c 46)
 let kindOf = fn c
-	(if (= c 40) LParen (if (= c 41) RParen (if (= c 91) LBrack (if (= c 93) RBrack (if (= c 123) LBrace (if (= c 125) RBrace (if (= c 58) Colon (if (= c 44) Comma (if (= c 10216) LAngle (if (= c 10217) RAngle Question))))))))))
+	if (= c 40)
+		LParen
+	elseif (= c 41)
+		RParen
+	elseif (= c 91)
+		LBrack
+	elseif (= c 93)
+		RBrack
+	elseif (= c 123)
+		LBrace
+	elseif (= c 125)
+		RBrace
+	elseif (= c 58)
+		Colon
+	elseif (= c 44)
+		Comma
+	elseif (= c 10216)
+		LAngle
+	elseif (= c 10217)
+		RAngle
+	else
+		Question
 let escapeOf = fn e
-	(if (= e 34) 34 (if (= e 92) 92 (if (= e 110) 10 (if (= e 116) 9 (if (= e 48) 0 -2)))))
+	if (= e 34)
+		34
+	elseif (= e 92)
+		92
+	elseif (= e 110)
+		10
+	elseif (= e 116)
+		9
+	elseif (= e 48)
+		0
+	else
+		-2
 let digitsOf = fn ws
 	(if (= (first ws) 45) (after ws) ws)
 letrec allDigits = fn l
@@ -53,44 +117,50 @@ letrec accum = fn (l acc)
 		(Ok acc)
 	else
 		let d = (- (first l) 48)
-		let lim = ((/ (- 9007199254740991 d) 10)?)
+		let lim = (/ (- 9007199254740991 d) 10)?
 		(if (< lim acc) (Err ~) (accum (after l) (+ (* acc 10) d)))
 letrec showInt = fn n
 	if (< n 10)
 		(Ok (cons (+ 48 n) ~))
 	else
-		let q = ((/ n 10)?)
-		let r = ((% n 10)?)
-		let s = ((showInt q)?)
+		let q = (/ n 10)?
+		let r = (% n 10)?
+		let s = (showInt q)?
 		(append ⟨s (cons (+ 48 r) ~)⟩)
 let lineCol = fn (ln cl)
-	let a = ((showInt ln)?)
-	let b = ((showInt cl)?)
-	let c1 = ((append ⟨"line " a⟩)?)
-	let c2 = ((append ⟨c1 ", column "⟩)?)
-	let c3 = ((append ⟨c2 b⟩)?)
+	let a = (showInt ln)?
+	let b = (showInt cl)?
+	let c1 = (append ⟨"line " a⟩)?
+	let c2 = (append ⟨c1 ", column "⟩)?
+	let c3 = (append ⟨c2 b⟩)?
 	(append ⟨c3 ": "⟩)
 let failAt = fn (ln cl msg)
-	let pre = ((lineCol ln cl)?)
-	let full = ((append ⟨pre msg⟩)?)
+	let pre = (lineCol ln cl)?
+	let full = (append ⟨pre msg⟩)?
 	(Err full)
 letrec scanWord = fn (r bs n)
-	(if (isDelim (first r)) ⟨bs r n⟩ (if (if (= (first r) 45) (if (= (second r) 62) (< 0 n) 0) 0) ⟨bs r n⟩ (scanWord (after r) (cons (first r) bs) (+ n 1))))
+	if (isDelim (first r))
+		⟨bs ⟨r n⟩⟩
+	elseif (if (= (first r) 45) (if (= (second r) 62) (< 0 n) 0) 0)
+		⟨bs ⟨r n⟩⟩
+	else
+		(scanWord (after r) (cons (first r) bs) (+ n 1))
 letrec scanStr = fn (r n ln c0 bs)
 	if (= (@ r) 1)
 		(failAt ln c0 "a string is never closed")
 	else
 		let c = (first r)
 		if (= c 34)
-			let bytes = ((reverse bs)?)
-			(Ok ⟨bytes (after r) (+ n 1)⟩)
+			let bytes = (reverse bs)?
+			(Ok ⟨bytes ⟨(after r) (+ n 1)⟩⟩)
 		elseif (= c 10)
 			(failAt ln (+ c0 n) "a string cannot run over a line")
 		elseif (= c 92)
 			let e = (second r)
 			let v = (escapeOf e)
 			if (= v -2)
-				let msg = ((append ⟨"unknown escape \\" (if (= e -1) ~ (cons e ~))⟩)?)
+				let msg =
+					(append ⟨"unknown escape \\" (if (= e -1) ~ (cons e ~))⟩)?
 				(failAt ln (+ c0 n) msg)
 			else
 				(scanStr (after (after r)) (+ n 2) ln c0 (cons v bs))
@@ -99,44 +169,108 @@ letrec scanStr = fn (r n ln c0 bs)
 fn src
 	letrec go = fn (r p ln cl sp acc cm)
 		if (= (@ r) 1)
-			(reverse (cons ⟨Eof ln cl sp⟩ acc))
+			(reverse (cons ⟨Eof ⟨ln ⟨cl sp⟩⟩⟩ acc))
 		else
 			let c = (first r)
 			if (= cm 1)
-				(if (= c 10) (go r p ln cl sp acc 0) (go (after r) c ln (+ cl 1) sp acc 1))
+				if (= c 10)
+					(go r p ln cl sp acc 0)
+				else
+					(go (after r) c ln (+ cl 1) sp acc 1)
 			elseif (isSpace c)
-				(if (= c 10) (go (after r) 10 (+ ln 1) 1 1 (cons ⟨Newline ln cl sp⟩ acc) 0) (go (after r) c ln (+ cl 1) 1 acc 0))
+				if (= c 10)
+					go
+						(after r)
+						10
+						(+ ln 1)
+						1
+						1
+						(cons ⟨Newline ⟨ln ⟨cl sp⟩⟩⟩ acc)
+						0
+				else
+					(go (after r) c ln (+ cl 1) 1 acc 0)
 			elseif (= c 59)
 				(go (after r) 59 ln (+ cl 1) sp acc 1)
 			elseif (isSingle c)
-				(go (after r) c ln (+ cl 1) 0 (cons ⟨(kindOf c) ln cl sp⟩ acc) 0)
+				go
+					(after r)
+					c
+					ln
+					(+ cl 1)
+					0
+					(cons ⟨(kindOf c) ⟨ln ⟨cl sp⟩⟩⟩ acc)
+					0
 			elseif (= c 46)
-				(if (if (= sp 0) (= (isDelim p) 0) 0) (failAt ln cl "a dot stands alone: put a space before it") (if (= (isDelim (second r)) 0) (failAt ln cl "a dot stands alone: put a space after it") (go (after r) 46 ln (+ cl 1) 0 (cons ⟨Dot ln cl sp⟩ acc) 0)))
+				if (if (= sp 0) (= (isDelim p) 0) 0)
+					(failAt ln cl "a dot stands alone: put a space before it")
+				elseif (= (isDelim (second r)) 0)
+					(failAt ln cl "a dot stands alone: put a space after it")
+				else
+					go
+						(after r)
+						46
+						ln
+						(+ cl 1)
+						0
+						(cons ⟨Dot ⟨ln ⟨cl sp⟩⟩⟩ acc)
+						0
 			elseif (= c 34)
 				match (scanStr (after r) 1 ln cl ~)
-					Ok res -> (go (fst (snd res)) 34 ln (+ cl (snd (snd res))) 0 (cons ⟨(Str (fst res)) ln cl sp⟩ acc) 0)
+					Ok res ->
+						go
+							(fst (snd res))
+							34
+							ln
+							(+ cl (snd (snd res)))
+							0
+							(cons ⟨(Str (fst res)) ⟨ln ⟨cl sp⟩⟩⟩ acc)
+							0
 					Err e -> (Err e)
 			elseif (if (= c 45) (= (second r) 62) 0)
-				(go (after (after r)) 62 ln (+ cl 2) 0 (cons ⟨Arrow ln cl sp⟩ acc) 0)
+				go
+					(after (after r))
+					62
+					ln
+					(+ cl 2)
+					0
+					(cons ⟨Arrow ⟨ln ⟨cl sp⟩⟩⟩ acc)
+					0
 			else
 				let res = (scanWord r ~ 0)
 				let lastc = (first (fst res))
-				let ws = ((reverse (fst res))?)
+				let ws = (reverse (fst res))?
 				let rest2 = (fst (snd res))
 				let n = (snd (snd res))
 				if (if (isDigit (first ws)) 1 (if (= (first ws) 45) (isDigit (second ws)) 0))
 					if (= (allDigits (digitsOf ws)) 0)
-						let msg = ((append ⟨ws " is not a whole integer"⟩)?)
+						let msg = (append ⟨ws " is not a whole integer"⟩)?
 						(failAt ln cl msg)
 					else
 						match (accum (digitsOf ws) 0)
-							Ok m -> (go rest2 lastc ln (+ cl n) 0 (cons ⟨(Num (if (= (first ws) 45) (- 0 m) m)) ln cl sp⟩ acc) 0)
+							Ok m ->
+								go
+									rest2
+									lastc
+									ln
+									(+ cl n)
+									0
+									cons
+										⟨(Num (if (= (first ws) 45) (- 0 m) m)) ⟨ln ⟨cl sp⟩⟩⟩
+										acc
+									0
 							Err e ->
-								let a = ((append ⟨"integer " ws⟩)?)
-								let b = ((append ⟨a " is out of range"⟩)?)
+								let a = (append ⟨"integer " ws⟩)?
+								let b = (append ⟨a " is out of range"⟩)?
 								(failAt ln cl b)
 				else
-					(go rest2 lastc ln (+ cl n) 0 (cons ⟨(Sym ws) ln cl sp⟩ acc) 0)
+					go
+						rest2
+						lastc
+						ln
+						(+ cl n)
+						0
+						(cons ⟨(Sym ws) ⟨ln ⟨cl sp⟩⟩⟩ acc)
+						0
 	(go src -1 1 1 1 ~ 0)
 ---
 ~ => Ok [⟨Eof 1 1 1⟩] fuel 100000
