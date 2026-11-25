@@ -5,5 +5,5 @@ append = lib/append.l2
 fn p
 	(fst p)
 ---
-(1 . 2) => 1 fuel 10000
-5 => Err "expected (?1 . ?2)" fuel 10000
+⟨1 2⟩ => 1 fuel 10000
+5 => Err "expected ⟨?1 ?2⟩" fuel 10000

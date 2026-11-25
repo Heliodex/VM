@@ -5,5 +5,5 @@ append = lib/append.l2
 fn p
 	(append p)
 ---
-([1 2] . [3]) => Ok [1 2 3] fuel 100000
-(~ . [7]) => Ok [7] fuel 100000
+⟨[1 2] [3]⟩ => Ok [1 2 3] fuel 100000
+⟨~ [7]⟩ => Ok [7] fuel 100000
