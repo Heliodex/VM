@@ -7,8 +7,9 @@ type MS = MS
 	fixed: Int
 	catch: Int
 fn m
-	let n = with m
-		fixed = 10
+	let n =
+		with m
+			fixed = 10
 	(+ (fixed n) (catch m))
 ---
 MS {
