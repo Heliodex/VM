@@ -9,9 +9,9 @@ fn p
 		if (= (@ l) 1)
 			(Ok ys)
 		else
-			let h = ((head l)?)
-			let t = ((tail l)?)
-			let r = ((app t)?)
+			let h = ((head l))?
+			let t = ((tail l))?
+			let r = ((app t))?
 			(Ok (cons h r))
 	(app xs)
 ---
