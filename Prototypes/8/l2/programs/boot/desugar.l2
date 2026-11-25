@@ -2,37 +2,37 @@ The L2 desugarer, written in L2: the stage that turns the parser's tree into the
 ---
 ---
 type Expr =
-	| EInt ⟨Int Int Int⟩
-	| EStr ⟨[Int] Int Int⟩
+	| EInt ⟨Int ⟨Int Int⟩⟩
+	| EStr ⟨[Int] ⟨Int Int⟩⟩
 	| ENil ⟨Int Int⟩
-	| EName ⟨[Int] Int Int⟩
-	| EList ⟨[Expr] Int Int⟩
-	| EPair ⟨Expr Expr Int Int⟩
-	| EApp ⟨Expr [Expr] Int Int⟩
-	| EFn ⟨[[Int]] Expr Int Int⟩
-	| ELet ⟨[Int] Expr Expr Int Int Int⟩
-	| EMutual ⟨[⟨[Int] Expr Int Int⟩] Expr Int Int⟩
-	| EIf ⟨Expr Expr Expr Int Int⟩
-	| EMatch ⟨Expr [⟨Pat Expr Int Int⟩] Int Int⟩
-	| ETry ⟨Expr Int Int⟩
-	| ECheck ⟨Expr Int Int⟩
-	| EUntyped ⟨Expr Int Int⟩
-	| ERec ⟨[Int] [⟨[Int] Expr Int Int⟩] Int Int⟩
-	| EWith ⟨Expr [⟨[Int] Expr Int Int⟩] Int Int⟩
-	| ERawFix ⟨Expr Int Int⟩
+	| EName ⟨[Int] ⟨Int Int⟩⟩
+	| EList ⟨[Expr] ⟨Int Int⟩⟩
+	| EPair ⟨Expr ⟨Expr ⟨Int Int⟩⟩⟩
+	| EApp ⟨Expr ⟨[Expr] ⟨Int Int⟩⟩⟩
+	| EFn ⟨[[Int]] ⟨Expr ⟨Int Int⟩⟩⟩
+	| ELet ⟨[Int] ⟨Expr ⟨Expr ⟨Int ⟨Int Int⟩⟩⟩⟩⟩
+	| EMutual ⟨[⟨[Int] ⟨Expr ⟨Int Int⟩⟩⟩] ⟨Expr ⟨Int Int⟩⟩⟩
+	| EIf ⟨Expr ⟨Expr ⟨Expr ⟨Int Int⟩⟩⟩⟩
+	| EMatch ⟨Expr ⟨[⟨Pat ⟨Expr ⟨Int Int⟩⟩⟩] ⟨Int Int⟩⟩⟩
+	| ETry ⟨Expr ⟨Int Int⟩⟩
+	| ECheck ⟨Expr ⟨Int Int⟩⟩
+	| EUntyped ⟨Expr ⟨Int Int⟩⟩
+	| ERec ⟨[Int] ⟨[⟨[Int] ⟨Expr ⟨Int Int⟩⟩⟩] ⟨Int Int⟩⟩⟩
+	| EWith ⟨Expr ⟨[⟨[Int] ⟨Expr ⟨Int Int⟩⟩⟩] ⟨Int Int⟩⟩⟩
+	| ERawFix ⟨Expr ⟨Int Int⟩⟩
 type Pat =
-	| PCon ⟨[Int] [Int] Int Int⟩
-	| PBind ⟨[Int] Int Int⟩
+	| PCon ⟨[Int] ⟨[Int] ⟨Int Int⟩⟩⟩
+	| PBind ⟨[Int] ⟨Int Int⟩⟩
 	| PWild ⟨Int Int⟩
-	| PRec ⟨[Int] [⟨[Int] [Int] Int Int⟩] Int Int⟩
+	| PRec ⟨[Int] ⟨[⟨[Int] ⟨[Int] ⟨Int Int⟩⟩⟩] ⟨Int Int⟩⟩⟩
 type Ty =
-	| TName ⟨[Int] Int Int⟩
-	| TApp ⟨[Int] [Ty] Int Int⟩
-	| TPair ⟨Ty Ty Int Int⟩
-	| TList ⟨Ty Int Int⟩
-	| TFun ⟨Ty Ty Int Int⟩
+	| TName ⟨[Int] ⟨Int Int⟩⟩
+	| TApp ⟨[Int] ⟨[Ty] ⟨Int Int⟩⟩⟩
+	| TPair ⟨Ty ⟨Ty ⟨Int Int⟩⟩⟩
+	| TList ⟨Ty ⟨Int Int⟩⟩
+	| TFun ⟨Ty ⟨Ty ⟨Int Int⟩⟩⟩
 	| NoType
-	| TRec [⟨[Int] Ty Int Int⟩]
+	| TRec [⟨[Int] ⟨Ty ⟨Int Int⟩⟩⟩]
 type Code =
 	| QInt Int
 	| QNil
@@ -41,19 +41,19 @@ type Code =
 	| CApp ⟨Code Code⟩
 	| CCell ⟨Code Code⟩
 	| CIndex ⟨Int Code⟩
-	| CIf ⟨Code Code Code⟩
+	| CIf ⟨Code ⟨Code Code⟩⟩
 	| CPin Code
 	| CForce Code
 	| CConstruct ⟨Int Code⟩
 	| CTagof Code
 	| CPayload Code
 	| CPrim1 ⟨Int Code⟩
-	| CPrim2 ⟨Int Code Code⟩
+	| CPrim2 ⟨Int ⟨Code Code⟩⟩
 type Ctor =
 	| CNone
 	| CPlain ⟨Int Int⟩
 	| CRecord ⟨[[Int]] Int⟩
-	| CAccess ⟨Int Int [Int]⟩
+	| CAccess ⟨Int ⟨Int [Int]⟩⟩
 type InputCheck =
 	| NoInputCheck
 	| HasInputCheck ⟨Test [Int]⟩
@@ -68,7 +68,6 @@ type Test =
 	| KSum [⟨Int Test⟩]
 	| KRec [Int]
 	| KFixdef ⟨[Int] Test⟩
-; Lists are taken apart with head and tail, which give a Result. hd gives the head, or the default on nil. tl gives the tail, or nil. A list is not a pair to the checker, so fst and snd are for pairs only.
 let hd = fn (l d)
 	match (head l)
 		Ok c -> c
@@ -77,7 +76,6 @@ let tl = fn l
 	match (tail l)
 		Ok t -> t
 		Err e -> ~
-; The last element of a list, taken with the default when the list is empty, is not needed: revL reverses any list, and its nil case is the Err of head.
 letrec revL = fn (l acc)
 	match (head l)
 		Ok c -> (revL (tl l) (cons c acc))
@@ -85,7 +83,14 @@ letrec revL = fn (l acc)
 letrec cat = fn (a b)
 	(if (= (@ a) 1) b (cons (hd a 0) (cat (tl a) b)))
 letrec same = fn (a b)
-	(if (= (@ a) 1) (= (@ b) 1) (if (= (@ b) 1) 0 (if (= (hd a 0) (hd b 0)) (same (tl a) (tl b)) 0)))
+	if (= (@ a) 1)
+		(= (@ b) 1)
+	elseif (= (@ b) 1)
+		0
+	elseif (= (hd a 0) (hd b 0))
+		(same (tl a) (tl b))
+	else
+		0
 letrec countL = fn l
 	(if (= (@ l) 1) 0 (+ 1 (countL (tl l))))
 letrec buildCells = fn codes
@@ -97,7 +102,12 @@ letrec wrapLams = fn (n b)
 letrec pushNames = fn (scope names)
 	(if (= (@ names) 1) scope (pushNames (cons (hd names ~) scope) (tl names)))
 letrec indexFrom = fn (scope name i)
-	(if (= (@ scope) 1) (-1) (if (same (hd scope ~) name) i (indexFrom (tl scope) name (+ i 1))))
+	if (= (@ scope) 1)
+		-1
+	elseif (same (hd scope ~) name)
+		i
+	else
+		(indexFrom (tl scope) name (+ i 1))
 let indexIn = fn (scope name)
 	(indexFrom scope name 0)
 letrec inList = fn (names s)
@@ -106,19 +116,25 @@ letrec showInt = fn n
 	if (< n 10)
 		(Ok (cons (+ 48 n) ~))
 	else
-		let q = ((/ n 10)?)
-		let r = ((% n 10)?)
-		let s = ((showInt q)?)
+		let q = (/ n 10)?
+		let r = (% n 10)?
+		let s = (showInt q)?
 		(Ok (cat s (cons (+ 48 r) ~)))
 let errAt = fn (at msg)
-	let l = ((showInt (fst at))?)
-	let c = ((showInt (snd at))?)
+	let l = (showInt (fst at))?
+	let c = (showInt (snd at))?
 	(Err (cat "line " (cat l (cat ", column " (cat c (cat ": " msg))))))
 let sameAt = fn (a b)
 	(if (= (fst a) (fst b)) (= (snd a) (snd b)) 0)
-let primTable = [⟨"+" 11⟩ ⟨"-" 12⟩ ⟨"*" 13⟩ ⟨"/" 14⟩ ⟨"%" 15⟩ ⟨"<" 16⟩ ⟨"=" 17⟩ ⟨"@" 18⟩]
+let primTable =
+	[⟨"+" 11⟩ ⟨"-" 12⟩ ⟨"*" 13⟩ ⟨"/" 14⟩ ⟨"%" 15⟩ ⟨"<" 16⟩ ⟨"=" 17⟩ ⟨"@" 18⟩]
 letrec primIn = fn (tbl s)
-	(if (= (@ tbl) 1) (-1) (if (same (fst (hd tbl ⟨~ 0⟩)) s) (snd (hd tbl ⟨~ 0⟩)) (primIn (tl tbl) s)))
+	if (= (@ tbl) 1)
+		-1
+	elseif (same (fst (hd tbl ⟨~ 0⟩)) s)
+		(snd (hd tbl ⟨~ 0⟩))
+	else
+		(primIn (tl tbl) s)
 let primOf = fn s
 	(primIn primTable s)
 let primArity = fn p
@@ -131,13 +147,13 @@ let isCap = fn name
 let blankName = fn name
 	(if (same name "_") 1 (same name "~"))
 let dummyE = (ENil ⟨0 0⟩)
-let dummyArm = ⟨(PWild ⟨0 0⟩) dummyE 0 0⟩
-let dummyBinding = ⟨~ dummyE 0 0⟩
-let dummyHoist = ⟨~ dummyE 0 0⟩
-let dummyField = ⟨~ NoType 0 0⟩
-let dummyCon = ⟨~ NoType 0 0⟩
-let dummyDecl = ⟨~ ~ ~ 0 0⟩
-let dummyTest = ⟨⟨0 0⟩ ~ KAny⟩
+let dummyArm = ⟨(PWild ⟨0 0⟩) ⟨dummyE ⟨0 0⟩⟩⟩
+let dummyBinding = ⟨~ ⟨dummyE ⟨0 0⟩⟩⟩
+let dummyHoist = ⟨~ ⟨dummyE ⟨0 0⟩⟩⟩
+let dummyField = ⟨~ ⟨NoType ⟨0 0⟩⟩⟩
+let dummyCon = ⟨~ ⟨NoType ⟨0 0⟩⟩⟩
+let dummyDecl = ⟨~ ⟨~ ⟨~ ⟨0 0⟩⟩⟩⟩
+let dummyTest = ⟨⟨0 0⟩ ⟨~ KAny⟩⟩
 let dummyBound = ⟨~ 0⟩
 let atOf = fn e
 	match e
@@ -168,20 +184,36 @@ let atOfArm = fn arm
 let primErr = fn (name at)
 	(errAt at (cat name " is a primitive, and cannot be bound"))
 let checkBinder3 = fn (name at)
-	(if (< (primOf name) 0) (if (= (isUnary name) 1) (primErr name at) (Ok ~)) (primErr name at))
+	if (< (primOf name) 0)
+		(if (= (isUnary name) 1) (primErr name at) (Ok ~))
+	else
+		(primErr name at)
 let checkBinder2 = fn (name at)
-	(if (= (blankName name) 1) (errAt at (cat name " cannot be bound")) (checkBinder3 name at))
+	if (= (blankName name) 1)
+		(errAt at (cat name " cannot be bound"))
+	else
+		(checkBinder3 name at)
 let checkBinder = fn (name at)
-	(if (= (isCap name) 1) (errAt at (cat name " is a constructor, and cannot be bound")) (checkBinder2 name at))
+	if (= (isCap name) 1)
+		(errAt at (cat name " is a constructor, and cannot be bound"))
+	else
+		(checkBinder2 name at)
 letrec checkNames = fn (names seen at)
 	if (= (@ names) 1)
 		(Ok ~)
 	else
-		let u = ((checkBinder (hd names ~) at)?)
-		(if (= (inList seen (hd names ~)) 1) (errAt at (cat (hd names ~) " is named twice in the parameters")) (checkNames (tl names) (cons (hd names ~) seen) at))
-; SUMS AND RECORDS: the constructors of the program, as a table from name to what the name is.
+		let u = (checkBinder (hd names ~) at)?
+		if (= (inList seen (hd names ~)) 1)
+			(errAt at (cat (hd names ~) " is named twice in the parameters"))
+		else
+			(checkNames (tl names) (cons (hd names ~) seen) at)
 letrec lookupCtorFrom = fn (tbl name)
-	(if (= (@ tbl) 1) CNone (if (same (fst (hd tbl ⟨~ CNone⟩)) name) (snd (hd tbl ⟨~ CNone⟩)) (lookupCtorFrom (tl tbl) name)))
+	if (= (@ tbl) 1)
+		CNone
+	elseif (same (fst (hd tbl ⟨~ CNone⟩)) name)
+		(snd (hd tbl ⟨~ CNone⟩))
+	else
+		(lookupCtorFrom (tl tbl) name)
 let builtinCtors = [⟨"Ok" (CPlain ⟨0 1⟩)⟩ ⟨"Err" (CPlain ⟨1 1⟩)⟩]
 let isNone = fn c
 	match c
@@ -207,7 +239,12 @@ letrec addFields = fn (fs idx count con tbl)
 	else
 		let f = (hd fs dummyField)
 		if (= (isNone (lookupCtorFrom tbl (fst f))) 1)
-			(addFields (tl fs) (+ idx 1) count con (cons ⟨(fst f) (CAccess ⟨idx count con⟩)⟩ tbl))
+			addFields
+				(tl fs)
+				(+ idx 1)
+				count
+				con
+				(cons ⟨(fst f) (CAccess ⟨idx ⟨count con⟩⟩)⟩ tbl)
 		else
 			(errAt (snd (snd f)) (cat (fst f) " is already declared"))
 letrec buildCons = fn (cs k tbl)
@@ -218,11 +255,17 @@ letrec buildCons = fn (cs k tbl)
 		if (= (isNone (lookupCtorFrom tbl (fst con))) 1)
 			if (= (isRecTy (fst (snd con))) 1)
 				let fs = (recFieldsOf (fst (snd con)))
-				let tbl2 = (cons ⟨(fst con) (CRecord ⟨(fieldNamesOf fs) k⟩)⟩ tbl)
-				let tbl3 = ((addFields fs 1 (countL fs) (fst con) tbl2)?)
+				let tbl2 =
+					(cons ⟨(fst con) (CRecord ⟨(fieldNamesOf fs) k⟩)⟩ tbl)
+				let tbl3 = (addFields fs 1 (countL fs) (fst con) tbl2)?
 				(buildCons (tl cs) (+ k 1) tbl3)
 			else
-				(buildCons (tl cs) (+ k 1) (cons ⟨(fst con) (CPlain ⟨k (- 1 (isNoType (fst (snd con))))⟩)⟩ tbl))
+				buildCons
+					(tl cs)
+					(+ k 1)
+					cons
+						⟨(fst con) (CPlain ⟨k (- 1 (isNoType (fst (snd con))))⟩)⟩
+						tbl
 		else
 			(errAt (snd (snd con)) (cat (fst con) " is already declared"))
 letrec buildDecls = fn (ds tbl)
@@ -230,7 +273,7 @@ letrec buildDecls = fn (ds tbl)
 		(Ok tbl)
 	else
 		let d = (hd ds dummyDecl)
-		let tbl2 = ((buildCons (fst (snd (snd d))) 0 tbl)?)
+		let tbl2 = (buildCons (fst (snd (snd d))) 0 tbl)?
 		(buildDecls (tl ds) tbl2)
 let buildCtors = fn ds
 	(buildDecls ds builtinCtors)
@@ -247,18 +290,26 @@ let appKind4 = fn (name n tbl)
 		CPlain p -> (if (= (snd p) 1) (if (< n 1) 0 4) 6)
 		_ -> 0
 let appKind3 = fn (name n tbl)
-	(if (< (primOf name) 0) (appKind4 name n tbl) (if (< n (primArity (primOf name))) 0 3))
+	if (< (primOf name) 0)
+		(appKind4 name n tbl)
+	elseif (< n (primArity (primOf name)))
+		0
+	else
+		3
 let appKind2 = fn (name n tbl)
 	(if (= (isUnary name) 1) (if (< n 1) 0 2) (appKind3 name n tbl))
 let appKind = fn (name n tbl)
 	(if (same name "cons") (if (< n 2) 0 1) (appKind2 name n tbl))
-; The fixed point that the host's M.fix is, as a Code value.
-let fixInner = (CLam (CApp ⟨(CVar 1) (CLam (CApp ⟨(CApp ⟨(CVar 1) (CVar 1)⟩) (CVar 0)⟩))⟩))
+let fixInner =
+	(CLam (CApp ⟨(CVar 1) (CLam (CApp ⟨(CApp ⟨(CVar 1) (CVar 1)⟩) (CVar 0)⟩))⟩))
 let fixCode = (CLam (CApp ⟨fixInner fixInner⟩))
-; RUN-TIME CHECKS: the predicate of a test, as the host compiles it, over the value at base and a path of steps (0 head, 1 tail, 2 payload).
 let stepIndex = fn (side e)
 	match e
-		CIndex p -> (if (< (fst p) 1125899906842624) (CIndex ⟨(+ (* 2 (fst p)) side) (snd p)⟩) (CIndex ⟨(+ 2 side) e⟩))
+		CIndex p ->
+			if (< (fst p) 1125899906842624)
+				(CIndex ⟨(+ (* 2 (fst p)) side) (snd p)⟩)
+			else
+				(CIndex ⟨(+ 2 side) e⟩)
 		_ -> (CIndex ⟨(+ 2 side) e⟩)
 let stepOp = fn (op e)
 	(if (= op 0) (stepIndex 0 e) (if (= op 1) (stepIndex 1 e) (CPayload e)))
@@ -269,7 +320,7 @@ let appendOp = fn (path op)
 let valueOf = fn (base path scope)
 	(applyPath (CVar (indexIn scope base)) path)
 let kindIs = fn (base path scope k)
-	(CPrim2 ⟨17 (CPrim1 ⟨18 (valueOf base path scope)⟩) (QInt k)⟩)
+	(CPrim2 ⟨17 ⟨(CPrim1 ⟨18 (valueOf base path scope)⟩) (QInt k)⟩⟩)
 letrec revC = fn (l acc)
 	match (head l)
 		Ok c -> (revC (tl l) (cons c acc))
@@ -279,9 +330,10 @@ letrec sumFold = fn (cs base path scope chain pred)
 		chain
 	else
 		let c = (hd cs ⟨0 KAny⟩)
-		let tagIs = (CPrim2 ⟨17 (CTagof (valueOf base path scope)) (QInt (fst c))⟩)
+		let tagIs =
+			(CPrim2 ⟨17 ⟨(CTagof (valueOf base path scope)) (QInt (fst c))⟩⟩)
 		let pay = (pred (snd c) base (appendOp path 2) scope)
-		(sumFold (tl cs) base path scope (CIf ⟨tagIs pay chain⟩) pred)
+		(sumFold (tl cs) base path scope (CIf ⟨tagIs ⟨pay chain⟩⟩) pred)
 letrec compilePred = fn (test base path scope)
 	match test
 		KAny -> (QInt 1)
@@ -289,30 +341,49 @@ letrec compilePred = fn (test base path scope)
 		KInt -> (kindIs base path scope 0)
 		KFn -> (kindIs base path scope 3)
 		KPin -> (kindIs base path scope 4)
-		KPair p -> (CIf ⟨(kindIs base path scope 2) (CIf ⟨(compilePred (fst p) base (appendOp path 0) scope) (compilePred (snd p) base (appendOp path 1) scope) (QInt 0)⟩) (QInt 0)⟩)
-		KList p -> (CIf ⟨(kindIs base path scope 1) (QInt 1) (CIf ⟨(kindIs base path scope 2) (CIf ⟨(compilePred (fst p) base (appendOp path 0) scope) (compilePred (snd p) base (appendOp path 1) scope) (QInt 0)⟩) (QInt 0)⟩)⟩)
-		KSum cs -> (CIf ⟨(kindIs base path scope 5) (sumFold (revC cs ~) base path scope (QInt 0) compilePred) (QInt 0)⟩)
-		KRec key -> (CApp ⟨(CVar (indexIn scope (cat "self:" key))) (valueOf base path scope)⟩)
-		KFixdef p -> (CApp ⟨(CApp ⟨fixCode (CLam (CLam (compilePred (snd p) "x" ~ (cons "x" (cons (cat "self:" (fst p)) scope)))))⟩) (valueOf base path scope)⟩)
-; Pairs of a record, and a field of one, in the host's order.
+		KPair p ->
+			CIf
+				⟨(kindIs base path scope 2) ⟨(CIf ⟨(compilePred (fst p) base (appendOp path 0) scope) ⟨(compilePred (snd p) base (appendOp path 1) scope) (QInt 0)⟩⟩) (QInt 0)⟩⟩
+		KList p ->
+			CIf
+				⟨(kindIs base path scope 1) ⟨(QInt 1) (CIf ⟨(kindIs base path scope 2) ⟨(CIf ⟨(compilePred (fst p) base (appendOp path 0) scope) ⟨(compilePred (snd p) base (appendOp path 1) scope) (QInt 0)⟩⟩) (QInt 0)⟩⟩)⟩⟩
+		KSum cs ->
+			CIf
+				⟨(kindIs base path scope 5) ⟨(sumFold (revC cs ~) base path scope (QInt 0) compilePred) (QInt 0)⟩⟩
+		KRec key ->
+			CApp
+				⟨(CVar (indexIn scope (cat "self:" key))) (valueOf base path scope)⟩
+		KFixdef p ->
+			CApp
+				⟨(CApp ⟨fixCode (CLam (CLam (compilePred (snd p) "x" ~ (cons "x" (cons (cat "self:" (fst p)) scope)))))⟩) (valueOf base path scope)⟩
 letrec tailN = fn (e n)
 	(if (< n 1) e (tailN (stepIndex 1 e) (- n 1)))
 let pathOf = fn (e index count)
 	let x = (tailN e (- index 1))
 	(if (< index count) (stepIndex 0 x) x)
 letrec pairsOf = fn codes
-	(if (= (@ (tl codes)) 1) (hd codes QNil) (CCell ⟨(hd codes QNil) (pairsOf (tl codes))⟩))
+	if (= (@ (tl codes)) 1)
+		(hd codes QNil)
+	else
+		(CCell ⟨(hd codes QNil) (pairsOf (tl codes))⟩)
 letrec posIn = fn (names n i)
-	(if (= (@ names) 1) (-1) (if (same (hd names ~) n) i (posIn (tl names) n (+ i 1))))
-; The checked forms of the operations that can fail.
+	if (= (@ names) 1)
+		-1
+	elseif (same (hd names ~) n)
+		i
+	else
+		(posIn (tl names) n (+ i 1))
 let divBody = fn (tag reason)
-	(CIf ⟨(CPrim2 ⟨17 (CVar 0) (QInt 0)⟩) (CConstruct ⟨1 (textCode reason)⟩) (CConstruct ⟨0 (CPrim2 ⟨tag (CVar 1) (CVar 0)⟩)⟩)⟩)
+	CIf
+		⟨(CPrim2 ⟨17 ⟨(CVar 0) (QInt 0)⟩⟩) ⟨(CConstruct ⟨1 (textCode reason)⟩) (CConstruct ⟨0 (CPrim2 ⟨tag ⟨(CVar 1) (CVar 0)⟩⟩)⟩)⟩⟩
 let divCheck = fn (tag x y reason)
 	(CApp ⟨(CApp ⟨(CLam (CLam (divBody tag reason))) x⟩) y⟩)
 let headCheck = fn x
-	(CApp ⟨(CLam (CIf ⟨(CPrim2 ⟨17 (CPrim1 ⟨18 (CVar 0)⟩) (QInt 2)⟩) (CConstruct ⟨0 (stepIndex 0 (CVar 0))⟩) (CConstruct ⟨1 (textCode "head of an empty list")⟩)⟩)) x⟩)
+	CApp
+		⟨(CLam (CIf ⟨(CPrim2 ⟨17 ⟨(CPrim1 ⟨18 (CVar 0)⟩) (QInt 2)⟩⟩) ⟨(CConstruct ⟨0 (stepIndex 0 (CVar 0))⟩) (CConstruct ⟨1 (textCode "head of an empty list")⟩)⟩⟩)) x⟩
 let tailCheck = fn x
-	(CApp ⟨(CLam (CIf ⟨(CPrim2 ⟨17 (CPrim1 ⟨18 (CVar 0)⟩) (QInt 2)⟩) (CConstruct ⟨0 (stepIndex 1 (CVar 0))⟩) (CConstruct ⟨1 (textCode "tail of an empty list")⟩)⟩)) x⟩)
+	CApp
+		⟨(CLam (CIf ⟨(CPrim2 ⟨17 ⟨(CPrim1 ⟨18 (CVar 0)⟩) (QInt 2)⟩⟩) ⟨(CConstruct ⟨0 (stepIndex 1 (CVar 0))⟩) (CConstruct ⟨1 (textCode "tail of an empty list")⟩)⟩⟩)) x⟩
 let unaryOf6 = fn (name e)
 	(if (same name "force") (CForce e) (CApp ⟨fixCode e⟩))
 let unaryOf5 = fn (name e)
@@ -326,24 +397,41 @@ let unaryOf2 = fn (name e)
 let unaryOf = fn (name e)
 	(if (same name "head") (headCheck e) (unaryOf2 name e))
 let plainValue = fn p
-	(if (= (snd p) 1) (CLam (CConstruct ⟨(fst p) (CVar 0)⟩)) (CConstruct ⟨(fst p) QNil⟩))
+	if (= (snd p) 1)
+		(CLam (CConstruct ⟨(fst p) (CVar 0)⟩))
+	else
+		(CConstruct ⟨(fst p) QNil⟩)
 let resolveCtor = fn (name at tbl)
 	match (lookupCtorFrom tbl name)
 		CNone -> (errAt at (cat name " is not bound"))
-		CRecord p -> (errAt at (cat name " is a record: write its fields in braces"))
-		CAccess p -> (Ok (CLam (pathOf (CPayload (CVar 0)) (fst p) (fst (snd p)))))
+		CRecord p ->
+			(errAt at (cat name " is a record: write its fields in braces"))
+		CAccess p ->
+			(Ok (CLam (pathOf (CPayload (CVar 0)) (fst p) (fst (snd p)))))
 		CPlain p -> (Ok (plainValue p))
 let resolveNonPrim3 = fn (name at tbl)
 	(resolveCtor name at tbl)
 let resolveNonPrim2 = fn (name at tbl)
-	(if (= (isUnary name) 1) (Ok (CLam (unaryOf name (CVar 0)))) (resolveNonPrim3 name at tbl))
+	if (= (isUnary name) 1)
+		(Ok (CLam (unaryOf name (CVar 0))))
+	else
+		(resolveNonPrim3 name at tbl)
 let resolveNonPrim = fn (name at tbl)
-	(if (same name "cons") (Ok (CLam (CLam (CCell ⟨(CVar 1) (CVar 0)⟩)))) (resolveNonPrim2 name at tbl))
-let primValue3 = fn (p)
-	(if (= p 15) (Ok (CLam (CLam (divCheck 15 (CVar 1) (CVar 0) "remainder by zero")))) (Ok (CLam (CLam (CPrim2 ⟨p (CVar 1) (CVar 0)⟩)))))
-let primValue2 = fn (p)
-	(if (= p 14) (Ok (CLam (CLam (divCheck 14 (CVar 1) (CVar 0) "division by zero")))) (primValue3 p))
-let primValue = fn (p)
+	if (same name "cons")
+		(Ok (CLam (CLam (CCell ⟨(CVar 1) (CVar 0)⟩))))
+	else
+		(resolveNonPrim2 name at tbl)
+let primValue3 = fn p
+	if (= p 15)
+		(Ok (CLam (CLam (divCheck 15 (CVar 1) (CVar 0) "remainder by zero"))))
+	else
+		(Ok (CLam (CLam (CPrim2 ⟨p ⟨(CVar 1) (CVar 0)⟩⟩))))
+let primValue2 = fn p
+	if (= p 14)
+		(Ok (CLam (CLam (divCheck 14 (CVar 1) (CVar 0) "division by zero"))))
+	else
+		(primValue3 p)
+let primValue = fn p
 	(if (= p 18) (Ok (CLam (CPrim1 ⟨18 (CVar 0)⟩))) (primValue2 p))
 let resolveGlobal = fn (name at tbl)
 	let p = (primOf name)
@@ -352,19 +440,17 @@ let resolveName = fn (name at scope tbl)
 	let i = (indexIn scope name)
 	(if (< i 0) (resolveGlobal name at tbl) (Ok (CVar i)))
 let binPrim2 = fn (p x y)
-	(if (= p 15) (divCheck 15 x y "remainder by zero") (CPrim2 ⟨p x y⟩))
+	(if (= p 15) (divCheck 15 x y "remainder by zero") (CPrim2 ⟨p ⟨x y⟩⟩))
 let binPrim = fn (p x y)
 	(if (= p 14) (divCheck 14 x y "division by zero") (binPrim2 p x y))
-; THE EARLY RETURN (?): hoisted into a match around the body of the function. A hoist is (name . (expr . at)), and the list of them is newest first.
 let childMode = fn mode
 	(if (= mode 2) 2 1)
-; A hoist binds its ? expression to the name, and the body is a match on the result: Ok binds the name and runs the body, and Err returns the Err.
 let hoistMatch = fn (h body)
 	let at = (snd (snd h))
-	let okArm = ⟨(PCon ⟨"Ok" (fst h) at⟩) body at⟩
-	let errBody = (EApp ⟨(EName ⟨"Err" at⟩) (cons (EName ⟨"e" at⟩) ~) at⟩)
-	let errArm = ⟨(PCon ⟨"Err" "e" at⟩) errBody at⟩
-	(EMatch ⟨(fst (snd h)) (cons okArm (cons errArm ~)) at⟩)
+	let okArm = ⟨(PCon ⟨"Ok" ⟨(fst h) at⟩⟩) ⟨body at⟩⟩
+	let errBody = (EApp ⟨(EName ⟨"Err" at⟩) ⟨(cons (EName ⟨"e" at⟩) ~) at⟩⟩)
+	let errArm = ⟨(PCon ⟨"Err" ⟨"e" at⟩⟩) ⟨errBody at⟩⟩
+	(EMatch ⟨(fst (snd h)) ⟨(cons okArm (cons errArm ~)) at⟩⟩)
 letrec wrapHoists = fn (body acc)
 	if (= (@ acc) 1)
 		body
@@ -372,69 +458,74 @@ letrec wrapHoists = fn (body acc)
 		(wrapHoists (hoistMatch (hd acc dummyHoist) body) (tl acc))
 let collectScope = fn (node mode coll)
 	if (= mode 0)
-		let r = ((coll node ~ 0)?)
+		let r = (coll node ~ 0)?
 		(Ok (wrapHoists (fst r) (snd r)))
 	else
-		let r = ((coll node ~ 2)?)
+		let r = (coll node ~ 2)?
 		(Ok (fst r))
 letrec collectItems = fn (items acc mode coll)
 	if (= (@ items) 1)
 		(Ok ⟨~ acc⟩)
 	else
-		let r = ((coll (hd items dummyE) acc mode)?)
-		let rest = ((collectItems (tl items) (snd r) mode coll)?)
+		let r = (coll (hd items dummyE) acc mode)?
+		let rest = (collectItems (tl items) (snd r) mode coll)?
 		(Ok ⟨(cons (fst r) (fst rest)) (snd rest)⟩)
 letrec collectArms = fn (arms mode coll)
 	if (= (@ arms) 1)
 		(Ok ~)
 	else
 		let arm = (hd arms dummyArm)
-		let body2 = ((collectScope (fst (snd arm)) mode coll)?)
-		let rest = ((collectArms (tl arms) mode coll)?)
-		(Ok ((cons ⟨(fst arm) body2 (snd (snd arm))⟩ rest)))
+		let body2 = (collectScope (fst (snd arm)) mode coll)?
+		let rest = (collectArms (tl arms) mode coll)?
+		(Ok (cons ⟨(fst arm) ⟨body2 (snd (snd arm))⟩⟩ rest))
 let collectTryOk = fn (p acc mode coll)
-	let r = ((coll (fst p) acc (childMode mode))?)
+	let r = (coll (fst p) acc (childMode mode))?
 	let nm = (cat " h" ((showInt (countL (snd r)))?))
-	(Ok ⟨(EName ⟨nm (snd p)⟩) (cons ⟨nm (fst r) (snd p)⟩ (snd r))⟩)
+	(Ok ⟨(EName ⟨nm (snd p)⟩) (cons ⟨nm ⟨(fst r) (snd p)⟩⟩ (snd r))⟩)
 let collectTry = fn (p acc mode coll)
-	(if (= mode 2) (errAt (snd p) "? can only be used where it runs whenever its function does, or in the tail of an if or match") (collectTryOk p acc mode coll))
+	if (= mode 2)
+		errAt
+			(snd p)
+			"? can only be used where it runs whenever its function does, or in the tail of an if or match"
+	else
+		(collectTryOk p acc mode coll)
 let collectApp = fn (p acc mode coll)
 	let cm = (childMode mode)
-	let ra = ((collectItems (fst (snd p)) acc cm coll)?)
-	let rf = ((coll (fst p) (snd ra) cm)?)
-	(Ok ⟨(EApp ⟨(fst rf) (fst ra) (snd (snd p))⟩) (snd rf)⟩)
+	let ra = (collectItems (fst (snd p)) acc cm coll)?
+	let rf = (coll (fst p) (snd ra) cm)?
+	(Ok ⟨(EApp ⟨(fst rf) ⟨(fst ra) (snd (snd p))⟩⟩) (snd rf)⟩)
 let collectList = fn (p acc mode coll)
-	let ri = ((collectItems (fst p) acc (childMode mode) coll)?)
+	let ri = (collectItems (fst p) acc (childMode mode) coll)?
 	(Ok ⟨(EList ⟨(fst ri) (snd p)⟩) (snd ri)⟩)
 let collectPair = fn (p acc mode coll)
 	let cm = (childMode mode)
-	let ra = ((coll (fst p) acc cm)?)
-	let rb = ((coll (fst (snd p)) (snd ra) cm)?)
-	(Ok ⟨(EPair ⟨(fst ra) (fst rb) (snd (snd p))⟩) (snd rb)⟩)
+	let ra = (coll (fst p) acc cm)?
+	let rb = (coll (fst (snd p)) (snd ra) cm)?
+	(Ok ⟨(EPair ⟨(fst ra) ⟨(fst rb) (snd (snd p))⟩⟩) (snd rb)⟩)
 let collectLet = fn (p acc mode coll)
 	let cm = (childMode mode)
-	let rv = ((coll (fst (snd p)) acc cm)?)
-	let body2 = ((collectScope (fst (snd (snd p))) mode coll)?)
-	(Ok (⟨(ELet ⟨(fst p) (fst rv) body2 (snd (snd (snd p)))⟩) (snd rv)⟩))
+	let rv = (coll (fst (snd p)) acc cm)?
+	let body2 = (collectScope (fst (snd (snd p))) mode coll)?
+	(Ok ⟨(ELet ⟨(fst p) ⟨(fst rv) ⟨body2 (snd (snd (snd p)))⟩⟩⟩) (snd rv)⟩)
 let collectUntyped = fn (p acc mode coll)
-	let re = ((coll (fst p) acc (childMode mode))?)
+	let re = (coll (fst p) acc (childMode mode))?
 	(Ok ⟨(EUntyped ⟨(fst re) (snd p)⟩) (snd re)⟩)
 let collectCheck = fn (p acc mode coll)
-	let re = ((coll (fst p) acc (childMode mode))?)
+	let re = (coll (fst p) acc (childMode mode))?
 	(Ok ⟨(ECheck ⟨(fst re) (snd p)⟩) (snd re)⟩)
 let collectMutual = fn (p acc mode coll)
-	let body2 = ((collectScope (fst (snd p)) mode coll)?)
-	(Ok ⟨(EMutual ⟨(fst p) body2 (snd (snd p))⟩) acc⟩)
+	let body2 = (collectScope (fst (snd p)) mode coll)?
+	(Ok ⟨(EMutual ⟨(fst p) ⟨body2 (snd (snd p))⟩⟩) acc⟩)
 let collectIf = fn (p acc mode coll)
 	let cm = (childMode mode)
-	let rc = ((coll (fst p) acc cm)?)
-	let t2 = ((collectScope (fst (snd p)) mode coll)?)
-	let e2 = ((collectScope (fst (snd (snd p))) mode coll)?)
-	(Ok (⟨(EIf ⟨(fst rc) t2 e2 (snd (snd (snd p)))⟩) (snd rc)⟩))
+	let rc = (coll (fst p) acc cm)?
+	let t2 = (collectScope (fst (snd p)) mode coll)?
+	let e2 = (collectScope (fst (snd (snd p))) mode coll)?
+	(Ok ⟨(EIf ⟨(fst rc) ⟨t2 ⟨e2 (snd (snd (snd p)))⟩⟩⟩) (snd rc)⟩)
 let collectMatch = fn (p acc mode coll)
-	let arms2 = ((collectArms (fst (snd p)) mode coll)?)
-	let rs = ((coll (fst p) acc (childMode mode))?)
-	(Ok (⟨(EMatch ⟨(fst rs) arms2 (snd (snd p))⟩) (snd rs)⟩))
+	let arms2 = (collectArms (fst (snd p)) mode coll)?
+	let rs = (coll (fst p) acc (childMode mode))?
+	(Ok ⟨(EMatch ⟨(fst rs) ⟨arms2 (snd (snd p))⟩⟩) (snd rs)⟩)
 letrec collect = fn (node acc mode)
 	match node
 		ETry p -> (collectTry p acc mode collect)
@@ -449,65 +540,123 @@ letrec collect = fn (node acc mode)
 		EMatch p -> (collectMatch p acc mode collect)
 		_ -> (Ok ⟨node acc⟩)
 let contextifyR = fn body
-	let r = ((collect body ~ 0)?)
+	let r = (collect body ~ 0)?
 	(Ok (wrapHoists (fst r) (snd r)))
-; THE CHECKED TESTS: a test is found by the position of its check, and the predicate of the input is the program's boundary.
 letrec findTest = fn (tbl at)
-	(if (= (@ tbl) 1) (Err "a check has no test") (if (sameAt (fst (hd tbl dummyTest)) at) (Ok (snd (hd tbl dummyTest))) (findTest (tl tbl) at)))
+	if (= (@ tbl) 1)
+		(Err "a check has no test")
+	elseif (sameAt (fst (hd tbl dummyTest)) at)
+		(Ok (snd (hd tbl dummyTest)))
+	else
+		(findTest (tl tbl) at)
 let finishTop = fn (code inputTest)
 	match inputTest
 		NoInputCheck -> code
-		HasInputCheck p -> (CLam (CIf ⟨(compilePred (fst p) "v" ~ (cons "v" ~)) (CApp ⟨code (CVar 0)⟩) (CConstruct ⟨1 (textCode (cat "expected " (snd p)))⟩)⟩))
+		HasInputCheck p ->
+			CLam
+				CIf
+					⟨(compilePred (fst p) "v" ~ (cons "v" ~)) ⟨(CApp ⟨code (CVar 0)⟩) (CConstruct ⟨1 (textCode (cat "expected " (snd p)))⟩)⟩⟩
 letrec wrapImp = fn (e rcodes)
-	(if (= (@ rcodes) 1) e (wrapImp (CApp ⟨(CLam e) (hd rcodes QNil)⟩) (tl rcodes)))
+	if (= (@ rcodes) 1)
+		e
+	else
+		(wrapImp (CApp ⟨(CLam e) (hd rcodes QNil)⟩) (tl rcodes))
 let wrapImports = fn (e codes)
 	(wrapImp e (revC codes ~))
-; THE MUTUAL GROUP, as the host builds it: a fix over a dispatch on a tag, and each name a call through the group.
 let eName = fn (n at)
 	(EName ⟨n at⟩)
 let eInt = fn (n at)
 	(EInt ⟨n at⟩)
 let eApp = fn (f args at)
-	(EApp ⟨f args at⟩)
+	(EApp ⟨f ⟨args at⟩⟩)
 let eFn = fn (names body at)
-	(EFn ⟨names body at⟩)
+	(EFn ⟨names ⟨body at⟩⟩)
 let eLet = fn (name value body at)
-	(ELet ⟨name value body 0 at⟩)
+	(ELet ⟨name ⟨value ⟨body ⟨0 at⟩⟩⟩⟩)
 let eIf = fn (c t e at)
-	(EIf ⟨c t e at⟩)
+	(EIf ⟨c ⟨t ⟨e at⟩⟩⟩)
 letrec checkMutual = fn bs
 	if (= (@ bs) 1)
 		(Ok ~)
 	else
 		let b = (hd bs dummyBinding)
 		if (= (isFnNode (fst (snd b))) 1)
-			let u = ((checkBinder (fst b) (snd (snd b)))?)
+			let u = (checkBinder (fst b) (snd (snd b)))?
 			(checkMutual (tl bs))
 		else
-			(errAt (snd (snd b)) "mutual binds functions, so that they can call each other")
+			errAt
+				(snd (snd b))
+				"mutual binds functions, so that they can call each other"
 letrec bindingNames = fn bs
 	(if (= (@ bs) 1) ~ (cons (fst (hd bs dummyBinding)) (bindingNames (tl bs))))
 letrec dropN = fn (l k)
 	(if (< k 1) l (dropN (tl l) (- k 1)))
 let memberE = fn (g j at)
-	(eFn (cons " y" ~) (eApp (eApp (eName g at) (cons (eInt j at) ~) at) (cons (eName " y" at) ~) at) at)
+	eFn
+		(cons " y" ~)
+		eApp
+			(eApp (eName g at) (cons (eInt j at) ~) at)
+			(cons (eName " y" at) ~)
+			at
+		at
 letrec wrapMembers = fn (names g k body at)
-	(if (< k 1) body (wrapMembers names g (- k 1) (eLet (hd (dropN names (- k 1)) ~) (memberE g (- k 1) at) body at) at))
+	if (< k 1)
+		body
+	else
+		wrapMembers
+			names
+			g
+			(- k 1)
+			(eLet (hd (dropN names (- k 1)) ~) (memberE g (- k 1) at) body at)
+			at
 let branchE = fn (bs names n j at)
-	(wrapMembers names " self" n (eApp (fst (snd (hd (dropN bs (- j 1)) dummyBinding))) (cons (eName " x" at) ~) at) at)
+	wrapMembers
+		names
+		" self"
+		n
+		eApp
+			(fst (snd (hd (dropN bs (- j 1)) dummyBinding)))
+			(cons (eName " x" at) ~)
+			at
+		at
 letrec chainLoop = fn (bs names n j chain at)
-	(if (< j 1) chain (chainLoop bs names n (- j 1) (eIf (eApp (eName "=" at) (cons (eName " tag" at) (cons (eInt (- j 1) at) ~)) at) (branchE bs names n j at) chain at) at))
+	if (< j 1)
+		chain
+	else
+		chainLoop
+			bs
+			names
+			n
+			(- j 1)
+			eIf
+				eApp
+					(eName "=" at)
+					(cons (eName " tag" at) (cons (eInt (- j 1) at) ~))
+					at
+				(branchE bs names n j at)
+				chain
+				at
+			at
 let mutualSurface = fn (bs body at)
-	let u = ((checkMutual bs)?)
+	let u = (checkMutual bs)?
 	let names = (bindingNames bs)
 	let n = (countL bs)
 	let chain = (chainLoop bs names n (- n 1) (branchE bs names n n at) at)
-	let dispatch = (eFn (cons " self" ~) (eFn (cons " tag" ~) (eFn (cons " x" ~) chain at) at) at)
+	let dispatch =
+		eFn
+			(cons " self" ~)
+			(eFn (cons " tag" ~) (eFn (cons " x" ~) chain at) at)
+			at
 	let groupBody = (wrapMembers names " group" n body at)
 	(Ok (eLet " group" (ERawFix ⟨dispatch at⟩) groupBody at))
-let dummyInit = ⟨~ dummyE 0 0⟩
+let dummyInit = ⟨~ ⟨dummyE ⟨0 0⟩⟩⟩
 letrec findInitR = fn (fields n)
-	(if (= (@ fields) 1) (Err "no such field") (if (same (fst (hd fields dummyInit)) n) (Ok (hd fields dummyInit)) (findInitR (tl fields) n)))
+	if (= (@ fields) 1)
+		(Err "no such field")
+	elseif (same (fst (hd fields dummyInit)) n)
+		(Ok (hd fields dummyInit))
+	else
+		(findInitR (tl fields) n)
 letrec recLitCheck = fn (fields names name prev)
 	if (= (@ fields) 1)
 		(Ok ~)
@@ -519,7 +668,9 @@ letrec recLitCheck = fn (fields names name prev)
 			else
 				(recLitCheck (tl fields) names name (cons (fst init) prev))
 		else
-			(errAt (snd (snd init)) (cat name (cat " has no field " (fst init))))
+			errAt
+				(snd (snd init))
+				(cat name (cat " has no field " (fst init)))
 letrec withCheck = fn (fields names con prev)
 	if (= (@ fields) 1)
 		(Ok ~)
@@ -531,8 +682,13 @@ letrec withCheck = fn (fields names con prev)
 			else
 				(withCheck (tl fields) names con (cons (fst init) prev))
 		else
-			(errAt (snd (snd init)) (cat (fst init) (cat " is not a field of " (cat con ", which the with takes from its first field"))))
-; The whole program: its constructors, its imports in scope, its checks, the boundary of its input. Its desugaring is one letrec, so every function sees the constructors and the checks of this program.
+			errAt
+				(snd (snd init))
+				cat
+					(fst init)
+					cat
+						" is not a field of "
+						(cat con ", which the with takes from its first field")
 fn input
 	let imports = (fst input)
 	let decls = (fst (snd input))
@@ -540,9 +696,9 @@ fn input
 	let tests = (fst (snd (snd (snd input))))
 	let importCodes = (fst (snd (snd (snd (snd input)))))
 	let inputTest = (snd (snd (snd (snd (snd input)))))
-	let ctors = ((buildCtors decls)?)
+	let ctors = (buildCtors decls)?
 	let scope = (pushNames ~ imports)
-	let body = ((contextifyR expr)?)
+	let body = (contextifyR expr)?
 	letrec
 		desugar = fn (node scope)
 			match node
@@ -554,210 +710,286 @@ fn input
 				EPair p -> (desugarPair (fst p) (fst (snd p)) scope)
 				EApp p -> (desugarApp (fst p) (fst (snd p)) scope)
 				EFn p -> (desugarFn (fst p) (fst (snd p)) (snd (snd p)) scope)
-				ELet p -> (desugarLet (fst p) (fst (snd p)) (fst (snd (snd p))) (fst (snd (snd (snd p)))) (snd (snd (snd (snd p)))) scope)
-				EMutual p -> (desugarMutual (fst p) (fst (snd p)) (snd (snd p)) scope)
-				EIf p -> (desugarIf (fst p) (fst (snd p)) (fst (snd (snd p))) scope)
+				ELet p ->
+					desugarLet
+						(fst p)
+						(fst (snd p))
+						(fst (snd (snd p)))
+						(fst (snd (snd (snd p))))
+						(snd (snd (snd (snd p))))
+						scope
+				EMutual p ->
+					(desugarMutual (fst p) (fst (snd p)) (snd (snd p)) scope)
+				EIf p ->
+					(desugarIf (fst p) (fst (snd p)) (fst (snd (snd p))) scope)
 				EMatch p -> (desugarMatch (fst p) (fst (snd p)) scope)
-				ETry p -> (errAt (snd p) "? was not rewritten: it is in a place the early-return rule does not reach")
+				ETry p ->
+					errAt
+						(snd p)
+						"? was not rewritten: it is in a place the early-return rule does not reach"
 				ECheck p -> (desugarCheck (fst p) (snd p) scope)
 				EUntyped p -> (desugar (fst p) scope)
 				ERec p -> (recLit (fst p) (fst (snd p)) (snd (snd p)) scope)
 				EWith p -> (withExpr (fst p) (fst (snd p)) (snd (snd p)) scope)
 				ERawFix p -> (desugarRawFix (fst p) scope)
 		desugarRawFix = fn (value scope)
-			let v = ((desugar value scope)?)
+			let v = (desugar value scope)?
 			(Ok (CApp ⟨fixCode v⟩))
 		desugarPair = fn (a b scope)
-			let x = ((desugar a scope)?)
-			let y = ((desugar b scope)?)
+			let x = (desugar a scope)?
+			let y = (desugar b scope)?
 			(Ok (CCell ⟨x y⟩))
 		desugarItems = fn (items scope)
 			if (= (@ items) 1)
 				(Ok ~)
 			else
-				let x = ((desugar (hd items dummyE) scope)?)
-				let rest = ((desugarItems (tl items) scope)?)
+				let x = (desugar (hd items dummyE) scope)?
+				let rest = (desugarItems (tl items) scope)?
 				(Ok (cons x rest))
 		desugarList = fn (items scope)
-			let codes = ((desugarItems items scope)?)
+			let codes = (desugarItems items scope)?
 			(Ok (buildCells codes))
 		applyArgs = fn (code args scope)
 			if (= (@ args) 1)
 				(Ok code)
 			else
-				let x = ((desugar (hd args dummyE) scope)?)
+				let x = (desugar (hd args dummyE) scope)?
 				(applyArgs (CApp ⟨code x⟩) (tl args) scope)
 		genericApp = fn (callee args scope)
-			let h = ((desugar callee scope)?)
+			let h = (desugar callee scope)?
 			(applyArgs h args scope)
 		consApp = fn (args scope)
-			let x = ((desugar (hd args dummyE) scope)?)
-			let y = ((desugar (hd (tl args) dummyE) scope)?)
+			let x = (desugar (hd args dummyE) scope)?
+			let y = (desugar (hd (tl args) dummyE) scope)?
 			(applyArgs (CCell ⟨x y⟩) (tl (tl args)) scope)
 		unaryApp = fn (name args scope)
-			let x = ((desugar (hd args dummyE) scope)?)
+			let x = (desugar (hd args dummyE) scope)?
 			(applyArgs (unaryOf name x) (tl args) scope)
 		primApp = fn (p args scope)
-			let x = ((desugar (hd args dummyE) scope)?)
-			(if (= (primArity p) 1) (applyArgs (CPrim1 ⟨p x⟩) (tl args) scope) (primApp2 p x args scope))
+			let x = (desugar (hd args dummyE) scope)?
+			if (= (primArity p) 1)
+				(applyArgs (CPrim1 ⟨p x⟩) (tl args) scope)
+			else
+				(primApp2 p x args scope)
 		primApp2 = fn (p x args scope)
-			let y = ((desugar (hd (tl args) dummyE) scope)?)
+			let y = (desugar (hd (tl args) dummyE) scope)?
 			(applyArgs (binPrim p x y) (tl (tl args)) scope)
 		ctorApp = fn (tag args scope)
-			let x = ((desugar (hd args dummyE) scope)?)
+			let x = (desugar (hd args dummyE) scope)?
 			(applyArgs (CConstruct ⟨tag x⟩) (tl args) scope)
 		nullApp = fn (tag args scope)
 			(applyArgs (CConstruct ⟨tag QNil⟩) args scope)
 		appByKind = fn (kind callee name args scope)
-			(if (= kind 1) (consApp args scope) (appByKind2 kind callee name args scope))
+			if (= kind 1)
+				(consApp args scope)
+			else
+				(appByKind2 kind callee name args scope)
 		appByKind2 = fn (kind callee name args scope)
-			(if (= kind 2) (unaryApp name args scope) (appByKind3 kind callee name args scope))
+			if (= kind 2)
+				(unaryApp name args scope)
+			else
+				(appByKind3 kind callee name args scope)
 		appByKind3 = fn (kind callee name args scope)
-			(if (= kind 3) (primApp (primOf name) args scope) (appByKind4 kind callee name args scope))
+			if (= kind 3)
+				(primApp (primOf name) args scope)
+			else
+				(appByKind4 kind callee name args scope)
 		appByKind4 = fn (kind callee name args scope)
-			(if (= kind 4) (ctorApp (ctorTag ctors name) args scope) (appByKind5 kind callee name args scope))
+			if (= kind 4)
+				(ctorApp (ctorTag ctors name) args scope)
+			else
+				(appByKind5 kind callee name args scope)
 		appByKind5 = fn (kind callee name args scope)
-			(if (= kind 5) (errAt (atOf callee) (cat name " is a record: write its fields in braces")) (appByKind6 kind callee name args scope))
+			if (= kind 5)
+				errAt
+					(atOf callee)
+					(cat name " is a record: write its fields in braces")
+			else
+				(appByKind6 kind callee name args scope)
 		appByKind6 = fn (kind callee name args scope)
-			(if (= kind 6) (nullApp (ctorTag ctors name) args scope) (genericApp callee args scope))
+			if (= kind 6)
+				(nullApp (ctorTag ctors name) args scope)
+			else
+				(genericApp callee args scope)
 		nameApp = fn (callee name args scope)
-			(if (< (indexIn scope name) 0) (appByKind (appKind name (countL args) ctors) callee name args scope) (genericApp callee args scope))
+			if (< (indexIn scope name) 0)
+				appByKind
+					(appKind name (countL args) ctors)
+					callee
+					name
+					args
+					scope
+			else
+				(genericApp callee args scope)
 		desugarApp = fn (callee args scope)
 			match callee
 				EName p -> (nameApp callee (fst p) args scope)
 				_ -> (genericApp callee args scope)
 		desugarFn = fn (names body at scope)
-			let ok = ((checkNames names ~ at)?)
-			let cb = ((contextifyR body)?)
-			let b = ((desugar cb (pushNames scope names))?)
+			let ok = (checkNames names ~ at)?
+			let cb = (contextifyR body)?
+			let b = (desugar cb (pushNames scope names))?
 			(Ok (wrapLams (countL names) b))
 		desugarLet = fn (name value body isRec at scope)
-			let u = ((checkBinder name at)?)
-			(if (= isRec 1) (desugarRec name value body at scope) (desugarPlainLet name value body scope))
+			let u = (checkBinder name at)?
+			if (= isRec 1)
+				(desugarRec name value body at scope)
+			else
+				(desugarPlainLet name value body scope)
 		desugarPlainLet = fn (name value body scope)
-			let b = ((desugar body (pushNames scope (cons name ~)))?)
-			let v = ((desugar value scope)?)
+			let b = (desugar body (pushNames scope (cons name ~)))?
+			let v = (desugar value scope)?
 			(Ok (CApp ⟨(CLam b) v⟩))
 		desugarRec = fn (name value body at scope)
-			(if (= (isFnNode value) 1) (desugarRecBody name value body scope) (errAt (atOf value) "letrec binds a fn, so the function can call itself"))
+			if (= (isFnNode value) 1)
+				(desugarRecBody name value body scope)
+			else
+				errAt
+					(atOf value)
+					"letrec binds a fn, so the function can call itself"
 		desugarRecBody = fn (name value body scope)
 			let inner = (pushNames scope (cons name ~))
-			let b = ((desugar body inner)?)
-			let v = ((desugar value inner)?)
+			let b = (desugar body inner)?
+			let v = (desugar value inner)?
 			(Ok (CApp ⟨(CLam b) (CApp ⟨fixCode (CLam v)⟩)⟩))
 		desugarMutual = fn (bs body at scope)
-			let surf = ((mutualSurface bs body at)?)
+			let surf = (mutualSurface bs body at)?
 			(desugar surf scope)
 		desugarIf = fn (c t e scope)
-			let cc = ((desugar c scope)?)
-			let tt = ((desugar t scope)?)
-			let ee = ((desugar e scope)?)
-			(Ok (CIf ⟨cc tt ee⟩))
+			let cc = (desugar c scope)?
+			let tt = (desugar t scope)?
+			let ee = (desugar e scope)?
+			(Ok (CIf ⟨cc ⟨tt ee⟩⟩))
 		desugarCheck = fn (e at scope)
-			let v = ((desugar e scope)?)
-			let et = ((findTest tests at)?)
+			let v = (desugar e scope)?
+			let et = (findTest tests at)?
 			let test1 = (compilePred (snd et) "v" ~ (cons "v" ~))
 			let okCode = (CConstruct ⟨0 (CVar 0)⟩)
 			let errCode = (CConstruct ⟨1 (textCode (cat "expected " (fst et)))⟩)
-			(Ok (CApp ⟨(CLam (CIf ⟨test1 okCode errCode⟩)) v⟩))
+			(Ok (CApp ⟨(CLam (CIf ⟨test1 ⟨okCode errCode⟩⟩)) v⟩))
 		desugarMatch = fn (scrut arms scope)
-			let s = ((desugar scrut scope)?)
-			let b = ((buildArms arms (pushNames scope (cons " scrut" ~)))?)
+			let s = (desugar scrut scope)?
+			let b = (buildArms arms (pushNames scope (cons " scrut" ~)))?
 			(Ok (CApp ⟨(CLam b) s⟩))
 		buildArms = fn (arms scope)
 			if (= (@ arms) 1)
 				(Ok (CIndex ⟨2 (QInt 0)⟩))
 			else
-				armCase (fst (hd arms dummyArm)) (fst (snd (hd arms dummyArm))) (tl arms) scope
+				armCase
+					(fst (hd arms dummyArm))
+					(fst (snd (hd arms dummyArm)))
+					(tl arms)
+					scope
 		armCase = fn (pat body rest scope)
 			match pat
 				PWild p -> (wildArm body rest scope)
 				PBind p -> (bindArm (fst p) (snd p) body rest scope)
-				PCon p -> (conArm (fst p) (fst (snd p)) (snd (snd p)) body rest scope)
-				PRec p -> (recArm (fst p) (fst (snd p)) (snd (snd p)) body rest scope)
+				PCon p ->
+					(conArm (fst p) (fst (snd p)) (snd (snd p)) body rest scope)
+				PRec p ->
+					(recArm (fst p) (fst (snd p)) (snd (snd p)) body rest scope)
 		wildArm = fn (body rest scope)
 			if (= (@ rest) 1)
 				(desugar body scope)
 			else
-				(errAt (atOfArm (hd rest dummyArm)) "an arm after a catch-all arm is unreachable")
+				errAt
+					(atOfArm (hd rest dummyArm))
+					"an arm after a catch-all arm is unreachable"
 		bindArm = fn (name at body rest scope)
 			if (= (@ rest) 1)
-				let u = ((checkBinder name at)?)
-				let b = ((desugar body (pushNames scope (cons name ~)))?)
+				let u = (checkBinder name at)?
+				let b = (desugar body (pushNames scope (cons name ~)))?
 				(Ok (CApp ⟨(CLam b) (CVar 0)⟩))
 			else
-				(errAt (atOfArm (hd rest dummyArm)) "an arm after a catch-all arm is unreachable")
+				errAt
+					(atOfArm (hd rest dummyArm))
+					"an arm after a catch-all arm is unreachable"
 		conArm = fn (name bind at body rest scope)
-			conArmC (lookupCtorFrom ctors name) name bind at body rest scope
+			(conArmC (lookupCtorFrom ctors name) name bind at body rest scope)
 		conArmC = fn (c name bind at body rest scope)
 			match c
 				CNone -> (errAt at (cat name " is not a constructor"))
-				CRecord p -> (errAt at (cat name " is a record: match its fields in braces"))
-				CPlain p -> (conArmOk (fst p) (snd p) name bind at body rest scope)
-				CAccess p -> (conArmOk (-1) 1 name bind at body rest scope)
+				CRecord p ->
+					errAt
+						at
+						(cat name " is a record: match its fields in braces")
+				CPlain p ->
+					(conArmOk (fst p) (snd p) name bind at body rest scope)
+				CAccess p -> (conArmOk -1 1 name bind at body rest scope)
 		conArmOk = fn (tag flag name bind at body rest scope)
-			let b = ((conBody bind flag name at body scope)?)
-			let r = ((buildArms rest scope)?)
-			(Ok (CIf ⟨(CPrim2 ⟨17 (CTagof (CVar 0)) (QInt tag)⟩) b r⟩))
+			let b = (conBody bind flag name at body scope)?
+			let r = (buildArms rest scope)?
+			(Ok (CIf ⟨(CPrim2 ⟨17 ⟨(CTagof (CVar 0)) (QInt tag)⟩⟩) ⟨b r⟩⟩))
 		conBody = fn (bind flag name at body scope)
 			if (= (@ bind) 1)
 				(desugar body scope)
+			elseif (= flag 0)
+				(errAt at (cat name " has no payload to bind"))
 			else
-				if (= flag 0)
-					(errAt at (cat name " has no payload to bind"))
-				else
-					let u = ((checkBinder bind at)?)
-					let b = ((desugar body (pushNames scope (cons bind ~)))?)
-					(Ok (CApp ⟨(CLam b) (CPayload (CVar 0))⟩))
+				let u = (checkBinder bind at)?
+				let b = (desugar body (pushNames scope (cons bind ~)))?
+				(Ok (CApp ⟨(CLam b) (CPayload (CVar 0))⟩))
 		recArm = fn (name fields at body rest scope)
 			match (lookupCtorFrom ctors name)
-				CRecord p -> (recArmOk (fst p) (snd p) name fields at body rest scope)
+				CRecord p ->
+					(recArmOk (fst p) (snd p) name fields at body rest scope)
 				_ -> (errAt at (cat name " is not a record"))
 		recArmOk = fn (names tag name fields at body rest scope)
-			let bound = ((recScan fields names ~ ~ name at)?)
-			let inner = ((recChain bound (countL names) body (pushNames scope (cons " p" ~)))?)
-			let rest2 = ((buildArms rest scope)?)
-			(Ok (CIf ⟨(CPrim2 ⟨17 (CTagof (CVar 0)) (QInt tag)⟩) (CApp ⟨(CLam inner) (CPayload (CVar 0))⟩) rest2⟩))
+			let bound = (recScan fields names ~ ~ name at)?
+			let inner =
+				(recChain bound (countL names) body (pushNames scope (cons " p" ~)))?
+			let rest2 = (buildArms rest scope)?
+			Ok
+				CIf
+					⟨(CPrim2 ⟨17 ⟨(CTagof (CVar 0)) (QInt tag)⟩⟩) ⟨(CApp ⟨(CLam inner) (CPayload (CVar 0))⟩) rest2⟩⟩
 		recScan = fn (fs names seen bound name at)
 			if (= (@ fs) 1)
-				let miss = ((recMissing names seen name at)?)
+				let miss = (recMissing names seen name at)?
 				(Ok (revC bound ~))
 			else
-				let f = (hd fs ⟨~ ~ 0 0⟩)
+				let f = (hd fs ⟨~ ⟨~ ⟨0 0⟩⟩⟩)
 				let idx = (posIn names (fst f) 1)
 				if (< idx 1)
-					(errAt (snd (snd f)) (cat name (cat " has no field " (fst f))))
+					errAt
+						(snd (snd f))
+						(cat name (cat " has no field " (fst f)))
+				elseif (= (inList seen (fst f)) 1)
+					(errAt (snd (snd f)) (cat (fst f) " is given twice"))
+				elseif (= (@ (fst (snd f))) 1)
+					(recScan (tl fs) names (cons (fst f) seen) bound name at)
 				else
-					if (= (inList seen (fst f)) 1)
-						(errAt (snd (snd f)) (cat (fst f) " is given twice"))
-					else
-						if (= (@ (fst (snd f))) 1)
-							(recScan (tl fs) names (cons (fst f) seen) bound name at)
-						else
-							let u = ((checkBinder (fst (snd f)) (snd (snd f)))?)
-							(recScan (tl fs) names (cons (fst f) seen) (cons ⟨(fst (snd f)) idx⟩ bound) name at)
+					let u = (checkBinder (fst (snd f)) (snd (snd f)))?
+					recScan
+						(tl fs)
+						names
+						(cons (fst f) seen)
+						(cons ⟨(fst (snd f)) idx⟩ bound)
+						name
+						at
 		recMissing = fn (names seen name at)
 			if (= (@ names) 1)
 				(Ok ~)
+			elseif (= (inList seen (hd names ~)) 1)
+				(recMissing (tl names) seen name at)
 			else
-				if (= (inList seen (hd names ~)) 1)
-					(recMissing (tl names) seen name at)
-				else
-					(errAt at (cat name (cat " needs the field " (hd names ~))))
+				(errAt at (cat name (cat " needs the field " (hd names ~))))
 		recChain = fn (bound count body sc)
 			if (= (@ bound) 1)
 				(desugar body sc)
 			else
 				let b = (hd bound dummyBound)
-				let inner = ((recChain (tl bound) count body (pushNames sc (cons (fst b) ~)))?)
-				(Ok (CApp ⟨(CLam inner) (pathOf (CVar (indexIn sc " p")) (snd b) count)⟩))
+				let inner =
+					(recChain (tl bound) count body (pushNames sc (cons (fst b) ~)))?
+				Ok
+					CApp
+						⟨(CLam inner) (pathOf (CVar (indexIn sc " p")) (snd b) count)⟩
 		recLit = fn (name fields at scope)
 			match (lookupCtorFrom ctors name)
 				CRecord p -> (recLitOk name fields at scope (fst p) (snd p))
 				_ -> (errAt at (cat name " is not a record"))
 		recLitOk = fn (name fields at scope names tag)
-			let u = ((recLitCheck fields names name ~)?)
-			let vals = ((recLitVals names fields name at scope)?)
+			let u = (recLitCheck fields names name ~)?
+			let vals = (recLitVals names fields name at scope)?
 			(Ok (CConstruct ⟨tag (pairsOf vals)⟩))
 		recLitVals = fn (names fields name at scope)
 			if (= (@ names) 1)
@@ -765,39 +997,56 @@ fn input
 			else
 				match (findInitR fields (hd names ~))
 					Ok init -> (recLitStep names fields name at scope init)
-					Err e -> (errAt at (cat name (cat " needs the field " (hd names ~))))
+					Err e ->
+						errAt
+							at
+							(cat name (cat " needs the field " (hd names ~)))
 		recLitStep = fn (names fields name at scope init)
-			let v = ((desugar (fst (snd init)) scope)?)
-			let rest = ((recLitVals (tl names) fields name at scope)?)
+			let v = (desugar (fst (snd init)) scope)?
+			let rest = (recLitVals (tl names) fields name at scope)?
 			(Ok (cons v rest))
 		withExpr = fn (base fields at scope)
-			let first = (hd fields ⟨~ dummyE 0 0⟩)
+			let first = (hd fields ⟨~ ⟨dummyE ⟨0 0⟩⟩⟩)
 			match (lookupCtorFrom ctors (fst first))
-				CAccess p -> (withOk base fields at scope (fst p) (fst (snd p)) (snd (snd p)) first)
-				_ -> (errAt (snd (snd first)) (cat (fst first) " is not a field of any record: a with takes its record from its first field"))
+				CAccess p ->
+					withOk
+						base
+						fields
+						at
+						scope
+						(fst p)
+						(fst (snd p))
+						(snd (snd p))
+						first
+				_ ->
+					errAt
+						(snd (snd first))
+						cat
+							(fst first)
+							" is not a field of any record: a with takes its record from its first field"
 		withOk = fn (base fields at scope idx count con first)
 			match (lookupCtorFrom ctors con)
 				CRecord p -> (withOk2 base fields scope (fst p) (snd p) con)
 				_ -> (errAt at (cat con " is not a record"))
 		withOk2 = fn (base fields scope names tag con)
-			let u = ((withCheck fields names con ~)?)
+			let u = (withCheck fields names con ~)?
 			let inner = (pushNames scope (cons " old" ~))
-			let vals = ((withVals names fields inner (countL names) 1)?)
-			let b = ((desugar base scope)?)
+			let vals = (withVals names fields inner (countL names) 1)?
+			let b = (desugar base scope)?
 			(Ok (CApp ⟨(CLam (CConstruct ⟨tag (pairsOf vals)⟩)) b⟩))
 		withVals = fn (names fields inner count j)
 			if (= (@ names) 1)
 				(Ok ~)
 			else
-				let v = ((withVal (findInitR fields (hd names ~)) inner count j)?)
-				let rest = ((withVals (tl names) fields inner count (+ j 1))?)
+				let v = (withVal (findInitR fields (hd names ~)) inner count j)?
+				let rest = (withVals (tl names) fields inner count (+ j 1))?
 				(Ok (cons v rest))
 		withVal = fn (r inner count j)
 			match r
 				Ok init -> (desugar (fst (snd init)) inner)
 				Err e -> (Ok (pathOf (CPayload (CVar 0)) j count))
 		finalize = fn (body scope importCodes inputTest)
-			let code = ((desugar body scope)?)
+			let code = (desugar body scope)?
 			(Ok (finishTop (wrapImports code importCodes) inputTest))
 	(finalize body scope importCodes inputTest)
 ---
